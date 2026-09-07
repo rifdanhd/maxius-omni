@@ -11,6 +11,7 @@ if (!JWT_SECRET) {
 export interface AuthUser {
   id: string;
   username: string;
+  canViewFullPii: boolean;
 }
 
 /**
@@ -29,14 +30,18 @@ export async function login(
   }
 
   const token = jwt.sign(
-    { sub: user.id, username: user.username },
+    { sub: user.id, username: user.username, canViewFullPii: user.canViewFullPii },
     JWT_SECRET,
     { expiresIn: "8h" }
   );
 
   return {
     token,
-    user: { id: user.id, username: user.username },
+    user: {
+      id: user.id,
+      username: user.username,
+      canViewFullPii: user.canViewFullPii,
+    },
   };
 }
 

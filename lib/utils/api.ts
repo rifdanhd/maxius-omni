@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/services/auth.service";
 
 export interface AuthenticatedRequest extends NextRequest {
-  user: { id: string; username: string };
+  user: { id: string; username: string; canViewFullPii: boolean };
 }
 
 /**
@@ -17,9 +17,15 @@ export interface AuthenticatedRequest extends NextRequest {
  *   });
  */
 export function withAuth(
-  handler: (req: AuthenticatedRequest) => Promise<Response>
+  handler: (
+    req: AuthenticatedRequest,
+    ctx?: { params: Promise<Record<string, string | undefined>> }
+  ) => Promise<Response>
 ) {
-  return async (req: NextRequest): Promise<Response> => {
+  return async (
+    req: NextRequest,
+    ctx?: { params: Promise<Record<string, string | undefined>> }
+  ): Promise<Response> => {
     const authHeader = req.headers.get("authorization");
     const token = authHeader?.startsWith("Bearer ")
       ? authHeader.slice(7)
@@ -31,12 +37,14 @@ export function withAuth(
 
     try {
       const payload = verifyToken(token);
-      // Inject user ke request object
+      // Inject user ke request object. Legacy token (sebelum fitur PII) tidak punya
+      // canViewFullPii → default true (perilaku lama = akses penuh, user admin).
       (req as AuthenticatedRequest).user = {
         id: payload.sub as string,
         username: payload.username as string,
+        canViewFullPii: payload.canViewFullPii !== false,
       };
-      return handler(req as AuthenticatedRequest);
+      return handler(req as AuthenticatedRequest, ctx);
     } catch {
       return Response.json(
         { error: "Token tidak valid atau sudah kadaluarsa." },

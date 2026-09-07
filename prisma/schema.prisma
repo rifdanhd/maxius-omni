@@ -1,0 +1,251 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String @id @default(uuid())
+  username     String @unique
+  passwordHash String
+
+  // izin melihat PII pembeli penuh. Default true = pemilik (user lama).
+  // true  → modal detail menampilkan nama/HP/alamat asli (dicatat PiiAccessLog).
+  // false → nama/HP/alamat selalu di-mask di semua tampilan.
+  canViewFullPii Boolean @default(true)
+}
+
+// 1 bisnis utama; "business-default" dibuat saat migrasi data.
+model Business {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts PlatformAccount[]
+  products MasterProduct[]
+}
+
+// 1 baris per akun per platform.
+// SQLite tidak mendukung enum Prisma → platform di-validasi di kode:
+// "SHOPEE" | "TOKOPEDIA" | "TIKTOK_SHOP"
+model PlatformAccount {
+  id         String   @id @default(uuid())
+  businessId String   @default("business-default")
+  business   Business @relation(fields: [businessId], references: [id])
+
+  platform String
+  label    String
+
+  appKey         String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scope          String?
+  externalShopId String?
+  shopCipher     String?
+
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  mappings      ProductMapping[]
+  salesLogs     SalesLog[]
+  syncLogs      SyncLog[]
+  orders        Order[]
+  orderMappings PlatformOrderMapping[]
+  shipments     Shipment[]
+
+  @@unique([platform, externalShopId])
+}
+
+model MasterProduct {
+  id         String   @id @default(uuid())
+  name       String
+  businessId String   @default("business-default")
+  business   Business @relation(fields: [businessId], references: [id])
+  threshold  Int      @default(20)
+
+  variants ProductVariant[]
+}
+
+// Parent memiliki banyak varian (warna/ukuran); stok dilacak di varian.
+model ProductVariant {
+  id    String @id @default(uuid())
+  sku   String
+  stock Int
+
+  masterProductId String
+  masterProduct   MasterProduct    @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  mappings        ProductMapping[]
+  salesLogs       SalesLog[]
+  orderItems      OrderItem[]
+
+  @@unique([masterProductId, sku])
+}
+
+// Mapping varian → SKU/ID eksternal per platform account.
+// @default("") hanya untuk bootstrap migrasi (di-backfill dengan nilai nyata).
+model ProductMapping {
+  id         String @id @default(uuid())
+  channelSku String
+
+  variantId String         @default("")
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, variantId])
+  @@unique([accountId, channelSku])
+}
+
+model SalesLog {
+  id         String   @id @default(uuid())
+  time       DateTime @default(now())
+  qty        Int
+  stockAfter Int
+  critical   Boolean
+  text       String
+  channelSku String
+
+  variantId String         @default("")
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id])
+}
+
+model Order {
+  id         String    @id @default(uuid())
+  orderNo    String
+  status     String
+  buyerName  String?
+  buyerEmail String?
+  amount     Float?
+  currency   String?
+  createTime DateTime?
+  paidTime   DateTime?
+
+  // Waktu SLA dari payload TikTok (nullable: tidak semua order/platform memilikinya).
+  // shippingDueTime: order auto-cancelled bila belum AWAITING_COLLECTION sebelum waktu ini.
+  // rtsSlaTime: batas terakhir shipping dari platform.
+  // ttsSlaTime: batas terakhir collection dari platform.
+  // recommendedShippingTime: waktu shipping yang direkomendasikan (SEA).
+  shippingDueTime          DateTime?
+  rtsSlaTime               DateTime?
+  ttsSlaTime               DateTime?
+  recommendedShippingTime  DateTime?
+
+  // Data pembeli (PII). Phone/alamat terenkripsi AES-256-GCM; hanya decrypt
+  // saat user.canViewFullPii. piiAnonymizedAt diisi ketika retensi 90 hari
+  // habis (job scripts/anonymize-pii.cjs) — semua field PII lalu di-null-kan.
+  buyerNote         String?
+  isCod             Boolean?
+  paymentMethodName String?
+  // JSON mentah object `payment` dari TikTok (breakdown sisi pembeli).
+  // Disimpan mentah karena struktur berbeda antar platform (Shopee/Tokopedia).
+  paymentJson       String?
+  recipientName     String?
+  recipientPhone    String?
+  recipientAddress  String?
+  piiAnonymizedAt   DateTime?
+
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items         OrderItem[]
+  orderMappings PlatformOrderMapping[]
+  shipments     Shipment[]
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  qty        Int
+  price      Float?
+  channelSku String
+  productId  String?
+  imageUrl   String?
+  // nama & label variasi dari payload platform (TikTok: product_name/sku_name).
+  productName String?
+  skuName     String?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+}
+
+model PlatformOrderMapping {
+  id                    String @id @default(uuid())
+  externalOrderId       String
+  rawStatus             String
+  // Epoch seconds dari payload.data.update_time webhook TikTok terakhir yang
+  // DIPROSES. Dipakai sebagai guard idempotency (retry/out-of-order delivery).
+  lastWebhookUpdateTime Int?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, externalOrderId])
+}
+
+model Shipment {
+  id         String    @id @default(uuid())
+  externalId String?
+  carrier    String?
+  trackingNo String?
+  status     String
+  shippedAt  DateTime?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, orderId, externalId])
+}
+
+model SyncLog {
+  id           String  @id @default(uuid())
+  direction    String
+  kind         String
+  status       String
+  message      String?
+  errorMessage String?
+  payload      String?
+
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// Audit akses PII & aksi retensi. readonly — tidak ada route yang menulis.
+// READ_ORDER_DETAIL: user menampilkan detail order (bukan hanya status) di modal.
+// ANONYMIZE: job retensi menghapus PII order lama / hapus manual atas permintaan buyer.
+model PiiAccessLog {
+  id        String   @id @default(uuid())
+  userId    String
+  username  String
+  orderId   String?
+  orderNo   String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([orderId])
+}
