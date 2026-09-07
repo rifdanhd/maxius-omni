@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "push": "bash scripts/git-push.sh"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
