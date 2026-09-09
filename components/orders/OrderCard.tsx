@@ -1,7 +1,11 @@
 "use client";
 
-import { Clock, RefreshCw, Pencil, MoreHorizontal, ChevronDown, MessageCircle, FileText } from "lucide-react";
+import { useState } from "react";
+import { Clock, RefreshCw, Pencil, MoreHorizontal, MessageCircle, FileText, PackageCheck, Printer } from "lucide-react";
 import OrderProgressSteps from "./OrderProgressSteps";
+import PrintDropdown from "./PrintDropdown";
+import TikTokLogo from "@/components/icons/TikTokLogo";
+import TrackingModal from "./TrackingModal";
 
 export type PrintType = "Label" | "Invoice" | "PackingList";
 
@@ -64,21 +68,26 @@ export default function OrderCard({
   onToggleChecked,
   onSync,
   onPrint,
+  onShip,
   onDetail,
+  shipping = false,
 }: {
   order: OrderCardOrder;
   checked: boolean;
   onToggleChecked: () => void;
   onSync: () => void;
   onPrint: (type: PrintType) => void;
+  onShip?: () => void;
   onDetail: () => void;
+  shipping?: boolean;
 }) {
+  const [showTracking, setShowTracking] = useState(false);
   const sla = computeSla(order);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-4 font-sans">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 font-sans relative">
       {/* Header */}
-      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
         <div className="flex items-center gap-4">
           <div className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-md border border-orange-200">
             {order.status}
@@ -100,10 +109,9 @@ export default function OrderCard({
             <RefreshCw size={14} /> Sync dari Marketplace
           </button>
           
-          <div className="flex items-center gap-2 bg-black text-white px-2.5 py-1 rounded-md text-xs font-bold">
-             {/* Mocking logo with text for now */}
-             <span className="bg-green-500 w-4 h-4 rounded flex items-center justify-center text-[10px]">T</span>
-             {order.storeName} | {order.platform}
+          <div className="flex items-center gap-2 bg-black text-white px-2.5 py-1 rounded-md text-xs font-semibold shadow-xs">
+             <TikTokLogo size={14} />
+             <span>{order.storeName} | {order.platform}</span>
           </div>
         </div>
       </div>
@@ -194,8 +202,9 @@ export default function OrderCard({
       </div>
       
       {/* Action Bar */}
-      <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-         <div className="flex items-center gap-3">
+      <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-xl flex-wrap gap-3">
+         {/* Sisi Kiri: Detail, Chat, Cetak, dan Progres Alur Kerja (seperti Desty) */}
+         <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={onDetail}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-md text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
@@ -205,45 +214,51 @@ export default function OrderCard({
             <button
               disabled
               title="Modul Chat belum tersedia"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-md text-xs font-semibold text-gray-300 cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-emerald-200 bg-emerald-50/40 rounded-md text-xs font-semibold text-emerald-600 cursor-not-allowed"
             >
-               <MessageCircle size={14} /> Chat Pembeli
+               <MessageCircle size={14} className="text-emerald-500" /> Chat Pembeli
             </button>
-            <div className="relative group">
-               <button className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-md text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
-                  Cetak <ChevronDown size={14} />
-               </button>
-               <div className="hidden group-hover:block absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
-                  <button
-                     onClick={() => onPrint("Label")}
-                     className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                     Cetak Label
-                  </button>
-                  <button
-                     onClick={() => onPrint("Invoice")}
-                     className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                     Cetak Invoice
-                  </button>
-                  <button
-                     onClick={() => onPrint("PackingList")}
-                     className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                     Cetak Packing List
-                  </button>
-               </div>
+            <PrintDropdown
+               prefixIcon={<Printer size={14} />}
+               placement="top-left"
+               items={[
+                  { id: "Label", label: "Cetak Label", description: "Label pengiriman & resi kurir" },
+                  { id: "Invoice", label: "Cetak Invoice", description: "Faktur resmi pesanan pembeli" },
+                  { id: "PackingList", label: "Cetak Packing List", description: "Daftar barang untuk gudang" },
+               ]}
+               label="Cetak"
+               onSelect={onPrint}
+            />
+            {/* Step alur kerja di sebelah Cetak */}
+            <div className="ml-1">
+               <OrderProgressSteps currentStage={order.fulfillmentStage} />
             </div>
          </div>
          
-         <div className="flex items-center gap-4">
-            <OrderProgressSteps currentStage={order.fulfillmentStage} />
-            <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
-               <MoreHorizontal size={16} />
+         {/* Sisi Kanan: Lacak di ujung (seperti Desty) */}
+         <div className="flex items-center gap-2.5 ml-auto">
+            {onShip && order.status === "AWAITING_SHIPMENT" ? (
+              <button
+                onClick={onShip}
+                disabled={shipping}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 rounded-md text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
+              >
+                <PackageCheck size={14} />
+                {shipping ? "Mengirim..." : "Kirim Paket"}
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setShowTracking(true)}
+              className="px-5 py-1.5 bg-[#2a3a8c] hover:bg-[#202e70] text-white rounded-md text-xs font-semibold transition-colors shadow-xs"
+            >
+              Lacak
             </button>
-            {sla ? (
+
+            {sla && (
                <div
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md ${
+                  className={`px-3 py-1 text-xs font-bold rounded-md ${
                      sla.tone === "urgent"
                         ? "bg-red-600 text-white"
                         : "bg-amber-400 text-amber-950"
@@ -251,13 +266,25 @@ export default function OrderCard({
                >
                   {sla.label}
                </div>
-            ) : (
-               <div className="px-4 py-1.5 bg-gray-100 text-gray-400 text-xs font-bold rounded-md">
-                  Menunggu
-               </div>
             )}
          </div>
       </div>
+
+      {showTracking && (
+        <TrackingModal
+          order={{
+            orderId: order.orderId,
+            courier: order.courier,
+            trackingNumber: order.trackingNumber,
+            status: order.status,
+            orderDate: order.orderDate,
+            buyerName: order.buyerName,
+            address: order.address,
+            pickupLocation: order.pickupLocation,
+          }}
+          onClose={() => setShowTracking(false)}
+        />
+      )}
     </div>
   );
 }

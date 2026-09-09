@@ -1,6 +1,12 @@
 import { prisma as defaultPrisma } from "@/lib/db/prisma";
 import { getOrders } from "@/lib/integrations/tiktokShop";
 import { encryptPii } from "@/lib/services/crypto.service";
+import {
+  deductStockForOrder,
+  cancelReasonForStatus,
+  CANCEL_STATUSES,
+  restoreStockForCanceledOrder,
+} from "@/lib/services/central-stock.service";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -179,6 +185,31 @@ export async function syncOrdersTikTok(
           },
         });
         await syncShipments(prisma, existing.orderId, accountId, raw.packages);
+        // Central stock: order yang "lahir" atau refresh ke AWAITING_SHIPMENT
+        // ikut memotong stok gudang. Idempoten via StockLedger (reason ORDER).
+        if (raw.status === "AWAITING_SHIPMENT") {
+          try {
+            await deductStockForOrder(existing.orderId);
+          } catch (e) {
+            result.errors.push(
+              `${externalOrderId}: potong stok gagal (${e instanceof Error ? e.message : String(e)})`
+            );
+          }
+        }
+        // Central stock: order yang refresh ke status batal me-restore stok yang
+        // tadi dipotong. Idempoten & aman (skip bila tidak pernah dipotong).
+        if (raw.status && CANCEL_STATUSES.has(raw.status)) {
+          const reason = cancelReasonForStatus(raw.status);
+          if (reason) {
+            try {
+              await restoreStockForCanceledOrder(existing.orderId, reason);
+            } catch (e) {
+              result.errors.push(
+                `${externalOrderId}: restore stok gagal (${e instanceof Error ? e.message : String(e)})`
+              );
+            }
+          }
+        }
         // Backfill nama produk/variasi di item yang sudah ada.
         for (const li of raw.line_items ?? []) {
           if (!li.sku_id && !li.seller_sku && !li.product_id) continue;
@@ -224,6 +255,7 @@ export async function syncOrdersTikTok(
     }
 
     try {
+      let createdOrderId: string | null = null;
       await prisma.$transaction(async (tx) => {
         const order = await tx.order.create({
           data: {
@@ -259,6 +291,7 @@ export async function syncOrdersTikTok(
             },
           },
         });
+        createdOrderId = order.id;
         await tx.platformOrderMapping.create({
           data: {
             externalOrderId,
@@ -269,7 +302,41 @@ export async function syncOrdersTikTok(
         });
         await syncShipments(tx, order.id, accountId, raw.packages);
       });
+
+      // Backfill gambar produk master dari gambar line item platform
+      // (hanya diisi bila produk induk belum punya gambar).
+      try {
+        for (const item of lineItems) {
+          if (!item.variantId || !item.imageUrl) continue;
+          const product = await prisma.masterProduct.findFirst({
+            where: { variants: { some: { id: item.variantId } } },
+            select: { id: true, imageUrl: true },
+          });
+          if (product && !product.imageUrl) {
+            await prisma.masterProduct.update({
+              where: { id: product.id },
+              data: { imageUrl: item.imageUrl },
+            });
+          }
+        }
+      } catch (e) {
+        result.errors.push(
+          `${externalOrderId}: backfill gambar gagal (${e instanceof Error ? e.message : String(e)})`
+        );
+      }
+
       result.created += 1;
+      // Central stock: order baru yang langsung AWAITING_SHIPMENT (dibayar)
+      // memotong stok gudang bersama. Idempoten via StockLedger.
+      if (createdOrderId && (raw.status ?? "") === "AWAITING_SHIPMENT") {
+        try {
+          await deductStockForOrder(createdOrderId);
+        } catch (e) {
+          result.errors.push(
+            `${externalOrderId}: potong stok gagal (${e instanceof Error ? e.message : String(e)})`
+          );
+        }
+      }
     } catch (e) {
       result.errors.push(`${externalOrderId}: ${e instanceof Error ? e.message : String(e)}`);
     }

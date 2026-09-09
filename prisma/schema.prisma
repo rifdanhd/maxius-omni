@@ -19,6 +19,8 @@ model User {
   // true  → modal detail menampilkan nama/HP/alamat asli (dicatat PiiAccessLog).
   // false → nama/HP/alamat selalu di-mask di semua tampilan.
   canViewFullPii Boolean @default(true)
+
+  stockLedgers StockLedger[]
 }
 
 // 1 bisnis utama; "business-default" dibuat saat migrasi data.
@@ -59,6 +61,7 @@ model PlatformAccount {
   orders        Order[]
   orderMappings PlatformOrderMapping[]
   shipments     Shipment[]
+  stockLedger   StockLedger[]
 
   @@unique([platform, externalShopId])
 }
@@ -66,24 +69,60 @@ model PlatformAccount {
 model MasterProduct {
   id         String   @id @default(uuid())
   name       String
+  // Kategori produk (opsional, string bebas). Dipakai untuk filter di halaman.
+  category   String?
+  // URL gambar produk (opsional).
+  imageUrl   String?
   businessId String   @default("business-default")
   business   Business @relation(fields: [businessId], references: [id])
   threshold  Int      @default(20)
 
   variants ProductVariant[]
+  images   ProductImage[]
+}
+
+// Galeri gambar per produk induk. Satu gambar bisa ditandai sebagai cover;
+// cover disinkronkan ke MasterProduct.imageUrl (dipakai Kelola Harga &
+// Produk Master). Urutan tampilan memakai `order` (naik), bukan createdAt.
+model ProductImage {
+  id             String       @id @default(cuid())
+  masterProduct  MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  masterProductId String
+  // URL gambar atau data URL (base64) bila diunggah dari file lokal.
+  url            String
+  isCover        Boolean      @default(false)
+  order          Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Parent memiliki banyak varian (warna/ukuran); stok dilacak di varian.
+// safetyStock = buffer opsional: stok yang boleh tampil ke marketplace ialah
+// max(0, stock - safetyStock), jadi tidak pernah oversell dgn menjual buffer.
 model ProductVariant {
   id    String @id @default(uuid())
   sku   String
   stock Int
+  // Buffer pelepas stok (opsional). 0 = nonaktif.
+  safetyStock Int @default(0)
+
+  // Harga default varian (dalam Rupiah). Null = belum di-set.
+  // Harga tayang di tiap marketplace = override mapping (ProductMapping.price)
+  // bila diisi, selain itu mengikuti harga default ini.
+  price Float?
+  // Terakhir kali harga default diubah (null = belum pernah di-set).
+  priceUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   masterProductId String
   masterProduct   MasterProduct    @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
   mappings        ProductMapping[]
   salesLogs       SalesLog[]
   orderItems      OrderItem[]
+  stockLedger     StockLedger[]
 
   @@unique([masterProductId, sku])
 }
@@ -99,6 +138,15 @@ model ProductMapping {
 
   accountId String
   account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Harga override per toko/marketplace (Rupiah). Null = mengikuti harga
+  // default varian (ProductVariant.price). Tidak memengaruhi varian lain.
+  price Float?
+  // Terakhir kali harga override diubah (null = belum pernah di-set).
+  priceUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([accountId, variantId])
   @@unique([accountId, channelSku])
@@ -248,4 +296,34 @@ model PiiAccessLog {
 
   @@index([userId])
   @@index([orderId])
+}
+
+// StockLedger — audit trail stok gudang bersama (central inventory).
+// Setiap perubahan stok PhysicalVariant dicatat di sini; referenceId untuk
+// reason ORDER diisi order.id sehingga per-hitung bisa di-idempoten-kan
+// (webhook retry/out-of-order tidak akan memotong dua kali).
+// reason (validasi di kode): ORDER | ORDER_CANCELLED | ORDER_REFUNDED | SALE | MANUAL_ADJUSTMENT | SYNC_CORRECTION | INIT
+model StockLedger {
+  id         String   @id @default(uuid())
+  changeQty  Int // negatif = pengurangan
+  reason     String
+  referenceId String? // mis. order.id utk reason ORDER / ORDER_CANCELLED
+  note       String?
+  stockAfter Int
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  // accountId opsional: toko/akun pemicu (null utk penyesuaian manual global).
+  accountId String?
+  account   PlatformAccount? @relation(fields: [accountId], references: [id])
+
+  // userId opsional: admin yang melakukan penyesuaian manual (reason MANUAL_ADJUSTMENT).
+  userId String?
+  user   User?           @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([variantId, createdAt])
+  @@index([reason, referenceId])
 }

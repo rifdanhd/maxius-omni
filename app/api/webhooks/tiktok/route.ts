@@ -1,6 +1,12 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import {
+  deductStockForOrder,
+  cancelReasonForStatus,
+  CANCEL_STATUSES,
+  restoreStockForCanceledOrder,
+} from "@/lib/services/central-stock.service";
 
 const APP_KEY = process.env.TIKTOK_APP_KEY!;
 const APP_SECRET = process.env.TIKTOK_APP_SECRET!;
@@ -228,6 +234,96 @@ async function handleOrderStatusChange(
       },
     }),
   ]);
+
+  // STOK GUDANG BERSAMA: order yang dibayar & menunggu dikirim memotong stok
+  // pusat. Inner try/catch supaya kegagalan pemotongan tidak menggagalkan update
+  // status yang sudah berhasil & tidak memicu retry-storm.
+  if (orderStatus === "AWAITING_SHIPMENT") {
+    try {
+      const deducted = await deductStockForOrder(mapping.orderId);
+      if (!deducted.ok) {
+        await logSync({
+          accountId,
+          kind: "central_stock_deduct",
+          status: "skipped",
+          message: `order ${externalOrderId}: ${deducted.reason ?? "?"}`,
+          payload: rawBody,
+        });
+      } else if (deducted.already) {
+        await logSync({
+          accountId,
+          kind: "central_stock_deduct",
+          status: "skipped",
+          message: `order ${externalOrderId}: stok sudah dipotong sebelumnya (idempotent)`,
+          payload: rawBody,
+        });
+      } else {
+        const n = deducted.deductions?.length ?? 0;
+        await logSync({
+          accountId,
+          kind: "central_stock_deduct",
+          status: "success",
+          message: `order ${externalOrderId}: stok gudang berkurang di ${n} varian`,
+          payload: rawBody,
+        });
+      }
+    } catch (e) {
+      console.error("[central_stock] gagal memotong stok:", e);
+      await logSync({
+        accountId,
+        kind: "central_stock_deduct",
+        status: "error",
+        errorMessage: e instanceof Error ? e.message : String(e),
+        payload: rawBody,
+      });
+    }
+  }
+
+  // STOK GUDANG BERSAMA: order yang batal me-restore stok yang tadi dipotong.
+  // Idempoten (via StockLedger reason ORDER_CANCELLED/ORDER_REFUNDED) dan aman
+  // bila ternyata order itu tidak pernah memotong stok sama sekali.
+  if (CANCEL_STATUSES.has(orderStatus)) {
+    try {
+      const reason = cancelReasonForStatus(orderStatus);
+      if (!reason) throw new Error(`status batal tanpa reason mapping: ${orderStatus}`);
+      const restored = await restoreStockForCanceledOrder(mapping.orderId, reason);
+      if (!restored.ok) {
+        await logSync({
+          accountId,
+          kind: "central_stock_restore",
+          status: "skipped",
+          message: `order ${externalOrderId}: ${restored.reason ?? "?"}`,
+          payload: rawBody,
+        });
+      } else if (restored.already) {
+        await logSync({
+          accountId,
+          kind: "central_stock_restore",
+          status: "skipped",
+          message: `order ${externalOrderId}: ${restored.reason === "no deduction" ? "tidak ada stok yang dipotong" : "stok sudah direstore sebelumnya (idempotent)"}`,
+          payload: rawBody,
+        });
+      } else {
+        const n = restored.restores?.length ?? 0;
+        await logSync({
+          accountId,
+          kind: "central_stock_restore",
+          status: "success",
+          message: `order ${externalOrderId}: stok gudang dikembalikan di ${n} varian`,
+          payload: rawBody,
+        });
+      }
+    } catch (e) {
+      console.error("[central_stock] gagal me-restore stok:", e);
+      await logSync({
+        accountId,
+        kind: "central_stock_restore",
+        status: "error",
+        errorMessage: e instanceof Error ? e.message : String(e),
+        payload: rawBody,
+      });
+    }
+  }
 
   await logSync({
     accountId,

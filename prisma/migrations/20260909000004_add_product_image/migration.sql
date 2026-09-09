@@ -1,0 +1,10 @@
+CREATE TABLE "ProductImage" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "masterProductId" TEXT NOT NULL,
+  "url" TEXT NOT NULL,
+  "isCover" BOOLEAN NOT NULL DEFAULT false,
+  "order" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL,
+  CONSTRAINT "ProductImage_masterProductId_fkey" FOREIGN KEY ("masterProductId") REFERENCES "MasterProduct" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);

@@ -69,7 +69,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md bg-white/80 backdrop-blur-xl border border-white/50 shadow-2xl rounded-3xl p-8 relative z-10">
         <div className="flex flex-col items-center mb-8">
-          <div className="h-16 mb-6 relative w-32">
+          <div className="relative h-24 mb-6 aspect-[278/307]">
             <Image 
               src="/Logo/Logo_backroundNO.png" 
               alt="Maxius.id Logo" 

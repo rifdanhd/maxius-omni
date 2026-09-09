@@ -44,9 +44,49 @@ export const GET = withAuth(async (req) => {
         ? { status: "__NONE__" }
         : { status: { in: statuses } };
 
-  // Search: cari buyerName / buyerEmail / orderNo (containment, case-insensitive).
+  // Search berdasarkan tipe field yang dipilih di dropdown frontend:
+  //   keyword  → Keyword Pesanan (pencarian luas: orderNo, buyerName, buyerEmail, nama produk)
+  //   orderNo  → No. Pesanan (orderNo)
+  //   product  → Produk Master (matching nama produk pada item order)
+  //   tracking → Nomor Resi (matching nomor resi pada shipment)
+  //   (tanpa searchType) → default keyword
   const q = searchParams.get("q")?.trim() || null;
-  const whereSearch = q ? { OR: [{ buyerName: { contains: q } }, { buyerEmail: { contains: q } }, { orderNo: { contains: q } }] } : {};
+  const searchType = searchParams.get("searchType")?.trim() || "keyword";
+
+  let whereSearch: object = {};
+  if (q) {
+    if (searchType === "orderNo") {
+      // Cari hanya berdasarkan No. Pesanan
+      whereSearch = { orderNo: { contains: q } };
+    } else if (searchType === "product") {
+      // Cari di nama produk / variasi pada item order
+      whereSearch = {
+        OR: [
+          { items: { some: { productName: { contains: q } } } },
+          { items: { some: { skuName: { contains: q } } } },
+          { items: { some: { channelSku: { contains: q } } } },
+        ],
+      };
+    } else if (searchType === "tracking") {
+      // Cari di nomor resi shipment
+      whereSearch = {
+        OR: [{ shipments: { some: { trackingNo: { contains: q } } } }],
+      };
+    } else {
+      // searchType === "keyword" (default) — pencarian luas di semua field relevan
+      whereSearch = {
+        OR: [
+          { orderNo: { contains: q } },
+          { buyerName: { contains: q } },
+          { buyerEmail: { contains: q } },
+          { items: { some: { productName: { contains: q } } } },
+          { items: { some: { skuName: { contains: q } } } },
+          { items: { some: { channelSku: { contains: q } } } },
+          { shipments: { some: { trackingNo: { contains: q } } } },
+        ],
+      };
+    }
+  }
 
   // Date range: rentang createTime (inclusive start, exclusive end).
   let whereDate = {};
@@ -65,7 +105,7 @@ export const GET = withAuth(async (req) => {
 
   const where = { AND: [whereStatus, whereSearch, whereDate] };
 
-  const [orders, total] = await Promise.all([
+  const [orders, total, statusGroups] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -82,7 +122,13 @@ export const GET = withAuth(async (req) => {
       take: pageSize,
     }),
     prisma.order.count({ where }),
+    prisma.order.groupBy({ by: ["status"], _count: true }),
   ]);
+
+  const counts: Record<string, number> = {};
+  statusGroups.forEach((g) => {
+    counts[g.status] = g._count;
+  });
 
   // List berarti selalu masked (keputusan PII): nama pembeli, tanpa ciphertext.
   // Reveal penuh hanya terjadi pada GET /api/orders/:id untuk user berhak.
@@ -111,6 +157,7 @@ export const GET = withAuth(async (req) => {
     page,
     pageSize,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    counts,
     // Metadata untuk kolom pencarian (server-side) — tetap kirim daftar status kanonik
     // supaya klien bisa fallback kalau butuh referensi.
     statuses: PLAIN_STATUSES,

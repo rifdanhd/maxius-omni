@@ -27,6 +27,7 @@ const MENU = [
     label: "Produk",
     children: [
       { key: "produk-master", label: "Produk Master", href: "/products" },
+      { key: "mapping-stok", label: "Mapping Stok Terpusat", href: "/products/mapping" },
       { key: "kelola-harga", label: "Kelola Harga", href: "/products/prices" },
       { key: "kelola-gambar", label: "Kelola Gambar", href: "/products/images" },
       { key: "product-copy", label: "Product Copy", href: "/products/copy" },
@@ -121,10 +122,10 @@ export default function Sidebar() {
     <aside className={`${collapsed ? 'w-20' : 'w-64'} shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen transition-all duration-300`}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-        <div className="h-10 flex items-center justify-center shrink-0 relative w-10">
+        <div className="h-14 flex items-center justify-center shrink-0 relative aspect-[278/307]">
           <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id Logo" fill className="object-contain" priority />
         </div>
-        {!collapsed && <span className="font-bold text-gray-900 text-lg">Maxius.id</span>}
+        {!collapsed && <span className="font-bold text-gray-900 text-xl">Maxius.id</span>}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 hide-scrollbar">

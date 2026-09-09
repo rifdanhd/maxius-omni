@@ -1,0 +1,1 @@
+ALTER TABLE "MasterProduct" ADD COLUMN "imageUrl" TEXT;

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import { syncStockToMarketplaces } from "@/lib/services/sync.service";
+import { STOCK_REASONS, pushVariantStockToOthers } from "@/lib/services/central-stock.service";
 
 /**
  * recordSale({ accountId, channelSku, qty })
@@ -75,9 +75,22 @@ export async function recordSale({
     },
   });
 
-  // Sinkronisasi ke marketplace lain (background, non-blocking)
-  const otherMappings = allMappings.filter((m) => m.accountId !== accountId);
-  syncStockToMarketplaces(otherMappings, updatedVariant.stock).catch((err) =>
+  // Audit trail: semua perubahan stok (termasuk penjualan manual/simulasi)
+  // wajib tercatat di StockLedger.
+  await prisma.stockLedger.create({
+    data: {
+      variantId: variant.id,
+      changeQty: -quantity,
+      reason: STOCK_REASONS.SALE,
+      note: `Penjualan ${quantity} pcs (SKU ${channelSku}) di ${account.label}`,
+      stockAfter: updatedVariant.stock,
+      accountId: account.id,
+    },
+  });
+
+  // Sinkronisasi ke marketplace lain (background, non-blocking) — stok yang
+  // didorong adalah stok efektif setelah buffer safety.
+  pushVariantStockToOthers(variant.id, account.id).catch((err) =>
     console.error("[Sync] Unexpected error:", err)
   );
 

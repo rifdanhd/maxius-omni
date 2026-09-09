@@ -162,6 +162,180 @@ export async function getProduct(
   return null;
 }
 
+/**
+ * getProductCategory — ambil nama kategori produk via category_chains (leaf).
+ * Order API TikTok TIDAK mengirim kategori line item; produk yang menyediakannya.
+ * Dipakai best-effort untuk label (gagal → null, cetakan tetap jalan).
+ */
+export async function getProductCategory(
+  accessToken: string,
+  channelSku: string,
+  shopCipher?: string
+): Promise<string | null> {
+  try {
+    const product = await getProduct(accessToken, channelSku, shopCipher);
+    const chains = (product?.category_chains as Array<Record<string, unknown>> | undefined) ?? [];
+    const leaf = chains[chains.length - 1];
+    const name = leaf?.name as string | undefined;
+    return name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * getShippingDocument — label pengiriman RESMI TikTok Shop.
+ * GET /fulfillment/202309/packages/{package_id}/shipping_documents
+ * Hanya berlaku untuk order "TikTok Shipping" (shipping_type=TIKTOK) yang sudah
+ * di-ship. Mengembalikan URL dokumen (valid 24 jam) + nomor resi.
+ *
+ * documentType: SHIPPING_LABEL_PICTURE (PNG) | SHIPPING_LABEL (PDF) | PACKING_SLIP ...
+ * documentFormat: PDF (default) | ZPL (BR/MX) — tidak berlaku utk SHIPPING_LABEL_PICTURE.
+ * Dipaksa PDF saat penggabungan label batch (satu file utk dicetak sekaligus).
+ */
+export async function getShippingDocument(
+  accessToken: string,
+  shopCipher: string | undefined,
+  packageId: string,
+  documentType: string = "SHIPPING_LABEL",
+  documentFormat?: string
+): Promise<{ docUrl: string | null; trackingNumber: string | null }> {
+  try {
+    const result = await callApi(
+      "GET",
+      `/fulfillment/202309/packages/${encodeURIComponent(packageId)}/shipping_documents`,
+      accessToken,
+      {
+        document_type: documentType,
+        document_size: "A6",
+        ...(documentFormat ? { document_format: documentFormat } : {}),
+      },
+      null,
+      shopCipher
+    );
+    const data = result.data as
+      | { doc_url?: string; tracking_number?: string }
+      | undefined;
+    return {
+      docUrl: data?.doc_url ?? null,
+      trackingNumber: data?.tracking_number ?? null,
+    };
+  } catch (e) {
+    console.error("[TikTok Shop] Gagal ambil shipping document:", e instanceof Error ? e.message : e);
+    return { docUrl: null, trackingNumber: null };
+  }
+}
+
+/**
+ * getPackageDetail — detail paket TikTok (tracking, provider, status).
+ * GET /fulfillment/202309/packages/{package_id}
+ * Dipakai untuk polling setelah ship: TikTok meng-assign resi/kurir secara
+ * ASYNC, response ShipPackage tidak memuat tracking number.
+ */
+export async function getPackageDetail(
+  accessToken: string,
+  shopCipher: string | undefined,
+  packageId: string
+): Promise<{
+  trackingNumber: string | null;
+  providerName: string | null;
+  providerId: string | null;
+  status: string | null;
+}> {
+  const result = await callApi(
+    "GET",
+    `/fulfillment/202309/packages/${encodeURIComponent(packageId)}`,
+    accessToken,
+    {},
+    null,
+    shopCipher
+  );
+  const d = (result.data ?? {}) as Record<string, unknown>;
+  return {
+    trackingNumber: (d.tracking_number as string | undefined) ?? null,
+    providerName: (d.shipping_provider_name as string | undefined) ?? null,
+    providerId: (d.shipping_provider_id as string | undefined) ?? null,
+    status: (d.package_status as string | undefined) ?? null,
+  };
+}
+
+/**
+ * shipPackage — kirim paket TikTok Shop.
+ * POST /fulfillment/202309/packages/{package_id}/ship
+ *
+ * Dua mode (sesuai shipping_type order):
+ * - TikTok Shipping: `handoverMethod` ("PICKUP" | "DROP_OFF") + opsional
+ *   `pickupSlot` (epoch seconds). TikTok meng-assign resi & kurir secara async
+ *   setelah sukses → gunakan waitForPackageTracking() untuk polling.
+ * - Seller Shipping: `selfShipment` = { shippingProviderId, trackingNumber }
+ *   (merchant sudah punya resi dari kuriinya sendiri).
+ */
+export async function shipPackage(
+  accessToken: string,
+  shopCipher: string | undefined,
+  packageId: string,
+  options: {
+    handoverMethod?: "PICKUP" | "DROP_OFF";
+    pickupSlot?: { startTime?: number; endTime?: number };
+    selfShipment?: { shippingProviderId?: string; trackingNumber?: string };
+  } = {}
+): Promise<{ requestId?: string }> {
+  const body: Record<string, unknown> = {};
+  if (options.handoverMethod) body.handover_method = options.handoverMethod;
+  if (options.pickupSlot && (options.pickupSlot.startTime || options.pickupSlot.endTime)) {
+    body.pickup_slot = {
+      ...(options.pickupSlot.startTime ? { start_time: options.pickupSlot.startTime } : {}),
+      ...(options.pickupSlot.endTime ? { end_time: options.pickupSlot.endTime } : {}),
+    };
+  }
+  if (options.selfShipment) {
+    body.self_shipment = {
+      ...(options.selfShipment.shippingProviderId ? { shipping_provider_id: options.selfShipment.shippingProviderId } : {}),
+      ...(options.selfShipment.trackingNumber ? { tracking_number: options.selfShipment.trackingNumber } : {}),
+    };
+  }
+
+  // callApi melempar Error "[TikTok Shop] ..." bila gagal (pola sama fungsi lain).
+  const result = await callApi(
+    "POST",
+    `/fulfillment/202309/packages/${encodeURIComponent(packageId)}/ship`,
+    accessToken,
+    {},
+    body,
+    shopCipher
+  );
+  return { requestId: (result.request_id as string | undefined) ?? undefined };
+}
+
+/** sleep — helper kecil utk delay antar retry (ms). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * waitForPackageTracking — poll GetPackageDetail sampai tracking number muncul
+ * (TikTok Shipping assign resi async). Default: hingga 4 percobaan, jeda 3 detik.
+ */
+export async function waitForPackageTracking(
+  accessToken: string,
+  shopCipher: string | undefined,
+  packageId: string,
+  opts: { attempts?: number; delayMs?: number } = {}
+): Promise<{
+  trackingNumber: string | null;
+  providerName: string | null;
+  providerId: string | null;
+  status: string | null;
+}> {
+  const { attempts = 4, delayMs = 3000 } = opts;
+  let last = await getPackageDetail(accessToken, shopCipher, packageId);
+  for (let i = 1; i < attempts && !last.trackingNumber; i++) {
+    await sleep(delayMs);
+    last = await getPackageDetail(accessToken, shopCipher, packageId);
+  }
+  return last;
+}
+
 export async function updateStock(
   accessToken: string,
   channelSku: string,
@@ -198,4 +372,48 @@ export async function updateStock(
 
   return callApi("POST", apiPath, accessToken, {}, body, shopCipher);
 
+}
+
+/**
+ * updatePrice — ubah harga tayang SKU TikTok Shop.
+ * POST /product/202309/products/{product_id}/prices/update
+ *
+ * Mirip updateStock: cari product via channelSku (seller_sku / sku.id /
+ * product.id), cocokkan SKU-nya, lalu update `price.amount` (IDR).
+ * `amount` wajib string di payload TikTok.
+ */
+export async function updatePrice(
+  accessToken: string,
+  channelSku: string,
+  newPrice: number,
+  shopCipher?: string
+) {
+  const product = await getProduct(accessToken, channelSku, shopCipher);
+  if (!product) {
+    throw new Error(`[TikTok Shop] SKU "${channelSku}" tidak ditemukan.`);
+  }
+
+  const productId = product.id as string;
+  const skus = (product.skus as Array<Record<string, unknown>>) || [];
+  const matchingSku =
+    skus.find((s) => s.seller_sku === channelSku) ||
+    skus.find((s) => s.id === channelSku);
+
+  if (!matchingSku) {
+    throw new Error(`[TikTok Shop] SKU detail "${channelSku}" tidak cocok.`);
+  }
+
+  const skuId = matchingSku.id as string;
+  const apiPath = `/product/202309/products/${productId}/prices/update`;
+
+  const body = {
+    skus: [
+      {
+        id: skuId,
+        price: { amount: String(newPrice), currency: "IDR" },
+      },
+    ],
+  };
+
+  return callApi("POST", apiPath, accessToken, {}, body, shopCipher);
 }

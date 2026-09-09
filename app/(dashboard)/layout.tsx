@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
-import { Bell, Download, Radio } from "lucide-react";
+import NotificationBell from "@/components/layout/NotificationBell";
+import { Download, Radio } from "lucide-react";
+
+const subscribe = () => () => {};
 
 export default function DashboardLayout({
   children,
@@ -11,15 +14,17 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [username, setUsername] = useState<string>("");
+  const username = useSyncExternalStore(
+    subscribe,
+    () => localStorage.getItem("username") || "Dermarket",
+    () => "Dermarket"
+  );
 
   useEffect(() => {
     // Basic client-side auth check
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
-    } else {
-      setUsername(localStorage.getItem("username") || "Dermarket");
     }
   }, [router]);
 
@@ -38,10 +43,7 @@ export default function DashboardLayout({
             <button className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 border border-gray-200">
               <Download size={16} />
             </button>
-            <button className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 border border-gray-200 relative">
-              <Bell size={16} />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationBell />
             <div className="flex items-center gap-2 border-l border-gray-200 pl-4 cursor-pointer">
               <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
                 {username?.slice(0, 1).toUpperCase() || 'D'}

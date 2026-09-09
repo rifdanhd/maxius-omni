@@ -35,8 +35,10 @@ export function maskPhone(value: string | null | undefined): string | null {
 }
 
 /**
- * Alamat: sembunyikan detail jalan, pertahankan kota/kabupaten & provinsi.
- * Ambil 2 segmen terakhir yang dipisah koma (umumnya city & province/region).
+ * Alamat: sembunyikan detail jalan/nomor dengan `***`, pertahankan kota/kabupaten
+ * & provinsi (2 segmen terakhir dipisah koma). Contoh:
+ * "Jl. Mawar No.12, RT.03, Jakarta Selatan, DKI Jakarta"
+ *   → "***, ***, Jakarta Selatan, DKI Jakarta"
  */
 export function maskAddress(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -44,7 +46,8 @@ export function maskAddress(value: string | null | undefined): string | null {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (parts.length < 2) return `… ${parts[0] ?? ""}`.trim();
+  if (parts.length < 2) return `*** ${parts[0] ?? ""}`.trim();
   const kept = parts.slice(-2).join(", ");
-  return `… ${kept}`;
+  const maskedHead = parts.slice(0, -2).map(() => "***").join(", ");
+  return maskedHead ? `${maskedHead}, ${kept}` : kept;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { decryptPii } from "@/lib/services/crypto.service";
+import { getProductCategory } from "@/lib/integrations/tiktokShop";
 import { maskName, maskPhone, maskAddress } from "@/lib/pii";
 
 /**
@@ -43,6 +44,25 @@ export const GET = withAuth(
   const rawPhone = decryptPii(order.recipientPhone);
   const rawAddress = decryptPii(order.recipientAddress);
 
+  // Kategori produk: order API TikTok tidak menyediakannya, jadi resolve
+  // best-effort via product API (per SKU unik). Gagal → null, tidak memblokir.
+  const categoriesBySku = new Map<string, string | null>();
+  const accountOnly = await prisma.platformAccount.findUnique({
+    where: { id: order.accountId },
+    select: { accessToken: true, shopCipher: true },
+  });
+  if (accountOnly?.accessToken) {
+    const uniqueSkus = [...new Set(order.items.map((it) => it.channelSku).filter(Boolean))];
+    for (const sku of uniqueSkus) {
+      const cat = await getProductCategory(
+        accountOnly.accessToken,
+        sku,
+        accountOnly.shopCipher ?? undefined
+      );
+      categoriesBySku.set(sku, cat);
+    }
+  }
+
   const payload: Record<string, unknown> = {
     orderNo: order.orderNo,
     status: order.status,
@@ -75,6 +95,7 @@ export const GET = withAuth(
       variantLabel: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,
       masterSku: it.variant?.sku ?? null,
       channelSku: it.channelSku,
+      category: categoriesBySku.get(it.channelSku) ?? null,
       qty: it.qty,
       price: it.price,
       subTotal: it.price != null ? it.price * it.qty : null,
