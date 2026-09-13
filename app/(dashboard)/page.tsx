@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Check, Info } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { authFetch } from "@/lib/utils/api-client";
 
 type Summary = {
   accountsConnected: number;
@@ -30,6 +31,36 @@ type AnalyticsData = {
   topProducts: { key: string; name: string; sku: string | null; qty: number; value: number }[];
 };
 
+type OpsKpi = {
+  centralStock: { variantCount: number; totalUnits: number; totalSellable: number };
+  lowStock: {
+    count: number;
+    top: Array<{
+      variantId: string;
+      sku: string;
+      variantName: string | null;
+      productName: string;
+      stock: number;
+      safetyStock: number;
+      sellable: number;
+      severity: "low" | "out";
+    }>;
+  };
+  mismatch: { total: number; failed: number; pendingRetry: number };
+  syncErrors: { count7d: number; byKind: Array<{ kind: string; count: number }> };
+  storeHealth: Array<{
+    accountId: string;
+    label: string;
+    platform: string;
+    hasToken: boolean;
+    hasCipher: boolean;
+    lastOrderAt: string | null;
+    lastSyncAt: string | null;
+    errors7d: number;
+    mismatch: number;
+  }>;
+};
+
 function formatRp(n: number): string {
   return "Rp" + Math.round(n).toLocaleString("id-ID");
 }
@@ -51,6 +82,7 @@ function trendUp(pct: number | null): boolean {
 export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary>({ accountsConnected: 0, activeSku: 0, criticalStock: 0, newOrders: 0, readyToShip: 0, completedOrders: 0, oversell: 0 });
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [opsKpi, setOpsKpi] = useState<OpsKpi | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('potensi'); // potensi, terjual, penjualan, pesanan
   const [panduanAwalOpen, setPanduanAwalOpen] = useState(true);
@@ -60,15 +92,19 @@ export default function DashboardPage() {
       try {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
-        const [summaryRes, analyticsRes] = await Promise.all([
-          fetch("/api/summary", { headers }),
-          fetch("/api/analytics", { headers }),
+        const [summaryRes, analyticsRes, kpiRes] = await Promise.all([
+          authFetch("/api/summary", { headers }),
+          authFetch("/api/analytics", { headers }),
+          authFetch("/api/dashboard/kpi", { headers }),
         ]);
         if (summaryRes.ok) {
           setSummary(await summaryRes.json());
         }
         if (analyticsRes.ok) {
           setAnalytics(await analyticsRes.json());
+        }
+        if (kpiRes.ok) {
+          setOpsKpi(await kpiRes.json());
         }
       } catch (e) {
         console.error(e);
@@ -102,6 +138,79 @@ export default function DashboardPage() {
           <ActionCard title="Stok Menipis" value={summary.criticalStock.toString()} />
           <ActionCard title="Oversell" value={summary.oversell.toString()} />
         </div>
+      </div>
+
+      {/* Section: Kesehatan Operasional (PHASE C.1) */}
+      <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-800">Kesehatan Operasional</h2>
+          <span className="text-xs text-gray-500">Stok central & sinkronisasi marketplace</span>
+        </div>
+        <div className="p-6 grid grid-cols-4 gap-4">
+          <ActionCard
+            title="Stok Central (Siap Jual)"
+            value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"}
+          />
+          <ActionCard
+            title="Stok Kritis"
+            value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"}
+          />
+          <ActionCard
+            title="Stok Mismatch"
+            value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"}
+          />
+          <ActionCard
+            title="Sync Error (7 hari)"
+            value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"}
+          />
+        </div>
+        {opsKpi && opsKpi.storeHealth.length > 0 && (
+          <div className="px-6 pb-6">
+            <h3 className="text-sm font-bold text-gray-700 mb-2">Kesehatan Toko</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <th className="py-2 pr-3">Toko</th>
+                  <th className="px-3 py-2">Platform</th>
+                  <th className="px-3 py-2 text-center">Token</th>
+                  <th className="px-3 py-2 text-center">Error 7d</th>
+                  <th className="px-3 py-2 text-center">Mismatch</th>
+                  <th className="px-3 py-2">Aktivitas Terakhir</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opsKpi.storeHealth.map((s) => {
+                  const lastActive = s.lastOrderAt ?? s.lastSyncAt;
+                  const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0;
+                  return (
+                    <tr key={s.accountId} className="border-b border-gray-100 last:border-0">
+                      <td className="py-2 pr-3 font-medium text-gray-900">
+                        <span
+                          className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-amber-500" : "bg-emerald-500"}`}
+                          title={unhealthy ? "Perlu perhatian" : "Sehat"}
+                        />
+                        {s.label}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{s.platform}</td>
+                      <td className="px-3 py-2 text-center">
+                        {s.hasToken ? (
+                          <span className="text-emerald-600 font-semibold">OK</span>
+                        ) : (
+                          <span className="text-red-600 font-semibold">Hilang</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-700">{s.errors7d}</td>
+                      <td className="px-3 py-2 text-center text-gray-700">{s.mismatch}</td>
+                      <td className="px-3 py-2 text-gray-500 text-xs">
+                        {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Section: Panduan Awal */}
