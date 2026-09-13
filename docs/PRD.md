@@ -1,284 +1,1287 @@
-# Product Requirements Document (PRD)
-## Maxius Platform — Dashboard Sinkronisasi Stok Omnichannel
+# MAXIUS — MASTER PRODUCT & ENGINEERING PROMPT
 
-| Field | Value |
-|---|---|
-| **Nama Produk** | Maxius.id (Maxius Platform) |
-| **Versi Dokumen** | 1.0 |
-| **Tanggal** | 08 September 2026 |
-| **Status** | In Development (MVP) |
-| **Target Pengguna** | Seller/e-commerce merchant Indonesia |
+## 1. ROLE
 
----
+Kamu bertindak sebagai **Senior Product Engineer + Software Architect** untuk membangun platform **MAXIUS**, sebuah sistem Omnichannel Commerce Management.
 
-## 1. Ringkasan Eksekutif
+Jangan menganggap MAXIUS hanya sebagai dashboard.
 
-Maxius Platform adalah dashboard omnichannel untuk seller Indonesia yang mengelola toko di beberapa marketplace (Shopee, TikTok Shop, Tokopedia). Masalah utama yang diselesaikan: **inkonsistensi stok antar marketplace** yang menyebabkan oversell (refund/penalty) atau stok stale (kehilangan penjualan).
+**Masalah bisnis utama yang harus diselesaikan adalah STOCK MANAGEMENT.**
 
-Platform ini menyediakan single source of truth untuk stok, otomatisasi sinkronisasi real-time via webhook, dan manajemen pesanan terpusat.
+Seluruh keputusan arsitektur, database, API, workflow, dan UI harus mendukung tujuan tersebut.
 
 ---
 
-## 2. Masalah & Solusi
+# 2. BUSINESS PROBLEM — MASALAH UTAMA
 
-### 2.1 Masalah
+Client memiliki **8 akun marketplace**:
 
-| # | Masalah | Dampak |
-|---|---|---|
-| 1 | Stok tidak sinkron antar marketplace | Oversell → refund, penalty dari marketplace |
-| 2 | Stok ditampilkan rendah/zero padahal ada | Lost sales, buyer beralih ke kompetitor |
-| 3 | Pesanan dari berbagai marketplace dikelola manual | Lambat, rentan human error |
-| 4 | Tidak ada audit trail perubahan stok | Sulit telusuri penyebab discrepancy |
-| 5 | Data buyer (PII) tidak terproteksi | Risiko compliance, keamanan data |
+* 4 akun Shopee
+* 4 akun TikTok Shop
 
-### 2.2 Solusi
+Saat ini setiap toko berjalan secara terpisah.
 
-- **Central Stock Management**: Satu tempat kelola stok, otomatis terpush ke semua marketplace.
-- **Webhook-Driven Sync**: Stok update real-time saat pesanan masuk/keluar, bukan polling.
-- **Stock Ledger**: Audit trail lengkap untuk setiap perubahan stok.
-- **Order Consolidation**: Semua pesanan dari semua toko di satu dashboard.
-- **PII Protection**: Enkripsi AES-256-GCM untuk data sensitif buyer, masking di UI, retensi 90 hari.
+Stok produk tersebar di masing-masing marketplace dan tidak memiliki satu sumber stok pusat.
 
----
+Akibatnya client sering mengalami:
 
-## 3. Target Pengguna
+* Selisih stok fisik dengan stok marketplace
+* Overselling
+* Pesanan masuk tetapi barang ternyata habis
+* Pembatalan pesanan
+* Stok harus diperbarui manual di banyak toko
+* Kesulitan mengetahui stok sebenarnya
+* Kesulitan mengetahui variant/motif yang paling laku
+* Kesulitan mengetahui toko mana yang menghasilkan omset terbesar
+* Risiko kerugian akibat inventory mismatch
 
-| Persona | Kebutuhan |
-|---|---|
-| **Seller Multichannel** | Kelola stok & pesanan dari Shopee + TikTok + Tokopedia dalam satu tempat |
-| **Admin/Tim Operasional** | Proses pesanan, cetak label, monitor SLA pengiriman |
-| **Owner/Bisnis** | Dashboard analitik GMV, penjualan, performa toko |
+### MASALAH PALING PENTING
 
----
+> **Client sering rugi karena stok tidak sinkron di 8 akun marketplace.**
 
-## 4. Fitur Utama
-
-### 4.1 Authentication & Authorization
-
-| ID | Fitur | Status |
-|---|---|---|
-| AUTH-01 | Login dengan JWT + bcrypt | ✅ Done |
-| AUTH-02 | User management (admin) | ✅ Done |
-| AUTH-03 | Flag `canViewFullPii` untuk akses data sensitif | ✅ Done |
-| AUTH-04 | Role-based access (3 tier) | ⏳ Deferred |
-
-### 4.2 Dashboard
-
-| ID | Fitur | Status |
-|---|---|---|
-| DASH-01 | Action cards: pesanan baru, siap kirim, stok rendah, oversell | ✅ Done |
-| DASH-02 | Business analytics: GMV, unit sold, completed orders | ✅ Done |
-| DASH-03 | Period-over-period comparison (7 hari rolling) | ✅ Done |
-| DASH-04 | Top stores & top products | ✅ Done |
-| DASH-05 | Panduan awal (onboarding) | ✅ Done |
-
-### 4.3 Order Management
-
-| ID | Fitur | Status |
-|---|---|---|
-| ORD-01 | Order list dengan tab (all/unpaid/new/ready/shipped/completed/cancelled/returns) | ✅ Done |
-| ORD-02 | Search, sort, date-range filter, pagination | ✅ Done |
-| ORD-03 | Order detail modal dengan PII masking | ✅ Done |
-| ORD-04 | Cetak label, invoice, packing list (manual & bulk) | ✅ Done |
-| ORD-05 | Ambil official shipping label dari TikTok | ✅ Done |
-| ORD-06 | Merge bulk label ke satu PDF (A6) | ✅ Done |
-| ORD-07 | Ship package (TikTok fulfillment: PICKUP/DROP_OFF/self) | ✅ Done |
-| ORD-08 | SLA alerts: urgent (<6h), warning (<24h) | ✅ Done |
-| ORD-09 | Async tracking number polling | ✅ Done |
-
-### 4.4 Central Stock Sync (Core)
-
-| ID | Fitur | Status |
-|---|---|---|
-| STK-01 | Master Product → Product Variant → Platform SKU Mapping | ✅ Done |
-| STK-02 | Stock tracked per variant (single source of truth) | ✅ Done |
-| STK-03 | Safety stock buffer (`effectiveStock`) | ✅ Done |
-| STK-04 | Stock ledger (audit trail) dengan reason codes | ✅ Done |
-| STK-05 | Idempotent stock deduction/restore on order status changes | ✅ Done |
-| STK-06 | Push stock update ke marketplace (fire-and-forget) | ✅ Done |
-| STK-07 | SyncLog untuk retry tracking | ✅ Done |
-| STK-08 | Queue-based batching untuk rate limit | ⏳ Planned (scale) |
-
-### 4.5 Marketplace Integration
-
-| ID | Marketplace | Status |
-|---|---|---|
-| INT-01 | TikTok Shop (API + Webhook) | ✅ Done |
-| INT-02 | Shopee (Webhook stub) | 🔧 Stub |
-| INT-03 | Tokopedia | ⏳ Planned |
-| INT-04 | TikTok OAuth authorize/callback | ✅ Done |
-
-### 4.6 Inventory Management
-
-| ID | Fitur | Status |
-|---|---|---|
-| INV-01 | Inventory settings | ✅ Done |
-| INV-02 | Stock opname (manual adjustment) | ✅ Done |
-| INV-03 | History (via ledger) | ✅ Done |
-
-### 4.7 WMS (Warehouse Management)
-
-| ID | Fitur | Status |
-|---|---|---|
-| WMS-01 | Inbound | 🔧 Placeholder |
-| WMS-02 | Outbound | 🔧 Placeholder |
-| WMS-03 | Warehouse | 🔧 Placeholder |
-| WMS-04 | Racks | 🔧 Placeholder |
-
-### 4.8 PII Compliance
-
-| ID | Fitur | Status |
-|---|---|---|
-| PII-01 | AES-256-GCM encryption untuk phone & address | ✅ Done |
-| PII-02 | Masking: nama, HP, alamat, email | ✅ Done |
-| PII-03 | PiiAccessLog audit trail | ✅ Done |
-| PII-04 | Retensi 90 hari + anonymization cron | ✅ Done |
-
-### 4.9 Analytics
-
-| ID | Fitur | Status |
-|---|---|---|
-| ANL-01 | 7-day rolling revenue/units/completed orders | ✅ Done |
-| ANL-02 | GMV (excl. cancelled) | ✅ Done |
-| ANL-03 | Top stores & top products | ✅ Done |
-
-### 4.10 Other Modules (Placeholder)
-
-| Modul | Status |
-|---|---|
-| Promotions | 🔧 Placeholder |
-| Chat | 🔧 Placeholder |
-| Customers | 🔧 Placeholder |
-| Reports (sales/stock) | 🔧 Placeholder |
-| Logs | 🔧 Placeholder |
-| Market | 🔧 Placeholder |
-| Apps/API Connections | 🔧 Placeholder |
-| Education | 🔧 Placeholder |
+MAXIUS harus menyelesaikan masalah ini terlebih dahulu.
 
 ---
 
-## 5. Arsitektur & Tech Stack
+# 3. CORE SOLUTION
 
-### 5.1 Tech Stack
+MAXIUS harus memiliki konsep:
 
-| Layer | Teknologi |
-|---|---|
-| **Framework** | Next.js 16 (App Router) |
-| **Language** | TypeScript 5 (strict) |
-| **Database** | SQLite (via Prisma ORM v5.22) |
-| **Styling** | Tailwind CSS v4 |
-| **Charts** | Recharts 3.10 |
-| **Icons** | Lucide React |
-| **Auth** | JWT + bcryptjs |
-| **PDF** | pdf-lib + jsbarcode |
-| **API Integration** | TikTok Shop Open API (custom client + vendored SDK) |
+## CENTRAL INVENTORY
 
-### 5.2 Data Model (Prisma)
+Central Inventory menjadi **Single Source of Truth** untuk stok.
 
-```
-User
-  └── canViewFullPii (Boolean)
+Flow utama:
 
-Business
-  └── PlatformAccount[] (SHOPEE | TOKOPEDIA | TIKTOK_SHOP)
-        └── appKey, accessToken, refreshToken, shopCipher, externalShopId
+BARANG DATANG
+↓
+INPUT KE MAXIUS
+↓
+CENTRAL INVENTORY
+↓
+PRODUCT / VARIANT / SKU
+↓
+SYNC KE 8 MARKETPLACE
+↓
+CUSTOMER ORDER
+↓
+MARKETPLACE API / WEBHOOK
+↓
+MAXIUS ORDER ENGINE
+↓
+IDENTIFY SKU
+↓
+RESERVE / DEDUCT STOCK
+↓
+CENTRAL INVENTORY BERUBAH
+↓
+SYNC STOCK KE SEMUA CHANNEL
+↓
+STOCK UPDATED
 
-MasterProduct (threshold)
-  └── ProductVariant[] (sku, stock, safetyStock)
-        └── ProductMapping[] (variant ⇄ channelSku per account)
-
-Order → OrderItem[]
-  └── PlatformOrderMapping (externalOrderId, rawStatus, lastWebhookUpdateTime)
-  └── Shipment (carrier, trackingNo)
-
-SalesLog | SyncLog | PiiAccessLog | StockLedger
-```
-
-### 5.3 Stock Sync Flow
-
-```
-Marketplace Webhook → Verify HMAC → Idempotency Check
-  → Deduct/Restore Stock (ProductVariant.stock)
-  → Write StockLedger (audit trail)
-  → Push Updated Stock to Other Marketplaces (fire-and-forget)
-  → Log SyncLog (success/error)
-```
+Jangan membuat setiap marketplace memiliki stok independen sebagai sumber kebenaran.
 
 ---
 
-## 6. Non-Functional Requirements
+# 4. CONTOH PRODUK NYATA
 
-| ID | Requirement | Target |
-|---|---|---|
-| NFR-01 | Latency webhook processing | < 2 detik |
-| NFR-02 | Idempotency | Webhook retry tidak double-deduct |
-| NFR-03 | Audit trail | Setiap perubahan stok tercatat di ledger |
-| NFR-04 | PII encryption | AES-256-GCM, key di env |
-| NFR-05 | PII retention | Anonymize setelah 90 hari |
-| NFR-06 | Scalability | Dirancang untuk puluhan ribu SKU |
-| NFR-07 | Rate limit handling | Queue-based batching (planned) |
+Gunakan produk berikut sebagai contoh utama saat mendesain sistem:
 
----
+**Kaos Kaki Ortus Dewasa**
 
-## 7. Milestone & Roadmap
+Contoh struktur:
 
-### Phase 1: MVP (Current) ✅
-- [x] Auth & user management
-- [x] Central stock sync (Master → Variant → Mapping)
-- [x] TikTok Shop integration (API + webhook)
-- [x] Order management (list, detail, print, ship)
-- [x] SLA alerts
-- [x] PII encryption & masking
-- [x] Basic analytics dashboard
-- [x] Stock ledger & audit trail
+PRODUCT
+└── Kaos Kaki Ortus Dewasa
+│
+├── Sambung
+│   ├── Hitam
+│   └── Putih
+│
+└── Pendek
+├── Hitam
+└── Putih
 
-### Phase 2: Marketplace Expansion
-- [ ] Shopee API integration (bukan stub)
-- [ ] Tokopedia API integration
-- [ ] Multi-marketplace webhook handling
+Setiap kombinasi harus dapat memiliki SKU dan inventory sendiri.
 
-### Phase 3: Scale & Performance
-- [ ] Queue-based stock update batching
-- [ ] Rate limit handling per marketplace
-- [ ] Database optimization (SQLite → PostgreSQL migration path)
-- [ ] Real-time stock broadcast (WebSocket/SSE)
+Contoh:
 
-### Phase 4: Advanced Features
-- [ ] Role-based access control (3 tier)
-- [ ] Finance breakdown (TikTok Finance API)
-- [ ] WMS module (inbound/outbound/warehouse/racks)
-- [ ] Promotions, Chat, Customers modules
-- [ ] Reports (sales/stock) detailed
-- [ ] Mobile responsive / PWA
+ORT-S-H = Sambung Hitam
+ORT-S-P = Sambung Putih
+ORT-P-H = Pendek Hitam
+ORT-P-P = Pendek Putih
+
+**Catatan:**
+SKU final harus mengikuti data marketplace sebenarnya. Jangan mengarang mapping SKU production.
 
 ---
 
-## 8. Risks & Mitigations
+# 5. CONTOH CENTRAL STOCK
 
-| Risiko | Dampak | Mitigasi |
-|---|---|---|
-| SQLite tidak cocok untuk production high-volume | Performance bottleneck | Rencana migrasi ke PostgreSQL di Phase 3 |
-| TikTok API sandbox ≠ production | Fitur tidak jalan di production | Verifikasi field response dengan akun production |
-| Rate limit marketplace | Stock update gagal | Queue-based batching + retry (planned) |
-| Webhook downtime | Stok tidak sinkron | Fallback polling (planned), stock ledger untuk reconciliation |
-| PII breach | Compliance violation | AES-256-GCM + masking + retention + access log |
+Misalnya:
+
+Sambung Hitam = 100 pcs
+
+MAXIUS:
+
+Central Stock = 100
+
+Jika:
+
+Shopee Account 1 menjual 10 pcs
+
+Maka:
+
+100 - 10 = 90
+
+Central Stock:
+
+90 pcs
+
+Kemudian MAXIUS harus melakukan stock synchronization ke channel yang terhubung.
+
+Contoh target:
+
+Shopee 1 → 90
+Shopee 2 → 90
+Shopee 3 → 90
+Shopee 4 → 90
+
+TikTok 1 → 90
+TikTok 2 → 90
+TikTok 3 → 90
+TikTok 4 → 90
+
+Tujuannya adalah mencegah marketplace lain tetap menampilkan stok lama.
 
 ---
 
-## 9. Success Metrics
+# 6. CONTOH BARANG MASUK
 
-| Metric | Target |
-|---|---|
-| Stock accuracy (oversell rate) | < 0.1% |
-| Webhook processing latency | < 2 detik |
-| Time to fulfill order | Berkurang 50% dari baseline |
-| User adoption | 100% pesanan diproses via dashboard |
+Client menerima:
+
+10 lusin kaos kaki.
+
+10 lusin = 120 pcs.
+
+Jika Central Stock sebelumnya:
+
+75 pcs
+
+Maka:
+
+75 + 120 = 195 pcs
+
+MAXIUS harus mencatat inventory movement:
+
+STOCK_IN
++120
+
+Central Stock:
+
+195
+
+Kemudian melakukan synchronization ke marketplace.
 
 ---
 
-## 10. Lampiran
+# 7. SAFETY STOCK / LIMIT STOCK
 
-- **Database Schema**: `prisma/schema.prisma`
-- **Dev Notes**: `docs/dev-notes.md`
-- **Agent Guidelines**: `AGENTS.md`
-- **Seed Data**: `prisma/seed.js` (admin user + 8 accounts + 4 products)
+MAXIUS harus mendukung:
+
+* Actual Stock
+* Safety Stock
+* Sellable Stock
+
+Contoh:
+
+Actual Stock = 195
+Safety Stock = 20
+
+Maka:
+
+Sellable Stock = 175
+
+Marketplace hanya boleh mendapatkan:
+
+175
+
+Sedangkan:
+
+20 pcs
+
+tetap menjadi buffer.
+
+Tujuannya adalah mengurangi risiko overselling akibat delay API, race condition, atau sinkronisasi marketplace.
+
+---
+
+# 8. VARIANT STOCK HARUS TERPISAH
+
+Jangan hanya menyimpan:
+
+Product Stock = 390
+
+MAXIUS harus mengetahui:
+
+Sambung Hitam = 100
+Sambung Putih = 80
+Pendek Hitam = 120
+Pendek Putih = 90
+
+Jika customer membeli:
+
+Sambung Hitam × 5
+
+Maka:
+
+Sambung Hitam:
+
+100 → 95
+
+Bukan hanya:
+
+Total Product:
+
+390 → 385
+
+Variant/SKU adalah unit inventory yang penting.
+
+---
+
+# 9. SKU MAPPING
+
+Marketplace dapat menggunakan SKU yang berbeda.
+
+Contoh:
+
+MASTER SKU
+ORT-S-H
+
+Marketplace:
+
+Shopee 1 → SKU-172839
+Shopee 2 → ORT-SH-01
+TikTok 1 → 928372
+TikTok 2 → ORT-BLK-S
+
+Semua mapping tersebut harus menunjuk ke:
+
+MASTER SKU
+ORT-S-H
+
+Dengan demikian semua channel tetap terhubung ke satu inventory pusat.
+
+---
+
+# 10. ORDER ENGINE
+
+Semua order dari 8 akun harus masuk ke satu Order Engine.
+
+Sources:
+
+Shopee 1
+Shopee 2
+Shopee 3
+Shopee 4
+
+TikTok 1
+TikTok 2
+TikTok 3
+TikTok 4
+
+↓
+
+UNIFIED ORDER
+
+↓
+
+Identify Marketplace Account
+
+↓
+
+Identify Marketplace Product
+
+↓
+
+Identify Marketplace SKU
+
+↓
+
+Resolve Master SKU
+
+↓
+
+Validate Stock
+
+↓
+
+Reserve / Deduct Stock
+
+↓
+
+Create Inventory Movement
+
+↓
+
+Update Central Inventory
+
+↓
+
+Queue Stock Synchronization
+
+↓
+
+Sync marketplace stock
+
+---
+
+# 11. CONCURRENCY / RACE CONDITION
+
+Ini sangat penting.
+
+Bayangkan stok hanya:
+
+5 pcs.
+
+Pada waktu hampir bersamaan:
+
+Shopee order = 4 pcs
+
+TikTok order = 4 pcs
+
+MAXIUS tidak boleh menghasilkan:
+
+5 - 4 - 4 = -3
+
+Sistem harus memiliki mekanisme:
+
+* Atomic inventory update
+* Transaction
+* Stock reservation
+* Idempotency
+* Duplicate order protection
+* Queue
+* Retry
+* Sync lock jika diperlukan
+
+Tujuan:
+
+> Stock tidak boleh menjadi negatif karena dua order diproses bersamaan.
+
+---
+
+# 12. WEBHOOK & ORDER SYNC
+
+Prioritaskan event-driven architecture jika API marketplace mendukung.
+
+Flow:
+
+MARKETPLACE
+↓
+WEBHOOK
+↓
+MAXIUS
+↓
+Validate Event
+↓
+Check Idempotency
+↓
+Resolve Order
+↓
+Resolve SKU
+↓
+Inventory Transaction
+↓
+Update Order
+↓
+Queue Stock Sync
+
+Jangan memproses webhook dua kali.
+
+Jika event yang sama datang dua kali:
+
+Order hanya boleh memengaruhi inventory satu kali.
+
+---
+
+# 13. SYNC ENGINE
+
+Buat Sync Engine terpisah.
+
+Contoh:
+
+Sync Job:
+
+SYNC_STOCK
+
+Target:
+
+TikTok Account 2
+
+SKU:
+
+ORT-S-H
+
+Quantity:
+
+90
+
+Status:
+
+PENDING
+↓
+PROCESSING
+↓
+SUCCESS
+
+atau:
+
+FAILED
+↓
+RETRY
+↓
+SUCCESS
+
+Simpan:
+
+* job ID
+* marketplace
+* account
+* entity
+* SKU
+* old value
+* new value
+* status
+* retry count
+* error message
+* timestamp
+
+---
+
+# 14. ERROR HANDLING
+
+Jangan menganggap API selalu berhasil.
+
+Jika:
+
+Central Stock = 90
+
+Tetapi update ke TikTok gagal.
+
+MAXIUS harus:
+
+1. Menyimpan central stock = 90
+2. Mencatat sync job FAILED
+3. Retry secara otomatis
+4. Memberikan notification jika gagal berkali-kali
+5. Menampilkan mismatch pada dashboard
+
+Contoh:
+
+STOCK MISMATCH
+
+Central:
+90
+
+TikTok 2:
+100
+
+Status:
+WARNING
+
+Action:
+Retry Sync
+
+---
+
+# 15. PRODUCT MANAGEMENT
+
+Product module harus mendukung:
+
+* Product
+* Category
+* Variant
+* SKU
+* Marketplace Mapping
+* Price
+* Stock
+* Safety Stock
+* Status
+* Product Image
+* Marketplace Product ID
+
+---
+
+# 16. INVENTORY MANAGEMENT
+
+Inventory adalah modul paling penting.
+
+Minimal:
+
+* Central Stock
+* Stock In
+* Stock Out
+* Stock Adjustment
+* Stock Reservation
+* Safety Stock
+* Sellable Stock
+* Inventory Movement
+* Stock History
+* Stock Mismatch
+* Sync Status
+
+Contoh:
+
+Inventory Movement:
+
+STOCK_IN
++120
+
+ORDER
+-10
+
+ADJUSTMENT
+-2
+
+RETURN
++1
+
+Semua perubahan harus memiliki audit trail.
+
+---
+
+# 17. UNIFIED ORDER MANAGEMENT
+
+Admin harus dapat melihat semua order dari satu dashboard.
+
+Filter:
+
+* Marketplace
+* Account
+* Order Status
+* Payment Status
+* Shipping Status
+* Product
+* Variant
+* SKU
+* Date
+
+Contoh:
+
+#INV001
+Shopee 1
+Kaos Kaki Ortus
+Sambung Hitam × 2
+Rp120.000
+Paid
+Processing
+
+---
+
+# 18. DASHBOARD
+
+Dashboard bukan fokus utama pertama.
+
+Dashboard hanya menjadi visualisasi dari engine.
+
+Minimal KPI:
+
+* Total Omset
+* Total Order
+* Product Sold
+* Central Stock
+* Low Stock
+* Stock Mismatch
+* Winning Product
+* Winning Variant
+* Store Performance
+* Store Health
+* Sync Error
+
+---
+
+# 19. WINNING PRODUCT / VARIANT
+
+MAXIUS harus dapat menentukan:
+
+Produk paling laku.
+
+Dan:
+
+Variant paling laku.
+
+Contoh:
+
+1. Sambung Hitam — 8.421 sold
+2. Pendek Hitam — 6.821 sold
+3. Sambung Putih — 4.211 sold
+4. Pendek Putih — 2.981 sold
+
+Filter:
+
+* Today
+* 7 Days
+* 30 Days
+* This Month
+* Custom Range
+
+Dan:
+
+* All Marketplace
+* Shopee
+* TikTok
+* Individual Account
+
+---
+
+# 20. OMSET REPORT
+
+Laporan harus dapat di-breakdown:
+
+Total Omset
+
+↓
+
+Platform
+
+↓
+
+Account
+
+↓
+
+Product
+
+↓
+
+Variant
+
+Contoh:
+
+Shopee:
+Rp70M
+
+TikTok:
+Rp55M
+
+Kemudian:
+
+Shopee 1:
+Rp20M
+
+Shopee 2:
+Rp18M
+
+dst.
+
+---
+
+# 21. STORE HEALTH
+
+Tampilkan informasi yang tersedia dari marketplace API.
+
+Contoh:
+
+Shopee 1
+Rating 4.9
+Healthy
+
+Shopee 2
+Rating 4.8
+Healthy
+
+Shopee 3
+Rating 4.2
+Warning
+
+Indikator dapat mencakup:
+
+* Rating
+* Cancellation
+* Order
+* Performance
+* Warning
+* Account/API status
+
+Jangan mengasumsikan data tersedia jika API marketplace tidak menyediakannya.
+
+---
+
+# 22. CUSTOMER ANALYTICS
+
+Dashboard dapat menampilkan:
+
+* Total customer
+* Repeat customer
+* Customer distribution
+* Demographic information
+
+Tetapi:
+
+**Jangan mengarang data umur/gender.**
+
+Hanya gunakan data yang benar-benar tersedia dan diizinkan oleh marketplace API.
+
+---
+
+# 23. CHAT
+
+Unified Chat:
+
+Shopee 1
+Shopee 2
+Shopee 3
+Shopee 4
+TikTok 1
+TikTok 2
+TikTok 3
+TikTok 4
+
+↓
+
+UNIFIED CHAT
+
+Admin dapat melihat percakapan dalam satu interface jika API marketplace mendukung kemampuan tersebut.
+
+Chat bukan prioritas MVP pertama.
+
+---
+
+# 24. CAMPAIGN
+
+Campaign management:
+
+Create Campaign
+↓
+Select Product
+↓
+Select Variant
+↓
+Select Marketplace
+↓
+Select Account
+↓
+Configure Promotion
+↓
+Activate
+
+Campaign juga harus memperhatikan inventory.
+
+Jangan membuat campaign yang menjual stock melebihi sellable inventory.
+
+---
+
+# 25. NOTIFICATION
+
+Minimal notification:
+
+* New Order
+* Low Stock
+* Stock Mismatch
+* Sync Failed
+* API Error
+* Token Expired
+* Store Health Warning
+* Inventory Adjustment
+* Failed Order Processing
+
+Notification channel awal:
+
+* Dashboard
+* Telegram
+
+---
+
+# 26. STORE MANAGEMENT
+
+MAXIUS harus mendukung 8 marketplace accounts.
+
+Structure:
+
+MARKETPLACES
+│
+├── SHOPEE
+│   ├── Account 1
+│   ├── Account 2
+│   ├── Account 3
+│   └── Account 4
+│
+└── TIKTOK
+├── Account 1
+├── Account 2
+├── Account 3
+└── Account 4
+
+Setiap account:
+
+* Platform
+* Shop ID
+* Account Name
+* Connection Status
+* API Status
+* Last Sync
+* Token status
+* Error status
+
+Gunakan mekanisme authentication/API resmi marketplace.
+
+---
+
+# 27. DATABASE PRINCIPLE
+
+Minimal entity:
+
+users
+
+marketplace_accounts
+
+products
+
+product_variants
+
+master_skus
+
+sku_mappings
+
+inventory
+
+inventory_movements
+
+inventory_reservations
+
+orders
+
+order_items
+
+sync_jobs
+
+sync_logs
+
+notifications
+
+store_metrics
+
+campaigns
+
+customers
+
+Gunakan relasi yang jelas.
+
+Jangan membuat satu tabel besar yang mencampur semua data.
+
+---
+
+# 28. AUDITABILITY
+
+Setiap perubahan stok harus dapat dilacak.
+
+Contoh:
+
+SKU:
+ORT-S-H
+
+Before:
+100
+
+Movement:
+ORDER
+
+Order:
+SP-12345
+
+Quantity:
+-10
+
+After:
+90
+
+Source:
+Shopee Account 1
+
+Timestamp:
+...
+
+Admin harus dapat menjawab:
+
+> “Kenapa stok produk ini sekarang tinggal 90?”
+
+---
+
+# 29. MVP PRIORITY
+
+## P0 — WAJIB
+
+1. Authentication
+2. Marketplace Account
+3. Shopee Integration
+4. TikTok Integration
+5. Product
+6. Variant
+7. Master SKU
+8. SKU Mapping
+9. Central Inventory
+10. Stock In
+11. Stock Adjustment
+12. Order Sync
+13. Stock Deduction
+14. Stock Reservation
+15. Webhook
+16. Idempotency
+17. Queue
+18. Retry
+19. Sync Log
+20. Stock Mismatch
+21. Basic Dashboard
+
+## P1
+
+1. Winning Product
+2. Winning Variant
+3. Omset
+4. Store Health
+5. Notifications
+6. Low Stock Alert
+7. Advanced Inventory History
+
+## P2
+
+1. Unified Chat
+2. Campaign
+3. Customer Analytics
+4. Advanced Reports
+5. Automation
+
+---
+
+# 30. DEVELOPMENT PRINCIPLE
+
+Jangan langsung membangun semua halaman.
+
+Urutan development:
+
+PHASE 1
+Database + Authentication
+
+↓
+
+PHASE 2
+Marketplace Account
+
+↓
+
+PHASE 3
+Product + Variant + SKU
+
+↓
+
+PHASE 4
+Central Inventory
+
+↓
+
+PHASE 5
+Order Engine
+
+↓
+
+PHASE 6
+Webhook + Idempotency
+
+↓
+
+PHASE 7
+Sync Engine + Queue + Retry
+
+↓
+
+PHASE 8
+Dashboard
+
+↓
+
+PHASE 9
+Analytics
+
+↓
+
+PHASE 10
+Chat + Campaign
+
+---
+
+# 31. ACCEPTANCE CRITERIA — CORE INVENTORY
+
+MAXIUS dianggap berhasil pada fitur inti jika skenario berikut berhasil.
+
+### Scenario 1 — Stock In
+
+Initial:
+0
+
+Stock In:
+120
+
+Expected:
+
+Central Stock = 120
+
+---
+
+### Scenario 2 — Order
+
+Initial:
+120
+
+Shopee order:
+10
+
+Expected:
+
+Central Stock = 110
+
+---
+
+### Scenario 3 — Another Marketplace
+
+Initial:
+110
+
+TikTok order:
+20
+
+Expected:
+
+Central Stock = 90
+
+---
+
+### Scenario 4 — Variant
+
+Sambung Hitam:
+100
+
+Order Sambung Hitam:
+5
+
+Expected:
+
+Sambung Hitam = 95
+
+Variant lain tidak berubah.
+
+---
+
+### Scenario 5 — Safety Stock
+
+Actual:
+100
+
+Safety:
+10
+
+Expected:
+
+Sellable:
+90
+
+---
+
+### Scenario 6 — Concurrent Order
+
+Stock:
+5
+
+Order A:
+4
+
+Order B:
+4
+
+Expected:
+
+Only one transaction succeeds completely according to available inventory.
+
+Stock must never become:
+
+-1
+-2
+-3
+
+---
+
+### Scenario 7 — Duplicate Webhook
+
+Same order event received twice.
+
+Expected:
+
+Inventory is deducted only once.
+
+---
+
+### Scenario 8 — Sync Failure
+
+Central:
+90
+
+Marketplace:
+100
+
+Sync fails.
+
+Expected:
+
+Central remains 90.
+
+Sync job:
+
+FAILED
+
+Retry:
+
+PENDING
+
+Dashboard:
+
+STOCK MISMATCH
+
+---
+
+# 32. IMPORTANT PRODUCT PRINCIPLE
+
+Selalu ingat:
+
+## MAXIUS = CENTRAL INVENTORY FIRST
+
+Bukan:
+
+Dashboard First.
+
+Bukan:
+
+Chat First.
+
+Bukan:
+
+Campaign First.
+
+Bukan:
+
+Analytics First.
+
+Tetapi:
+
+**INVENTORY → ORDER → SYNC → ANALYTICS**
+
+Karena masalah client adalah:
+
+> **RUGI KARENA STOK TIDAK TERKONTROL DI 8 TOKO.**
+
+Semua fitur lain harus mendukung penyelesaian masalah tersebut.
+
+---
+
+# 33. BUSINESS FLOW FINAL
+
+BARANG DATANG
+↓
+ADMIN INPUT STOCK
+↓
+CENTRAL INVENTORY
+↓
+PRODUCT / VARIANT / SKU
+↓
+8 MARKETPLACE
+↓
+CUSTOMER ORDER
+↓
+WEBHOOK / API
+↓
+ORDER ENGINE
+↓
+RESOLVE SKU
+↓
+CHECK INVENTORY
+↓
+RESERVE STOCK
+↓
+DEDUCT STOCK
+↓
+INVENTORY MOVEMENT
+↓
+CENTRAL STOCK UPDATED
+↓
+QUEUE STOCK SYNC
+↓
+SHOPEE + TIKTOK UPDATED
+↓
+SYNC LOG
+↓
+NOTIFICATION
+↓
+DASHBOARD / REPORT
+
+---
+
+# 34. INFRASTRUCTURE
+
+Initial deployment:
+
+Domain:
+maxius.id
+
+Estimated domain:
+Rp300.000 / year
+
+Hosting:
+VPS
+
+Estimated:
+Rp87.000 / month
+
+Architecture harus disiapkan agar dapat berkembang ketika jumlah marketplace/account/order meningkat.
+
+---
+
+# 35. FINAL INSTRUCTION TO AI AGENT
+
+Sebelum menulis kode:
+
+1. Pahami business problem.
+2. Identifikasi dependency antar fitur.
+3. Buat database architecture.
+4. Buat inventory architecture.
+5. Buat order lifecycle.
+6. Buat SKU mapping strategy.
+7. Buat sync strategy.
+8. Buat webhook/idempotency strategy.
+9. Buat queue/retry strategy.
+10. Baru implementasikan UI.
+
+Jika ada fitur yang terlihat bagus tetapi tidak membantu menyelesaikan masalah inventory, **jangan jadikan prioritas**.
+
+Jangan over-engineer.
+
+Bangun MVP yang stabil terlebih dahulu.
+
+Setiap implementasi harus mempertimbangkan:
+
+* Data consistency
+* Inventory accuracy
+* Idempotency
+* Concurrency
+* API failure
+* Retry
+* Audit trail
+* Security
+* Scalability
+* Observability
+
+### THE MOST IMPORTANT REQUIREMENT
+
+> **MAXIUS harus memastikan bahwa penjualan dari salah satu dari 8 akun marketplace dapat memengaruhi Central Inventory dengan benar dan perubahan tersebut dapat disinkronkan kembali ke marketplace lainnya.**
+
+Jika requirement ini belum aman dan reliable, jangan lanjut menganggap fitur analytics/chat/campaign sebagai prioritas.
+
+## END OF MASTER PROMPT
