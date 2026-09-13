@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Kode hasil generate (OpenAPI Generator) — jangan dilint/diedit manual.
+    "lib/tiktok-sdk/**",
+    // Skrip E2E Playwright (punya toolchain sendiri di luar project).
+    "e2e/**",
   ]),
 ]);
 

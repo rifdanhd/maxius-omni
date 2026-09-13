@@ -44,3 +44,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# e2e (playwright, toolchain di luar project)
+e2e/screenshots/
+e2e/test-results/
+
+# test output & artefak sementara (jangan di-commit)
+test-results/
+scripts/tmp-*.mts
+scripts/tmp-*.mjs
+docs/*-results.json
