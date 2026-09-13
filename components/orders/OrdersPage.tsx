@@ -7,6 +7,11 @@ import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, printPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
 import { ordersToCsv, downloadCsv, type ExportOrderRow } from "./exportOrders";
+import RequestPickupModal, { type PickupShipResult, type RequestPickupOrder } from "./RequestPickupModal";
+import PickupSuccessModal from "./PickupSuccessModal";
+import PrintMethodModal from "./PrintMethodModal";
+import { PackageCheck } from "lucide-react";
+import { authFetch } from "@/lib/utils/api-client";
 
 const PAGE_SIZE = 20;
 
@@ -81,6 +86,7 @@ type Order = {
   account: { id: string; platform: string; label: string } | null;
   items: OrderItem[];
   orderMappings: { externalOrderId: string; rawStatus: string }[];
+  shipments: { externalId: string | null; carrier: string | null; trackingNo: string | null; status: string }[];
 };
 
 type OrderDetail = {
@@ -126,6 +132,7 @@ function toCardOrder(o: Order) {
     : "-";
   const storeName = o.account?.label ?? "-";
   const platform = PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-";
+  const shipment = o.shipments?.[0] ?? null;
 
   return {
     id: o.id,
@@ -146,8 +153,8 @@ function toCardOrder(o: Order) {
     address: "",
     orderDate,
     sellerNote: null,
-    courier: "-",
-    trackingNumber: "-",
+    courier: shipment?.carrier ?? "-",
+    trackingNumber: shipment?.trackingNo ?? "-",
     buyerNote: null,
     pickupLocation: "Master Warehouse",
     fulfillmentStage: null,
@@ -187,7 +194,7 @@ function toPrintable(o: Order): PrintableOrder {
 async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
   try {
     const token = localStorage.getItem("token");
-    const res = await fetch(`/api/orders/${id}`, {
+    const res = await authFetch(`/api/orders/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
@@ -207,7 +214,7 @@ async function fetchOfficialLabel(
 ): Promise<{ docUrl: string; trackingNumber: string | null } | null> {
   try {
     const token = localStorage.getItem("token");
-    const res = await fetch(`/api/orders/${id}/label`, {
+    const res = await authFetch(`/api/orders/${id}/label`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
@@ -344,10 +351,14 @@ export default function OrdersPage() {
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [shippingId, setShippingId] = useState<string | null>(null);
   const [printingBulk, setPrintingBulk] = useState(false);
+  const [pickupTargets, setPickupTargets] = useState<RequestPickupOrder[] | null>(null);
+  const [pickupResult, setPickupResult] = useState<PickupShipResult | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printOrderIds, setPrintOrderIds] = useState<string[]>([]);
 
   const currentTab = TABS.find((t) => t.id === activeTab) ?? TABS[0];
   const currentSubTabs = SUB_TABS[activeTab] ?? null;
@@ -361,7 +372,7 @@ export default function OrdersPage() {
         ? { id: opts.tab.id, label: opts.tab.label, statuses: opts.subTab.statuses }
         : opts.tab;
       const query = buildQueryParams({ ...opts, tab: effectiveTab });
-      const res = await fetch(`/api/orders?${query}`, {
+      const res = await authFetch(`/api/orders?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Terjadi kesalahan saat memuat pesanan (${res.status})`);
@@ -449,7 +460,7 @@ export default function OrdersPage() {
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/orders/sync", {
+      const res = await authFetch("/api/orders/sync", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -463,19 +474,53 @@ export default function OrdersPage() {
       setTotal(result.total ?? 0);
       setPageCount(result.pageCount ?? 1);
       setSelected(new Set());
+      const reconcileNote = (data.results as { reconciled?: number }[] | undefined)
+        ?.map((r) => r.reconciled ?? 0)
+        .reduce((a, b) => a + b, 0);
       const detail = data.results
-        ?.map((r: { label?: string; created?: number; skipped?: number; error?: string }) =>
+        ?.map((r: { label?: string; created?: number; skipped?: number; reconciled?: number; error?: string }) =>
           r.error
             ? `${r.label}: ${r.error}`
-            : `${r.label}: +${r.created ?? 0} baru, ${r.skipped ?? 0} sudah ada`
+            : `${r.label}: +${r.created ?? 0} baru, ${r.skipped ?? 0} sudah ada${(r.reconciled ?? 0) > 0 ? `, ${r.reconciled} resi dilengkapi` : ""}`
         )
         .join("\n");
-      alert(`Sync selesai — ${data.synced ?? 0} order baru, ${data.skipped ?? 0} sudah ada.${detail ? `\n\n${detail}` : ""}`);
+      alert(`Sync selesai — ${data.synced ?? 0} order baru, ${data.skipped ?? 0} sudah ada.${reconcileNote ? `\n\nResi backfill: ${reconcileNote} paket diperbarui.` : ""}${detail ? `\n\n${detail}` : ""}`);
     } catch (e) {
       console.error(e);
       setError("Terjadi kesalahan saat sync.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleReconcile = async () => {
+    setReconciling(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await authFetch("/api/orders/fulfillment/reconcile", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? `Gagal sync resi (${res.status})`);
+        return;
+      }
+      const detail = (data.results as { label?: string; scanned?: number; updated?: number; error?: string }[])
+        ?.map((r) => (r.error ? `${r.label}: ${r.error}` : `${r.label}: ${r.updated ?? 0}/${r.scanned ?? 0} resi dilengkapi`))
+        .join("\n");
+      alert(`Sync resi selesai — ${data.updated ?? 0} paket diperbarui dari ${data.scanned ?? 0}.${detail ? `\n\n${detail}` : ""}`);
+      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
+      setOrders(refreshed.orders ?? []);
+      setTotal(refreshed.total ?? 0);
+      setPageCount(refreshed.pageCount ?? 1);
+      setSelected(new Set());
+    } catch (e) {
+      console.error(e);
+      setError("Terjadi kesalahan saat sync resi.");
+    } finally {
+      setReconciling(false);
     }
   };
 
@@ -504,7 +549,7 @@ export default function OrdersPage() {
     setPrintingBulk(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/orders/bulk-label", {
+      const res = await authFetch("/api/orders/bulk-label", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ orderIds: targets.map((o) => o.id) }),
@@ -577,62 +622,69 @@ export default function OrdersPage() {
     downloadCsv(`pesanan-${date}.csv`, csv);
   };
 
-  /** handleShip — ship paket TikTok otomatis, lalu refresh & cetak label resmi. */
-  const handleShip = async (order: Order) => {
-    if (shippingId) return;
-    setShippingId(order.id);
+  const allSelected = orders.length > 0 && orders.every((o) => selected.has(o.id));
+
+  /** Apakah tab aktif adalah "Siap Dikirim" (AWAITING_SHIPMENT)? */
+  const isReadyTab = currentTab.id === "ready";
+
+  /** handlePickup — buka modal "Atur Pengiriman" untuk pesanan terpilih. */
+  const handlePickup = () => {
+    const targets = orders
+      .filter((o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT")
+      .map((o) => ({
+        id: o.id,
+        orderNo: o.orderNo,
+        status: o.status,
+        platform: PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-",
+        storeName: o.account?.label ?? "-",
+        totalQty: o.items.reduce((acc, it) => acc + it.qty, 0),
+        totalPrice: formatPrice(o.amount),
+        buyerName: o.buyerName ?? "-",
+        courier: o.shipments?.[0]?.carrier ?? "-",
+        paymentMethod: o.currency ?? "IDR",
+      }));
+    if (targets.length === 0) return;
+    setPickupTargets(targets);
+  };
+
+  const handlePickupConfirm = (result: PickupShipResult) => {
+    setPickupTargets(null);
+    setPickupResult(result);
+  };
+
+  const refreshList = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/orders/${order.id}/ship`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        // Docker: handover_method default DROP_OFF. Untuk jadwal pickup khusus
-        // (PICKUP + pickup_slot) kirim body lengkap ketika UI-nya tersedia.
-        body: JSON.stringify({ handover_method: "DROP_OFF" }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        alert(data?.error ?? "Gagal mengirim paket.");
-        return;
-      }
-
-      // Refresh list supaya Kurir & Nomor Resi ikut ter-update.
-      try {
-        const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
-        setOrders(refreshed.orders ?? []);
-        setTotal(refreshed.total ?? total);
-        setPageCount(refreshed.pageCount ?? pageCount);
-      } catch {
-        // Refresh gagal bukan hal fatal — info sudah tampil di alert di bawah.
-      }
-
-      if (data.docUrl) {
-        // Label resmi TikTok langsung dicetak.
-        printShippingDocument(data.docUrl, `Label ${order.orderNo}`);
-      } else {
-        alert(
-          `Paket berhasil dikirim.\nKurir: ${data.providerName ?? "-"} · Resi: ${
-            data.trackingNumber ?? "masih diproses"
-          }${
-            data.labelReady
-              ? ""
-              : "\n\nLabel resmi belum tersedia. Klik 'Cetak Label' beberapa saat lagi."
-          }`
-        );
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Terjadi kesalahan saat mengirim paket.");
-    } finally {
-      setShippingId(null);
+      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
+      setOrders(refreshed.orders ?? []);
+      setTotal(refreshed.total ?? total);
+      setPageCount(refreshed.pageCount ?? pageCount);
+      setCounts(refreshed.counts ?? counts);
+      setSelected(new Set());
+    } catch {
+      // Refresh gagal bukan hal fatal — info sudah tampil di modal.
     }
+  };
+
+  const handlePickupSuccessClose = async () => {
+    setPickupResult(null);
+    await refreshList();
+  };
+
+  const handleOpenPrintLabels = (successfulOrderIds: string[]) => {
+    setPrintOrderIds(successfulOrderIds);
+    setShowPrintModal(true);
+  };
+
+  const handlePrintDone = async () => {
+    setShowPrintModal(false);
+    setPickupResult(null);
+    setPrintOrderIds([]);
+    await refreshList();
   };
 
   const handleOpenDetail = (order: Order) => {
     router.push(`/orders/detail/${order.id}`);
   };
-
-  const allSelected = orders.length > 0 && orders.every((o) => selected.has(o.id));
 
   return (
     <div className="p-8 font-sans h-full flex flex-col">
@@ -653,6 +705,14 @@ export default function OrdersPage() {
           >
             <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Menyinkronkan..." : "Sync Pesanan"}
+          </button>
+          <button
+            onClick={handleReconcile}
+            disabled={reconciling}
+            className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={16} className={reconciling ? "animate-spin" : ""} />
+            {reconciling ? "Menyinkronkan Resi..." : "Sync Resi"}
           </button>
           <button
             onClick={handleExportVisible}
@@ -839,18 +899,29 @@ export default function OrdersPage() {
               <span className="text-sm font-medium text-gray-700">Pilih Semua</span>
             </label>
             {selected.size > 0 && (
-              <PrintDropdown
-                variant="filled"
-                prefixIcon={<Printer size={14} />}
-                label={`Cetak (${selected.size})`}
-                placement="bottom-left"
-                onSelect={(type) => printSelectedBulk(type)}
-                items={[
-                  { id: "Label", label: "Cetak Label", description: "Label resmi TikTok gabungan (PDF)" },
-                  { id: "Invoice", label: "Cetak Invoice", description: "Faktur pesanan terpilih" },
-                  { id: "PackingList", label: "Cetak Packing List", description: "Daftar packing pesanan terpilih" },
-                ]}
-              />
+              <>
+                {isReadyTab && (
+                  <button
+                    onClick={handlePickup}
+                    disabled={printingBulk}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 rounded-md text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors"
+                  >
+                    <PackageCheck size={14} /> Atur Pengiriman ({selected.size})
+                  </button>
+                )}
+                <PrintDropdown
+                  variant="filled"
+                  prefixIcon={<Printer size={14} />}
+                  label={`Cetak (${selected.size})`}
+                  placement="bottom-left"
+                  onSelect={(type) => printSelectedBulk(type)}
+                  items={[
+                    { id: "Label", label: "Cetak Label", description: "Label resmi TikTok gabungan (PDF)" },
+                    { id: "Invoice", label: "Cetak Invoice", description: "Faktur pesanan terpilih" },
+                    { id: "PackingList", label: "Cetak Packing List", description: "Daftar packing pesanan terpilih" },
+                  ]}
+                />
+              </>
             )}
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-600">
@@ -897,14 +968,55 @@ export default function OrdersPage() {
                 onToggleChecked={() => toggleSelect(order.id)}
                 onSync={handleSync}
                 onPrint={(type) => printOrder(order, type)}
-                onShip={() => handleShip(order)}
-                shipping={shippingId === order.id}
+                onPickup={() => {
+                  // Single-order pickup dari kartu — buka modal dengan order ini saja.
+                  const o = order;
+                  setPickupTargets([{
+                    id: o.id,
+                    orderNo: o.orderNo,
+                    status: o.status,
+                    platform: PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-",
+                    storeName: o.account?.label ?? "-",
+                    totalQty: o.items.reduce((acc, it) => acc + it.qty, 0),
+                    totalPrice: formatPrice(o.amount),
+                    buyerName: o.buyerName ?? "-",
+                    courier: o.shipments?.[0]?.carrier ?? "-",
+                    paymentMethod: o.currency ?? "IDR",
+                  }]);
+                }}
+                shipping={false}
                 onDetail={() => handleOpenDetail(order)}
               />
             ))
           )}
         </div>
       </div>
+
+      {/* Modal Alur Pengiriman */}
+      {pickupTargets && (
+        <RequestPickupModal
+          orders={pickupTargets}
+          onClose={() => setPickupTargets(null)}
+          onConfirm={handlePickupConfirm}
+        />
+      )}
+
+      {pickupResult && (
+        <PickupSuccessModal
+          result={pickupResult}
+          onClose={handlePickupSuccessClose}
+          onPrintLabels={handleOpenPrintLabels}
+        />
+      )}
+
+      {showPrintModal && pickupResult && (
+        <PrintMethodModal
+          title={`Label Pengiriman (${printOrderIds.length})`}
+          orderIds={printOrderIds}
+          onClose={() => setShowPrintModal(false)}
+          onDone={handlePrintDone}
+        />
+      )}
     </div>
   );
 }

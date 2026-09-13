@@ -116,6 +116,7 @@ export const GET = withAuth(async (req) => {
         },
         account: { select: { id: true, platform: true, label: true } },
         orderMappings: { select: { externalOrderId: true, rawStatus: true } },
+        shipments: { select: { externalId: true, carrier: true, trackingNo: true, status: true } },
       },
       orderBy: { [sortField]: sortDir },
       skip: (page - 1) * pageSize,
@@ -149,6 +150,7 @@ export const GET = withAuth(async (req) => {
     items: o.items,
     account: o.account,
     orderMappings: o.orderMappings,
+    shipments: o.shipments,
   }));
 
   return NextResponse.json({

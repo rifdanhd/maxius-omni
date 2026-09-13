@@ -25,10 +25,10 @@ export const POST = withAuth(async () => {
       continue;
     }
     try {
-      const { fetched, created, skipped, errors: errs } = await syncOrdersTikTok(acc.id);
+      const { fetched, created, skipped, reconciled = 0, errors: errs } = await syncOrdersTikTok(acc.id);
       totalCreated += created;
       totalSkipped += skipped;
-      results.push({ accountId: acc.id, label: acc.label, fetched, created, skipped });
+      results.push({ accountId: acc.id, label: acc.label, fetched, created, skipped, reconciled });
       if (errs.length) errors.push(...errs.map((e) => `${acc.label}: ${e}`));
     } catch (e) {
       results.push({ accountId: acc.id, label: acc.label, error: e instanceof Error ? e.message : String(e) });

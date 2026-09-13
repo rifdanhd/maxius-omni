@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, RefreshCw, Pencil, MoreHorizontal, MessageCircle, FileText, PackageCheck, Printer } from "lucide-react";
+import { Clock, RefreshCw, Pencil, MessageCircle, FileText, PackageCheck, Printer } from "lucide-react";
 import OrderProgressSteps from "./OrderProgressSteps";
 import PrintDropdown from "./PrintDropdown";
 import TikTokLogo from "@/components/icons/TikTokLogo";
-import TrackingModal from "./TrackingModal";
+import TrackingModal, { type TrackingEvent } from "./TrackingModal";
+import { authFetch } from "@/lib/utils/api-client";
 
 export type PrintType = "Label" | "Invoice" | "PackingList";
 
@@ -69,6 +70,7 @@ export default function OrderCard({
   onSync,
   onPrint,
   onShip,
+  onPickup,
   onDetail,
   shipping = false,
 }: {
@@ -78,11 +80,37 @@ export default function OrderCard({
   onSync: () => void;
   onPrint: (type: PrintType) => void;
   onShip?: () => void;
+  onPickup?: () => void;
   onDetail: () => void;
   shipping?: boolean;
 }) {
   const [showTracking, setShowTracking] = useState(false);
+  const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[] | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
   const sla = computeSla(order);
+
+  // Riwayat tracking di-fetch on-demand saat modal Lacak dibuka (sekali per
+  // buka; modal lama memakai timeline simulasi bila kosong).
+  const handleOpenTracking = async () => {
+    setShowTracking(true);
+    setTrackingEvents(null);
+    setTrackingLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await authFetch(`/api/orders/${order.id}/tracking`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data?.ok && Array.isArray(data.trackingEvents)) {
+        setTrackingEvents(data.trackingEvents as TrackingEvent[]);
+      }
+      // gagal → tetap null → modal pakai fallback simulasi
+    } catch {
+      // fallback simulasi tetap tampil
+    } finally {
+      setTrackingLoading(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 font-sans relative">
@@ -248,9 +276,20 @@ export default function OrderCard({
               </button>
             ) : null}
 
+            {onPickup && order.status === "AWAITING_SHIPMENT" ? (
+              <button
+                onClick={onPickup}
+                disabled={shipping}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 rounded-md text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
+              >
+                <PackageCheck size={14} />
+                {shipping ? "Memproses..." : "Atur Pengiriman"}
+              </button>
+            ) : null}
+
             <button
               type="button"
-              onClick={() => setShowTracking(true)}
+              onClick={handleOpenTracking}
               className="px-5 py-1.5 bg-[#2a3a8c] hover:bg-[#202e70] text-white rounded-md text-xs font-semibold transition-colors shadow-xs"
             >
               Lacak
@@ -282,6 +321,8 @@ export default function OrderCard({
             address: order.address,
             pickupLocation: order.pickupLocation,
           }}
+          trackingEvents={trackingEvents}
+          loading={trackingLoading}
           onClose={() => setShowTracking(false)}
         />
       )}

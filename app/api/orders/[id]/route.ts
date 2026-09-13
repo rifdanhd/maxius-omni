@@ -78,6 +78,7 @@ export const GET = withAuth(
     isCod: order.isCod,
     currency: order.currency,
     buyerNote: order.buyerNote,
+    sellerNote: order.sellerNote,
     amount: order.amount,
     canViewFullPii: allowFull,
     buyer: {
@@ -101,6 +102,7 @@ export const GET = withAuth(
       subTotal: it.price != null ? it.price * it.qty : null,
     })),
     shipments: order.shipments.map((s) => ({
+      externalId: s.externalId,
       carrier: s.carrier,
       trackingNo: s.trackingNo,
       status: s.status,

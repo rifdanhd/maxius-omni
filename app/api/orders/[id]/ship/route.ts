@@ -58,6 +58,7 @@ export const POST = withAuth(
       handover_method?: "PICKUP" | "DROP_OFF";
       pickup_slot?: { start_time?: number; end_time?: number };
       self_shipment?: { shipping_provider_id?: string; tracking_number?: string };
+      seller_note?: string | null;
     };
 
     // Seller Shipping: resi disuplai merchant, label resmi TikTok tidak berlaku.
@@ -102,7 +103,7 @@ export const POST = withAuth(
       providerId = body.self_shipment?.shipping_provider_id ?? null;
     }
 
-    // Update data lokal: shipment + status order.
+    // Update data lokal: shipment + status order + catatan penjual.
     await prisma.$transaction([
       prisma.shipment.updateMany({
         where: { accountId: order.accountId, orderId: order.id, externalId: packageId },
@@ -110,6 +111,7 @@ export const POST = withAuth(
           trackingNo: trackingNumber,
           carrier: providerName,
           status: isSellerShipping ? "SHIPPED" : "AWAITING_COLLECTION",
+          shippedAt: new Date(),
         },
       }),
       prisma.order.update({
@@ -119,6 +121,9 @@ export const POST = withAuth(
             order.status === "AWAITING_SHIPMENT" || order.status === "ON_HOLD"
               ? "AWAITING_COLLECTION"
               : order.status,
+          ...(typeof body.seller_note === "string" && body.seller_note.trim()
+            ? { sellerNote: body.seller_note.trim() }
+            : {}),
         },
       }),
     ]);

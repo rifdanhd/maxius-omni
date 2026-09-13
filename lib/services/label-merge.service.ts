@@ -1,4 +1,4 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 
 /**
@@ -9,15 +9,35 @@ import { getShippingDocument } from "@/lib/integrations/tiktokShop";
  * batch hanyalah /packages/batch_ship utk mengirim paket). Karena itu label tiap
  * order diambil SATU PER SATU (paralel utk kecepatan) lalu digabung jadi 1 PDF
  * di sini memakai pdf-lib.
+ *
+ * Per order: halaman label RESMI TikTok ditanam, lalu satu halaman A6 "Ringkasan
+ * Produk" yang DIBUAT SENDIRI dari OrderItem/ProductVariant lokal (tabel: Produk,
+ * Varian/SKU, Seller SKU, Qty). Opsional "Picking List" ikut ditambahkan.
  */
 
 const A6_PT = { width: 297.64, height: 419.53 }; // 105 x 148 mm @ 72dpi
+
+const DARK = rgb(0.15, 0.15, 0.15);
+const LIGHT = rgb(0.85, 0.85, 0.85);
+const GRAY = rgb(0.5, 0.5, 0.5);
+const NAVY = rgb(0.13, 0.13, 0.32);
+const WHITE = rgb(1, 1, 1);
+const PURPLE = rgb(0.46, 0.3, 0.9);
+
+export type LabelMergeProductRow = {
+  productName: string;
+  variant: string;
+  sellerSku: string;
+  qty: number;
+};
 
 export type LabelMergeItem = {
   orderNo: string;
   packageId: string;
   accessToken: string;
   shopCipher?: string | null;
+  rows?: LabelMergeProductRow[];
+  includePickingList?: boolean;
 };
 
 export type LabelMergeResult = {
@@ -65,6 +85,90 @@ async function embedLabelImage(
     width: w,
     height: h,
   });
+}
+
+const MAX_ROWS_PER_PAGE = 18;
+
+function clip(text: string, max = 28): string {
+  const t = String(text ?? "").trim().replace(/\s+/g, " ");
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t || "-";
+}
+
+function addTableHeader(page: import("pdf-lib").PDFPage, bold: import("pdf-lib").PDFFont, y: number) {
+  const margin = 14;
+  const cols = [
+    { label: "Produk", w: 118 },
+    { label: "Varian / SKU", w: 72 },
+    { label: "Seller SKU", w: 55 },
+    { label: "Qty", w: 24 },
+  ];
+  const tableW = cols.reduce((a, c) => a + c.w, 0);
+  page.drawRectangle({ x: margin - 2, y: y - 3, width: tableW + 4, height: 13, color: NAVY });
+  let x = margin;
+  for (const c of cols) {
+    page.drawText(c.label, { x, y, size: 6.5, font: bold, color: WHITE });
+    x += c.w;
+  }
+  return { cols, tableW };
+}
+
+/** Ringkasan produk per order — halaman A6 tabel buatan lokal (bukan label TikTok). */
+export function addProductSummaryPage(
+  merged: PDFDocument,
+  orderNo: string,
+  rows: LabelMergeProductRow[],
+  kind: "PRODUK" | "PICKING LIST"
+): void {
+  const page = merged.addPage([A6_PT.width, A6_PT.height]);
+  const font = merged.embedStandardFont(StandardFonts.Helvetica);
+  const bold = merged.embedStandardFont(StandardFonts.HelveticaBold);
+
+  const title = kind === "PRODUK" ? "Ringkasan Produk" : "Picking List";
+  const badge = "MAXIUS · " + (kind === "PRODUK" ? "LABEL" : "GUDANG");
+
+  page.drawText(badge, { x: 14, y: A6_PT.height - 22, size: 7, font: bold, color: PURPLE });
+  page.drawText(title, { x: 14, y: A6_PT.height - 36, size: 13, font: bold });
+  page.drawText(`No. Pesanan: ${clip(orderNo, 40)}`, { x: 14, y: A6_PT.height - 50, size: 8, font });
+
+  const headerY = A6_PT.height - 68;
+  const { cols, tableW } = addTableHeader(page, bold, headerY);
+
+  const margin = 14;
+  const y = headerY - 18;
+  const rowH = 11;
+  let rowIndex = 0;
+  for (const r of rows.slice(0, MAX_ROWS_PER_PAGE)) {
+    const cy = y - rowIndex * rowH;
+    if (cy < 24) break;
+    page.drawLine({ start: { x: margin, y: cy - 3 }, end: { x: margin + tableW, y: cy - 3 }, thickness: 0.4, color: LIGHT });
+    let x = margin;
+    const vals = [clip(r.productName, 30), clip(r.variant, 18), clip(r.sellerSku, 14), String(r.qty)];
+    for (let i = 0; i < cols.length; i++) {
+      page.drawText(vals[i], {
+        x,
+        y: cy,
+        size: 6.8,
+        font,
+        color: DARK,
+        maxWidth: cols[i].w - 4,
+      });
+      x += cols[i].w;
+    }
+    rowIndex += 1;
+  }
+
+  // Baris ringkasan di bawah tabel.
+  const totalQty = rows.reduce((a, r) => a + Number(r.qty || 0), 0);
+  page.drawLine({ start: { x: margin, y: 34 }, end: { x: margin + tableW, y: 34 }, thickness: 0.8, color: DARK });
+  page.drawText("Total Item", { x: margin, y: 24, size: 7.5, font: bold });
+  page.drawText(String(rows.length), { x: margin + 60, y: 24, size: 7.5, font: bold });
+  page.drawText("Total Qty", { x: margin + 110, y: 24, size: 7.5, font: bold });
+  page.drawText(String(totalQty), { x: margin + 160, y: 24, size: 7.5, font: bold });
+  page.drawText(`Dicetak ${formatDate()}`, { x: margin, y: 12, size: 6, font, color: GRAY });
+}
+
+function formatDate(): string {
+  return new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 }
 
 async function fetchDocumentBytes(docUrl: string): Promise<Uint8Array> {
@@ -126,6 +230,14 @@ export async function mergeShippingDocuments(
         await embedLabelImage(merged, bytes);
       } else {
         throw new Error("format dokumen tidak didukung");
+      }
+      // Bagian bawah: tabel ringkasan produk dari OrderItem/ProductVariant lokal.
+      if (item.rows && item.rows.length > 0) {
+        addProductSummaryPage(merged, item.orderNo, item.rows, "PRODUK");
+      }
+      // Opsional: halaman Picking List untuk gudang.
+      if (item.includePickingList) {
+        addProductSummaryPage(merged, item.orderNo, item.rows ?? [], "PICKING LIST");
       }
       count += 1;
     } catch (e) {

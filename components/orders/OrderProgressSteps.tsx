@@ -1,7 +1,5 @@
 "use client";
 
-import { Check } from "lucide-react";
-
 type Stage = "Picking List" | "Packing List" | "Label" | "Invoice";
 
 const STAGES: Stage[] = ["Picking List", "Packing List", "Label", "Invoice"];

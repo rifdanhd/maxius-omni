@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { authFetch } from "@/lib/utils/api-client";
 
 type DetailItem = {
   id: string;
@@ -109,7 +110,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await authFetch(`/api/orders/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Terjadi kesalahan saat memuat detail (${res.status})`);
