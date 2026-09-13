@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/utils/api-client";
 import {
   Search,
   ChevronDown,
@@ -103,7 +104,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products/${row.id}/images`, {
+      const res = await authFetch(`/api/products/${row.id}/images`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Gagal memuat gambar (${res.status})`);
@@ -121,7 +122,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
       setError(null);
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`/api/products/${row.id}/images`, {
+        const res = await authFetch(`/api/products/${row.id}/images`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (cancelled) return;
@@ -161,7 +162,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products/${row.id}/images`, {
+      const res = await authFetch(`/api/products/${row.id}/images`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ images: urls.map((url) => ({ url })) }),
@@ -185,7 +186,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products/${row.id}/images/${img.id}`, {
+      const res = await authFetch(`/api/products/${row.id}/images/${img.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -203,7 +204,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products/${row.id}/images/${img.id}`, {
+      const res = await authFetch(`/api/products/${row.id}/images/${img.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ isCover: true }),
@@ -228,7 +229,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products/${row.id}/images/${img.id}`, {
+      const res = await authFetch(`/api/products/${row.id}/images/${img.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ orderedIds: next.map((i) => i.id) }),
@@ -393,7 +394,7 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
     async function load() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("/api/products/gallery/history", {
+        const res = await authFetch("/api/products/gallery/history", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error(`Gagal memuat riwayat (${res.status})`);
@@ -493,7 +494,7 @@ export default function KelolaGambarPage() {
     let cancelled = false;
     async function run() {
       try {
-        const res = await fetch(`/api/products/gallery?${sp.toString()}`, {
+        const res = await authFetch(`/api/products/gallery?${sp.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (cancelled) return;
@@ -532,7 +533,7 @@ export default function KelolaGambarPage() {
     async function loadCategories() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("/api/products/gallery?pageSize=1000", {
+        const res = await authFetch("/api/products/gallery?pageSize=1000", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;

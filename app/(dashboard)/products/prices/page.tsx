@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/utils/api-client";
 import {
   Search,
   ChevronDown,
@@ -271,7 +272,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
     setErr(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/products/pricing/bulk-upload", {
+      const res = await authFetch("/api/products/pricing/bulk-upload", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ csv: csvText.text }),
@@ -463,8 +464,8 @@ export default function KelolaHargaPage() {
       try {
         const token = localStorage.getItem("token");
         const [accRes, catRes] = await Promise.all([
-          fetch("/api/accounts", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("/api/products/pricing?pageSize=1000", {
+          authFetch("/api/accounts", { headers: { Authorization: `Bearer ${token}` } }),
+          authFetch("/api/products/pricing?pageSize=1000", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -503,7 +504,7 @@ export default function KelolaHargaPage() {
     let cancelled = false;
     async function run() {
       try {
-        const res = await fetch(`/api/products/pricing?${sp.toString()}`, {
+        const res = await authFetch(`/api/products/pricing?${sp.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (cancelled) return;
@@ -595,7 +596,7 @@ export default function KelolaHargaPage() {
 
   async function saveDefaultPrice(row: PricingRow, price: number) {
     const token = localStorage.getItem("token");
-    const res = await fetch(`/api/products/pricing/${row.id}`, {
+    const res = await authFetch(`/api/products/pricing/${row.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ price }),
@@ -622,7 +623,7 @@ export default function KelolaHargaPage() {
 
   async function saveOverridePrice(row: PricingRow, market: Market, price: number) {
     const token = localStorage.getItem("token");
-    const res = await fetch(
+    const res = await authFetch(
       `/api/products/pricing/${row.id}/marketplace/${market.id}`,
       {
         method: "PATCH",
@@ -652,7 +653,7 @@ export default function KelolaHargaPage() {
 
   async function clearOverridePrice(row: PricingRow, market: Market) {
     const token = localStorage.getItem("token");
-    const res = await fetch(
+    const res = await authFetch(
       `/api/products/pricing/${row.id}/marketplace/${market.id}`,
       {
         method: "PATCH",
