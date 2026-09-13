@@ -14,6 +14,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const token = useSyncExternalStore(
+    subscribe,
+    () => localStorage.getItem("token"),
+    () => null
+  );
   const username = useSyncExternalStore(
     subscribe,
     () => localStorage.getItem("username") || "Dermarket",
@@ -21,12 +26,26 @@ export default function DashboardLayout({
   );
 
   useEffect(() => {
-    // Basic client-side auth check
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-    }
-  }, [router]);
+    if (token !== null) return;
+    // Token null saat full page load BELUM tentu berarti logged out: waktu
+    // hydrate, hook sempat menyerahkan server snapshot (null) padahal token
+    // valid ada di localStorage. Verifikasi ulang nilai LIVE secara async
+    // sebelum redirect — cegah bounce paksa sesi valid ke /login.
+    const t = setTimeout(() => {
+      if (localStorage.getItem("token") === null) {
+        router.replace("/login");
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [token, router]);
+
+  if (token === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500 text-sm">
+        Memeriksa sesi...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] flex font-sans">

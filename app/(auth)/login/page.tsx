@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Loader2 } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionExpired = searchParams.get("reason") === "session_expired";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -83,6 +93,11 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {sessionExpired && !error && (
+            <div className="bg-amber-50 text-amber-700 text-xs px-4 py-3 rounded-xl border border-amber-200">
+              Sesi Anda berakhir, silakan login kembali.
+            </div>
+          )}
           <div>
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-2">Username</label>
             <input
