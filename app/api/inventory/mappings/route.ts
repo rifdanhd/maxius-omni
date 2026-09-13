@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 
 const mappingInclude = {
   account: { select: { id: true, platform: true, label: true } },
@@ -28,18 +29,24 @@ export const GET = withAuth(async () => {
 /**
  * POST /api/inventory/mappings
  * Buat mapping listing (account + channelSku) ke varian stok pusat.
- * Kalau `variantId` kosong, buat MasterProduct + ProductVariant baru dulu
- * (nama produk & sku bisa disediakan; fallback pakai channelSku).
+ * - `variantId` terisi → pakai varian existing.
+ * - `variantId` kosong + `masterProductId` terisi → buat varian BARU di bawah
+ *   master existing (utk SKU ke-2 dst. dari produk marketplace yang sama).
+ * - keduanya kosong → buat MasterProduct + ProductVariant baru dulu
+ *   (nama produk & sku bisa disediakan; fallback pakai channelSku).
  */
 export const POST = withAuth(async (req) => {
   const body = (await req.json().catch(() => ({}))) as {
     accountId?: string;
     channelSku?: string;
     variantId?: string;
+    masterProductId?: string;
     newProductName?: string;
     sku?: string;
     stock?: number;
     safetyStock?: number;
+    price?: number;
+    imageUrl?: string;
   };
 
   const accountId = body.accountId?.trim();
@@ -58,6 +65,12 @@ export const POST = withAuth(async (req) => {
   const safetyStock = Number.isFinite(Number(body.safetyStock))
     ? Math.max(0, Number(body.safetyStock))
     : 0;
+  const newPrice = Number.isFinite(Number(body.price)) && Number(body.price) >= 0
+    ? Number(body.price)
+    : null;
+  const newImageUrl = typeof body.imageUrl === "string" && body.imageUrl.trim()
+    ? body.imageUrl.trim()
+    : null;
 
   let variantId = body.variantId;
 
@@ -66,20 +79,61 @@ export const POST = withAuth(async (req) => {
     if (!variant) {
       return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
     }
+  } else if (body.masterProductId?.trim()) {
+    // Varian baru di bawah master existing.
+    const master = await prisma.masterProduct.findUnique({
+      where: { id: body.masterProductId.trim() },
+    });
+    if (!master) {
+      return NextResponse.json({ error: "Produk master tidak ditemukan." }, { status: 400 });
+    }
+    const created = await prisma.productVariant.create({
+      data: {
+        sku: body.sku?.trim() || channelSku,
+        stock: newStock,
+        safetyStock,
+        ...(newPrice !== null ? { price: newPrice, priceUpdatedAt: new Date() } : {}),
+        masterProductId: master.id,
+      },
+    });
+    variantId = created.id;
+
+    await prisma.stockLedger.create({
+      data: {
+        variantId,
+        changeQty: newStock,
+        reason: STOCK_REASONS.INIT,
+        note: `Stok awal varian ${created.sku}`,
+        stockAfter: newStock,
+      },
+    });
   } else {
     // Buat produk + varian baru sekaligus, lalu mapping di bawah.
+    // Ambang awal produk baru = setting global Pengaturan Inventori
+    // (produk existing tetap pakai threshold per-produk masing-masing).
+    const settings = await getCachedInventorySettings();
     const created = await prisma.$transaction(async (tx) => {
       const product = await tx.masterProduct.create({
-        data: { name: body.newProductName?.trim() || channelSku },
+        data: {
+          name: body.newProductName?.trim() || channelSku,
+          threshold: settings.lowStockDefaultThreshold,
+          ...(newImageUrl ? { imageUrl: newImageUrl } : {}),
+        },
       });
       const variant = await tx.productVariant.create({
         data: {
           sku: body.sku?.trim() || channelSku,
           stock: newStock,
           safetyStock,
+          ...(newPrice !== null ? { price: newPrice, priceUpdatedAt: new Date() } : {}),
           masterProductId: product.id,
         },
       });
+      if (newImageUrl) {
+        await tx.productImage.create({
+          data: { masterProductId: product.id, url: newImageUrl, isCover: true, order: 0 },
+        });
+      }
       return variant;
     });
     variantId = created.id;

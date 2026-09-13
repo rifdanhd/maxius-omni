@@ -1,5 +1,7 @@
 import { prisma as defaultPrisma } from "@/lib/db/prisma";
 import { getOrders } from "@/lib/integrations/tiktokShop";
+import { reconcileShipmentTracking } from "@/lib/services/shipment-reconcile.service";
+import { ingestTrackingForAccount } from "@/lib/services/shipment-tracking.service";
 import { encryptPii } from "@/lib/services/crypto.service";
 import {
   deductStockForOrder,
@@ -106,13 +108,35 @@ async function syncShipments(
   for (const pkg of packagesRaw ?? []) {
     const externalId = pkg.id !== undefined ? String(pkg.id) : "";
     if (!externalId) continue;
-    const carrier =
+
+    // Nilai dari payload order search — bisa saja masih kosong (resi TikTok
+    // di-assign async, baru muncul di GetPackageDetail belakangan).
+    const payloadCarrier =
       (pkg.shipping_provider_name as string) ||
       (pkg.shipping_provider as string) ||
       null;
-    const trackingNo = (pkg.tracking_number as string) ?? null;
-    const status = (pkg.package_status as string) ?? "PACKAGED";
-    const shippedAt = toDate(pkg.create_time as number | undefined);
+    const payloadTrackingNo = (pkg.tracking_number as string) ?? null;
+    const payloadStatus = (pkg.package_status as string) ?? "PACKAGED";
+    const payloadShippedAt = toDate(pkg.create_time as number | undefined);
+
+    // MERGE, bukan timpa-mentah: data pickup (resi/kurir/status) yang sudah
+    // terisi di DB tidak boleh ditimpa null/stale oleh payload order search
+    // yang belum memuat tracking (mis. order sudah di-ship via aplikasi lalu
+    // di-sync ulang). Status hanya boleh maju, tidak turun dari
+    // AWAITING_COLLECTION kembali ke PACKAGED.
+    const existing = await db.shipment.findUnique({
+      where: { accountId_orderId_externalId: { accountId, orderId, externalId } },
+      select: { carrier: true, trackingNo: true, status: true, shippedAt: true },
+    });
+
+    const carrier = payloadCarrier ?? existing?.carrier ?? null;
+    const trackingNo = payloadTrackingNo ?? existing?.trackingNo ?? null;
+    const status =
+      existing && payloadStatus === "PACKAGED" && existing.status !== "PACKAGED"
+        ? existing.status
+        : payloadStatus;
+    const shippedAt = payloadShippedAt ?? existing?.shippedAt ?? null;
+
     await db.shipment.upsert({
       where: {
         accountId_orderId_externalId: { accountId, orderId, externalId },
@@ -150,7 +174,7 @@ export async function syncOrdersTikTok(
 
   const { orders } = await getOrders(account.accessToken, account.shopCipher);
 
-  const result = { fetched: orders.length, created: 0, skipped: 0, errors: [] as string[] };
+  const result = { fetched: orders.length, created: 0, skipped: 0, errors: [] as string[], reconciled: 0, reconcileScan: 0, trackingEvents: 0 };
 
   for (const raw of orders as OrderRaw[]) {
     const externalOrderId = raw.id;
@@ -340,6 +364,28 @@ export async function syncOrdersTikTok(
     } catch (e) {
       result.errors.push(`${externalOrderId}: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  // Backfill resi & kurir untuk shipment yang tetap kosong setelah sync —
+  // TikTok meng-assign nomor resi secara ASYNC (bisa muncul belakangan).
+  try {
+    const reconcile = await reconcileShipmentTracking(accountId);
+    result.reconciled = reconcile.updated;
+    result.reconcileScan = reconcile.scanned;
+    result.errors.push(...reconcile.errors.map((e) => `reconcile: ${e}`));
+  } catch (e) {
+    result.errors.push(`reconcile: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // Ingest timeline tracking (ShipmentTrackingEvent) untuk semua order
+  // non-final. Idempotent — re-run tidak menduplikasi event. Error tidak
+  // menggagalkan sync order (tracking = data tambahan, bukan jalan kritis).
+  try {
+    const tracking = await ingestTrackingForAccount(accountId);
+    result.trackingEvents = tracking.eventsInserted;
+    result.errors.push(...tracking.errors.map((e) => `tracking: ${e}`));
+  } catch (e) {
+    result.errors.push(`tracking: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   return result;

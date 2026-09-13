@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, AlertTriangle, PackageX, ChevronRight } from "lucide-react";
 import type { StockAlert } from "@/app/api/stock-alerts/route";
+import { authFetch } from "@/lib/utils/api-client";
 
 export default function NotificationBell() {
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
@@ -11,7 +12,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    fetch("/api/stock-alerts", {
+    authFetch("/api/stock-alerts", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => (res.ok ? res.json() : Promise.resolve(null)))

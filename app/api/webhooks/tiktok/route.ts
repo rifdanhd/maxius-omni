@@ -18,7 +18,7 @@ if (!APP_KEY || !APP_SECRET) {
 /**
  * verifyTikTokShopSignature
  *
- * TikTok Shop webhook signature (bukan TikTok API request signature):
+ * Tokopedia | Shop webhook signature (bukan TikTok API request signature):
  *   - Header   : Authorization (nilai mentah, TANPA prefix Bearer)
  *   - Base     : app_key + raw_request_body (persis seperti diterima, tanpa reformat)
  *   - Key      : app_secret

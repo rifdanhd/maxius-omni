@@ -44,16 +44,26 @@ export async function recordSale({
   const variant = mapping.variant;
   const product = variant.masterProduct;
 
-  if (variant.stock < quantity) {
+  // ANTI-OVERSELL (TUGAS 1): pengurangan memakai SATU statement atomik
+  // "UPDATE ... WHERE stock >= qty" — bukan baca-validasi-lalu-tulis.
+  // Dua penjualan bersamaan utk varian sama: hanya satu yang lolos bila stok
+  // cuma cukup untuk satu; yang lain gagal jelas (tidak pernah minus).
+  const deduct = await prisma.productVariant.updateMany({
+    where: { id: variant.id, stock: { gte: quantity } },
+    data: { stock: { decrement: quantity } },
+  });
+  if (deduct.count === 0) {
+    // Baca stok terkini sekali lagi HANYA untuk pesan (bukan validasi).
+    const now = await prisma.productVariant.findUnique({
+      where: { id: variant.id },
+      select: { stock: true },
+    });
     throw new Error(
-      `Stok tidak cukup. Sisa stok "${product.name}" (varian "${variant.sku}") tinggal ${variant.stock}.`
+      `Stok tidak cukup. Sisa stok "${product.name}" (varian "${variant.sku}") tinggal ${now?.stock ?? 0}.`
     );
   }
-
-  // Update stok secara atomik
-  const updatedVariant = await prisma.productVariant.update({
+  const updatedVariant = await prisma.productVariant.findUniqueOrThrow({
     where: { id: variant.id },
-    data: { stock: { decrement: quantity } },
   });
 
   const isCritical = updatedVariant.stock <= product.threshold;

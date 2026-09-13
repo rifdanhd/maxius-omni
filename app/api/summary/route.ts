@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { cached } from "@/lib/utils/ttl-cache";
+import { isLowStock } from "@/lib/services/central-stock.service";
 
 const CACHE_TTL_MS = 60_000;
 
@@ -18,7 +19,9 @@ function startOfToday(): Date {
  * - newOrders       : Order masuk hari ini (createTime >= start of day, bukan CANCELLED)
  * - readyToShip     : Order berstatus AWAITING_SHIPMENT
  * - completedOrders : Order berstatus COMPLETED
- * - criticalStock   : varian dengan stock <= threshold master product
+ * - criticalStock   : varian "stok menipis" menurut isLowStock()
+ *   (stock-level.policy) — definisi yang SAMA dengan /api/stock-alerts &
+ *   halaman Stok Varian: tersedia <= minStock per-varian (fallback threshold).
  * - oversell        : jumlah varian di mana total qty order AKTIF (status ∉
  *                     CANCELLED/COMPLETED) melebihi stock tersisa varian
  */
@@ -35,11 +38,15 @@ export const GET = withAuth(async () => {
           .findMany({
             select: {
               stock: true,
+              safetyStock: true,
+              minStock: true,
               masterProduct: { select: { threshold: true } },
             },
           })
           .then((variants) =>
-            variants.filter((v) => v.stock <= v.masterProduct.threshold).length
+            variants.filter((v) =>
+              isLowStock(v.stock, v.safetyStock, v.minStock, v.masterProduct.threshold)
+            ).length
           ),
 
         prisma.order.count({
