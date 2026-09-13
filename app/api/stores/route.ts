@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { withAuth } from "@/lib/utils/api";
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     const accounts = await prisma.platformAccount.findMany();
     
@@ -20,4 +21,4 @@ export async function GET() {
     console.error("Error fetching stores:", error);
     return NextResponse.json({ error: "Failed to fetch stores" }, { status: 500 });
   }
-}
+});

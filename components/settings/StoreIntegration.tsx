@@ -3,68 +3,98 @@
 import { useState, useEffect } from "react";
 import { MonitorPlay, Edit2, RefreshCw, Trash2, ShoppingBag } from "lucide-react";
 import AddMarketplaceModal from "./AddMarketplaceModal";
+import { authFetch } from "@/lib/utils/api-client";
+
+type StoreItem = {
+  id: string;
+  name: string;
+  url?: string;
+  platform?: string;
+  status?: string;
+  connectedAt?: string;
+};
+
+// Ambil daftar toko (tanpa setState — reusable dari effect & event handler).
+const fetchStores = async (): Promise<StoreItem[]> => {
+  const res = await authFetch("/api/stores"); // assuming we will have this API in next.js or we map to external api
+  if (!res.ok) throw new Error("Failed to load stores");
+  return ((await res.json()) as StoreItem[]) || [];
+};
+
+// Fallback mock data for UI demo if backend is empty/error.
+const MOCK_STORES: StoreItem[] = [
+  {
+    id: "1",
+    name: "weirdme.cloth",
+    url: "https://shopee.co.id/weirdme.cloth",
+    platform: "shopee",
+    status: "connected",
+    connectedAt: "07-09-2026 07:40",
+  },
+  {
+    id: "2",
+    name: "Dermarket",
+    url: "",
+    platform: "tiktok",
+    status: "connected",
+    connectedAt: "04-09-2026 01:30",
+  },
+];
 
 export default function StoreIntegration() {
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreItem[]>([]);
+  // loading diinisialisasi true: spinner tampil sejak mount sampai load selesai,
+  // sehingga effect tidak melakukan setState sinkron saat mount.
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      try {
+        const data = await fetchStores();
+        if (!cancelled) setStores(data);
+      } catch (e) {
+        console.error("Gagal memuat toko:", e);
+        if (!cancelled) setStores(MOCK_STORES);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadStores = async () => {
     try {
-      setLoading(true);
-      const res = await fetch("/api/stores"); // assuming we will have this API in next.js or we map to external api
-      if (!res.ok) throw new Error("Failed to load stores");
-      const data = await res.json();
-      setStores(data || []);
+      setStores(await fetchStores());
     } catch (e) {
       console.error("Gagal memuat toko:", e);
-      // fallback mock data for UI demo if backend is empty/error
-      setStores([
-        {
-          id: '1',
-          name: 'weirdme.cloth',
-          url: 'https://shopee.co.id/weirdme.cloth',
-          platform: 'shopee',
-          status: 'connected',
-          connectedAt: '07-09-2026 07:40'
-        },
-        {
-          id: '2',
-          name: 'Dermarket',
-          url: '',
-          platform: 'tiktok',
-          status: 'connected',
-          connectedAt: '04-09-2026 01:30'
-        }
-      ]);
-    } finally {
-      setLoading(false);
+      setStores(MOCK_STORES);
     }
   };
 
-  useEffect(() => {
-    loadStores();
-  }, []);
-
   const handleSync = async (id: string) => {
     try {
-      const res = await fetch(`/api/stores/${id}/sync`, { method: "POST" });
+      const res = await authFetch(`/api/stores/${id}/sync`, { method: "POST" });
       if (!res.ok) throw new Error("Sync failed");
       alert("Sinkronisasi berhasil!");
-    } catch (e: any) {
-      alert("Gagal sinkronisasi: " + e.message);
+    } catch (e) {
+      alert("Gagal sinkronisasi: " + (e instanceof Error ? e.message : String(e)));
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Apakah kamu yakin ingin menghapus toko ${name}?`)) {
       try {
-        const res = await fetch(`/api/stores/${id}`, { method: "DELETE" });
+        const res = await authFetch(`/api/stores/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error("Delete failed");
         alert("Toko berhasil dihapus!");
         loadStores();
-      } catch (e: any) {
-        alert("Gagal menghapus toko: " + e.message);
+      } catch (e) {
+        alert("Gagal menghapus toko: " + (e instanceof Error ? e.message : String(e)));
       }
     }
   };

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- script seed CJS, dijalankan via `node prisma/seed.js` */
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 
@@ -20,11 +21,6 @@ async function main() {
 
   // 2. Buat Akun Toko (PlatformAccount)
   const accountsData = [
-    { id: "shopee-1", platform: "SHOPEE", label: "Shopee - Kaos Kaki A" },
-    { id: "shopee-2", platform: "SHOPEE", label: "Shopee - Kaos Kaki B" },
-    { id: "shopee-3", platform: "SHOPEE", label: "Shopee - Kaos Kaki C" },
-    { id: "shopee-4", platform: "SHOPEE", label: "Shopee - Kaos Kaki D" },
-    { id: "shopee-5", platform: "SHOPEE", label: "Shopee - Kaos Kaki E" },
     { id: "tiktok-1", platform: "TIKTOK_SHOP", label: "TikTok Shop - Kaos Kaki A" },
     { id: "tiktok-2", platform: "TIKTOK_SHOP", label: "TikTok Shop - Kaos Kaki B" },
     { id: "tiktok-3", platform: "TIKTOK_SHOP", label: "TikTok Shop - Kaos Kaki C" },
@@ -48,11 +44,6 @@ async function main() {
       stock: 120,
       threshold: 20,
       mappings: [
-        { accountId: "shopee-1", channelSku: "SHP1-BLK01" },
-        { accountId: "shopee-2", channelSku: "SHP2-HTM-01" },
-        { accountId: "shopee-3", channelSku: "SHP3-BLACK1" },
-        { accountId: "shopee-4", channelSku: "SHP4-BLK-S" },
-        { accountId: "shopee-5", channelSku: "SHP5-01BLK" },
         { accountId: "tiktok-1", channelSku: "TTS1-BLACK01" },
         { accountId: "tiktok-2", channelSku: "TTS2-HTM01" },
         { accountId: "tiktok-3", channelSku: "TTS3-BLK-A" },
@@ -64,8 +55,6 @@ async function main() {
       stock: 18,
       threshold: 20,
       mappings: [
-        { accountId: "shopee-1", channelSku: "SHP1-STR01" },
-        { accountId: "shopee-2", channelSku: "SHP2-GRS-02" },
         { accountId: "tiktok-1", channelSku: "TTS1-STRIPE01" },
         { accountId: "tiktok-2", channelSku: "TTS2-GRS02" },
       ],
@@ -76,9 +65,6 @@ async function main() {
       stock: 64,
       threshold: 15,
       mappings: [
-        { accountId: "shopee-1", channelSku: "SHP1-WHT01" },
-        { accountId: "shopee-3", channelSku: "SHP3-PTH-03" },
-        { accountId: "shopee-5", channelSku: "SHP5-03WHT" },
         { accountId: "tiktok-1", channelSku: "TTS1-WHITE01" },
         { accountId: "tiktok-3", channelSku: "TTS3-PTH-C" },
       ],
@@ -89,8 +75,6 @@ async function main() {
       stock: 40,
       threshold: 15,
       mappings: [
-        { accountId: "shopee-2", channelSku: "SHP2-ABU-04" },
-        { accountId: "shopee-4", channelSku: "SHP4-GRY-S" },
         { accountId: "tiktok-2", channelSku: "TTS2-ABU04" },
         { accountId: "tiktok-3", channelSku: "TTS3-GRY-D" },
       ],

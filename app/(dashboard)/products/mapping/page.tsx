@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { authFetch } from "@/lib/utils/api-client";
 import { Plus, Trash2, RefreshCw, History, Save, X, Link2, Boxes, SlidersHorizontal } from "lucide-react";
 
 type Store = { id: string; name: string; platform: string; status: string };
@@ -38,7 +39,7 @@ const effectiveStock = (v: Variant | null) =>
 
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("token");
-  const res = await fetch(path, {
+  const res = await authFetch(path, {
     ...opts,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -82,7 +83,7 @@ export default function ProductMappingPage() {
     const [m, v, storesRes] = await Promise.all([
       api<{ mappings: Mapping[] }>("/api/inventory/mappings"),
       api<{ variants: Variant[] }>("/api/inventory/variants"),
-      fetch("/api/stores", {
+      authFetch("/api/stores", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       }).then((r) => r.json()),
     ]);

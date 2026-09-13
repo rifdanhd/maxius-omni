@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
+import type { LucideIcon } from "lucide-react";
 import {
   Home, ShoppingBag, Package, Warehouse, Tag, MessageSquare,
   Users, BarChart2, Settings, ChevronDown, ChevronUp, ClipboardList,
   Compass, Grid2x2, BookOpen, Boxes, MessageCircle, Rss, ArrowLeftToLine, ArrowRightToLine, LogOut
 } from "lucide-react";
+import { authFetch } from "@/lib/utils/api-client";
 
-const MENU = [
+type MenuChild = { key: string; label: string; href?: string; submenu?: boolean };
+type MenuGroup = { key: string; icon: LucideIcon; label: string; children: MenuChild[] };
+type MenuLink = { key: string; icon: LucideIcon; label: string; href: string };
+type MenuItem = MenuGroup | MenuLink;
+
+const MENU: MenuItem[] = [
   { key: "dashboard", icon: Home, label: "Dashboard", href: "/" },
   {
     key: "pesanan",
@@ -31,8 +38,7 @@ const MENU = [
       { key: "kelola-harga", label: "Kelola Harga", href: "/products/prices" },
       { key: "kelola-gambar", label: "Kelola Gambar", href: "/products/images" },
       { key: "product-copy", label: "Product Copy", href: "/products/copy" },
-      { key: "produk-marketplace", label: "Produk Marketplace", href: "/products/marketplace" },
-      { key: "tokopedia-shop", label: "Tokopedia | Shop", href: "/products/tokopedia" },
+      { key: "produk-marketplace", label: "Produk Marketplace", submenu: true },
     ],
   },
   {
@@ -40,6 +46,8 @@ const MENU = [
     icon: Boxes,
     label: "Inventori",
     children: [
+      { key: "stok-varian", label: "Stok Varian", href: "/inventory" },
+      { key: "stok-mismatch", label: "Stok Mismatch", href: "/inventory/mismatch" },
       { key: "pengaturan-inventori", label: "Pengaturan Inventori", href: "/inventory/settings" },
       { key: "stok-opname", label: "Stok Opname", href: "/inventory/opname" },
       { key: "riwayat-inventori", label: "Riwayat Inventori", href: "/inventory/history" },
@@ -88,11 +96,50 @@ const MENU = [
   { key: "pusat-edukasi", icon: BookOpen, label: "Pusat Edukasi", href: "/education" },
 ];
 
+type ConnectedPlatform = { key: string; label: string; href: string };
+
+function isMenuLink(item: MenuItem): item is MenuLink {
+  return "href" in item;
+}
+
+function isMenuGroup(item: MenuItem): item is MenuGroup {
+  return "children" in item;
+}
+
+// Cache session-level agar submenu marketplace tidak fetch ulang tiap render/remount.
+let accountsCache: ConnectedPlatform[] | null = null;
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ produk: true });
+  const [marketplaceOpen, setMarketplaceOpen] = useState(true);
+  const [platforms, setPlatforms] = useState<ConnectedPlatform[]>(() => accountsCache ?? []);
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (accountsCache) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await authFetch("/api/accounts/connected", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const d = (await res.json()) as { platforms?: ConnectedPlatform[] };
+        if (!cancelled && d.platforms) {
+          accountsCache = d.platforms;
+          setPlatforms(d.platforms);
+        }
+      } catch {
+        // Sidebar tetap render; submenu kosong hingga fetch berhasil.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleLogout() {
     try {
@@ -113,9 +160,13 @@ export default function Sidebar() {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
-  function isItemActive(item: typeof MENU[0]) {
-    if (item.href) return pathname === item.href;
-    return item.children?.some((c) => c.href === pathname);
+  function isItemActive(item: MenuItem) {
+    if (isMenuLink(item)) return pathname === item.href;
+    return item.children.some((c) => c.href === pathname);
+  }
+
+  function platformActive(href: string) {
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   return (
@@ -132,7 +183,7 @@ export default function Sidebar() {
         
         {/* Menu Items */}
         {MENU.map((item) => {
-          const hasChildren = !!item.children;
+          const hasChildren = isMenuGroup(item);
           const active = isItemActive(item);
           const open = openGroups[item.key] && !collapsed;
 
@@ -151,7 +202,7 @@ export default function Sidebar() {
 
           return (
             <div key={item.key}>
-              {hasChildren ? (
+              {isMenuGroup(item) ? (
                 <button
                   onClick={() => toggleGroup(item.key)}
                   className={className}
@@ -160,28 +211,77 @@ export default function Sidebar() {
                   {buttonContent}
                 </button>
               ) : (
-                <Link href={item.href!} className={className} title={collapsed ? item.label : undefined}>
+                <Link href={item.href} className={className} title={collapsed ? item.label : undefined}>
                   {buttonContent}
                 </Link>
               )}
 
               {/* Submenus */}
-              {hasChildren && open && !collapsed && (
+              {"children" in item && open && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1 mb-2">
-                  {item.children!.map((child) => (
-                    <Link
-                      key={child.key}
-                      href={child.href}
-                      className={
-                        "text-left px-3 py-2 rounded-lg text-sm transition-colors block " +
-                        (pathname === child.href
-                          ? "text-gray-900 font-semibold"
-                          : "text-gray-500 hover:text-gray-900")
-                      }
-                    >
-                      {child.label}
-                    </Link>
-                  ))}
+                  {item.children.map((child) => {
+                    if ("submenu" in child && child.submenu) {
+                      const mpActive = platforms.some((p) => platformActive(p.href));
+                      return (
+                        <div key={child.key}>
+                          <button
+                            onClick={() => setMarketplaceOpen((v) => !v)}
+                            className={
+                              "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors group " +
+                              (mpActive
+                                ? "text-gray-900 font-semibold"
+                                : "text-gray-500 hover:text-gray-900")
+                            }
+                          >
+                            <span className="flex-1 text-left">{child.label}</span>
+                            {marketplaceOpen ? (
+                              <ChevronUp size={16} className="text-gray-400" />
+                            ) : (
+                              <ChevronDown size={16} className="text-gray-400" />
+                            )}
+                          </button>
+                          {marketplaceOpen && (
+                            <div className="mt-1 ml-2 flex flex-col gap-1">
+                              {platforms.length > 0 ? (
+                                platforms.map((p) => (
+                                  <Link
+                                    key={p.key}
+                                    href={p.href}
+                                    className={
+                                      "text-left px-3 py-1.5 rounded-lg text-sm transition-colors block " +
+                                      (platformActive(p.href)
+                                        ? "text-gray-900 font-semibold"
+                                        : "text-gray-400 hover:text-gray-900")
+                                    }
+                                  >
+                                    {p.label}
+                                  </Link>
+                                ))
+                              ) : (
+                                <span className="px-3 py-1.5 text-xs text-gray-400 italic">
+                                  Belum ada channel terhubung.
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return (
+                      <Link
+                        key={child.key}
+                        href={child.href!}
+                        className={
+                          "text-left px-3 py-2 rounded-lg text-sm transition-colors block " +
+                          (pathname === child.href
+                            ? "text-gray-900 font-semibold"
+                            : "text-gray-500 hover:text-gray-900")
+                        }
+                      >
+                        {child.label}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>

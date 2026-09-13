@@ -1,12 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { withAuth } from "@/lib/utils/api";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const DELETE = withAuth(async (_req, ctx) => {
   try {
-    const { id } = await params;
+    const { id } = (await ctx?.params) as { id: string };
     
     // Delete the account
     await prisma.platformAccount.delete({
@@ -18,4 +16,4 @@ export async function DELETE(
     console.error("Error deleting store:", error);
     return NextResponse.json({ error: "Failed to delete store" }, { status: 500 });
   }
-}
+});

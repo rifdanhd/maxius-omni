@@ -1,12 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { withAuth } from "@/lib/utils/api";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const POST = withAuth(async (_req, ctx) => {
   try {
-    const { id } = await params;
+    const { id } = (await ctx?.params) as { id: string };
     
     // Simulate a sync operation for the account
     const account = await prisma.platformAccount.findUnique({ where: { id } });
@@ -21,4 +19,4 @@ export async function POST(
     console.error("Error syncing store:", error);
     return NextResponse.json({ error: "Failed to sync store" }, { status: 500 });
   }
-}
+});
