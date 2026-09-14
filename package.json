@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
+    "clean:seed": "tsx scripts/clean-seed.mts",
     "push": "bash scripts/git-push.sh"
   },
   "dependencies": {

@@ -35,7 +35,7 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
   };
 
   const marketplaces: PlatformConfig[] = [
-    { name: "Shopee", icon: <ShoppingBag size={24} className="text-orange-500" /> },
+    { name: "Shopee", icon: <ShoppingBag size={24} className="text-orange-500" />, authorizePath: "/api/auth/shopee/authorize" },
     { name: "Lazada", icon: <ShoppingCart size={24} className="text-blue-500" /> },
     { name: "TikTok Shop", icon: <TikTokLogo size={14} />, authorizePath: "/api/auth/tiktok/authorize" },
     { name: "Blibli", icon: <ShoppingBag size={24} className="text-blue-400" /> },

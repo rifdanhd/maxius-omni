@@ -8,11 +8,13 @@ import {
   restoreStockForCanceledOrder,
 } from "@/lib/services/central-stock.service";
 
-const APP_KEY = process.env.TIKTOK_APP_KEY!;
-const APP_SECRET = process.env.TIKTOK_APP_SECRET!;
-
-if (!APP_KEY || !APP_SECRET) {
-  throw new Error("TIKTOK_APP_KEY / TIKTOK_APP_SECRET belum diisi di file .env");
+function getTikTokWebhookEnv(): { appKey: string; appSecret: string } {
+  const appKey = process.env.TIKTOK_APP_KEY;
+  const appSecret = process.env.TIKTOK_APP_SECRET;
+  if (!appKey || !appSecret) {
+    throw new Error("TIKTOK_APP_KEY / TIKTOK_APP_SECRET belum diisi di environment.");
+  }
+  return { appKey, appSecret };
 }
 
 /**
@@ -28,10 +30,11 @@ if (!APP_KEY || !APP_SECRET) {
  */
 function verifyTikTokShopSignature(rawBody: string, authHeader: string | null): boolean {
   if (!authHeader) return false;
+  const { appKey, appSecret } = getTikTokWebhookEnv();
 
   const computedHex = crypto
-    .createHmac("sha256", APP_SECRET)
-    .update(`${APP_KEY}${rawBody}`)
+    .createHmac("sha256", appSecret)
+    .update(`${appKey}${rawBody}`)
     .digest("hex");
 
   const computed = Buffer.from(computedHex, "hex");

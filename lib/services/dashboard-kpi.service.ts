@@ -45,6 +45,9 @@ export type KpiStoreHealth = {
   lastSyncAt: Date | null;
   errors7d: number;
   mismatch: number;
+  /** Marker SyncLog kind=orphan_sku yang belum ditangani (SKU order
+   *  belum ter-mapping ke varian — ditindaklanjuti via halaman Mapping). */
+  orphanSkus: number;
 };
 
 export type DashboardKpi = {
@@ -65,7 +68,7 @@ export async function getDashboardKpi(): Promise<DashboardKpi> {
     prisma.$queryRaw<Array<{ c: bigint; units: bigint | null; sellable: bigint | null }>>`
       SELECT COUNT(*) AS c,
              COALESCE(SUM(pv.stock), 0) AS units,
-             COALESCE(SUM(MAX(pv.stock - pv."safetyStock", 0)), 0) AS sellable
+             COALESCE(SUM(GREATEST(pv.stock - pv."safetyStock", 0)), 0) AS sellable
       FROM "ProductVariant" pv
     `,
     prisma.$queryRaw<Array<{ c: bigint }>>`
@@ -108,12 +111,13 @@ export async function getDashboardKpi(): Promise<DashboardKpi> {
   // query kecil per akun paralel — bukan N+1 atas ribuan baris).
   const health: KpiStoreHealth[] = await Promise.all(
     accounts.map(async (a) => {
-      const [lastOrder, lastSync, errors7d, failedJobs, retryJobs] = await Promise.all([
+      const [lastOrder, lastSync, errors7d, failedJobs, retryJobs, orphanSkus] = await Promise.all([
         prisma.order.aggregate({ where: { accountId: a.id }, _max: { createTime: true } }),
         prisma.syncLog.aggregate({ where: { accountId: a.id }, _max: { createdAt: true } }),
         prisma.syncLog.count({ where: { accountId: a.id, status: "error", createdAt: { gte: since } } }),
         prisma.syncJob.count({ where: { accountId: a.id, status: "FAILED" } }),
         prisma.syncJob.count({ where: { accountId: a.id, status: "PENDING", retryCount: { gte: 1 } } }),
+        prisma.syncLog.count({ where: { accountId: a.id, kind: "orphan_sku", handledAt: null } }),
       ]);
       return {
         accountId: a.id,
@@ -125,6 +129,7 @@ export async function getDashboardKpi(): Promise<DashboardKpi> {
         lastSyncAt: lastSync._max.createdAt,
         errors7d,
         mismatch: failedJobs + retryJobs,
+        orphanSkus,
       };
     })
   );

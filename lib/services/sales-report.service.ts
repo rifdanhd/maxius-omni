@@ -19,7 +19,7 @@ import { prisma } from "@/lib/db/prisma";
  *   ingest refund tercatat sebagai backlog (prioritas rendah, 0 kejadian).
  * - Revenue per item = SUM(COALESCE(price,0) * qty); order tanpa item berharga
  *   fallback ke Order.amount (konvensi yang sama dengan analytics-agg).
- * - Batas hari = Asia/Jakarta (strftime '+7 hours', sama dengan analytics-agg).
+ * - Batas hari = Asia/Jakarta (AT TIME ZONE, sama dengan analytics-agg).
  */
 
 export const OMSET_EXCLUDE_STATUSES = ["CANCELLED", "REFUNDED", "RETURNED"];
@@ -79,6 +79,8 @@ function accountFilter(f: ReportFilters) {
 const num = (v: unknown): number =>
   typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : Number(v ?? 0);
 
+const asTs = (ms: number): Date => new Date(ms);
+
 export type WinningRow = {
   key: string;
   productId: string | null;
@@ -120,12 +122,12 @@ export async function getWinning(
              SUM(oi.qty) AS qty,
              SUM(COALESCE(oi.price, 0) * oi.qty) AS revenue,
              COUNT(DISTINCT o.id) AS orders
-      FROM OrderItem oi
+      FROM "OrderItem" oi
       JOIN "Order" o ON o.id = oi."orderId"
-      LEFT JOIN PlatformAccount pa ON pa.id = o."accountId"
-      LEFT JOIN ProductVariant v ON v.id = oi."variantId"
-      LEFT JOIN MasterProduct mp ON mp.id = v."masterProductId"
-      WHERE o."createTime" >= ${filters.fromMs} AND o."createTime" < ${filters.toMs}
+      LEFT JOIN "PlatformAccount" pa ON pa.id = o."accountId"
+      LEFT JOIN "ProductVariant" v ON v.id = oi."variantId"
+      LEFT JOIN "MasterProduct" mp ON mp.id = v."masterProductId"
+      WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
       GROUP BY mp.id
@@ -167,12 +169,12 @@ export async function getWinning(
            SUM(oi.qty) AS qty,
            SUM(COALESCE(oi.price, 0) * oi.qty) AS revenue,
            COUNT(DISTINCT o.id) AS orders
-    FROM OrderItem oi
+    FROM "OrderItem" oi
     JOIN "Order" o ON o.id = oi."orderId"
-    LEFT JOIN PlatformAccount pa ON pa.id = o."accountId"
-    LEFT JOIN ProductVariant v ON v.id = oi."variantId"
-    LEFT JOIN MasterProduct mp ON mp.id = v."masterProductId"
-    WHERE o."createTime" >= ${filters.fromMs} AND o."createTime" < ${filters.toMs}
+    LEFT JOIN "PlatformAccount" pa ON pa.id = o."accountId"
+    LEFT JOIN "ProductVariant" v ON v.id = oi."variantId"
+    LEFT JOIN "MasterProduct" mp ON mp.id = v."masterProductId"
+    WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
       AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
       ${acct}
     GROUP BY oi."variantId", oi."channelSku"
@@ -223,19 +225,19 @@ export async function getOmset(
   const acct = accountFilter(filters);
   const bucketExpr =
     granularity === "month"
-      ? Prisma.sql`strftime('%Y-%m', o."createTime" / 1000, 'unixepoch', '+7 hours')`
+      ? Prisma.sql`to_char(o."createTime" AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM')`
       : granularity === "week"
-        ? Prisma.sql`strftime('%Y-%W', o."createTime" / 1000, 'unixepoch', '+7 hours')`
-        : Prisma.sql`strftime('%Y-%m-%d', o."createTime" / 1000, 'unixepoch', '+7 hours')`;
+        ? Prisma.sql`to_char(o."createTime" AT TIME ZONE 'Asia/Jakarta', 'IYYY-IW')`
+        : Prisma.sql`to_char(o."createTime" AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD')`;
 
   const [buckets, byPlatform, byAccount, byCategory] = await Promise.all([
     prisma.$queryRaw<Array<{ bucket: string; orders: bigint; revenue: number | null; units: bigint | null }>>(Prisma.sql`
       WITH revenue AS (
         SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev,
                SUM(oi.qty) AS units
-        FROM OrderItem oi
+        FROM "OrderItem" oi
         JOIN "Order" o2 ON o2.id = oi."orderId"
-        WHERE o2."createTime" >= ${filters.fromMs} AND o2."createTime" < ${filters.toMs}
+        WHERE o2."createTime" >= ${asTs(filters.fromMs)} AND o2."createTime" < ${asTs(filters.toMs)}
         GROUP BY oi."orderId"
       )
       SELECT ${bucketExpr} AS bucket,
@@ -244,8 +246,8 @@ export async function getOmset(
              SUM(COALESCE(r.units, 0)) AS units
       FROM "Order" o
       LEFT JOIN revenue r ON r.oid = o.id
-      LEFT JOIN PlatformAccount pa ON pa.id = o."accountId"
-      WHERE o."createTime" >= ${filters.fromMs} AND o."createTime" < ${filters.toMs}
+      LEFT JOIN "PlatformAccount" pa ON pa.id = o."accountId"
+      WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
       GROUP BY bucket
@@ -255,9 +257,9 @@ export async function getOmset(
       WITH revenue AS (
         SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev,
                SUM(oi.qty) AS units
-        FROM OrderItem oi
+        FROM "OrderItem" oi
         JOIN "Order" o2 ON o2.id = oi."orderId"
-        WHERE o2."createTime" >= ${filters.fromMs} AND o2."createTime" < ${filters.toMs}
+        WHERE o2."createTime" >= ${asTs(filters.fromMs)} AND o2."createTime" < ${asTs(filters.toMs)}
         GROUP BY oi."orderId"
       )
       SELECT pa.platform AS platform,
@@ -266,8 +268,8 @@ export async function getOmset(
              SUM(COALESCE(r.units, 0)) AS units
       FROM "Order" o
       LEFT JOIN revenue r ON r.oid = o.id
-      LEFT JOIN PlatformAccount pa ON pa.id = o."accountId"
-      WHERE o."createTime" >= ${filters.fromMs} AND o."createTime" < ${filters.toMs}
+      LEFT JOIN "PlatformAccount" pa ON pa.id = o."accountId"
+      WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
       GROUP BY pa.platform
@@ -277,9 +279,9 @@ export async function getOmset(
       WITH revenue AS (
         SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev,
                SUM(oi.qty) AS units
-        FROM OrderItem oi
+        FROM "OrderItem" oi
         JOIN "Order" o2 ON o2.id = oi."orderId"
-        WHERE o2."createTime" >= ${filters.fromMs} AND o2."createTime" < ${filters.toMs}
+        WHERE o2."createTime" >= ${asTs(filters.fromMs)} AND o2."createTime" < ${asTs(filters.toMs)}
         GROUP BY oi."orderId"
       )
       SELECT o."accountId" AS accountId,
@@ -288,8 +290,8 @@ export async function getOmset(
              SUM(COALESCE(r.units, 0)) AS units
       FROM "Order" o
       LEFT JOIN revenue r ON r.oid = o.id
-      LEFT JOIN PlatformAccount pa ON pa.id = o."accountId"
-      WHERE o."createTime" >= ${filters.fromMs} AND o."createTime" < ${filters.toMs}
+      LEFT JOIN "PlatformAccount" pa ON pa.id = o."accountId"
+      WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
       GROUP BY o."accountId"
@@ -300,12 +302,12 @@ export async function getOmset(
              COUNT(DISTINCT o.id) AS orders,
              SUM(COALESCE(oi.price, 0) * oi.qty) AS revenue,
              SUM(oi.qty) AS units
-      FROM OrderItem oi
+      FROM "OrderItem" oi
       JOIN "Order" o ON o.id = oi."orderId"
-      LEFT JOIN PlatformAccount pa ON pa.id = o."accountId"
-      LEFT JOIN ProductVariant v ON v.id = oi."variantId"
-      LEFT JOIN MasterProduct mp ON mp.id = v."masterProductId"
-      WHERE o."createTime" >= ${filters.fromMs} AND o."createTime" < ${filters.toMs}
+      LEFT JOIN "PlatformAccount" pa ON pa.id = o."accountId"
+      LEFT JOIN "ProductVariant" v ON v.id = oi."variantId"
+      LEFT JOIN "MasterProduct" mp ON mp.id = v."masterProductId"
+      WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
       GROUP BY mp.category

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
 
 const mappingInclude = {
   account: { select: { id: true, platform: true, label: true } },
@@ -155,7 +156,10 @@ export const POST = withAuth(async (req) => {
       data: { accountId, channelSku, variantId },
       include: mappingInclude,
     });
-    return NextResponse.json({ ok: true, mapping }, { status: 201 });
+    // Backfill OrderItem historis yang masih orphan utk SKU ini — analytics
+    // (topProducts) langsung menampilkan produk master, bukan SKU mentah.
+    const backfilled = await backfillOrderItems(accountId, channelSku, variantId);
+    return NextResponse.json({ ok: true, mapping, backfilled }, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(

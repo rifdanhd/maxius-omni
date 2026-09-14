@@ -9,6 +9,7 @@ import {
   CANCEL_STATUSES,
   restoreStockForCanceledOrder,
 } from "@/lib/services/central-stock.service";
+import { logOrphanSku } from "@/lib/services/sync-log.util";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -176,6 +177,10 @@ export async function syncOrdersTikTok(
 
   const result = { fetched: orders.length, created: 0, skipped: 0, errors: [] as string[], reconciled: 0, reconcileScan: 0, trackingEvents: 0 };
 
+  // Akumulasi orphan SKU (channelSku → qty) utk penanda pasif SyncLog
+  // kind=orphan_sku — di-flush setelah loop order, idempotent per marker.
+  const orphanQty = new Map<string, number>();
+
   for (const raw of orders as OrderRaw[]) {
     const externalOrderId = raw.id;
     if (!externalOrderId) continue;
@@ -276,6 +281,9 @@ export async function syncOrdersTikTok(
     for (const item of lineItems) {
       if (!item.channelSku) continue;
       item.variantId = await resolveVariantId(prisma, accountId, item.channelSku);
+      if (!item.variantId) {
+        orphanQty.set(item.channelSku, (orphanQty.get(item.channelSku) ?? 0) + item.qty);
+      }
     }
 
     try {
@@ -364,6 +372,12 @@ export async function syncOrdersTikTok(
     } catch (e) {
       result.errors.push(`${externalOrderId}: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  // Penanda pasif orphan SKU: detect & tag saja (keputusan owner — mapping
+  // tetap manual via panel halaman Mapping). Tidak pernah gagalkan sync.
+  for (const [sku, qty] of orphanQty) {
+    await logOrphanSku(accountId, sku, qty);
   }
 
   // Backfill resi & kurir untuk shipment yang tetap kosong setelah sync —

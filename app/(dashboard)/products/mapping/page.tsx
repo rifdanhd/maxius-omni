@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
-import { Plus, Trash2, RefreshCw, History, Save, X, Link2, Boxes, SlidersHorizontal } from "lucide-react";
+import { Plus, Trash2, RefreshCw, History, Save, X, Link2, Boxes, SlidersHorizontal, AlertTriangle, PackagePlus, Link as LinkIcon } from "lucide-react";
 
 type Store = { id: string; name: string; platform: string; status: string };
 type Variant = {
@@ -52,6 +52,18 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
+type OrphanSku = {
+  channelSku: string;
+  accountId: string;
+  accountLabel: string | null;
+  platform: string | null;
+  qty: number;
+  orderCount: number;
+  sampleProductName: string | null;
+  lastSeenAt: string | null;
+  existingMappingId: string | null;
+};
+
 const emptyForm = {
   accountId: "",
   channelSku: "",
@@ -78,6 +90,15 @@ export default function ProductMappingPage() {
   const [adjustVariant, setAdjustVariant] = useState<Variant | null>(null);
   const [adjustForm, setAdjustForm] = useState({ newStock: "", note: "" });
   const [adjustSaving, setAdjustSaving] = useState(false);
+  const [orphans, setOrphans] = useState<OrphanSku[]>([]);
+  const [orphansLoaded, setOrphansLoaded] = useState(false);
+  const [mapMode, setMapMode] = useState<Record<string, "existing" | "new">>({});
+  const [mapTarget, setMapTarget] = useState<Record<string, string>>({});
+  const [newName, setNewName] = useState<Record<string, string>>({});
+  const [mapSaving, setMapSaving] = useState<string | null>(null);
+  const [stockInVariant, setStockInVariant] = useState<Variant | null>(null);
+  const [stockInForm, setStockInForm] = useState({ qty: "", note: "" });
+  const [stockInSaving, setStockInSaving] = useState(false);
 
   const loadAll = useCallback(async () => {
     const [m, v, storesRes] = await Promise.all([
@@ -97,11 +118,18 @@ export default function ProductMappingPage() {
     setLedger(r.entries ?? []);
   }, []);
 
+  const loadOrphans = useCallback(async () => {
+    const r = await api<{ orphans: OrphanSku[] }>("/api/inventory/orphan-skus");
+    setOrphans(r.orphans ?? []);
+    setOrphansLoaded(true);
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
         await loadAll();
         await loadLedger();
+        await loadOrphans();
       } catch (e) {
         console.error(e);
         setError(e instanceof Error ? e.message : "Gagal memuat data.");
@@ -109,7 +137,7 @@ export default function ProductMappingPage() {
         setLoading(false);
       }
     })();
-  }, [loadAll, loadLedger]);
+  }, [loadAll, loadLedger, loadOrphans]);
 
   async function handleCreateMapping() {
     setError(null);
@@ -177,9 +205,70 @@ export default function ProductMappingPage() {
     }
   }
 
+  async function handleMapOrphan(o: OrphanSku) {
+    const mode = mapMode[o.channelSku] ?? "existing";
+    setError(null);
+    if (mode === "existing" && !mapTarget[o.channelSku]) {
+      setError("Pilih varian target dulu untuk SKU ini.");
+      return;
+    }
+    if (mode === "new" && !newName[o.channelSku]?.trim()) {
+      setError("Isi nama produk master baru untuk SKU ini.");
+      return;
+    }
+    setMapSaving(o.channelSku);
+    try {
+      await api(`/api/inventory/orphan-skus/map`, {
+        method: "POST",
+        body: JSON.stringify(
+          mode === "existing"
+            ? { accountId: o.accountId, channelSku: o.channelSku, mode, variantId: mapTarget[o.channelSku] }
+            : { accountId: o.accountId, channelSku: o.channelSku, mode, newProductName: newName[o.channelSku].trim(), platformTitle: o.sampleProductName ?? undefined }
+        ),
+      });
+      setMapMode((p) => { const n = { ...p }; delete n[o.channelSku]; return n; });
+      setMapTarget((p) => { const n = { ...p }; delete n[o.channelSku]; return n; });
+      setNewName((p) => { const n = { ...p }; delete n[o.channelSku]; return n; });
+      await Promise.all([loadAll(), loadOrphans(), loadLedger()]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal mapping SKU.");
+    } finally {
+      setMapSaving(null);
+    }
+  }
+
   function openAdjust(v: Variant) {
     setAdjustVariant(v);
     setAdjustForm({ newStock: String(v.stock), note: "" });
+  }
+
+  async function handleStockIn() {
+    if (!stockInVariant) return;
+    const qty = Math.floor(Number(stockInForm.qty));
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setError("Isi jumlah barang masuk (bilangan bulat > 0).");
+      return;
+    }
+    setStockInSaving(true);
+    setError(null);
+    try {
+      await api("/api/inventory/stock-in", {
+        method: "POST",
+        body: JSON.stringify({
+          variantId: stockInVariant.id,
+          qty,
+          note: stockInForm.note.trim() || undefined,
+        }),
+      });
+      setStockInVariant(null);
+      setStockInForm({ qty: "", note: "" });
+      await loadAll();
+      await loadLedger();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal mencatat barang masuk.");
+    } finally {
+      setStockInSaving(false);
+    }
   }
 
   async function handleAdjust() {
@@ -358,6 +447,102 @@ export default function ProductMappingPage() {
         </div>
       </div>
 
+      {/* SKU Order Belum Ter-mapping (orphan) — detect & tag saja, aksi manual */}
+      {orphansLoaded && orphans.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl shadow-sm" data-testid="orphan-panel">
+          <div className="px-6 py-4 border-b border-amber-200 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-600" />
+            <h2 className="font-semibold text-gray-900">
+              SKU Order Belum Ter-mapping ({orphans.length})
+            </h2>
+            <span className="text-xs text-gray-500">
+              — muncul di order ({orphans.reduce((s, o) => s + o.qty, 0)} pcs) tapi belum punya varian stok pusat. Analytics belum menampilkan nama produknya.
+            </span>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {orphans.map((o) => {
+              const mode = mapMode[o.channelSku] ?? "existing";
+              return (
+                <div key={`${o.accountId}|${o.channelSku}`} className="p-4" data-testid={`orphan-row-${o.channelSku}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm text-gray-900">{o.channelSku}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">{o.qty} pcs</span>
+                        <span className="text-xs text-gray-500">{o.orderCount} order</span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 truncate max-w-[480px]">
+                        {o.sampleProductName ?? "(nama listing tidak tersedia)"} · {o.accountLabel ?? "-"}
+                        {o.existingMappingId ? " · mapping sudah ada — pakai Ganti Varian/aksi di bawah untuk backfill" : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setMapMode((p) => ({ ...p, [o.channelSku]: "existing" }))}
+                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "existing" ? "border-[#2a3a8c] bg-white text-[#2a3a8c]" : "border-gray-200 bg-white text-gray-600"}`}
+                      >
+                        <LinkIcon size={13} /> Ke varian ada
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMapMode((p) => ({ ...p, [o.channelSku]: "new" }));
+                          setNewName((p) => ({ ...p, [o.channelSku]: p[o.channelSku] ?? o.sampleProductName ?? "" }));
+                        }}
+                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "new" ? "border-[#2a3a8c] bg-white text-[#2a3a8c]" : "border-gray-200 bg-white text-gray-600"}`}
+                      >
+                        <PackagePlus size={13} /> Buat master baru
+                      </button>
+                    </div>
+                  </div>
+
+                  {mode === "existing" ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <select
+                        value={mapTarget[o.channelSku] ?? ""}
+                        onChange={(e) => setMapTarget((p) => ({ ...p, [o.channelSku]: e.target.value }))}
+                        className="border border-gray-300 rounded-md px-3 py-1.5 text-sm outline-none max-w-[320px]"
+                      >
+                        <option value="">— pilih varian —</option>
+                        {variants.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.masterProduct.name} / {v.sku} (stok {v.stock})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleMapOrphan(o)}
+                        disabled={mapSaving === o.channelSku || !mapTarget[o.channelSku]}
+                        className="rounded-md bg-[#2a3a8c] px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-900 disabled:opacity-50"
+                      >
+                        {mapSaving === o.channelSku ? "Menyimpan..." : "Mapping + Backfill"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={newName[o.channelSku] ?? ""}
+                        onChange={(e) => setNewName((p) => ({ ...p, [o.channelSku]: e.target.value }))}
+                        placeholder="Nama produk master baru"
+                        className="border border-gray-300 rounded-md px-3 py-1.5 text-sm outline-none max-w-[360px]"
+                      />
+                      <button
+                        onClick={() => handleMapOrphan(o)}
+                        disabled={mapSaving === o.channelSku || !newName[o.channelSku]?.trim()}
+                        className="rounded-md bg-[#2a3a8c] px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-900 disabled:opacity-50"
+                      >
+                        {mapSaving === o.channelSku ? "Menyimpan..." : "Buat Master + Mapping"}
+                      </button>
+                      <span className="text-xs text-gray-500">Stok awal 0 — isi lewat “Sesuaikan Stok” setelah ini.</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Daftar Mapping */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
@@ -473,6 +658,54 @@ export default function ProductMappingPage() {
           <Boxes size={16} className="text-[#2a3a8c]" />
           <h2 className="font-semibold text-gray-900">Daftar Varian (sku_master)</h2>
         </div>
+        {stockInVariant && (
+          <div className="p-6 border-b border-gray-200 bg-emerald-50/50">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">
+              Barang Masuk: {stockInVariant.masterProduct.name} / {stockInVariant.sku}
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Stok sekarang {stockInVariant.stock}. Isi JUMLAH MASUK (bukan stok total) — stok baru
+              = stok sekarang + qty, tercatat di Riwayat Stok dengan alasan STOCK_IN.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-[160px_1fr_auto] gap-3 items-end">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-2">Jumlah Masuk</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={stockInForm.qty}
+                  onChange={(e) => setStockInForm((f) => ({ ...f, qty: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-2">Catatan</label>
+                <input
+                  type="text"
+                  value={stockInForm.note}
+                  onChange={(e) => setStockInForm((f) => ({ ...f, note: e.target.value }))}
+                  placeholder="mis. PO-2026-091, terima 2 lusin"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleStockIn}
+                  disabled={stockInSaving}
+                  className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                >
+                  <Save size={15} /> {stockInSaving ? "Menyimpan..." : "Catat"}
+                </button>
+                <button
+                  onClick={() => setStockInVariant(null)}
+                  className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {adjustVariant && (
           <div className="p-6 border-b border-gray-200 bg-indigo-50/50">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">
@@ -547,13 +780,22 @@ export default function ProductMappingPage() {
                     <td className="px-6 py-3 text-gray-700">{v.safetyStock}</td>
                     <td className="px-6 py-3 text-gray-700">{effectiveStock(v)}</td>
                     <td className="px-6 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => openAdjust(v)}
-                        className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                        title="Set stok fisik hasil pengecekan"
-                      >
-                        <SlidersHorizontal size={14} /> Sesuaikan Stok
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => { setStockInVariant(v); setStockInForm({ qty: "", note: "" }); }}
+                          className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                          title="Catat barang masuk (restock fisik) — +qty, bukan angka absolut"
+                        >
+                          <PackagePlus size={14} /> Barang Masuk
+                        </button>
+                        <button
+                          onClick={() => openAdjust(v)}
+                          className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          title="Set stok fisik hasil pengecekan"
+                        >
+                          <SlidersHorizontal size={14} /> Sesuaikan Stok
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

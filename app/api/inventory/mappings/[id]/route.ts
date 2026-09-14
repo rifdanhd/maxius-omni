@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
 
 /**
  * PATCH /api/inventory/mappings/:id  — "repoint" mapping ke varian
@@ -45,7 +46,11 @@ export const PATCH = withAuth(
       },
     });
 
-    return NextResponse.json({ ok: true, mapping: updated });
+    // Repoint = keputusan "SKU ini sebenarnya milik varian X" — backfill juga
+    // OrderItem historis yang masih orphan utk pasangan (akun, SKU) ini.
+    const backfilled = await backfillOrderItems(mapping.accountId, mapping.channelSku, variantId);
+
+    return NextResponse.json({ ok: true, mapping: updated, backfilled });
   }
 );
 

@@ -4,17 +4,16 @@
  * Sebelumnya /api/analytics menarik SEMUA order + SEMUA item window 14 hari ke
  * memori Node lalu mengagregasi dengan loop JS berlapis (O(hari × order)) —
  * mahal di memori & CPU saat tabel tumbuh. Versi ini memindahkan agregasi ke
- * SQLite via query mentah yang ter-index:
+ * Postgres via query mentah yang ter-index:
  *
- *   - Per-hari: strftime('%Y-%m-%dT00:00:00+07:00', createTime/1000, 'unixepoch')
- *     (createTime disimpan INTEGER epoch-ms oleh Prisma — tervalidasi runtime).
+ *   - Per-hari: to_char("createTime" AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD')
  *   - Status & toko: GROUP BY — hasil beberapa baris, bukan ribuan.
  *   - Produk teratas: agregasi per varian + ORDER BY qty DESC LIMIT 10.
  *
  * Definisi bisnis SAMA dengan versi lama (jangan mengubah angka):
  *   - GMV: semua order KECUALI status CANCELLED (UNPAID ikut dihitung).
  *   - Revenue per order: SUM(price * qty) dari item; fallback amount order bila
- *     order tidak punya item berharga.
+ *   order tidak punya item berharga.
  *   - window "current" = 7 hari berakhir hari ini; "previous" = 7 hari
  *     sebelumnya; batas hari = Asia/Jakarta (+07:00), sama dgn startOfDayUTC lama.
  */
@@ -44,12 +43,23 @@ function dayLabel(ms: number): string {
 
 type DayRow = { day: string; orders: number; revenue: number; units: number };
 type StoreRow = { accountId: string; c: number; revenue: number; units: number };
-type ProductRow = { key: string | null; sku: string | null; name: string | null; qty: number; value: number };
+type ProductRow = {
+  variantId: string | null;
+  channelSku: string | null;
+  sku: string | null;
+  name: string | null;
+  qty: number;
+  value: number;
+};
 
 const GMV_EXCLUDE = ["CANCELLED"];
 
-/** SQLite COUNT/SUM bisa kembali sebagai BigInt via $queryRaw → normalkan. */
+/** COUNT/SUM via $queryRaw bisa kembali sebagai BigInt → normalkan. */
 const num = (v: unknown): number => (typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : Number(v ?? 0));
+
+const dayBucket = Prisma.sql`to_char(o."createTime" AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD')`;
+
+const asTs = (ms: number): Date => new Date(ms);
 
 function normalizeDayRow(r: DayRow): DayRow {
   return { day: r.day, orders: num(r.orders), revenue: num(r.revenue), units: num(r.units) };
@@ -66,26 +76,25 @@ export async function getAnalyticsAggregated() {
   // CTE `revenue` difilter ke window yang sama via join Order — OrderItem
   // selalu milik order-nya, jadi ini tidak mengubah hasil, hanya memangkas
   // agregasi dari SEMUA item historis menjadi item dalam window saja.
-  // Bucket hari = tanggal JAKARTA: modifier '+7 hours' pada strftime (bukan
-  // teks '+07:00' di format, itu hanya label — tanpa modifier, bucket-nya UTC
-  // dan order dini hari WIB salah masuk hari sebelumnya).
+  // Bucket hari = tanggal JAKARTA via AT TIME ZONE (tanpanya, order dini hari
+  // WIB salah masuk hari sebelumnya).
   const dayRows = await prisma.$queryRaw<DayRow[]>(Prisma.sql`
     WITH revenue AS (
-      SELECT oi.orderId AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev,
+      SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev,
              SUM(oi.qty) AS units
-      FROM OrderItem oi
-      JOIN "Order" o2 ON o2.id = oi.orderId
-      WHERE o2.createTime >= ${previousStart} AND o2.createTime < ${rangeEnd}
-      GROUP BY oi.orderId
+      FROM "OrderItem" oi
+      JOIN "Order" o2 ON o2.id = oi."orderId"
+      WHERE o2."createTime" >= ${asTs(previousStart)} AND o2."createTime" < ${asTs(rangeEnd)}
+      GROUP BY oi."orderId"
     )
-    SELECT strftime('%Y-%m-%d', o.createTime / 1000, 'unixepoch', '+7 hours') AS day,
+    SELECT ${dayBucket} AS day,
            COUNT(DISTINCT o.id) AS orders,
            SUM(COALESCE(r.rev, o.amount, 0)) AS revenue,
            SUM(COALESCE(r.units, 0)) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
-    WHERE o.createTime >= ${currentStart}
-      AND o.createTime < ${rangeEnd}
+    WHERE o."createTime" >= ${asTs(currentStart)}
+      AND o."createTime" < ${asTs(rangeEnd)}
       AND o.status NOT IN (${Prisma.join(GMV_EXCLUDE)})
     GROUP BY day
     ORDER BY day
@@ -129,72 +138,76 @@ export async function getAnalyticsAggregated() {
   // GMV COMPLETED per window — query terpisah agar sederhana & tetap ter-index.
   const completedCurrent = await prisma.$queryRaw<{ c: number; revenue: number; units: number }[]>(Prisma.sql`
     WITH revenue AS (
-      SELECT oi.orderId AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
-      FROM OrderItem oi
-      JOIN "Order" o2 ON o2.id = oi.orderId
-      WHERE o2.createTime >= ${currentStart} AND o2.createTime < ${rangeEnd}
-      GROUP BY oi.orderId
+      SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
+      FROM "OrderItem" oi
+      JOIN "Order" o2 ON o2.id = oi."orderId"
+      WHERE o2."createTime" >= ${asTs(currentStart)} AND o2."createTime" < ${asTs(rangeEnd)}
+      GROUP BY oi."orderId"
     )
     SELECT COUNT(DISTINCT o.id) AS c,
            COALESCE(SUM(COALESCE(r.rev, o.amount, 0)), 0) AS revenue,
            COALESCE(SUM(COALESCE(r.units, 0)), 0) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
-    WHERE o.createTime >= ${currentStart} AND o.createTime < ${rangeEnd}
+    WHERE o."createTime" >= ${asTs(currentStart)} AND o."createTime" < ${asTs(rangeEnd)}
       AND o.status = 'COMPLETED'
   `);
   const completedPrevious = await prisma.$queryRaw<{ c: number; revenue: number; units: number }[]>(Prisma.sql`
     WITH revenue AS (
-      SELECT oi.orderId AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
-      FROM OrderItem oi
-      JOIN "Order" o2 ON o2.id = oi.orderId
-      WHERE o2.createTime >= ${previousStart} AND o2.createTime < ${currentStart}
-      GROUP BY oi.orderId
+      SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
+      FROM "OrderItem" oi
+      JOIN "Order" o2 ON o2.id = oi."orderId"
+      WHERE o2."createTime" >= ${asTs(previousStart)} AND o2."createTime" < ${asTs(currentStart)}
+      GROUP BY oi."orderId"
     )
     SELECT COUNT(DISTINCT o.id) AS c,
            COALESCE(SUM(COALESCE(r.rev, o.amount, 0)), 0) AS revenue,
            COALESCE(SUM(COALESCE(r.units, 0)), 0) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
-    WHERE o.createTime >= ${previousStart} AND o.createTime < ${currentStart}
+    WHERE o."createTime" >= ${asTs(previousStart)} AND o."createTime" < ${asTs(currentStart)}
       AND o.status = 'COMPLETED'
   `);
 
   // Toko teratas: GROUP BY accountId.
   const storeRows = await prisma.$queryRaw<StoreRow[]>(Prisma.sql`
     WITH revenue AS (
-      SELECT oi.orderId AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
-      FROM OrderItem oi
-      JOIN "Order" o2 ON o2.id = oi.orderId
-      WHERE o2.createTime >= ${currentStart} AND o2.createTime < ${rangeEnd}
-      GROUP BY oi.orderId
+      SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
+      FROM "OrderItem" oi
+      JOIN "Order" o2 ON o2.id = oi."orderId"
+      WHERE o2."createTime" >= ${asTs(currentStart)} AND o2."createTime" < ${asTs(rangeEnd)}
+      GROUP BY oi."orderId"
     )
-    SELECT o.accountId, COUNT(DISTINCT o.id) AS c,
+    SELECT o."accountId", COUNT(DISTINCT o.id) AS c,
            SUM(COALESCE(r.rev, o.amount, 0)) AS revenue,
            COALESCE(SUM(COALESCE(r.units, 0)), 0) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
-    WHERE o.createTime >= ${currentStart} AND o.createTime < ${rangeEnd}
+    WHERE o."createTime" >= ${asTs(currentStart)} AND o."createTime" < ${asTs(rangeEnd)}
       AND o.status NOT IN (${Prisma.join(GMV_EXCLUDE)})
-    GROUP BY o.accountId
+    GROUP BY o."accountId"
     ORDER BY revenue DESC
     LIMIT 10
   `);
 
   // Produk teratas: agregasi per varian di DB, LIMIT 10.
+  // GROUP BY (variantId, channelSku): item yang belum di-mapping ke varian
+  // master (variantId NULL) tetap terpisah per channelSku, bukan menumpuk
+  // jadi satu baris "unknown".
   const productRows = await prisma.$queryRaw<ProductRow[]>(Prisma.sql`
-    SELECT oi.variantId AS key,
+    SELECT oi."variantId" AS variantId,
+           oi."channelSku" AS channelSku,
            MAX(v.sku) AS sku,
            MAX(mp.name) AS name,
            SUM(oi.qty) AS qty,
            SUM(COALESCE(oi.price, 0) * oi.qty) AS value
-    FROM OrderItem oi
-    JOIN "Order" o ON o.id = oi.orderId
-    LEFT JOIN ProductVariant v ON v.id = oi.variantId
-    LEFT JOIN MasterProduct mp ON mp.id = v.masterProductId
-    WHERE o.createTime >= ${currentStart} AND o.createTime < ${rangeEnd}
+    FROM "OrderItem" oi
+    JOIN "Order" o ON o.id = oi."orderId"
+    LEFT JOIN "ProductVariant" v ON v.id = oi."variantId"
+    LEFT JOIN "MasterProduct" mp ON mp.id = v."masterProductId"
+    WHERE o."createTime" >= ${asTs(currentStart)} AND o."createTime" < ${asTs(rangeEnd)}
       AND o.status NOT IN (${Prisma.join(GMV_EXCLUDE)})
-    GROUP BY oi.variantId, oi.channelSku
+    GROUP BY oi."variantId", oi."channelSku"
     ORDER BY qty DESC
     LIMIT 10
   `);
@@ -264,9 +277,12 @@ export async function getAnalyticsAggregated() {
       .filter((s) => s.value > 0),
     topProducts: productRows
       .map((p) => ({
-        key: p.key ?? p.sku ?? "unknown",
-        name: p.name ?? p.sku ?? p.key ?? "unknown",
+        // Key = identitas grup sebenarnya (kolom GROUP BY). channelSku NOT NULL
+        // di schema, jadi key selalu unik & tidak pernah "unknown".
+        key: `${p.variantId ?? ""}|${p.channelSku ?? ""}`,
+        name: p.name ?? p.channelSku ?? p.variantId ?? "unknown",
         sku: p.sku,
+        channelSku: p.channelSku,
         qty: num(p.qty),
         value: num(p.value),
       }))

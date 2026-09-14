@@ -81,8 +81,37 @@ async function main() {
     },
   ];
 
-  // Hapus semua produk lama untuk mencegah duplikasi (karena seed ini berjalan setiap reset)
-  await prisma.masterProduct.deleteMany();
+  // SCOPE PENGHAPUSAN: WHITELIST DUMMY SAJA — sama persis dengan scripts/clean-seed.mts.
+  // Jangan pernah deleteMany() tanpa where: data asli (RIKI, Stiker, bundle user,
+  // mapping manual) harus selamat dari seed. (Insiden 2026-09: delete tanpa filter
+  // menghapus produk asli.)
+  const DUMMY_PRODUCT_NAMES = [
+    "Kaos kaki polos hitam",
+    "Kaos kaki motif garis",
+    "Kaos kaki olahraga putih",
+    "Kaos kaki mata kaki abu",
+  ];
+  const DUMMY_VARIANT_SKUS = ["SOCK-BLK", "SOCK-STR", "SOCK-WHT", "SOCK-GRY"];
+
+  // Hapus subtree dummy untuk state fresh — TAPI scoped ketat ke whitelist.
+  // Urutan FK-safe: BundleItem dulu (componentVariant = Restrict, P2003),
+  // lalu produk dummy (Cascade membersihkan varian + mapping dummy).
+  const dummyProducts = await prisma.masterProduct.findMany({
+    where: { name: { in: DUMMY_PRODUCT_NAMES } },
+    select: { id: true },
+  });
+  const dummyProductIds = dummyProducts.map((p) => p.id);
+  const dummyVariants = await prisma.productVariant.findMany({
+    where: { sku: { in: DUMMY_VARIANT_SKUS }, masterProductId: { in: dummyProductIds } },
+    select: { id: true },
+  });
+  const dummyVariantIds = dummyVariants.map((v) => v.id);
+  await prisma.bundleItem.deleteMany({
+    where: {
+      OR: [{ bundleProductId: { in: dummyProductIds } }, { componentVariantId: { in: dummyVariantIds } }],
+    },
+  });
+  await prisma.masterProduct.deleteMany({ where: { id: { in: dummyProductIds } } });
 
   for (const mp of masterProductsData) {
     await prisma.masterProduct.create({

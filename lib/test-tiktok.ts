@@ -1,7 +1,8 @@
 import { ClientConfiguration, TikTokShopNodeApiClient } from "./tiktok-sdk";
 
-ClientConfiguration.globalConfig.app_key = "6l6ht2ppn0v3n";
-ClientConfiguration.globalConfig.app_secret = "GANTI_DENGAN_APP_SECRET_ASLI";
+// Kredensial HANYA dari environment — jangan hardcode app key/secret di sini.
+ClientConfiguration.globalConfig.app_key = process.env.TIKTOK_APP_KEY ?? "";
+ClientConfiguration.globalConfig.app_secret = process.env.TIKTOK_APP_SECRET ?? "";
 
 const client = new TikTokShopNodeApiClient({
   config: {

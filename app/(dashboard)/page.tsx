@@ -28,7 +28,7 @@ type AnalyticsData = {
   };
   chart: { date: string; current: number | null; previous: number | null }[];
   topStores: { id: string; label: string; platform: string; value: number; units: number }[];
-  topProducts: { key: string; name: string; sku: string | null; qty: number; value: number }[];
+  topProducts: { key: string; name: string; sku: string | null; channelSku: string | null; qty: number; value: number }[];
 };
 
 type OpsKpi = {
@@ -58,6 +58,7 @@ type OpsKpi = {
     lastSyncAt: string | null;
     errors7d: number;
     mismatch: number;
+    orphanSkus: number;
   }>;
 };
 
@@ -175,13 +176,14 @@ export default function DashboardPage() {
                   <th className="px-3 py-2 text-center">Token</th>
                   <th className="px-3 py-2 text-center">Error 7d</th>
                   <th className="px-3 py-2 text-center">Mismatch</th>
+                  <th className="px-3 py-2 text-center">SKU Belum Mapping</th>
                   <th className="px-3 py-2">Aktivitas Terakhir</th>
                 </tr>
               </thead>
               <tbody>
                 {opsKpi.storeHealth.map((s) => {
                   const lastActive = s.lastOrderAt ?? s.lastSyncAt;
-                  const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0;
+                  const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0 || s.orphanSkus > 0;
                   return (
                     <tr key={s.accountId} className="border-b border-gray-100 last:border-0">
                       <td className="py-2 pr-3 font-medium text-gray-900">
@@ -201,6 +203,19 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-3 py-2 text-center text-gray-700">{s.errors7d}</td>
                       <td className="px-3 py-2 text-center text-gray-700">{s.mismatch}</td>
+                      <td className="px-3 py-2 text-center">
+                        {s.orphanSkus > 0 ? (
+                          <a
+                            href="/products/mapping"
+                            className="font-semibold text-amber-600 hover:underline"
+                            title="Order memuat SKU yang belum ter-mapping — buka halaman Mapping"
+                          >
+                            {s.orphanSkus}
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">0</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-gray-500 text-xs">
                         {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
                       </td>
@@ -406,7 +421,7 @@ export default function DashboardPage() {
                     <div className="w-12 h-12 bg-orange-200 rounded-md shrink-0"></div>
                     <div>
                       <p className="text-sm font-semibold text-gray-800 leading-tight">{product.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{product.sku ?? product.key}</p>
+                      <p className="text-xs text-gray-500 mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
                     </div>
                   </div>
                   <div className="text-right">
