@@ -7,7 +7,11 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Pakai POSTGRES_URL (format postgres:// standar) dari Vercel Storage.
+  // JANGAN pakai DATABASE_URL — di Storage Prisma Postgres, var itu berisi
+  // URL accelerate (prisma+postgres://) yang butuh extension khusus dan
+  // ditolak Prisma Client plain ("the URL must start with postgresql://").
+  url      = env("POSTGRES_URL")
 }
 
 model User {
