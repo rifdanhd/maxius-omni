@@ -114,7 +114,7 @@ export function buildAuthorizeUrl(state?: string): string {
   const redirect =
     process.env.SHOPEE_REDIRECT_URI ?? process.env.SHOPEE_REDIRECT_URL ?? "";
   if (!redirect) throw new Error("[Shopee] SHOPEE_REDIRECT_URI belum diisi di .env.");
-  const url = new URL("https://partner.shopeemobile.com/api/v2/shop/auth_partner");
+  const url = new URL("/api/v2/shop/auth_partner", SHOPEE_API_BASE);
   url.searchParams.set("partner_id", PARTNER_ID);
   url.searchParams.set("redirect", redirect);
   if (state) url.searchParams.set("state", state);
