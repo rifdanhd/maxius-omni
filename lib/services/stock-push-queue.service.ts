@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { updateStockBatch, type StockBatchItem } from "@/lib/integrations/tiktokShop";
+import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
 import { logStockPush } from "@/lib/services/sync-log.util";
 import { backoffDelayMs, isTransientPlatformError, MAX_TRANSIENT_RETRIES } from "@/lib/services/rate-limit.policy";
 
@@ -131,7 +132,7 @@ async function flushAccount(accountId: string): Promise<void> {
 async function flushChunkWithRetry(accountId: string, chunk: StockBatchItem[], q: AccountQueue): Promise<void> {
   const account = await prisma.platformAccount.findUnique({
     where: { id: accountId },
-    select: { accessToken: true, shopCipher: true },
+    select: { id: true, label: true, accessToken: true, refreshToken: true, tokenExpiresAt: true, shopCipher: true },
   });
   if (!account?.accessToken) {
     for (const it of chunk) {
@@ -142,7 +143,9 @@ async function flushChunkWithRetry(accountId: string, chunk: StockBatchItem[], q
 
   let result;
   try {
-    result = await updateStockBatch(account.accessToken, chunk, account.shopCipher ?? undefined);
+    result = await withRefreshedTiktokToken(account, (token) =>
+      updateStockBatch(token, chunk, account.shopCipher ?? undefined),
+    );
   } catch (err) {
     // Kegagalan level batch (mis. auth error di search) → tangani per item.
     for (const it of chunk) {

@@ -73,6 +73,8 @@ async function logSync(params: {
 
 type WebhookPayload = {
   type?: number;
+  event?: string;
+  event_type?: string;
   tts_notification_id?: string;
   shop_id?: string;
   timestamp?: number;
@@ -117,7 +119,29 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      switch (payload.type) {
+      const eventName = payload.event ?? payload.event_type;
+      if (eventName === "SELLER_DEAUTHORIZATION") {
+        // Seller mencabut otorisasi — hapus token agar UI terbaca Terputus.
+        await prisma.platformAccount.update({
+          where: { id: account.id },
+          data: { accessToken: null, refreshToken: null, tokenExpiresAt: null },
+        });
+        await logSync({
+          accountId: account.id,
+          kind: "seller_deauthorization",
+          status: "skipped",
+          message: "Otorisasi TikTok dicabut seller — akun ditandai terputus, hubungkan ulang.",
+          payload: rawBody,
+        });
+      } else if (eventName === "UPCOMING_AUTHORIZATION_EXPIRATION") {
+        await logSync({
+          accountId: account.id,
+          kind: "authorization_expiry_warning",
+          status: "skipped",
+          message: "Otorisasi TikTok segera kedaluwarsa — minta seller authorize ulang.",
+          payload: rawBody,
+        });
+      } else switch (payload.type) {
         case 1:
           await handleOrderStatusChange(account.id, rawBody, payload);
           break;
@@ -134,8 +158,6 @@ export async function POST(req: NextRequest) {
           });
       }
     } catch (err) {
-      // Error tak terduga saat proses (DB error dll) → catat, tetap 200 supaya
-      // TikTok tidak retry-storm. Return 500 hanya bila sengaja mau TikTok retry.
       const message = err instanceof Error ? err.stack ?? err.message : String(err);
       console.error(`[webhook] process error untuk akun ${account.id}:`, err);
       await logSync({

@@ -10,13 +10,15 @@ const TIKTOK_API_BASE = "https://open-api.tiktokglobalshop.com";
 export class TikTokApiError extends Error {
   code: number;
   requestId: string;
-  constructor(kind: "AUTH" | "API", code: number, message: string, requestId: string) {
+  kind: "AUTH" | "SCOPE" | "API";
+  constructor(kind: "AUTH" | "SCOPE" | "API", code: number, message: string, requestId: string) {
     super(
       kind === "AUTH"
         ? `[Tokopedia | Shop] ⚠️ Auth error (${code}): ${message} | ${requestId}`
         : `[Tokopedia | Shop] API error (${code}): ${message} | ${requestId}`
     );
     this.name = "TikTokApiError";
+    this.kind = kind;
     this.code = code;
     this.requestId = requestId;
   }
@@ -114,8 +116,12 @@ async function callApi(
     const requestId = (data.request_id as string) || "-";
 
     const TOKEN_ERRORS = [105001, 105002, 105003, 105004];
+    const SCOPE_ERRORS = [105005];
     if (TOKEN_ERRORS.includes(code)) {
       throw new TikTokApiError("AUTH", code, message, requestId);
+    }
+    if (SCOPE_ERRORS.includes(code)) {
+      throw new TikTokApiError("SCOPE", code, message, requestId);
     }
     throw new TikTokApiError("API", code, message, requestId);
   }
@@ -126,8 +132,12 @@ async function callApi(
     const requestId = (data.request_id as string) || "-";
 
     const TOKEN_ERRORS = [105001, 105002, 105003, 105004];
+    const SCOPE_ERRORS = [105005];
     if (TOKEN_ERRORS.includes(code)) {
       throw new TikTokApiError("AUTH", code, message, requestId);
+    }
+    if (SCOPE_ERRORS.includes(code)) {
+      throw new TikTokApiError("SCOPE", code, message, requestId);
     }
     throw new TikTokApiError("API", code, message, requestId);
   }
@@ -139,6 +149,50 @@ export async function getAuthorizedShops(accessToken: string) {
   const result = await callApi("GET", "/authorization/202309/shops", accessToken);
   const shops = (result.data as { shops?: Array<Record<string, string>> } | undefined)?.shops;
   return shops ?? [];
+}
+
+// Refresh access token (berlaku default 7 hari, WAJIB refresh sebelum expired).
+// Response memakai epoch absolut (access_token_expire_in), sama seperti get token.
+export async function refreshAccessToken(refreshToken: string): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: Date;
+}> {
+  if (!APP_KEY || !APP_SECRET) throw new Error("[TikTok] TIKTOK_APP_KEY/SECRET belum diisi.");
+  const url = new URL("https://auth.tiktok-shops.com/api/v2/token/refresh");
+  url.searchParams.set("app_key", APP_KEY);
+  url.searchParams.set("app_secret", APP_SECRET);
+  url.searchParams.set("refresh_token", refreshToken);
+  url.searchParams.set("grant_type", "refresh_token");
+  const res = await fetch(url.toString());
+  const data = (await res.json().catch(() => null)) as {
+    code?: number;
+    message?: string;
+    data?: {
+      access_token?: string;
+      access_token_expire_in?: number;
+      refresh_token?: string;
+    };
+  } | null;
+  if (!res.ok || !data || data.code !== 0) {
+    throw new TikTokApiError(
+      "AUTH",
+      data?.code ?? res.status,
+      data?.message ?? `HTTP ${res.status} saat refresh token TikTok.`,
+      "-",
+    );
+  }
+  const d = data.data ?? {};
+  if (!d.access_token || !d.refresh_token) {
+    throw new TikTokApiError("AUTH", data.code ?? -1, "Refresh token TikTok tak lengkap.", "-");
+  }
+  return {
+    accessToken: d.access_token,
+    refreshToken: d.refresh_token,
+    expiresAt: d.access_token_expire_in
+      ? new Date(d.access_token_expire_in * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  };
 }
 
 export async function searchPromotionActivities(

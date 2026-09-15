@@ -40,8 +40,7 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const authHeader = req.headers.get("authorization");
 
-  const hasKey = Boolean(process.env.SHOPEE_PARTNER_KEY);
-  if (hasKey && authHeader && !verifyPushSignature(rawBody, authHeader)) {
+  if (!verifyPushSignature(rawBody, authHeader, req.url)) {
     return new Response(null, { status: 401 });
   }
 
@@ -76,6 +75,29 @@ export async function POST(req: NextRequest) {
         kind: "shop_authorization",
         status: "success",
         message: "Otorisasi toko Shopee berubah.",
+        payload: rawBody,
+      });
+    } else if (code === 2) {
+      // shop_authorization_canceled_push — seller mencabut otorisasi.
+      // Hapus token agar UI terbaca Terputus + API tidak dipanggil sia-sia.
+      await prisma.platformAccount.update({
+        where: { id: account.id },
+        data: { accessToken: null, refreshToken: null, tokenExpiresAt: null },
+      });
+      await logSync({
+        accountId: account.id,
+        kind: "shop_deauthorization",
+        status: "skipped",
+        message: "Otorisasi Shopee dicabut seller — akun ditandai terputus, hubungkan ulang.",
+        payload: rawBody,
+      });
+    } else if (code === 12) {
+      // open_api_authorization_expiry — H-7 sebelum authorization expired.
+      await logSync({
+        accountId: account.id,
+        kind: "authorization_expiry_warning",
+        status: "skipped",
+        message: "Otorisasi Shopee segera kedaluwarsa — minta seller authorize ulang.",
         payload: rawBody,
       });
     } else {

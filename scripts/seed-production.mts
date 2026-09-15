@@ -8,8 +8,8 @@
  *
  * Idempotent: aman dijalankan berulang (upsert semua).
  *
- * USAGE (DATABASE_URL harus menunjuk ke Postgres production):
- *   DATABASE_URL="postgres://..." npx tsx scripts/seed-production.mts
+ * USAGE (POSTGRES_URL harus menunjuk ke Postgres production):
+ *   POSTGRES_URL="postgres://..." npx tsx scripts/seed-production.mts
  *
  * JANGAN jalankan prisma/seed.js ke production — itu seed dummy dev
  * (kaos kaki + akun tiktok-1..3) untuk testing lokal saja.

@@ -8,10 +8,23 @@ const PLATFORM = "TIKTOK_SHOP";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
+  const error = searchParams.get("error");
 
-  if (!code) {
+  if (error || !code) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_code", req.url),
+      new URL(
+        `/settings/accounts?error=${encodeURIComponent(error ?? "missing_code")}`,
+        req.url,
+      ),
+    );
+  }
+
+  // Validasi state anti-CSRF (di-set oleh /api/auth/tiktok/authorize).
+  const expectedState = req.cookies.get("tiktok_oauth_state")?.value;
+  const gotState = searchParams.get("state");
+  if (expectedState && gotState !== expectedState) {
+    return NextResponse.redirect(
+      new URL("/settings/accounts?error=invalid_state", req.url),
     );
   }
 

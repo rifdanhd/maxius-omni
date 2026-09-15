@@ -2,19 +2,34 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 
+const AUTHORIZE_PATH: Record<string, string> = {
+  SHOPEE: "/api/auth/shopee/authorize",
+  TIKTOK_SHOP: "/api/auth/tiktok/authorize",
+};
+
 export const GET = withAuth(async () => {
   try {
-    const accounts = await prisma.platformAccount.findMany();
-    
-    // Map Account to the store format expected by the frontend
-    const stores = accounts.map(acc => ({
-      id: acc.id,
-      name: acc.label,
-      url: `https://${acc.platform}.com/${acc.label}`, // mock URL for now
-      platform: acc.platform,
-      status: acc.accessToken ? 'connected' : 'disconnected',
-      connectedAt: '07-09-2026 07:40' // Mock connection time as it's not in DB yet
-    }));
+    const accounts = await prisma.platformAccount.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+
+    const stores = accounts.map((acc) => {
+      const hasToken = Boolean(acc.accessToken);
+      const expired =
+        hasToken && acc.tokenExpiresAt
+          ? acc.tokenExpiresAt.getTime() <= Date.now()
+          : false;
+      return {
+        id: acc.id,
+        name: acc.label,
+        platform: acc.platform,
+        status: !hasToken ? "disconnected" : expired ? "expired" : "connected",
+        connectedAt: acc.createdAt.toISOString(),
+        tokenExpiresAt: acc.tokenExpiresAt?.toISOString() ?? null,
+        scope: acc.scope,
+        authorizePath: AUTHORIZE_PATH[acc.platform] ?? null,
+      };
+    });
 
     return NextResponse.json(stores);
   } catch (error) {

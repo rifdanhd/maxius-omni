@@ -3,6 +3,12 @@ import crypto from "crypto";
 const SHOPEE_API_BASE =
   process.env.SHOPEE_API_BASE ?? "https://partner.shopeemobile.com";
 
+// Format resmi Shop API v2 (semua tipe App): host auth + auth_type=seller.
+// Legacy /api/v2/shop/auth_partner hanya untuk migrasi lama.
+// Host sandbox: https://open.sandbox.test-stable.shopee.com/auth (via SHOPEE_AUTH_BASE).
+const SHOPEE_AUTH_BASE =
+  process.env.SHOPEE_AUTH_BASE ?? "https://open.shopee.com/auth";
+
 const PARTNER_ID = process.env.SHOPEE_PARTNER_ID ?? "";
 const PARTNER_KEY = process.env.SHOPEE_PARTNER_KEY ?? "";
 
@@ -114,9 +120,11 @@ export function buildAuthorizeUrl(state?: string): string {
   const redirect =
     process.env.SHOPEE_REDIRECT_URI ?? process.env.SHOPEE_REDIRECT_URL ?? "";
   if (!redirect) throw new Error("[Shopee] SHOPEE_REDIRECT_URI belum diisi di .env.");
-  const url = new URL("/api/v2/shop/auth_partner", SHOPEE_API_BASE);
+  const url = new URL(SHOPEE_AUTH_BASE);
   url.searchParams.set("partner_id", PARTNER_ID);
-  url.searchParams.set("redirect", redirect);
+  url.searchParams.set("auth_type", "seller");
+  url.searchParams.set("redirect_uri", redirect);
+  url.searchParams.set("response_type", "code");
   if (state) url.searchParams.set("state", state);
   return url.toString();
 }
@@ -447,16 +455,26 @@ export async function updatePrice(
   });
 }
 
-export function verifyPushSignature(rawBody: string, authHeader: string | null): boolean {
+// Verifikasi push Shopee: HMAC-SHA256(PARTNER_KEY, requestUrl|rawBody).
+// Format base string sesuai dokumen Push Mechanism resmi.
+export function verifyPushSignature(
+  rawBody: string,
+  authHeader: string | null,
+  requestUrl?: string,
+): boolean {
   if (!PARTNER_KEY) return false;
   if (!authHeader) return false;
-  const computed = crypto.createHmac("sha256", PARTNER_KEY).update(rawBody).digest("hex");
-  try {
-    const a = Buffer.from(computed, "hex");
-    const b = Buffer.from(authHeader.trim(), "hex");
-    if (a.length !== b.length) return computed === authHeader.trim().toLowerCase();
-    return crypto.timingSafeEqual(a, b);
-  } catch {
-    return computed === authHeader.trim().toLowerCase();
+  const candidates = requestUrl ? [`${requestUrl}|${rawBody}`, rawBody] : [rawBody];
+  const target = authHeader.trim().toLowerCase();
+  for (const base of candidates) {
+    const computed = crypto.createHmac("sha256", PARTNER_KEY).update(base).digest("hex");
+    try {
+      const a = Buffer.from(computed, "hex");
+      const b = Buffer.from(target, "hex");
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
+    } catch {
+      if (computed === target) return true;
+    }
   }
+  return false;
 }
