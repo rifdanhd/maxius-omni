@@ -18,7 +18,7 @@ type MenuLink = { key: string; icon: LucideIcon; label: string; href: string };
 type MenuItem = MenuGroup | MenuLink;
 
 const MENU: MenuItem[] = [
-  { key: "dashboard", icon: Home, label: "Dashboard", href: "/" },
+  { key: "dashboard", icon: Home, label: "Dashboard", href: "/dashboard" },
   {
     key: "pesanan",
     icon: ShoppingBag,

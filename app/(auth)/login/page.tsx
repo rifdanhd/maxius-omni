@@ -62,7 +62,7 @@ function LoginForm() {
       localStorage.setItem("username", data.user.username);
 
       // Redirect hanya setelah token tersimpan
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
