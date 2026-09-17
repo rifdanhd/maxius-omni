@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db/prisma";
 import { logStockPush } from "@/lib/services/sync-log.util";
 import type { SyncPushItemResult } from "@/lib/services/sync.service";
 import {
+  assertAccountActive,
+  resolveShopeeCreds,
+} from "@/lib/services/app-credential.service";
+import {
   ShopeeApiError,
   getItemBaseInfo,
   getItemList,
@@ -9,6 +13,7 @@ import {
   refreshAccessToken,
   updatePrice as apiUpdatePrice,
   updateStockBatch as apiUpdateStockBatch,
+  type ShopeeCreds,
 } from "@/lib/integrations/shopee";
 
 export const SHOPEE_ADAPTER_ERROR = "Shopee adapter belum diimplementasikan";
@@ -21,13 +26,22 @@ type PushParams = {
 };
 
 async function loadShopeeAccount(accountId: string) {
-  return prisma.platformAccount.findUnique({ where: { id: accountId } });
+  return prisma.platformAccount.findUnique({
+    where: { id: accountId },
+    include: { appCredential: true },
+  });
+}
+
+function credsOf(account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>): ShopeeCreds {
+  return resolveShopeeCreds(account.appCredential);
 }
 
 async function withRefreshedToken<T>(
   account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>,
-  fn: (accessToken: string, shopId: string) => Promise<T>
+  fn: (accessToken: string, shopId: string, creds: ShopeeCreds) => Promise<T>
 ): Promise<T> {
+  assertAccountActive(account);
+  const creds = credsOf(account);
   const shopId = account.externalShopId;
   if (!account.accessToken || !shopId) {
     throw new Error(
@@ -35,12 +49,12 @@ async function withRefreshedToken<T>(
     );
   }
   try {
-    return await fn(account.accessToken, shopId);
+    return await fn(account.accessToken, shopId, creds);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const authLike = /error_auth|auth|token|expired|invalid/i.test(msg);
     if (!authLike || !account.refreshToken) throw e;
-    const r = await refreshAccessToken(account.refreshToken, shopId);
+    const r = await refreshAccessToken(account.refreshToken, shopId, creds);
     await prisma.platformAccount.update({
       where: { id: account.id },
       data: {
@@ -49,7 +63,7 @@ async function withRefreshedToken<T>(
         tokenExpiresAt: new Date(Date.now() + r.expireIn * 1000),
       },
     });
-    return fn(r.accessToken, shopId);
+    return fn(r.accessToken, shopId, creds);
   }
 }
 
@@ -79,10 +93,10 @@ export async function pushStockToShopee(params: PushParams): Promise<SyncPushIte
     return done(false, true, error);
   }
   try {
-    const r = await withRefreshedToken(account, (token, shopId) =>
+    const r = await withRefreshedToken(account, (token, shopId, creds) =>
       apiUpdateStockBatch(token, shopId, [
         { channelSku: params.channelSku, quantity: params.newStock },
-      ])
+      ], creds)
     );
     const failed = r.failed[0];
     if (failed) {
@@ -132,8 +146,8 @@ export async function pushPriceToShopee(params: {
     return;
   }
   try {
-    await withRefreshedToken(account, (token, shopId) =>
-      apiUpdatePrice(token, shopId, params.channelSku, params.price)
+    await withRefreshedToken(account, (token, shopId, creds) =>
+      apiUpdatePrice(token, shopId, params.channelSku, params.price, creds)
     );
     await message("success", `Harga ${params.price} → SKU "${params.channelSku}" (${account.label}).`);
   } catch (err) {
@@ -202,7 +216,10 @@ export async function listShopeeProducts(opts: {
 export async function syncShopeeListings(): Promise<
   Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }>
 > {
-  const accounts = await prisma.platformAccount.findMany({ where: { platform: "SHOPEE" } });
+  const accounts = await prisma.platformAccount.findMany({
+    where: { platform: "SHOPEE" },
+    include: { appCredential: true },
+  });
   const results: Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }> = [];
   for (const account of accounts) {
     if (!account.accessToken || !account.externalShopId) {
@@ -220,21 +237,21 @@ export async function syncShopeeListings(): Promise<
       let modelCount = 0;
       let matched = 0;
       for (let page = 0; page < 20; page++) {
-        const { items, hasMore } = await withRefreshedToken(account, (token, shopId) =>
-          getItemList(token, shopId, { offset, pageSize: 50 })
+        const { items, hasMore } = await withRefreshedToken(account, (token, shopId, creds) =>
+          getItemList(token, shopId, { offset, pageSize: 50 }, creds)
         );
         if (items.length === 0) break;
         itemCount += items.length;
-        const infos = await withRefreshedToken(account, (token, shopId) =>
-          getItemBaseInfo(token, shopId, items.map((i) => i.item_id))
+        const infos = await withRefreshedToken(account, (token, shopId, creds) =>
+          getItemBaseInfo(token, shopId, items.map((i) => i.item_id), creds)
         );
         for (const info of infos) {
           const itemId = Number(info.item_id);
           const title = (info.item_name as string | undefined) ?? null;
           const status = (info.item_status as string | undefined) ?? null;
           const itemSku = info.item_sku as string | undefined;
-          const { models } = await withRefreshedToken(account, (token, shopId) =>
-            getModelList(token, shopId, itemId)
+          const { models } = await withRefreshedToken(account, (token, shopId, creds) =>
+            getModelList(token, shopId, itemId, creds)
           );
           modelCount += models.length;
           const touch = async (candidates: Array<string | undefined>, extraTitle: string | null, extraStatus: string | null) => {

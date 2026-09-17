@@ -27,10 +27,21 @@ export class TikTokApiError extends Error {
 const APP_KEY = process.env.TIKTOK_APP_KEY!;
 const APP_SECRET = process.env.TIKTOK_APP_SECRET!;
 
+// Kredensial app partner. Default = env (perilaku lama); isi dari
+// AppCredential (clientId=app_key, clientSecret=app_secret) bila ada
+// multi-app — tanpa refactor pemanggil (param opsional di ekor).
+export type TiktokCreds = { appKey: string; appSecret: string };
+
+function envTiktokCreds(): TiktokCreds {
+  if (!APP_KEY || !APP_SECRET) throw new Error("[TikTok] TIKTOK_APP_KEY/SECRET belum diisi.");
+  return { appKey: APP_KEY, appSecret: APP_SECRET };
+}
+
 function generateSign(
   apiPath: string,
   queryParams: Record<string, string | number>,
-  body: Record<string, unknown> | null
+  body: Record<string, unknown> | null,
+  creds?: TiktokCreds
 ): string {
   const EXCLUDED_KEYS = ["sign", "access_token"];
 
@@ -46,10 +57,11 @@ function generateSign(
     signString += JSON.stringify(body);
   }
 
-  signString = `${APP_SECRET}${signString}${APP_SECRET}`;
+  const secret = creds?.appSecret ?? APP_SECRET;
+  signString = `${secret}${signString}${secret}`;
 
   return crypto
-    .createHmac("sha256", APP_SECRET)
+    .createHmac("sha256", secret)
     .update(signString)
     .digest("hex");
 }
@@ -60,12 +72,13 @@ async function callApi(
   accessToken: string,
   queryParams: Record<string, string | number> = {},
   body: Record<string, unknown> | null = null,
-  shopCipher?: string
+  shopCipher?: string,
+  creds?: TiktokCreds
 ): Promise<Record<string, unknown>> {
   const timestamp = Math.floor(Date.now() / 1000);
 
   const allQueryParams: Record<string, string | number> = {
-    app_key: APP_KEY,
+    app_key: creds?.appKey ?? APP_KEY,
     timestamp,
     ...queryParams,
   };
@@ -76,7 +89,7 @@ async function callApi(
     allQueryParams.shop_cipher = shopCipher;
   }
 
-  const sign = generateSign(apiPath, allQueryParams, body);
+  const sign = generateSign(apiPath, allQueryParams, body, creds);
   allQueryParams.sign = sign;
 
   const qs = new URLSearchParams();
@@ -145,23 +158,23 @@ async function callApi(
   return data;
 }
 
-export async function getAuthorizedShops(accessToken: string) {
-  const result = await callApi("GET", "/authorization/202309/shops", accessToken);
+export async function getAuthorizedShops(accessToken: string, creds?: TiktokCreds) {
+  const result = await callApi("GET", "/authorization/202309/shops", accessToken, {}, null, undefined, creds);
   const shops = (result.data as { shops?: Array<Record<string, string>> } | undefined)?.shops;
   return shops ?? [];
 }
 
 // Refresh access token (berlaku default 7 hari, WAJIB refresh sebelum expired).
 // Response memakai epoch absolut (access_token_expire_in), sama seperti get token.
-export async function refreshAccessToken(refreshToken: string): Promise<{
+export async function refreshAccessToken(refreshToken: string, creds?: TiktokCreds): Promise<{
   accessToken: string;
   refreshToken: string;
   expiresAt: Date;
 }> {
-  if (!APP_KEY || !APP_SECRET) throw new Error("[TikTok] TIKTOK_APP_KEY/SECRET belum diisi.");
+  const c = creds ?? envTiktokCreds();
   const url = new URL("https://auth.tiktok-shops.com/api/v2/token/refresh");
-  url.searchParams.set("app_key", APP_KEY);
-  url.searchParams.set("app_secret", APP_SECRET);
+  url.searchParams.set("app_key", c.appKey);
+  url.searchParams.set("app_secret", c.appSecret);
   url.searchParams.set("refresh_token", refreshToken);
   url.searchParams.set("grant_type", "refresh_token");
   const res = await fetch(url.toString());
@@ -1048,12 +1061,13 @@ export async function getCategoryRules(
 async function callApiMultipart(
   apiPath: string,
   accessToken: string,
-  form: FormData
+  form: FormData,
+  creds?: TiktokCreds
 ): Promise<Record<string, unknown>> {
   const timestamp = Math.floor(Date.now() / 1000);
-  const queryParams: Record<string, string | number> = { app_key: APP_KEY, timestamp };
+  const queryParams: Record<string, string | number> = { app_key: creds?.appKey ?? APP_KEY, timestamp };
   // Sertakan shop_cipher bila path menuntut (bawaan pemanggil via param).
-  const sign = generateSign(apiPath, queryParams, null);
+  const sign = generateSign(apiPath, queryParams, null, creds);
   queryParams.sign = sign;
 
   const qs = new URLSearchParams();

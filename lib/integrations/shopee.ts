@@ -9,8 +9,21 @@ const SHOPEE_API_BASE =
 const SHOPEE_AUTH_BASE =
   process.env.SHOPEE_AUTH_BASE ?? "https://open.shopee.com/auth";
 
-const PARTNER_ID = process.env.SHOPEE_PARTNER_ID ?? "";
-const PARTNER_KEY = process.env.SHOPEE_PARTNER_KEY ?? "";
+// Kredensial app partner. Default = env (perilaku lama); isi dari
+// AppCredential (clientId=partner_id, clientSecret=partner_key) begitu
+// app ISV disetujui — tanpa refactor pemanggil (param opsional di ekor).
+export type ShopeeCreds = { partnerId: string; partnerKey: string };
+
+function envShopeeCreds(): ShopeeCreds {
+  const partnerId = process.env.SHOPEE_PARTNER_ID ?? "";
+  const partnerKey = process.env.SHOPEE_PARTNER_KEY ?? "";
+  if (!partnerId || !partnerKey) {
+    throw new Error(
+      "[Shopee] SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY belum diisi di .env."
+    );
+  }
+  return { partnerId, partnerKey };
+}
 
 export class ShopeeApiError extends Error {
   error: string;
@@ -23,27 +36,20 @@ export class ShopeeApiError extends Error {
   }
 }
 
-function requireEnv(): void {
-  if (!PARTNER_ID || !PARTNER_KEY) {
-    throw new Error(
-      "[Shopee] SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY belum diisi di .env."
-    );
-  }
-}
-
 function signShopApi(
   apiPath: string,
   timestamp: number,
   accessToken: string,
-  shopId: string | number
+  shopId: string | number,
+  creds: ShopeeCreds
 ): string {
-  const base = `${PARTNER_ID}${apiPath}${timestamp}${accessToken}${shopId}`;
-  return crypto.createHmac("sha256", PARTNER_KEY).update(base).digest("hex");
+  const base = `${creds.partnerId}${apiPath}${timestamp}${accessToken}${shopId}`;
+  return crypto.createHmac("sha256", creds.partnerKey).update(base).digest("hex");
 }
 
-function signPublicApi(apiPath: string, timestamp: number): string {
-  const base = `${PARTNER_ID}${apiPath}${timestamp}`;
-  return crypto.createHmac("sha256", PARTNER_KEY).update(base).digest("hex");
+function signPublicApi(apiPath: string, timestamp: number, creds: ShopeeCreds): string {
+  const base = `${creds.partnerId}${apiPath}${timestamp}`;
+  return crypto.createHmac("sha256", creds.partnerKey).update(base).digest("hex");
 }
 
 type ShopeeEnvelope = {
@@ -57,13 +63,14 @@ async function postShopApi(
   apiPath: string,
   accessToken: string,
   shopId: string | number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  creds?: ShopeeCreds
 ): Promise<Record<string, unknown>> {
-  requireEnv();
+  const c = creds ?? envShopeeCreds();
   const timestamp = Math.floor(Date.now() / 1000);
-  const sign = signShopApi(apiPath, timestamp, accessToken, shopId);
+  const sign = signShopApi(apiPath, timestamp, accessToken, shopId, c);
   const qs = new URLSearchParams({
-    partner_id: PARTNER_ID,
+    partner_id: c.partnerId,
     timestamp: String(timestamp),
     access_token: accessToken,
     shop_id: String(shopId),
@@ -91,13 +98,14 @@ async function postShopApi(
 async function getShopApi(
   apiPath: string,
   accessToken: string,
-  shopId: string | number
+  shopId: string | number,
+  creds?: ShopeeCreds
 ): Promise<Record<string, unknown>> {
-  requireEnv();
+  const c = creds ?? envShopeeCreds();
   const timestamp = Math.floor(Date.now() / 1000);
-  const sign = signShopApi(apiPath, timestamp, accessToken, shopId);
+  const sign = signShopApi(apiPath, timestamp, accessToken, shopId, c);
   const qs = new URLSearchParams({
-    partner_id: PARTNER_ID,
+    partner_id: c.partnerId,
     timestamp: String(timestamp),
     access_token: accessToken,
     shop_id: String(shopId),
@@ -115,13 +123,13 @@ async function getShopApi(
   return (data.response ?? {}) as Record<string, unknown>;
 }
 
-export function buildAuthorizeUrl(state?: string): string {
-  requireEnv();
+export function buildAuthorizeUrl(state?: string, creds?: ShopeeCreds): string {
+  const c = creds ?? envShopeeCreds();
   const redirect =
     process.env.SHOPEE_REDIRECT_URI ?? process.env.SHOPEE_REDIRECT_URL ?? "";
   if (!redirect) throw new Error("[Shopee] SHOPEE_REDIRECT_URI belum diisi di .env.");
   const url = new URL(SHOPEE_AUTH_BASE);
-  url.searchParams.set("partner_id", PARTNER_ID);
+  url.searchParams.set("partner_id", c.partnerId);
   url.searchParams.set("auth_type", "seller");
   url.searchParams.set("redirect_uri", redirect);
   url.searchParams.set("response_type", "code");
@@ -131,7 +139,8 @@ export function buildAuthorizeUrl(state?: string): string {
 
 export async function getAccessTokenByCode(
   code: string,
-  shopId?: string | number
+  shopId?: string | number,
+  creds?: ShopeeCreds
 ): Promise<{
   accessToken: string;
   refreshToken: string;
@@ -139,16 +148,16 @@ export async function getAccessTokenByCode(
   shopIdList?: number[];
   merchantIdList?: number[];
 }> {
-  requireEnv();
+  const c = creds ?? envShopeeCreds();
   const apiPath = "/api/v2/auth/token/get";
   const timestamp = Math.floor(Date.now() / 1000);
-  const sign = signPublicApi(apiPath, timestamp);
+  const sign = signPublicApi(apiPath, timestamp, c);
   const qs = new URLSearchParams({
-    partner_id: PARTNER_ID,
+    partner_id: c.partnerId,
     timestamp: String(timestamp),
     sign,
   });
-  const body: Record<string, unknown> = { code, partner_id: Number(PARTNER_ID) };
+  const body: Record<string, unknown> = { code, partner_id: Number(c.partnerId) };
   if (shopId !== undefined && shopId !== null && String(shopId) !== "") {
     body.shop_id = Number(shopId);
   }
@@ -180,19 +189,20 @@ export async function getAccessTokenByCode(
 
 export async function refreshAccessToken(
   refreshToken: string,
-  shopId: string | number
+  shopId: string | number,
+  creds?: ShopeeCreds
 ): Promise<{ accessToken: string; refreshToken: string; expireIn: number }> {
-  requireEnv();
+  const c = creds ?? envShopeeCreds();
   const apiPath = "/api/v2/auth/access_token/get";
   const timestamp = Math.floor(Date.now() / 1000);
-  const sign = signPublicApi(apiPath, timestamp);
+  const sign = signPublicApi(apiPath, timestamp, c);
   const qs = new URLSearchParams({
-    partner_id: PARTNER_ID,
+    partner_id: c.partnerId,
     timestamp: String(timestamp),
     sign,
   });
   const body = {
-    partner_id: Number(PARTNER_ID),
+    partner_id: Number(c.partnerId),
     shop_id: Number(shopId),
     refresh_token: refreshToken,
   };
@@ -216,8 +226,8 @@ export async function refreshAccessToken(
   return { accessToken, refreshToken: newRefresh, expireIn: Number(r.expire_in ?? 14400) };
 }
 
-export async function getShopInfo(accessToken: string, shopId: string | number) {
-  const r = await getShopApi("/api/v2/shop/get_shop_info", accessToken, shopId);
+export async function getShopInfo(accessToken: string, shopId: string | number, creds?: ShopeeCreds) {
+  const r = await getShopApi("/api/v2/shop/get_shop_info", accessToken, shopId, creds);
   return {
     shopId: String((r.shop_id as number | undefined) ?? shopId),
     shopName: (r.shop_name as string | undefined) ?? null,
@@ -230,12 +240,13 @@ export type ShopeeItemSummary = { item_id: number; item_status?: string };
 export async function getItemList(
   accessToken: string,
   shopId: string | number,
-  opts: { offset?: number; pageSize?: number; itemStatus?: string[] } = {}
+  opts: { offset?: number; pageSize?: number; itemStatus?: string[] } = {},
+  creds?: ShopeeCreds
 ): Promise<{ items: ShopeeItemSummary[]; totalCount: number; hasMore: boolean }> {
   const { offset = 0, pageSize = 50, itemStatus } = opts;
   const body: Record<string, unknown> = { offset, page_size: pageSize };
   if (itemStatus && itemStatus.length > 0) body.item_status = itemStatus;
-  const r = await postShopApi("/api/v2/product/get_item_list", accessToken, shopId, body);
+  const r = await postShopApi("/api/v2/product/get_item_list", accessToken, shopId, body, creds);
   const items = (r.item as ShopeeItemSummary[] | undefined) ?? [];
   return {
     items,
@@ -247,12 +258,13 @@ export async function getItemList(
 export async function getItemBaseInfo(
   accessToken: string,
   shopId: string | number,
-  itemIds: number[]
+  itemIds: number[],
+  creds?: ShopeeCreds
 ): Promise<Array<Record<string, unknown>>> {
   if (itemIds.length === 0) return [];
   const r = await postShopApi("/api/v2/product/get_item_base_info", accessToken, shopId, {
     item_id_list: itemIds,
-  });
+  }, creds);
   return (r.item_list as Array<Record<string, unknown>> | undefined) ?? [];
 }
 
@@ -265,11 +277,12 @@ export type ShopeeModel = {
 export async function getModelList(
   accessToken: string,
   shopId: string | number,
-  itemId: number
+  itemId: number,
+  creds?: ShopeeCreds
 ): Promise<{ models: ShopeeModel[]; itemSku?: string }> {
   const r = await postShopApi("/api/v2/product/get_model_list", accessToken, shopId, {
     item_id: itemId,
-  });
+  }, creds);
   const models = (r.model as ShopeeModel[] | undefined) ?? [];
   return { models, itemSku: r.item_sku as string | undefined };
 }
@@ -285,7 +298,8 @@ function parseDirectId(channelSku: string): ResolvedModel | null {
 export async function resolveModel(
   accessToken: string,
   shopId: string | number,
-  channelSku: string
+  channelSku: string,
+  creds?: ShopeeCreds
 ): Promise<ResolvedModel> {
   const direct = parseDirectId(channelSku);
   if (direct) return direct;
@@ -293,12 +307,13 @@ export async function resolveModel(
   let offset = 0;
   const pageSize = 50;
   for (let page = 0; page < 20; page++) {
-    const { items, hasMore } = await getItemList(accessToken, shopId, { offset, pageSize });
+    const { items, hasMore } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
     if (items.length === 0) break;
     const baseInfos = await getItemBaseInfo(
       accessToken,
       shopId,
-      items.map((i) => i.item_id)
+      items.map((i) => i.item_id),
+      creds
     );
     for (const info of baseInfos) {
       const itemId = Number(info.item_id);
@@ -307,7 +322,7 @@ export async function resolveModel(
       }
     }
     for (const item of items) {
-      const { models } = await getModelList(accessToken, shopId, item.item_id);
+      const { models } = await getModelList(accessToken, shopId, item.item_id, creds);
       const hit = models.find((m) => m.model_sku === wanted);
       if (hit) return { itemId: item.item_id, modelId: hit.model_id };
     }
@@ -323,7 +338,8 @@ export async function resolveModel(
 export async function resolveModelsBatch(
   accessToken: string,
   shopId: string | number,
-  channelSkus: string[]
+  channelSkus: string[],
+  creds?: ShopeeCreds
 ): Promise<{
   resolved: Map<string, ResolvedModel>;
   missing: string[];
@@ -341,12 +357,13 @@ export async function resolveModelsBatch(
     let offset = 0;
     const pageSize = 50;
     for (let page = 0; page < 20 && wanted.size > 0; page++) {
-      const { items, hasMore } = await getItemList(accessToken, shopId, { offset, pageSize });
+      const { items, hasMore } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
       if (items.length === 0) break;
       const baseInfos = await getItemBaseInfo(
         accessToken,
         shopId,
-        items.map((i) => i.item_id)
+        items.map((i) => i.item_id),
+        creds
       );
       for (const info of baseInfos) {
         const sku = info.item_sku as string | undefined;
@@ -357,7 +374,7 @@ export async function resolveModelsBatch(
       }
       for (const item of items) {
         if (wanted.size === 0) break;
-        const { models } = await getModelList(accessToken, shopId, item.item_id);
+        const { models } = await getModelList(accessToken, shopId, item.item_id, creds);
         for (const m of models) {
           if (m.model_sku && wanted.has(m.model_sku)) {
             resolved.set(m.model_sku, { itemId: item.item_id, modelId: m.model_id });
@@ -377,13 +394,14 @@ export async function updateStock(
   accessToken: string,
   shopId: string | number,
   channelSku: string,
-  newStock: number
+  newStock: number,
+  creds?: ShopeeCreds
 ) {
-  const { itemId, modelId } = await resolveModel(accessToken, shopId, channelSku);
+  const { itemId, modelId } = await resolveModel(accessToken, shopId, channelSku, creds);
   return postShopApi("/api/v2/product/update_stock", accessToken, shopId, {
     item_id: itemId,
     stock_list: [{ model_id: modelId, seller_stock: [{ stock: Math.max(0, Math.floor(newStock)) }] }],
-  });
+  }, creds);
 }
 
 export type ShopeeStockBatchItem = { channelSku: string; quantity: number };
@@ -395,14 +413,16 @@ export type ShopeeStockBatchResult = {
 export async function updateStockBatch(
   accessToken: string,
   shopId: string | number,
-  items: ShopeeStockBatchItem[]
+  items: ShopeeStockBatchItem[],
+  creds?: ShopeeCreds
 ): Promise<ShopeeStockBatchResult> {
   const result: ShopeeStockBatchResult = { ok: [], failed: [] };
   if (items.length === 0) return result;
   const { resolved, missing } = await resolveModelsBatch(
     accessToken,
     shopId,
-    items.map((i) => i.channelSku)
+    items.map((i) => i.channelSku),
+    creds
   );
   const missingSet = new Set(missing);
   for (const item of items) {
@@ -433,7 +453,7 @@ export async function updateStockBatch(
           model_id: s.modelId,
           seller_stock: [{ stock: Math.max(0, Math.floor(s.item.quantity)) }],
         })),
-      });
+      }, creds);
       result.ok.push(...skus.map((s) => s.item));
     } catch (err) {
       for (const s of skus) result.failed.push({ item: s.item, error: err });
@@ -446,28 +466,33 @@ export async function updatePrice(
   accessToken: string,
   shopId: string | number,
   channelSku: string,
-  newPrice: number
+  newPrice: number,
+  creds?: ShopeeCreds
 ) {
-  const { itemId, modelId } = await resolveModel(accessToken, shopId, channelSku);
+  const { itemId, modelId } = await resolveModel(accessToken, shopId, channelSku, creds);
   return postShopApi("/api/v2/product/update_price", accessToken, shopId, {
     item_id: itemId,
     price_list: [{ model_id: modelId, original_price: newPrice }],
-  });
+  }, creds);
 }
 
-// Verifikasi push Shopee: HMAC-SHA256(PARTNER_KEY, requestUrl|rawBody).
+// Verifikasi push Shopee: HMAC-SHA256(partnerKey, requestUrl|rawBody).
 // Format base string sesuai dokumen Push Mechanism resmi.
+// creds opsional: webhook multi-credential mencoba tiap secret via
+// listActiveShopeeSecrets() di route (satu per satu ke fungsi ini).
 export function verifyPushSignature(
   rawBody: string,
   authHeader: string | null,
   requestUrl?: string,
+  creds?: ShopeeCreds
 ): boolean {
-  if (!PARTNER_KEY) return false;
+  const key = creds?.partnerKey ?? process.env.SHOPEE_PARTNER_KEY ?? "";
+  if (!key) return false;
   if (!authHeader) return false;
   const candidates = requestUrl ? [`${requestUrl}|${rawBody}`, rawBody] : [rawBody];
   const target = authHeader.trim().toLowerCase();
   for (const base of candidates) {
-    const computed = crypto.createHmac("sha256", PARTNER_KEY).update(base).digest("hex");
+    const computed = crypto.createHmac("sha256", key).update(base).digest("hex");
     try {
       const a = Buffer.from(computed, "hex");
       const b = Buffer.from(target, "hex");

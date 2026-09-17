@@ -7,14 +7,25 @@ import {
   CANCEL_STATUSES,
   restoreStockForCanceledOrder,
 } from "@/lib/services/central-stock.service";
+import { resolveTiktokCreds } from "@/lib/services/app-credential.service";
 
-function getTikTokWebhookEnv(): { appKey: string; appSecret: string } {
-  const appKey = process.env.TIKTOK_APP_KEY;
-  const appSecret = process.env.TIKTOK_APP_SECRET;
-  if (!appKey || !appSecret) {
-    throw new Error("TIKTOK_APP_KEY / TIKTOK_APP_SECRET belum diisi di environment.");
+async function listActiveTiktokSecrets(): Promise<Array<{ appKey: string; appSecret: string }>> {
+  const rows = await prisma.appCredential.findMany({
+    where: { platform: "TIKTOK_SHOP", isActive: true },
+    select: { clientId: true, clientSecret: true },
+  });
+  const pairs = rows
+    .filter((r) => r.clientId && r.clientSecret)
+    .map((r) => ({ appKey: r.clientId as string, appSecret: r.clientSecret as string }));
+  try {
+    const env = resolveTiktokCreds(null);
+    if (!pairs.some((p) => p.appKey === env.appKey && p.appSecret === env.appSecret)) {
+      pairs.push({ appKey: env.appKey, appSecret: env.appSecret });
+    }
+  } catch {
+    // env belum diisi — verifikasi mengandalkan kredensial DB saja.
   }
-  return { appKey, appSecret };
+  return pairs;
 }
 
 /**
@@ -28,21 +39,30 @@ function getTikTokWebhookEnv(): { appKey: string; appSecret: string } {
  * Verifikasi di body mentah SEBELUM JSON.parse. Tanpa timestamp di dalam
  * signature → tidak ada replay protection; dedupe ditangani saat processing.
  */
-function verifyTikTokShopSignature(rawBody: string, authHeader: string | null): boolean {
+function verifyTikTokShopSignature(
+  rawBody: string,
+  authHeader: string | null,
+  pairs: Array<{ appKey: string; appSecret: string }>
+): boolean {
   if (!authHeader) return false;
-  const { appKey, appSecret } = getTikTokWebhookEnv();
+  return pairs.some(({ appKey, appSecret }) => {
+    const computedHex = crypto
+      .createHmac("sha256", appSecret)
+      .update(`${appKey}${rawBody}`)
+      .digest("hex");
 
-  const computedHex = crypto
-    .createHmac("sha256", appSecret)
-    .update(`${appKey}${rawBody}`)
-    .digest("hex");
+    const computed = Buffer.from(computedHex, "hex");
+    let received: Buffer;
+    try {
+      received = Buffer.from(authHeader, "hex");
+    } catch {
+      return false;
+    }
 
-  const computed = Buffer.from(computedHex, "hex");
-  const received = Buffer.from(authHeader, "hex");
-
-  // timingSafeEqual THROW bila panjang buffer beda — cek panjang dulu.
-  if (computed.length !== received.length) return false;
-  return crypto.timingSafeEqual(computed, received);
+    // timingSafeEqual THROW bila panjang buffer beda — cek panjang dulu.
+    if (computed.length !== received.length) return false;
+    return crypto.timingSafeEqual(computed, received);
+  });
 }
 
 function toEpochSeconds(raw: unknown): number | null {
@@ -93,7 +113,8 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const authHeader = req.headers.get("authorization");
 
-  if (!verifyTikTokShopSignature(rawBody, authHeader)) {
+  // Multi-credential: coba tiap app key/secret aktif (DB + env) sampai cocok.
+  if (!verifyTikTokShopSignature(rawBody, authHeader, await listActiveTiktokSecrets())) {
     return new Response(null, { status: 401 });
   }
 
@@ -107,7 +128,7 @@ export async function POST(req: NextRequest) {
 
     const account = await prisma.platformAccount.findUnique({
       where: { platform_externalShopId: { platform: "TIKTOK_SHOP", externalShopId: shopId } },
-      select: { id: true },
+      select: { id: true, isFrozen: true, frozenReason: true },
     });
 
     // shop_id tidak dikenal → bukan salah TikTok, jangan trigger retry.
@@ -115,6 +136,12 @@ export async function POST(req: NextRequest) {
     // tanpa akun — cukup catat ke log server.
     if (!account) {
       console.warn(`[webhook] unknown shop_id dari TikTok: ${shopId}`);
+      return new Response(null, { status: 200 });
+    }
+    if (account.isFrozen) {
+      console.warn(
+        `[webhook] push dari akun dibekukan ${shopId} diabaikan (${account.frozenReason ?? "tanpa alasan"}).`
+      );
       return new Response(null, { status: 200 });
     }
 

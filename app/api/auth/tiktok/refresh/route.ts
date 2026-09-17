@@ -2,15 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { refreshAccessToken } from "@/lib/integrations/tiktokShop";
+import {
+  assertAccountActive,
+  resolveTiktokCreds,
+} from "@/lib/services/app-credential.service";
 
 export const POST = withAuth(async (req: NextRequest) => {
   const body = (await req.json().catch(() => ({}))) as { accountId?: string };
   if (!body.accountId) {
     return NextResponse.json({ error: "accountId wajib diisi." }, { status: 400 });
   }
-  const account = await prisma.platformAccount.findUnique({ where: { id: body.accountId } });
+  const account = await prisma.platformAccount.findUnique({
+    where: { id: body.accountId },
+    include: { appCredential: true },
+  });
   if (!account || account.platform !== "TIKTOK_SHOP") {
     return NextResponse.json({ error: "Akun TikTok Shop tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertAccountActive(account);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Akun dibekukan." },
+      { status: 403 }
+    );
   }
   if (!account.refreshToken) {
     return NextResponse.json(
@@ -19,7 +34,10 @@ export const POST = withAuth(async (req: NextRequest) => {
     );
   }
   try {
-    const r = await refreshAccessToken(account.refreshToken);
+    const r = await refreshAccessToken(
+      account.refreshToken,
+      resolveTiktokCreds(account.appCredential)
+    );
     await prisma.platformAccount.update({
       where: { id: account.id },
       data: {

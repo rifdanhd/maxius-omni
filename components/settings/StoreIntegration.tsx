@@ -28,6 +28,8 @@ const OAUTH_MESSAGES: Record<string, { ok: boolean; text: string }> = {
   missing_env: { ok: false, text: "Kredensial aplikasi belum dikonfigurasi di server." },
   shopee_missing_env: { ok: false, text: "Partner ID/Key Shopee belum dikonfigurasi di server." },
   shopee_token_exchange_failed: { ok: false, text: "Gagal menukar kode Shopee — coba hubungkan ulang." },
+  shopee_authorize_disabled: { ok: false, text: "Authorize Shopee dimatikan sementara — app ISV masih dalam review. Hubungi admin." },
+  account_frozen: { ok: false, text: "Akun ini dibekukan — authorize/refresh ditolak. Hubungi admin." },
   token_request_failed: { ok: false, text: "Gagal menghubungi server token TikTok — coba lagi." },
 };
 
@@ -211,7 +213,19 @@ export default function StoreIntegration() {
                     <div className="flex items-center justify-end gap-3">
                       {store.status !== "connected" && store.authorizePath && (
                         <button
-                          onClick={() => window.location.assign(store.authorizePath!)}
+                          onClick={() => {
+                            // Guard Shopee: konfirmasi manual sebelum re-authorize
+                            // (app ISV masih under review).
+                            if (
+                              store.platform === "SHOPEE" &&
+                              !window.confirm(
+                                "Yakin authorize ulang toko Shopee ini? App ISV masih dalam review — batalkan bila tidak sengaja."
+                              )
+                            ) {
+                              return;
+                            }
+                            window.location.assign(store.authorizePath!);
+                          }}
                           className="text-xs font-semibold text-white bg-[#2a3a8c] hover:bg-blue-900 px-3 py-1.5 rounded transition-colors"
                           title="Hubungkan ulang via OAuth"
                         >

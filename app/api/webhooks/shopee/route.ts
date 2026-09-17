@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPushSignature } from "@/lib/integrations/shopee";
+import { listActiveShopeeSecrets } from "@/lib/services/app-credential.service";
 import {
   CANCEL_STATUSES,
   cancelReasonForStatus,
@@ -40,7 +41,15 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const authHeader = req.headers.get("authorization");
 
-  if (!verifyPushSignature(rawBody, authHeader, req.url)) {
+  // Multi-credential: coba tiap partner key aktif (DB + env) sampai cocok.
+  const secrets = await listActiveShopeeSecrets();
+  const verified = secrets.some((key) =>
+    verifyPushSignature(rawBody, authHeader, req.url, {
+      partnerId: "",
+      partnerKey: key,
+    })
+  );
+  if (!verified) {
     return new Response(null, { status: 401 });
   }
 
@@ -58,10 +67,16 @@ export async function POST(req: NextRequest) {
 
   const account = await prisma.platformAccount.findUnique({
     where: { platform_externalShopId: { platform: "SHOPEE", externalShopId: shopId } },
-    select: { id: true },
+    select: { id: true, isFrozen: true, frozenReason: true },
   });
   if (!account) {
     console.warn(`[webhook/shopee] unknown shop_id: ${shopId}`);
+    return new Response(null, { status: 200 });
+  }
+  if (account.isFrozen) {
+    console.warn(
+      `[webhook/shopee] push dari akun dibekukan ${shopId} diabaikan (${account.frozenReason ?? "tanpa alasan"}).`
+    );
     return new Response(null, { status: 200 });
   }
 

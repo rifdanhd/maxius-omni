@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getAuthorizedShops } from "@/lib/integrations/tiktokShop";
+import {
+  getAuthorizeCredential,
+  resolveTiktokCreds,
+} from "@/lib/services/app-credential.service";
+import { TIKTOK_OAUTH_CRED_COOKIE } from "../authorize/route";
 
 const TIKTOK_TOKEN_URL = "https://auth.tiktok-shops.com/api/v2/token/get";
 const PLATFORM = "TIKTOK_SHOP";
@@ -28,18 +33,32 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const appKey = process.env.TIKTOK_APP_KEY;
-  const appSecret = process.env.TIKTOK_APP_SECRET;
-
-  if (!appKey || !appSecret) {
+  // Kredensial yg dipakai saat authorize (cookie) — token exchange wajib
+  // memakai app key/secret yg sama.
+  let credential = null;
+  try {
+    credential = await getAuthorizeCredential(
+      PLATFORM,
+      req.cookies.get(TIKTOK_OAUTH_CRED_COOKIE)?.value ?? undefined
+    );
+  } catch {
     return NextResponse.redirect(
       new URL("/settings/accounts?error=missing_env", req.url),
     );
   }
+  let creds;
+  try {
+    creds = resolveTiktokCreds(credential);
+  } catch {
+    return NextResponse.redirect(
+      new URL("/settings/accounts?error=missing_env", req.url),
+    );
+  }
+  const appKey = creds.appKey;
 
   const tokenUrl = new URL(TIKTOK_TOKEN_URL);
-  tokenUrl.searchParams.set("app_key", appKey);
-  tokenUrl.searchParams.set("app_secret", appSecret);
+  tokenUrl.searchParams.set("app_key", creds.appKey);
+  tokenUrl.searchParams.set("app_secret", creds.appSecret);
   tokenUrl.searchParams.set("auth_code", code);
   tokenUrl.searchParams.set("grant_type", "authorized_code");
 
@@ -135,7 +154,7 @@ export async function GET(req: NextRequest) {
   // Dapatkan shop id resmi setelah token exchange (open_id dari token sering null).
   let shops: Array<Record<string, string>> = [];
   try {
-    shops = await getAuthorizedShops(data.access_token);
+    shops = await getAuthorizedShops(data.access_token, creds);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(
@@ -151,6 +170,19 @@ export async function GET(req: NextRequest) {
 
   try {
     if (shop?.id) {
+      // Proteksi: akun dibekukan tidak boleh di-authorize ulang.
+      const existing = await prisma.platformAccount.findUnique({
+        where: {
+          platform_externalShopId: { platform: PLATFORM, externalShopId: shop.id },
+        },
+        select: { id: true, isFrozen: true, frozenReason: true },
+      });
+      if (existing?.isFrozen) {
+        console.warn(
+          `[TikTok OAuth] authorize ditolak utk shop ${shop.id}: akun dibekukan (${existing.frozenReason ?? "tanpa alasan"}).`
+        );
+        return NextResponse.redirect(new URL("/settings/accounts?error=account_frozen", req.url));
+      }
       await prisma.platformAccount.upsert({
         where: {
           platform_externalShopId: {
@@ -165,11 +197,13 @@ export async function GET(req: NextRequest) {
           shopCipher: shop.cipher ?? null,
           appKey,
           ...tokenPayload,
+          ...(credential ? { appCredentialId: credential.id } : {}),
         },
         update: {
           label: shop.name ?? shop.code ?? undefined,
           shopCipher: shop.cipher ?? undefined,
           ...tokenPayload,
+          ...(credential ? { appCredentialId: credential.id } : {}),
         },
       });
     } else {
@@ -182,6 +216,7 @@ export async function GET(req: NextRequest) {
           label: `Pending TikTok Shop - ${new Date().toISOString()}`,
           appKey,
           ...tokenPayload,
+          ...(credential ? { appCredentialId: credential.id } : {}),
         },
       });
     }
