@@ -26,6 +26,43 @@ model User {
 
   stockLedgers StockLedger[]
   stockOpnames StockOpname[]
+
+  businesses UserBusiness[]
+}
+
+// Akses user ke brand (fase 1: semua user akses semua brand, tanpa role).
+model UserBusiness {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, businessId])
+}
+
+// Kredensial aplikasi partner per platform (ISV / Seller app).
+// Shopee: clientId=partner_id, clientSecret=partner_key.
+// TikTok Shop: clientId=app_key, clientSecret=app_secret, serviceId=service_id.
+// Secret disimpan plaintext — konsisten dgn accessToken/refreshToken existing.
+// Baris "Legacy ENV" = baca dari env (kolom secret null), dipakai akun lama.
+model AppCredential {
+  id           String  @id @default(uuid())
+  platform     String
+  label        String
+  clientId     String?
+  clientSecret String?
+  serviceId    String?
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts PlatformAccount[]
+
+  @@unique([platform, label])
 }
 
 // 1 bisnis utama; "business-default" dibuat saat migrasi data.
@@ -37,6 +74,7 @@ model Business {
 
   accounts PlatformAccount[]
   products MasterProduct[]
+  users    UserBusiness[]
 }
 
 // 1 baris per akun per platform.
@@ -49,6 +87,15 @@ model PlatformAccount {
 
   platform String
   label    String
+
+  // Kredensial app partner yg dipakai akun ini. Null = "Legacy ENV" (env).
+  appCredentialId String?
+  appCredential   AppCredential? @relation(fields: [appCredentialId], references: [id], onDelete: SetNull)
+
+  // Proteksi: akun dibekukan (mis. sengketa dgn Shopee Support).
+  // Akun frozen DITOLAK di authorize/refresh/sync/push.
+  isFrozen     Boolean @default(false)
+  frozenReason String?
 
   appKey         String?
   accessToken    String?

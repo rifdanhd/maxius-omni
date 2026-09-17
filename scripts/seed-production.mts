@@ -2,9 +2,11 @@
  * seed-production.mts — seed MINIMAL untuk database production (Postgres).
  *
  * Hanya membuat baris fondasi, TANPA data dummy:
- *   1. Business id="business-default" (wajib ada — default FK PlatformAccount/MasterProduct)
+ *   1. 5 Business fase 1 (business-default = "Maxius" + 4 brand lain)
  *   2. User admin (admin/admin123 — GANTI password setelah login pertama)
  *   3. InventorySetting id="inventory-default" (singleton pengaturan inventori)
+ *   4. AppCredential "Legacy ENV" per platform (secret null = baca dari env)
+ *   5. UserBusiness: semua user akses semua brand (fase 1, tanpa role)
  *
  * Idempotent: aman dijalankan berulang (upsert semua).
  *
@@ -20,12 +22,22 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const business = await prisma.business.upsert({
-    where: { id: "business-default" },
-    update: {},
-    create: { id: "business-default", name: "Bisnis Utama" },
-  });
-  console.log(`✅ Business: id=${business.id} name="${business.name}"`);
+  const brands = [
+    { id: "business-default", name: "Maxius" },
+    { id: "business-raxen", name: "Raxen" },
+    { id: "business-kaos-kaki-sport", name: "Kaos Kaki Sport" },
+    { id: "business-den-sport", name: "Den Sport" },
+    { id: "business-getobdg", name: "Geto.bdg" },
+  ];
+  for (const b of brands) {
+    // business-default existing di production di-rename (bukan duplikat).
+    await prisma.business.upsert({
+      where: { id: b.id },
+      update: { name: b.name },
+      create: { id: b.id, name: b.name },
+    });
+  }
+  console.log(`✅ Business: ${brands.map((b) => b.name).join(", ")}`);
 
   const passwordHash = bcrypt.hashSync("admin123", 10);
   const admin = await prisma.user.upsert({
@@ -42,13 +54,43 @@ async function main() {
   });
   console.log(`✅ InventorySetting: id=${setting.id}`);
 
+  for (const c of [
+    { id: "app-cred-shopee-legacy", platform: "SHOPEE", label: "Legacy ENV (Seller app)" },
+    { id: "app-cred-tiktok-legacy", platform: "TIKTOK_SHOP", label: "Legacy ENV" },
+  ]) {
+    await prisma.appCredential.upsert({
+      where: { platform_label: { platform: c.platform, label: c.label } },
+      update: {},
+      create: { id: c.id, platform: c.platform, label: c.label },
+    });
+  }
+  console.log(`✅ AppCredential: Legacy ENV (Shopee + TikTok)`);
+
+  // Fase 1: semua user akses semua brand.
+  const [users, businesses] = await Promise.all([
+    prisma.user.findMany({ select: { id: true, username: true } }),
+    prisma.business.findMany({ select: { id: true } }),
+  ]);
+  for (const u of users) {
+    for (const b of businesses) {
+      await prisma.userBusiness.upsert({
+        where: { userId_businessId: { userId: u.id, businessId: b.id } },
+        update: {},
+        create: { userId: u.id, businessId: b.id },
+      });
+    }
+  }
+  console.log(`✅ UserBusiness: ${users.length} user × ${businesses.length} brand`);
+
   const counts = await Promise.all([
     prisma.user.count(),
     prisma.business.count(),
     prisma.platformAccount.count(),
+    prisma.appCredential.count(),
+    prisma.userBusiness.count(),
   ]);
   console.log(
-    `\nRingkasan DB: users=${counts[0]}, businesses=${counts[1]}, accounts=${counts[2]}`
+    `\nRingkasan DB: users=${counts[0]}, businesses=${counts[1]}, accounts=${counts[2]}, credentials=${counts[3]}, userBusiness=${counts[4]}`
   );
 }
 
