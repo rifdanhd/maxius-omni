@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { updateImage, deleteImage } from "@/lib/services/gallery.service";
 
 // PATCH /api/products/[productId]/images/[imageId]
 //   Body: { isCover: true } set cover | { order: number } set urutan satu gambar
 //         | { orderedIds: string[] } urutkan ulang seluruh galeri
 // DELETE /api/products/[productId]/images/[imageId] — hapus gambar
-export const PATCH = withAuth(async (req: NextRequest, ctx) => {
+export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const params = ctx?.params ? await ctx.params : null;
   const productId = params?.productId;
   const imageId = params?.imageId;
@@ -33,14 +33,14 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     return NextResponse.json({ error: "orderedIds tidak boleh kosong." }, { status: 400 });
   }
 
-  const result = await updateImage(productId, imageId, action);
+  const result = await updateImage(productId, imageId, action, req.businessId);
   if (!result.ok) {
     return NextResponse.json({ error: result.reason ?? "Gagal update gambar." }, { status: 400 });
   }
   return NextResponse.json({ ok: true });
 });
 
-export const DELETE = withAuth(async (_req: NextRequest, ctx) => {
+export const DELETE = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const params = ctx?.params ? await ctx.params : null;
   const productId = params?.productId;
   const imageId = params?.imageId;
@@ -48,7 +48,7 @@ export const DELETE = withAuth(async (_req: NextRequest, ctx) => {
     return NextResponse.json({ error: "Product/image id hilang." }, { status: 400 });
   }
 
-  const result = await deleteImage(productId, imageId);
+  const result = await deleteImage(productId, imageId, req.businessId);
   if (!result.ok) {
     return NextResponse.json({ error: result.reason ?? "Gagal hapus gambar." }, { status: 400 });
   }

@@ -4,6 +4,7 @@ import {
   lowStockSql,
 } from "@/lib/services/central-stock.service";
 import { countMismatchSyncJobs } from "@/lib/services/sync-mismatch.service";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 /**
  * PHASE C.1 — Dashboard KPI (read-only, agregat on-the-fly).
@@ -61,7 +62,7 @@ export type DashboardKpi = {
 const num = (v: unknown): number =>
   typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : Number(v ?? 0);
 
-export async function getDashboardKpi(): Promise<DashboardKpi> {
+export async function getDashboardKpi(businessId: string): Promise<DashboardKpi> {
   const since = new Date(Date.now() - KPI_WINDOW_DAYS * 86_400_000);
 
   const [central, lowCount, lowTop, mismatch, syncErrGroups, accounts] = await Promise.all([
@@ -70,12 +71,14 @@ export async function getDashboardKpi(): Promise<DashboardKpi> {
              COALESCE(SUM(pv.stock), 0) AS units,
              COALESCE(SUM(GREATEST(pv.stock - pv."safetyStock", 0)), 0) AS sellable
       FROM "ProductVariant" pv
+      JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
+      WHERE mp."businessId" = ${businessId}
     `,
     prisma.$queryRaw<Array<{ c: bigint }>>`
       SELECT COUNT(*) AS c
       FROM "ProductVariant" pv
       JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
-      WHERE ${lowStockSql("pv", "mp")}
+      WHERE ${lowStockSql("pv", "mp")} AND mp."businessId" = ${businessId}
     `,
     prisma.$queryRaw<
       Array<{
@@ -91,17 +94,18 @@ export async function getDashboardKpi(): Promise<DashboardKpi> {
              mp.name AS productName, pv.stock AS stock, pv."safetyStock" AS safetyStock
       FROM "ProductVariant" pv
       JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
-      WHERE ${lowStockSql("pv", "mp")}
+      WHERE ${lowStockSql("pv", "mp")} AND mp."businessId" = ${businessId}
       ORDER BY (pv.stock - pv."safetyStock") ASC
       LIMIT 5
     `,
-    countMismatchSyncJobs(),
+    countMismatchSyncJobs(businessId),
     prisma.syncLog.groupBy({
       by: ["kind"],
-      where: { status: "error", createdAt: { gte: since } },
+      where: { status: "error", createdAt: { gte: since }, ...businessWhere.syncLog(businessId) },
       _count: { _all: true },
     }),
     prisma.platformAccount.findMany({
+      where: businessWhere.account(businessId),
       select: { id: true, label: true, platform: true, accessToken: true, shopCipher: true },
       orderBy: { label: "asc" },
     }),

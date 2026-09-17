@@ -62,7 +62,10 @@ export const POST = withAuth(async (req) => {
   }
 
   const variants = await prisma.productVariant.findMany({
-    where: { id: { in: items.map((it) => it.variantId) } },
+    where: {
+      id: { in: items.map((it) => it.variantId) },
+      masterProduct: { businessId: req.businessId },
+    },
     select: {
       id: true,
       sku: true,
@@ -101,6 +104,7 @@ export const POST = withAuth(async (req) => {
     const product = await tx.masterProduct.create({
       data: {
         name,
+        businessId: req.businessId,
         ...(category ? { category } : {}),
         ...(imageUrl ? { imageUrl } : {}),
         type: BUNDLE_TYPE,

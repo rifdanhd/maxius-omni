@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { listGallery, GallerySort } from "@/lib/services/gallery.service";
 
 // GET /api/products/gallery?search=&sort=&category=&status=&page=&pageSize=
 // Galeri per produk master (kategori, jumlah varian, jumlah gambar, status kelengkapan).
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const sp = req.nextUrl.searchParams;
   const sort = sp.get("sort") as GallerySort | null;
   const validSorts: GallerySort[] = ["name_asc", "name_desc", "variants_desc", "images_desc"];
@@ -13,6 +13,7 @@ export const GET = withAuth(async (req: NextRequest) => {
   const pageSize = Number(sp.get("pageSize") ?? 20);
 
   const result = await listGallery({
+    businessId: req.businessId,
     search: sp.get("search") ?? undefined,
     sort: sort && validSorts.includes(sort) ? sort : undefined,
     category: sp.get("category") ?? undefined,

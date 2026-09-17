@@ -18,13 +18,14 @@ export const GET = withAuth(async (req) => {
     url.searchParams.get("to")
   );
   const filters = {
+    businessId: req.businessId,
     fromMs,
     toMs,
     platform: platform && VALID_PLATFORMS.has(platform) ? platform : null,
     accountId: url.searchParams.get("accountId"),
   };
   const data = await cached(
-    `omset:${fromMs}:${toMs}:${granularity}:${filters.platform ?? "-"}:${filters.accountId ?? "-"}`,
+    `omset:${req.businessId}:${fromMs}:${toMs}:${granularity}:${filters.platform ?? "-"}:${filters.accountId ?? "-"}`,
     CACHE_TTL_MS,
     () => getOmset(filters, granularity)
   );

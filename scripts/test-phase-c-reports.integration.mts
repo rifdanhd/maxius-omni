@@ -82,7 +82,7 @@ await mkOrder(t1.id, "O3", "CANCELLED", [
 await mkOrder(s1.id, "O4", "DELIVERED", [], 75_000);
 
 const { fromMs, toMs } = parseReportRange(null, null);
-const F = { fromMs, toMs, platform: null, accountId: null };
+const F = { businessId: "business-default", fromMs, toMs, platform: null, accountId: null };
 
 async function counts() {
   return [await prisma.order.count(), await prisma.orderItem.count()].join(",");

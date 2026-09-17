@@ -19,6 +19,7 @@
  */
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 export const WINDOW_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -65,7 +66,7 @@ function normalizeDayRow(r: DayRow): DayRow {
   return { day: r.day, orders: num(r.orders), revenue: num(r.revenue), units: num(r.units) };
 }
 
-export async function getAnalyticsAggregated() {
+export async function getAnalyticsAggregated(businessId: string) {
   const midnightToday = startOfDayJakarta(new Date());
   const currentStart = midnightToday - (WINDOW_DAYS - 1) * DAY_MS;
   const previousStart = currentStart - WINDOW_DAYS * DAY_MS;
@@ -84,7 +85,9 @@ export async function getAnalyticsAggregated() {
              SUM(oi.qty) AS units
       FROM "OrderItem" oi
       JOIN "Order" o2 ON o2.id = oi."orderId"
+      JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
       WHERE o2."createTime" >= ${asTs(previousStart)} AND o2."createTime" < ${asTs(rangeEnd)}
+        AND pa2."businessId" = ${businessId}
       GROUP BY oi."orderId"
     )
     SELECT ${dayBucket} AS day,
@@ -93,8 +96,10 @@ export async function getAnalyticsAggregated() {
            SUM(COALESCE(r.units, 0)) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
+    JOIN "PlatformAccount" pa ON pa.id = o."accountId"
     WHERE o."createTime" >= ${asTs(currentStart)}
       AND o."createTime" < ${asTs(rangeEnd)}
+      AND pa."businessId" = ${businessId}
       AND o.status NOT IN (${Prisma.join(GMV_EXCLUDE)})
     GROUP BY day
     ORDER BY day
@@ -141,7 +146,9 @@ export async function getAnalyticsAggregated() {
       SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
       FROM "OrderItem" oi
       JOIN "Order" o2 ON o2.id = oi."orderId"
+      JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
       WHERE o2."createTime" >= ${asTs(currentStart)} AND o2."createTime" < ${asTs(rangeEnd)}
+        AND pa2."businessId" = ${businessId}
       GROUP BY oi."orderId"
     )
     SELECT COUNT(DISTINCT o.id) AS c,
@@ -149,7 +156,9 @@ export async function getAnalyticsAggregated() {
            COALESCE(SUM(COALESCE(r.units, 0)), 0) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
+    JOIN "PlatformAccount" pa ON pa.id = o."accountId"
     WHERE o."createTime" >= ${asTs(currentStart)} AND o."createTime" < ${asTs(rangeEnd)}
+      AND pa."businessId" = ${businessId}
       AND o.status = 'COMPLETED'
   `);
   const completedPrevious = await prisma.$queryRaw<{ c: number; revenue: number; units: number }[]>(Prisma.sql`
@@ -157,7 +166,9 @@ export async function getAnalyticsAggregated() {
       SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
       FROM "OrderItem" oi
       JOIN "Order" o2 ON o2.id = oi."orderId"
+      JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
       WHERE o2."createTime" >= ${asTs(previousStart)} AND o2."createTime" < ${asTs(currentStart)}
+        AND pa2."businessId" = ${businessId}
       GROUP BY oi."orderId"
     )
     SELECT COUNT(DISTINCT o.id) AS c,
@@ -165,7 +176,9 @@ export async function getAnalyticsAggregated() {
            COALESCE(SUM(COALESCE(r.units, 0)), 0) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
+    JOIN "PlatformAccount" pa ON pa.id = o."accountId"
     WHERE o."createTime" >= ${asTs(previousStart)} AND o."createTime" < ${asTs(currentStart)}
+      AND pa."businessId" = ${businessId}
       AND o.status = 'COMPLETED'
   `);
 
@@ -175,7 +188,9 @@ export async function getAnalyticsAggregated() {
       SELECT oi."orderId" AS oid, SUM(COALESCE(oi.price, 0) * oi.qty) AS rev, SUM(oi.qty) AS units
       FROM "OrderItem" oi
       JOIN "Order" o2 ON o2.id = oi."orderId"
+      JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
       WHERE o2."createTime" >= ${asTs(currentStart)} AND o2."createTime" < ${asTs(rangeEnd)}
+        AND pa2."businessId" = ${businessId}
       GROUP BY oi."orderId"
     )
     SELECT o."accountId", COUNT(DISTINCT o.id) AS c,
@@ -183,7 +198,9 @@ export async function getAnalyticsAggregated() {
            COALESCE(SUM(COALESCE(r.units, 0)), 0) AS units
     FROM "Order" o
     LEFT JOIN revenue r ON r.oid = o.id
+    JOIN "PlatformAccount" pa ON pa.id = o."accountId"
     WHERE o."createTime" >= ${asTs(currentStart)} AND o."createTime" < ${asTs(rangeEnd)}
+      AND pa."businessId" = ${businessId}
       AND o.status NOT IN (${Prisma.join(GMV_EXCLUDE)})
     GROUP BY o."accountId"
     ORDER BY revenue DESC
@@ -203,9 +220,11 @@ export async function getAnalyticsAggregated() {
            SUM(COALESCE(oi.price, 0) * oi.qty) AS value
     FROM "OrderItem" oi
     JOIN "Order" o ON o.id = oi."orderId"
+    JOIN "PlatformAccount" pa ON pa.id = o."accountId"
     LEFT JOIN "ProductVariant" v ON v.id = oi."variantId"
     LEFT JOIN "MasterProduct" mp ON mp.id = v."masterProductId"
     WHERE o."createTime" >= ${asTs(currentStart)} AND o."createTime" < ${asTs(rangeEnd)}
+      AND pa."businessId" = ${businessId}
       AND o.status NOT IN (${Prisma.join(GMV_EXCLUDE)})
     GROUP BY oi."variantId", oi."channelSku"
     ORDER BY qty DESC
@@ -227,7 +246,7 @@ export async function getAnalyticsAggregated() {
   const accounts =
     storeRows.length > 0
       ? await prisma.platformAccount.findMany({
-          where: { id: { in: storeRows.map((s) => s.accountId) } },
+          where: { id: { in: storeRows.map((s) => s.accountId) }, ...businessWhere.account(businessId) },
           select: { id: true, label: true, platform: true },
         })
       : [];

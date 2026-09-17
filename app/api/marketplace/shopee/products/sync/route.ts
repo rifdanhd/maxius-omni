@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/utils/api";
 import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
 
-export const POST = withAuth(async () => {
+export const POST = withAuth(async (req) => {
   try {
-    const results = await syncShopeeListings();
+    const results = await syncShopeeListings(req.businessId);
     return NextResponse.json({ ok: true, accounts: results });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Sync gagal.";

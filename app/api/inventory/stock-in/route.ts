@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import {
   adjustStockManually,
   STOCK_REASONS,
@@ -35,9 +36,14 @@ export const POST = withAuth(async (req) => {
   // dihitung di sini (aritmetik +qty terjadi atomik di dalam transaksi).
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
-    select: { id: true, sku: true },
+    select: { id: true, sku: true, masterProduct: { select: { businessId: true } } },
   });
   if (!variant) {
+    return NextResponse.json({ error: "Varian tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertSameBrand(variant.masterProduct.businessId, req.businessId);
+  } catch {
     return NextResponse.json({ error: "Varian tidak ditemukan." }, { status: 404 });
   }
 

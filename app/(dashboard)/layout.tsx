@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import NotificationBell from "@/components/layout/NotificationBell";
+import BrandSwitcher from "@/components/layout/BrandSwitcher";
 import { Download, Radio } from "lucide-react";
 
 const subscribe = () => () => {};
@@ -56,6 +57,7 @@ export default function DashboardLayout({
         <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 z-10">
           <div className="flex-1"></div>
           <div className="flex items-center gap-4">
+            <BrandSwitcher />
             <button className="flex items-center gap-2 border border-gray-200 rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
               <Radio size={16} /> Mode Livestream
             </button>

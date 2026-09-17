@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   saveProductCopyAsDraft,
   type CopyVariantInput,
@@ -7,7 +7,7 @@ import {
 
 // POST /api/product-copy/save
 // Body: hasil preview yang sudah diedit user → buat MasterProduct baru berstatus draft.
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   const body = (await req.json().catch(() => null)) as {
     name?: unknown;
     description?: unknown;
@@ -60,6 +60,7 @@ export const POST = withAuth(async (req: NextRequest) => {
 
   try {
     const { id } = await saveProductCopyAsDraft({
+      businessId: req.businessId,
       name,
       description,
       price,

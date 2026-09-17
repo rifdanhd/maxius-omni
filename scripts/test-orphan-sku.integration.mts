@@ -80,7 +80,7 @@ await mkOrder(acctA.id, "COMPLETED", [
 ]);
 
 /* 1. Deteksi: SKU-X (3 pcs / 2 order) & SKU-Z; SKU-Y batal = dikecualikan */
-const orphans1 = await findOrphanSkus();
+const orphans1 = await findOrphanSkus("business-default");
 assert.equal(orphans1.length, 3, `harus 3 orphan, dapat ${orphans1.length}`);
 assert.equal(orphans1[0].channelSku, "SKU-X", "urut qty terbesar");
 assert.equal(orphans1[0].qty, 3);
@@ -97,7 +97,7 @@ ok("deteksi: 3 orphan (SKU-X 3pcs/2order, SKU-Z, SKU-Q), CANCELLED dikecualikan"
 const existingMapping = await prisma.productMapping.create({
   data: { accountId: acctA.id, channelSku: "SKU-Z", variantId: variant2!.id },
 });
-const orphans2 = await findOrphanSkus();
+const orphans2 = await findOrphanSkus("business-default");
 const z = orphans2.find((o) => o.channelSku === "SKU-Z");
 assert.ok(z, "SKU-Z tetap orphan walau mapping sudah ada");
 assert.equal(z!.existingMappingId, existingMapping.id);
@@ -109,13 +109,14 @@ assert.ok(r3.ok, "mapOrphanToVariant harus sukses");
 if (r3.ok) assert.equal(r3.backfilled, 2, `backfill 2 baris, dapat ${r3.backfilled}`);
 const remainingX = await prisma.orderItem.count({ where: { channelSku: "SKU-X", variantId: null } });
 assert.equal(remainingX, 0);
-const orphans3 = await findOrphanSkus();
+const orphans3 = await findOrphanSkus("business-default");
 assert.ok(!orphans3.some((o) => o.channelSku === "SKU-X"));
 ok("mapOrphanToVariant: 3 OrderItem ter-backfill, orphan SKU-X hilang dari deteksi");
 
 /* 4. mapOrphanToNewMaster: master+varian+mapping+ledger INIT+backfill.
  *    SKU-Z sudah punya mapping (step 2) → pakai SKU-Q yang masih orphan. */
 const r4 = await mapOrphanToNewMaster({
+  businessId: "business-default",
   accountId: acctA.id,
   channelSku: "SKU-Q",
   newProductName: "Produk Q Master",
@@ -130,7 +131,7 @@ const initLedger = await prisma.stockLedger.findFirst({
 });
 assert.ok(initLedger, "StockLedger INIT dibuat (audit trail titik nol)");
 assert.equal(initLedger!.stockAfter, 0);
-const orphans4 = await findOrphanSkus();
+const orphans4 = await findOrphanSkus("business-default");
 assert.deepEqual(orphans4.map((o) => o.channelSku), ["SKU-Z"], "tersisa SKU-Z (mapping ada, item historis sudah menunjuk varian2)");
 ok("mapOrphanToNewMaster: master baru + ledger INIT + backfill 1 baris item");
 

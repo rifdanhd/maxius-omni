@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
@@ -19,8 +20,9 @@ const mappingInclude = {
   },
 } as const;
 
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   const mappings = await prisma.productMapping.findMany({
+    where: { account: { businessId: req.businessId } },
     include: mappingInclude,
     orderBy: [{ variant: { masterProduct: { name: "asc" } } }, { variant: { sku: "asc" } }],
   });
@@ -61,6 +63,11 @@ export const POST = withAuth(async (req) => {
 
   const account = await prisma.platformAccount.findUnique({ where: { id: accountId } });
   if (!account) return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 400 });
+  try {
+    assertSameBrand(account.businessId, req.businessId);
+  } catch {
+    return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 400 });
+  }
 
   const newStock = Number.isFinite(Number(body.stock)) ? Math.max(0, Number(body.stock)) : 0;
   const safetyStock = Number.isFinite(Number(body.safetyStock))
@@ -76,8 +83,16 @@ export const POST = withAuth(async (req) => {
   let variantId = body.variantId;
 
   if (variantId) {
-    const variant = await prisma.productVariant.findUnique({ where: { id: variantId } });
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+      include: { masterProduct: { select: { businessId: true } } },
+    });
     if (!variant) {
+      return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
+    }
+    try {
+      assertSameBrand(variant.masterProduct.businessId, req.businessId);
+    } catch {
       return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
     }
   } else if (body.masterProductId?.trim()) {
@@ -86,6 +101,11 @@ export const POST = withAuth(async (req) => {
       where: { id: body.masterProductId.trim() },
     });
     if (!master) {
+      return NextResponse.json({ error: "Produk master tidak ditemukan." }, { status: 400 });
+    }
+    try {
+      assertSameBrand(master.businessId, req.businessId);
+    } catch {
       return NextResponse.json({ error: "Produk master tidak ditemukan." }, { status: 400 });
     }
     const created = await prisma.productVariant.create({
@@ -117,6 +137,7 @@ export const POST = withAuth(async (req) => {
       const product = await tx.masterProduct.create({
         data: {
           name: body.newProductName?.trim() || channelSku,
+          businessId: req.businessId,
           threshold: settings.lowStockDefaultThreshold,
           ...(newImageUrl ? { imageUrl: newImageUrl } : {}),
         },

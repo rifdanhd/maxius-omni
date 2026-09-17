@@ -3,8 +3,9 @@ import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 
 // Daftar varian stok pusat utk dropdown di UI mapping (grup per produk).
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   const variants = await prisma.productVariant.findMany({
+    where: { masterProduct: { businessId: req.businessId } },
     select: {
       id: true,
       sku: true,

@@ -744,6 +744,7 @@ export interface CopyVariantInput {
 }
 
 export interface SaveDraftInput {
+  businessId: string;
   name: string;
   description?: string;
   price?: number | null;
@@ -851,6 +852,7 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
     const product = await tx.masterProduct.create({
       data: {
         name,
+        businessId: input.businessId,
         threshold: settings.lowStockDefaultThreshold,
         category: input.category ? String(input.category).trim() : null,
         imageUrl,

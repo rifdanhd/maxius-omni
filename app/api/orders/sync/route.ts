@@ -3,9 +3,9 @@ import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { syncOrdersTikTok } from "@/lib/services/order-sync.service";
 
-export const POST = withAuth(async () => {
+export const POST = withAuth(async (req) => {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "TIKTOK_SHOP" },
+    where: { platform: "TIKTOK_SHOP", businessId: req.businessId },
     select: {
       id: true,
       label: true,

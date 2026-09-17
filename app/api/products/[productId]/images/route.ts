@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   listProductImages,
   addImages,
@@ -10,15 +10,15 @@ import {
 // POST /api/products/[productId]/images — tambah gambar baru.
 //   Body: { url: string } | { images: [{ url: string }, ...] }
 //   url bisa berupa http(s):// atau data:image/... (file lokal → base64).
-export const GET = withAuth(async (_req: NextRequest, ctx) => {
+export const GET = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const productId = ctx?.params ? (await ctx.params).productId : null;
   if (!productId) return NextResponse.json({ error: "Product id hilang." }, { status: 400 });
 
-  const images = await listProductImages(productId);
+  const images = await listProductImages(productId, req.businessId);
   return NextResponse.json({ images });
 });
 
-export const POST = withAuth(async (req: NextRequest, ctx) => {
+export const POST = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const productId = ctx?.params ? (await ctx.params).productId : null;
   if (!productId) return NextResponse.json({ error: "Product id hilang." }, { status: 400 });
 
@@ -38,7 +38,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   }
 
   const safe = entries as { url: string }[];
-  const result = await addImages(productId, safe);
+  const result = await addImages(productId, safe, req.businessId);
   if (!result.ok) {
     return NextResponse.json(
       { error: result.reasons[0]?.reason ?? "Gagal menambah gambar." },

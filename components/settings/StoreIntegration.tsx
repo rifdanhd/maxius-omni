@@ -3,17 +3,21 @@
 import { useState, useEffect } from "react";
 import { MonitorPlay, RefreshCw, Trash2, ShoppingBag } from "lucide-react";
 import AddMarketplaceModal from "./AddMarketplaceModal";
-import { authFetch } from "@/lib/utils/api-client";
+import { authFetch, getActiveBusinessId } from "@/lib/utils/api-client";
 
 type StoreItem = {
   id: string;
   name: string;
   platform?: string;
+  businessName?: string;
   status?: string;
   connectedAt?: string;
   tokenExpiresAt?: string | null;
   scope?: string | null;
   authorizePath?: string | null;
+  isFrozen?: boolean;
+  frozenReason?: string | null;
+  lastSyncAt?: string | null;
 };
 
 // Pesan banner hasil OAuth (?success / ?error dari redirect callback).
@@ -112,12 +116,14 @@ export default function StoreIntegration() {
     }
   };
 
-  const statusMeta = (status?: string) =>
-    status === "connected"
-      ? { dot: "bg-green-500", text: "Terhubung" }
-      : status === "expired"
-        ? { dot: "bg-amber-500", text: "Token kedaluwarsa" }
-        : { dot: "bg-red-500", text: "Terputus" };
+  const statusMeta = (store: StoreItem) =>
+    store.isFrozen
+      ? { dot: "bg-gray-400", text: "Dibekukan" }
+      : store.status === "connected"
+        ? { dot: "bg-green-500", text: "Terhubung" }
+        : store.status === "expired"
+          ? { dot: "bg-amber-500", text: "Token kedaluwarsa" }
+          : { dot: "bg-red-500", text: "Terputus" };
 
   const platformLabel = (platform?: string) =>
     platform === "SHOPEE" ? "Shopee" : platform === "TIKTOK_SHOP" ? "TikTok Shop" : (platform ?? "—");
@@ -160,7 +166,7 @@ export default function StoreIntegration() {
                 <th className="px-6 py-4 font-semibold w-[25%]">Nama Toko</th>
                 <th className="px-6 py-4 font-semibold w-[20%]">Platform</th>
                 <th className="px-6 py-4 font-semibold w-[20%]">Status</th>
-                <th className="px-6 py-4 font-semibold w-[20%]">Waktu Dihubungkan</th>
+                <th className="px-6 py-4 font-semibold w-[20%]">Sinkron Terakhir</th>
                 <th className="px-6 py-4 font-semibold text-right w-[15%]">Atur</th>
               </tr>
             </thead>
@@ -198,15 +204,18 @@ export default function StoreIntegration() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
-                      <div className={`w-2 h-2 rounded-full ${statusMeta(store.status).dot}`}></div>
-                      <span className="text-sm text-gray-600">
-                        {statusMeta(store.status).text}
+                      <div className={`w-2 h-2 rounded-full ${statusMeta(store).dot}`}></div>
+                      <span className="text-sm text-gray-600" title={store.isFrozen ? (store.frozenReason ?? "Dibekukan admin") : undefined}>
+                        {statusMeta(store).text}
                       </span>
                     </div>
+                    {store.businessName && (
+                      <div className="text-xs text-gray-400 mt-0.5">{store.businessName}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-gray-600">
-                      {store.connectedAt ? new Date(store.connectedAt).toLocaleString("id-ID") : "-"}
+                      {store.lastSyncAt ? new Date(store.lastSyncAt).toLocaleString("id-ID") : "-"}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -224,7 +233,10 @@ export default function StoreIntegration() {
                             ) {
                               return;
                             }
-                            window.location.assign(store.authorizePath!);
+                            const sep = store.authorizePath!.includes("?") ? "&" : "?";
+                            window.location.assign(
+                              `${store.authorizePath!}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
+                            );
                           }}
                           className="text-xs font-semibold text-white bg-[#2a3a8c] hover:bg-blue-900 px-3 py-1.5 rounded transition-colors"
                           title="Hubungkan ulang via OAuth"

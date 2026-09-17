@@ -12,8 +12,9 @@ const PLATFORM_MENU: Record<string, { key: string; label: string; href: string }
 
 const PLATFORM_ORDER = ["SHOPEE", "TIKTOK_SHOP", "TOKOPEDIA"] as const;
 
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   const accounts = await prisma.platformAccount.findMany({
+    where: { businessId: req.businessId },
     select: { platform: true, accessToken: true },
   });
 

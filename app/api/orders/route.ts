@@ -103,7 +103,7 @@ export const GET = withAuth(async (req) => {
     };
   }
 
-  const where = { AND: [whereStatus, whereSearch, whereDate] };
+  const where = { AND: [{ account: { businessId: req.businessId } }, whereStatus, whereSearch, whereDate] };
 
   const [orders, total, statusGroups] = await Promise.all([
     prisma.order.findMany({
@@ -123,7 +123,11 @@ export const GET = withAuth(async (req) => {
       take: pageSize,
     }),
     prisma.order.count({ where }),
-    prisma.order.groupBy({ by: ["status"], _count: true }),
+    prisma.order.groupBy({
+      by: ["status"],
+      where: { account: { businessId: req.businessId } },
+      _count: true,
+    }),
   ]);
 
   const counts: Record<string, number> = {};

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { decryptPii } from "@/lib/services/crypto.service";
 import { getProductCategory } from "@/lib/integrations/tiktokShop";
 import { maskName, maskPhone, maskAddress } from "@/lib/pii";
@@ -27,13 +28,18 @@ export const GET = withAuth(
           },
         },
       },
-      account: { select: { id: true, platform: true, label: true } },
+      account: { select: { id: true, platform: true, label: true, businessId: true } },
       shipments: true,
       orderMappings: { select: { externalOrderId: true, rawStatus: true } },
     },
   });
 
   if (!order) {
+    return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertSameBrand(order.account.businessId, req.businessId);
+  } catch {
     return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
   }
 

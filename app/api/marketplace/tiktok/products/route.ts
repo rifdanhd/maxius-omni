@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   listTikTokProducts,
   getTikTokAccounts,
@@ -21,7 +21,7 @@ const SORTS = [
 
 // GET /api/marketplace/tiktok/products
 //   search, sort, accountIds (csv), tab, page, pageSize
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const sp = req.nextUrl.searchParams;
   const tab = sp.get("tab") ?? "all";
   if (tab !== "all" && !(TIKTOK_TABS as readonly string[]).includes(tab)) {
@@ -38,6 +38,7 @@ export const GET = withAuth(async (req: NextRequest) => {
     .filter(Boolean);
 
   const result = await listTikTokProducts({
+    businessId: req.businessId,
     search: sp.get("search") ?? undefined,
     sort: sort as (typeof SORTS)[number],
     accountIds,
@@ -47,8 +48,8 @@ export const GET = withAuth(async (req: NextRequest) => {
   });
 
   const [accounts, lastSyncedAt] = await Promise.all([
-    getTikTokAccounts(),
-    getLastTiktokSyncTime(),
+    getTikTokAccounts(req.businessId),
+    getLastTiktokSyncTime(req.businessId),
   ]);
 
   return NextResponse.json({

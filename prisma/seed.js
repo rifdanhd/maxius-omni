@@ -9,7 +9,7 @@ async function main() {
 
   // 1. Buat User Admin
   const passwordHash = bcrypt.hashSync("admin123", 10);
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
     create: {
@@ -18,6 +18,23 @@ async function main() {
     },
   });
   console.log("✅ User 'admin' dibuat/diperbarui.");
+
+  // 1b. Fase multi-brand: pastikan Business default + akses admin ke semua brand
+  // (tanpa ini semua /api/* me-return 403 untuk user seed ini).
+  await prisma.business.upsert({
+    where: { id: "business-default" },
+    update: {},
+    create: { id: "business-default", name: "Maxius" },
+  });
+  const allBusinesses = await prisma.business.findMany({ select: { id: true } });
+  for (const b of allBusinesses) {
+    await prisma.userBusiness.upsert({
+      where: { userId_businessId: { userId: admin.id, businessId: b.id } },
+      update: {},
+      create: { userId: admin.id, businessId: b.id },
+    });
+  }
+  console.log(`✅ Admin di-link ke ${allBusinesses.length} brand.`);
 
   // 2. Buat Akun Toko (PlatformAccount)
   const accountsData = [

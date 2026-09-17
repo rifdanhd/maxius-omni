@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { withAuth } from "@/lib/utils/api";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get("accountId") ?? undefined;
   const status = searchParams.get("status") ?? undefined;
@@ -13,7 +13,7 @@ export const GET = withAuth(async (req: NextRequest) => {
     where: {
       ...(accountId ? { accountId } : {}),
       ...(status ? { status } : {}),
-      account: { platform: "TIKTOK_SHOP" },
+      account: { platform: "TIKTOK_SHOP", businessId: req.businessId },
     },
     orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
     take,

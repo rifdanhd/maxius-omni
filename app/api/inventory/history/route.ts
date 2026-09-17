@@ -8,6 +8,7 @@ import { listInventoryHistory } from "@/lib/services/stock-history.service";
 export const GET = withAuth(async (req) => {
   const url = new URL(req.url);
   const result = await listInventoryHistory({
+    businessId: req.businessId,
     cursor: url.searchParams.get("cursor"),
     limit: Number(url.searchParams.get("limit") ?? 50),
     from: url.searchParams.get("from"),

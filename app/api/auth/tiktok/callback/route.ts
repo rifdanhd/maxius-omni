@@ -56,6 +56,16 @@ export async function GET(req: NextRequest) {
   }
   const appKey = creds.appKey;
 
+  const cookieBrand = req.cookies.get("maxius_oauth_brand")?.value?.trim();
+  let businessId = "business-default";
+  if (cookieBrand) {
+    const exists = await prisma.business.findUnique({
+      where: { id: cookieBrand },
+      select: { id: true },
+    });
+    if (exists) businessId = exists.id;
+  }
+
   const tokenUrl = new URL(TIKTOK_TOKEN_URL);
   tokenUrl.searchParams.set("app_key", creds.appKey);
   tokenUrl.searchParams.set("app_secret", creds.appSecret);
@@ -193,6 +203,7 @@ export async function GET(req: NextRequest) {
         create: {
           platform: PLATFORM,
           label: shop.name ?? shop.code ?? `TikTok Shop (${shop.id})`,
+          businessId,
           externalShopId: shop.id,
           shopCipher: shop.cipher ?? null,
           appKey,
@@ -214,6 +225,7 @@ export async function GET(req: NextRequest) {
         data: {
           platform: PLATFORM,
           label: `Pending TikTok Shop - ${new Date().toISOString()}`,
+          businessId,
           appKey,
           ...tokenPayload,
           ...(credential ? { appCredentialId: credential.id } : {}),

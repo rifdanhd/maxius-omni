@@ -35,13 +35,14 @@ async function main() {
   );
 
   for (const t of TARGETS) {
-    const orphan = (await findOrphanSkus()).find((o) => o.channelSku === t.channelSku);
+    const orphan = (await findOrphanSkus("business-default")).find((o) => o.channelSku === t.channelSku);
     if (!orphan) {
       console.log(`= ${t.channelSku}: tidak ada OrderItem orphan — dilewati (sudah aman).`);
       continue;
     }
     console.log(`\n=== ${t.channelSku} (account=${orphan.accountId}, ${orphan.qty} pcs) ===`);
     const r = await mapOrphanToNewMaster({
+      businessId: "business-default",
       accountId: orphan.accountId,
       channelSku: t.channelSku,
       newProductName: t.masterName,

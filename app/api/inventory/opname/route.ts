@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import {
   createStockOpname,
@@ -14,16 +13,15 @@ export const GET = withAuth(async (req) => {
   const wantsCounts = url.searchParams.get("counts") === "1";
 
   if (wantsCounts) {
-    const grouped = await prisma.stockOpname.groupBy({
-      by: ["status"],
-      _count: { _all: true },
-    });
+    const opnames = await listStockOpnames({ businessId: req.businessId });
     const counts: Record<string, number> = {};
-    for (const g of grouped) counts[g.status] = g._count._all;
+    for (const o of opnames as Array<{ status: string }>) {
+      counts[o.status] = (counts[o.status] ?? 0) + 1;
+    }
     return NextResponse.json({ counts });
   }
 
-  const opnames = await listStockOpnames({ status });
+  const opnames = await listStockOpnames({ businessId: req.businessId, status });
   return NextResponse.json({ opnames });
 });
 
@@ -33,6 +31,7 @@ export const GET = withAuth(async (req) => {
 export const POST = withAuth(async (req) => {
   const body = await req.json().catch(() => null);
   const result = await createStockOpname({
+    businessId: req.businessId,
     variantIds: Array.isArray(body?.variantIds) ? body.variantIds : undefined,
     all: body?.all === true,
     note: typeof body?.note === "string" ? body.note : null,

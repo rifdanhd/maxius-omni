@@ -156,9 +156,9 @@ export async function pushPriceToShopee(params: {
   }
 }
 
-export async function getShopeeAccounts() {
+export async function getShopeeAccounts(businessId: string) {
   return prisma.platformAccount.findMany({
-    where: { platform: "SHOPEE" },
+    where: { platform: "SHOPEE", businessId },
     select: { id: true, label: true, externalShopId: true, updatedAt: true },
     orderBy: { label: "asc" },
   });
@@ -177,14 +177,19 @@ export type ShopeeListingRow = {
 };
 
 export async function listShopeeProducts(opts: {
+  businessId: string;
   search?: string;
   accountIds?: string[];
   page?: number;
   pageSize?: number;
 }): Promise<{ rows: ShopeeListingRow[]; total: number; page: number; pageSize: number }> {
-  const { search, accountIds, page = 1, pageSize = 20 } = opts;
+  const { businessId, search, accountIds, page = 1, pageSize = 20 } = opts;
   const where: Record<string, unknown> = {
-    account: { platform: "SHOPEE", ...(accountIds?.length ? { id: { in: accountIds } } : {}) },
+    account: {
+      platform: "SHOPEE",
+      businessId,
+      ...(accountIds?.length ? { id: { in: accountIds } } : {}),
+    },
     ...(search
       ? { OR: [{ channelSku: { contains: search } }, { platformTitle: { contains: search } }] }
       : {}),
@@ -213,11 +218,11 @@ export async function listShopeeProducts(opts: {
   return { rows, total, page, pageSize };
 }
 
-export async function syncShopeeListings(): Promise<
+export async function syncShopeeListings(businessId: string): Promise<
   Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }>
 > {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "SHOPEE" },
+    where: { platform: "SHOPEE", businessId },
     include: { appCredential: true },
   });
   const results: Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }> = [];

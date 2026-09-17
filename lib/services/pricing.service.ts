@@ -27,6 +27,7 @@ export type PricingSort =
   | "created_desc";
 
 export interface ListPricingParams {
+  businessId: string;
   search?: string;
   sort?: PricingSort;
   storeIds?: string[];
@@ -58,12 +59,17 @@ export interface PricingRow {
 }
 
 export async function listPricing(
-  params: ListPricingParams = {}
+  params: ListPricingParams
 ): Promise<{ rows: PricingRow[]; total: number; page: number; pageSize: number }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
 
-  const where: Prisma.ProductVariantWhereInput = {};
+  const where: Prisma.ProductVariantWhereInput = {
+    masterProduct: {
+      businessId: params.businessId,
+      ...(params.category?.trim() ? { category: params.category.trim() } : {}),
+    },
+  };
 
   const search = params.search?.trim();
   if (search) {
@@ -72,9 +78,6 @@ export async function listPricing(
       { masterProduct: { name: { contains: search } } },
       { mappings: { some: { channelSku: { contains: search } } } },
     ];
-  }
-  if (params.category?.trim()) {
-    where.masterProduct = { category: params.category.trim() };
   }
   if (params.storeIds && params.storeIds.length > 0) {
     where.mappings = { some: { accountId: { in: params.storeIds } } };
@@ -160,7 +163,8 @@ const effectiveMarketPrice = (override: number | null, defaultPrice: number | nu
  */
 export async function updateVariantDefaultPrice(
   variantId: string,
-  price: number
+  price: number,
+  businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
   if (!Number.isFinite(price) || price < 0) {
     return { ok: false, reason: "Harga harus angka >= 0." };
@@ -168,9 +172,14 @@ export async function updateVariantDefaultPrice(
 
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
-    include: { mappings: { select: { id: true, accountId: true, channelSku: true, price: true } } },
+    include: {
+      masterProduct: { select: { businessId: true } },
+      mappings: { select: { id: true, accountId: true, channelSku: true, price: true } },
+    },
   });
-  if (!variant) return { ok: false, reason: "Varian tidak ditemukan." };
+  if (!variant || variant.masterProduct.businessId !== businessId) {
+    return { ok: false, reason: "Varian tidak ditemukan." };
+  }
 
   const newPrice = Math.round(price * 100) / 100;
   await prisma.productVariant.update({
@@ -198,7 +207,8 @@ export async function updateVariantDefaultPrice(
  */
 export async function updateMappingPrice(
   mappingId: string,
-  price: number | null
+  price: number | null,
+  businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
   if (price !== null && (!Number.isFinite(price) || price < 0)) {
     return { ok: false, reason: "Harga harus angka >= 0." };
@@ -206,9 +216,24 @@ export async function updateMappingPrice(
 
   const mapping = await prisma.productMapping.findUnique({
     where: { id: mappingId },
-    include: { variant: { select: { id: true, price: true } } },
+    include: {
+      account: { select: { businessId: true } },
+      variant: {
+        select: {
+          id: true,
+          price: true,
+          masterProduct: { select: { businessId: true } },
+        },
+      },
+    },
   });
-  if (!mapping) return { ok: false, reason: "Mapping toko tidak ditemukan." };
+  if (
+    !mapping ||
+    mapping.account.businessId !== businessId ||
+    mapping.variant.masterProduct.businessId !== businessId
+  ) {
+    return { ok: false, reason: "Mapping toko tidak ditemukan." };
+  }
 
   const newPrice = price === null ? null : Math.round(price * 100) / 100;
   const effectiveAfter = effectiveMarketPrice(newPrice, mapping.variant.price);
@@ -252,7 +277,10 @@ export interface BulkPriceResult {
  * - Baris dengan store diisi         → update override mapping varian@toko
  *   (store = label toko, opsional channel_sku utk verifikasi mapping).
  */
-export async function processBulkPrice(rows: BulkPriceRow[]): Promise<BulkPriceResult> {
+export async function processBulkPrice(
+  rows: BulkPriceRow[],
+  businessId: string
+): Promise<BulkPriceResult> {
   const result: BulkPriceResult = { ok: true, updated: 0, skipped: 0, failed: [] };
 
   for (const r of rows) {
@@ -265,7 +293,7 @@ export async function processBulkPrice(rows: BulkPriceRow[]): Promise<BulkPriceR
       if (r.store) {
         // Override per toko — cari mapping varian oleh toko tsb.
         const variant = await prisma.productVariant.findFirst({
-          where: { sku: r.sku },
+          where: { sku: r.sku, masterProduct: { businessId } },
           include: {
             mappings: {
               include: { account: { select: { id: true, label: true } } },
@@ -289,7 +317,7 @@ export async function processBulkPrice(rows: BulkPriceRow[]): Promise<BulkPriceR
           });
           continue;
         }
-        const upd = await updateMappingPrice(mapping.id, r.price);
+        const upd = await updateMappingPrice(mapping.id, r.price, businessId);
         if (!upd.ok) {
           result.failed.push({ row: r.row, message: upd.reason ?? "Gagal update override." });
           continue;
@@ -303,12 +331,14 @@ export async function processBulkPrice(rows: BulkPriceRow[]): Promise<BulkPriceR
           });
           continue;
         }
-        const variant = await prisma.productVariant.findFirst({ where: { sku: r.sku } });
+        const variant = await prisma.productVariant.findFirst({
+          where: { sku: r.sku, masterProduct: { businessId } },
+        });
         if (!variant) {
           result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan.` });
           continue;
         }
-        const upd = await updateVariantDefaultPrice(variant.id, r.price);
+        const upd = await updateVariantDefaultPrice(variant.id, r.price, businessId);
         if (!upd.ok) {
           result.failed.push({ row: r.row, message: upd.reason ?? "Gagal update harga default." });
           continue;

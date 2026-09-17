@@ -6,7 +6,7 @@ import {
   isShopeeAuthorizeEnabled,
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
-import { SHOPEE_OAUTH_CRED_COOKIE } from "../authorize/route";
+import { SHOPEE_OAUTH_CRED_COOKIE, OAUTH_BRAND_COOKIE } from "../authorize/route";
 
 const PLATFORM = "SHOPEE";
 
@@ -53,6 +53,18 @@ export async function GET(req: NextRequest) {
   }
   const creds = resolveShopeeCreds(credential);
 
+  // Brand utk akun baru (cookie dari authorize; default Maxius).
+  // Hanya id Business yg benar-benar ada yg dipakai.
+  const cookieBrand = req.cookies.get(OAUTH_BRAND_COOKIE)?.value?.trim();
+  let businessId = "business-default";
+  if (cookieBrand) {
+    const exists = await prisma.business.findUnique({
+      where: { id: cookieBrand },
+      select: { id: true },
+    });
+    if (exists) businessId = exists.id;
+  }
+
   let token;
   try {
     token = await getAccessTokenByCode(code, shopId ?? undefined, creds);
@@ -93,6 +105,7 @@ export async function GET(req: NextRequest) {
           create: {
             platform: PLATFORM,
             label,
+            businessId,
             externalShopId: sid,
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
@@ -113,6 +126,7 @@ export async function GET(req: NextRequest) {
         data: {
           platform: PLATFORM,
           label: `Pending Shopee - ${new Date().toISOString()}`,
+          businessId,
           accessToken: token.accessToken,
           refreshToken: token.refreshToken,
           tokenExpiresAt: new Date(Date.now() + token.expireIn * 1000),

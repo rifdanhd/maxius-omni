@@ -21,6 +21,7 @@ export const POST = withAuth(async (req) => {
   const accounts = await prisma.platformAccount.findMany({
     where: {
       platform: "TIKTOK_SHOP" as const,
+      businessId: req.businessId,
       ...(accountId ? { id: accountId } : {}),
     },
     select: { id: true, label: true },

@@ -87,6 +87,7 @@ export type TikTokSort =
   | "updated_desc";
 
 export interface ListTikTokParams {
+  businessId: string;
   search?: string;
   sort?: TikTokSort;
   accountIds?: string[];
@@ -312,9 +313,9 @@ type SyncAccountResult = {
  * syncTikTokListing — tarik semua produk TikTok (per akun) & update status
  * seluruh ProductMapping milik akun itu. Idempoten terhadap totalCount.
  */
-export async function syncTikTokListings(): Promise<SyncAccountResult[]> {
+export async function syncTikTokListings(businessId: string): Promise<SyncAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "TIKTOK_SHOP" },
+    where: { platform: "TIKTOK_SHOP", businessId },
     include: {
       mappings: {
         include: {
@@ -389,10 +390,11 @@ export async function syncTikTokListings(): Promise<SyncAccountResult[]> {
  * dipakai endpoint unmapped + section "belum ter-mapping" di UI.
  */
 export async function getTikTokUnmapped(
+  businessId: string,
   accountId?: string
 ): Promise<Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }>> {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "TIKTOK_SHOP", ...(accountId ? { id: accountId } : {}) },
+    where: { platform: "TIKTOK_SHOP", businessId, ...(accountId ? { id: accountId } : {}) },
     include: {
       mappings: { select: { channelSku: true } },
     },
@@ -417,12 +419,18 @@ export async function getTikTokUnmapped(
 }
 
 /** syncTikTokMapping — sync ulang SATU mapping (by channelSku, 3 modus lookup). */
-export async function syncTikTokMapping(mappingId: string): Promise<{ ok: boolean; reason?: string }> {
+export async function syncTikTokMapping(
+  mappingId: string,
+  businessId: string
+): Promise<{ ok: boolean; reason?: string }> {
   const m = await prisma.productMapping.findUnique({
     where: { id: mappingId },
     include: { account: true },
   });
   if (!m) return { ok: false, reason: "Mapping tidak ditemukan." };
+  if (m.account.businessId !== businessId) {
+    return { ok: false, reason: "Mapping tidak ditemukan." };
+  }
   if (m.account.platform !== "TIKTOK_SHOP") {
     return { ok: false, reason: "Mapping bukan milik akun Tokopedia." };
   }
@@ -447,13 +455,17 @@ export async function syncTikTokMapping(mappingId: string): Promise<{ ok: boolea
  */
 export async function setListingActive(
   mappingId: string,
-  active: boolean
+  active: boolean,
+  businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
   const m = await prisma.productMapping.findUnique({
     where: { id: mappingId },
     include: { account: true },
   });
   if (!m) return { ok: false, reason: "Mapping tidak ditemukan." };
+  if (m.account.businessId !== businessId) {
+    return { ok: false, reason: "Mapping tidak ditemukan." };
+  }
   if (m.account.platform !== "TIKTOK_SHOP") {
     return { ok: false, reason: "Mapping bukan milik akun Tokopedia." };
   }
@@ -524,7 +536,7 @@ function tabOf(v: {
 }
 
 export async function listTikTokProducts(
-  params: ListTikTokParams = {}
+  params: ListTikTokParams
 ): Promise<{
   rows: TikTokListingRow[];
   total: number;
@@ -538,10 +550,13 @@ export async function listTikTokProducts(
   const search = params.search?.trim();
   const mappings = await prisma.productMapping.findMany({
     where: {
-      account: { platform: "TIKTOK_SHOP" },
-      ...(params.accountIds && params.accountIds.length > 0
-        ? { account: { platform: "TIKTOK_SHOP", id: { in: params.accountIds } } }
-        : {}),
+      account: {
+        platform: "TIKTOK_SHOP",
+        businessId: params.businessId,
+        ...(params.accountIds && params.accountIds.length > 0
+          ? { id: { in: params.accountIds } }
+          : {}),
+      },
       ...(search
         ? {
             OR: [
@@ -706,9 +721,11 @@ export async function listTikTokProducts(
 
 /* ------------------------------ Metadata ------------------------------ */
 
-export async function getTikTokAccounts(): Promise<Array<{ id: string; label: string }>> {
+export async function getTikTokAccounts(
+  businessId: string
+): Promise<Array<{ id: string; label: string }>> {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "TIKTOK_SHOP" },
+    where: { platform: "TIKTOK_SHOP", businessId },
     select: { id: true, label: true },
     orderBy: { label: "asc" },
   });
@@ -718,9 +735,9 @@ export async function getTikTokAccounts(): Promise<Array<{ id: string; label: st
 /** Kategori marketplace tunggal saat ini:Tokopedia | Shop (TikTok+Tokopedia). */
 export const MARKETPLACE_CHANNEL_LABEL = "TikTok Shop";
 
-export async function getLastTiktokSyncTime(): Promise<Date | null> {
+export async function getLastTiktokSyncTime(businessId: string): Promise<Date | null> {
   const log = await prisma.syncLog.findFirst({
-    where: { kind: "listing_sync", status: "success" },
+    where: { kind: "listing_sync", status: "success", account: { businessId } },
     orderBy: { createdAt: "desc" },
   });
   return log?.createdAt ?? null;

@@ -21,6 +21,7 @@ export const POST = withAuth(async (req) => {
 
   const where = {
     platform: "TIKTOK_SHOP" as const,
+    businessId: req.businessId,
     ...(accountId ? { id: accountId } : {}),
   };
 

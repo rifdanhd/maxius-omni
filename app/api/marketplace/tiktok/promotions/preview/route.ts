@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertAccountMappingsInBrand } from "@/lib/services/business-scope.service";
 import { previewPromotion } from "@/lib/services/promotion-write.service";
 import {
   extremeDiscountConfirmMessage,
@@ -15,7 +16,7 @@ import {
  * Response memuat semua yang dibutuhkan guardrail G1–G3; keputusan submit
  * tetap divalidasi ulang server-side di /create (jangan percaya client).
  */
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   const body = (await req.json().catch(() => null)) as {
     accountId?: string;
     mappingIds?: string[];
@@ -71,6 +72,12 @@ export const POST = withAuth(async (req: NextRequest) => {
       { error: `Diskon ${value}% tidak valid (rentang 0–100).` },
       { status: 400 }
     );
+  }
+
+  try {
+    await assertAccountMappingsInBrand(body.accountId, body.mappingIds, req.businessId);
+  } catch {
+    return NextResponse.json({ error: "Toko / mapping tidak ditemukan di brand ini." }, { status: 404 });
   }
 
   const result = await previewPromotion({

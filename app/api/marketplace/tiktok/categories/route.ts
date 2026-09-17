@@ -1,28 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { prisma } from "@/lib/db/prisma";
 import { getCategories } from "@/lib/integrations/tiktokShop";
 
 // GET /api/marketplace/tiktok/categories?keyword=...&accountId=...
 //   Proksi ke kategori Tokopedia | Shop (search by keyword) untuk tree-select.
-async function resolveAccount(accountId?: string | null) {
+async function resolveAccount(accountId?: string | null, businessId?: string) {
   if (accountId) {
     const acc = await prisma.platformAccount.findUnique({ where: { id: accountId } });
-    if (acc?.accessToken) return acc;
+    if (acc?.accessToken && (!businessId || acc.businessId === businessId)) return acc;
+    return null;
   }
   return (
     (await prisma.platformAccount.findFirst({
-      where: { platform: "TIKTOK_SHOP", accessToken: { not: null } },
+      where: {
+        platform: "TIKTOK_SHOP",
+        accessToken: { not: null },
+        ...(businessId ? { businessId } : {}),
+      },
     })) ?? null
   );
 }
 
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req) => {
   const sp = req.nextUrl.searchParams;
   const keyword = sp.get("keyword") ?? undefined;
   const accountId = sp.get("accountId") ?? undefined;
 
-  const acc = await resolveAccount(accountId);
+  const acc = await resolveAccount(accountId, req.businessId);
   if (!acc) return NextResponse.json({ error: "Tidak ada akun Tokopedia | Shop valid." }, { status: 400 });
 
   try {

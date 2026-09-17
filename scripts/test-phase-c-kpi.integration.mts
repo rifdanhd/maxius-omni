@@ -107,14 +107,14 @@ const before = await counts();
 
 console.log("=== PHASE C.1: Dashboard KPI ===");
 await ok("central stock: 3 varian, 105 units, 95 sellable", async () => {
-  const kpi = await getDashboardKpi();
+  const kpi = await getDashboardKpi("business-default");
   assert.equal(kpi.centralStock.variantCount, 3);
   assert.equal(kpi.centralStock.totalUnits, 105);
   assert.equal(kpi.centralStock.totalSellable, 95);
 });
 
 await ok("low stock: count 2 (B low, C out), top terurut sellable", async () => {
-  const kpi = await getDashboardKpi();
+  const kpi = await getDashboardKpi("business-default");
   assert.equal(kpi.lowStock.count, 2);
   assert.equal(kpi.lowStock.top[0].sku, "KPI-C");
   assert.equal(kpi.lowStock.top[0].severity, "out");
@@ -124,12 +124,12 @@ await ok("low stock: count 2 (B low, C out), top terurut sellable", async () => 
 });
 
 await ok("mismatch reuse predikat B: total 2 (failed 1, pendingRetry 1)", async () => {
-  const kpi = await getDashboardKpi();
+  const kpi = await getDashboardKpi("business-default");
   assert.deepEqual(kpi.mismatch, { total: 2, failed: 1, pendingRetry: 1 });
 });
 
 await ok("sync error 7d: 2 (error lama dikecualikan), byKind benar", async () => {
-  const kpi = await getDashboardKpi();
+  const kpi = await getDashboardKpi("business-default");
   assert.equal(kpi.syncErrors.count7d, 2);
   assert.deepEqual(
     kpi.syncErrors.byKind.map((g) => g.kind).sort(),
@@ -138,7 +138,7 @@ await ok("sync error 7d: 2 (error lama dikecualikan), byKind benar", async () =>
 });
 
 await ok("store health fakta-DB: token/cipher boolean, aktivitas, error, mismatch", async () => {
-  const kpi = await getDashboardKpi();
+  const kpi = await getDashboardKpi("business-default");
   assert.equal(kpi.storeHealth.length, 2);
   const tt = kpi.storeHealth.find((s) => s.accountId === tiktokAcc.id)!;
   const sp = kpi.storeHealth.find((s) => s.accountId === shopeeAcc.id)!;

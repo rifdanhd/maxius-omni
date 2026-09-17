@@ -8,6 +8,7 @@ import {
 } from "@/lib/services/app-credential.service";
 
 export const SHOPEE_OAUTH_CRED_COOKIE = "shopee_oauth_cred";
+export const OAUTH_BRAND_COOKIE = "maxius_oauth_brand";
 
 export async function GET(req: NextRequest) {
   // Feature flag: authorize Shopee diblokir total sampai ISV approved
@@ -38,6 +39,17 @@ export async function GET(req: NextRequest) {
     // WAJIB memakai partner key yg sama).
     if (credential) {
       res.cookies.set(SHOPEE_OAUTH_CRED_COOKIE, credential.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 1800,
+      });
+    }
+    // Bawa brand aktif ke callback (akun baru dibuat di brand ini).
+    const businessId = searchParams.get("businessId")?.trim();
+    if (businessId) {
+      res.cookies.set(OAUTH_BRAND_COOKIE, businessId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

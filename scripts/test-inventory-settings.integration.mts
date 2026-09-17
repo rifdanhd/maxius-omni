@@ -150,6 +150,7 @@ console.log("=== 2 — lowStockDefaultThreshold → produk baru ===");
 await ok("product-copy: draft baru memakai ambang global (bukan 20)", async () => {
   await updateInventorySettings({ lowStockDefaultThreshold: 7 });
   const { id } = await saveProductCopyAsDraft({
+    businessId: "business-default",
     name: "[TEST] Produk Copy Threshold",
     variants: [{ name: "Rasa Asli", price: null, stock: 3 }],
   });

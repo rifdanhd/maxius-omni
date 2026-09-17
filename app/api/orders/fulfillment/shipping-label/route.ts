@@ -32,7 +32,7 @@ export const POST = withAuth(async (req) => {
   }
 
   const orders = await prisma.order.findMany({
-    where: { id: { in: orderIds.map(String) } },
+    where: { id: { in: orderIds.map(String) }, account: { businessId: req.businessId } },
     select: {
       id: true,
       orderNo: true,

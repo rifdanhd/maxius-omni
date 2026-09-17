@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, ShoppingBag, Store, ShoppingCart } from "lucide-react";
 import TikTokLogo from "@/components/icons/TikTokLogo";
+import { getActiveBusinessId } from "@/lib/utils/api-client";
 
 type PlatformConfig = {
   name: string;
@@ -36,7 +37,11 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
       return;
     }
     if (authorizePath) {
-      window.location.assign(authorizePath);
+      // Bawa brand aktif: akun baru dibuat di brand ini (callback).
+      const sep = authorizePath.includes("?") ? "&" : "?";
+      window.location.assign(
+        `${authorizePath}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
+      );
       return;
     }
     showToast(`Integrasi ${platform} segera hadir`);

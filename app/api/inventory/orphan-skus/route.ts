@@ -9,9 +9,9 @@ import { findOrphanSkus } from "@/lib/services/orphan-sku.service";
 // backfill historis di POST/PATCH mappings).
 // Read-only: sistem CUMA mendeteksi & menandai — keputusan mapping/buat master
 // tetap manual via UI (tanpa auto-create).
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   try {
-    const orphans = await findOrphanSkus();
+    const orphans = await findOrphanSkus(req.businessId);
     return NextResponse.json({
       orphans,
       totalQty: orphans.reduce((s, o) => s + o.qty, 0),

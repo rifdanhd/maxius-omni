@@ -1,8 +1,15 @@
 import { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/services/auth.service";
+import {
+  BusinessScopeError,
+  resolveRequestBusiness,
+} from "@/lib/services/business-scope.service";
 
 export interface AuthenticatedRequest extends NextRequest {
   user: { id: string; username: string; canViewFullPii: boolean };
+  // Brand aktif yg sudah tervalidasi keanggotaannya (fase multi-brand).
+  // Route yg menampilkan data brand WAJIB filter dgn ini.
+  businessId: string;
 }
 
 /**
@@ -39,11 +46,20 @@ export function withAuth(
       const payload = verifyToken(token);
       // Inject user ke request object. Legacy token (sebelum fitur PII) tidak punya
       // canViewFullPii → default true (perilaku lama = akses penuh, user admin).
-      (req as AuthenticatedRequest).user = {
+      const user = {
         id: payload.sub as string,
         username: payload.username as string,
         canViewFullPii: payload.canViewFullPii !== false,
       };
+      (req as AuthenticatedRequest).user = user;
+      try {
+        (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id);
+      } catch (e) {
+        if (e instanceof BusinessScopeError) {
+          return Response.json({ error: e.message }, { status: 403 });
+        }
+        throw e;
+      }
       return handler(req as AuthenticatedRequest, ctx);
     } catch {
       return Response.json(

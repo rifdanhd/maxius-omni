@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { adjustStockManually } from "@/lib/services/central-stock.service";
 
 // Sesuaikan Stok manual: tetapkan angka mutlak (newStock >= 0) utk satu varian
@@ -20,6 +22,19 @@ export const POST = withAuth(async (req, ctx) => {
       { error: "newStock harus angka bulat >= 0." },
       { status: 400 }
     );
+  }
+
+  const variantBrand = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: { masterProduct: { select: { businessId: true } } },
+  });
+  if (!variantBrand) {
+    return NextResponse.json({ error: "Varian tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertSameBrand(variantBrand.masterProduct.businessId, req.businessId);
+  } catch {
+    return NextResponse.json({ error: "Varian tidak ditemukan." }, { status: 404 });
   }
 
   const result = await adjustStockManually({

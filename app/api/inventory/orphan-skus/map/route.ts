@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import {
   mapOrphanToVariant,
   mapOrphanToNewMaster,
@@ -41,9 +42,23 @@ export const POST = withAuth(async (req) => {
     return NextResponse.json({ error: "accountId & channelSku wajib diisi." }, { status: 400 });
   }
 
+  const account = await prisma.platformAccount.findUnique({
+    where: { id: accountId },
+    select: { id: true, businessId: true },
+  });
+  if (!account) {
+    return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 400 });
+  }
+  try {
+    assertSameBrand(account.businessId, req.businessId);
+  } catch {
+    return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 400 });
+  }
+
   try {
     if (body.mode === "new") {
       const result = await mapOrphanToNewMaster({
+        businessId: req.businessId,
         accountId,
         channelSku,
         newProductName: body.newProductName,
@@ -62,9 +77,14 @@ export const POST = withAuth(async (req) => {
     }
     const variant = await prisma.productVariant.findUnique({
       where: { id: variantId },
-      select: { id: true },
+      select: { id: true, masterProduct: { select: { businessId: true } } },
     });
     if (!variant) {
+      return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 404 });
+    }
+    try {
+      assertSameBrand(variant.masterProduct.businessId, req.businessId);
+    } catch {
       return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 404 });
     }
 

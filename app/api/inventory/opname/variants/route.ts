@@ -11,15 +11,18 @@ export const GET = withAuth(async (req) => {
   const take = Math.min(100, Math.max(1, Number(url.searchParams.get("take") ?? 50) || 50));
 
   const variants = await prisma.productVariant.findMany({
-    where: q
-      ? {
-          OR: [
-            { sku: { contains: q } },
-            { name: { contains: q } },
-            { masterProduct: { is: { name: { contains: q } } } },
-          ],
-        }
-      : undefined,
+    where: {
+      masterProduct: { businessId: req.businessId },
+      ...(q
+        ? {
+            OR: [
+              { sku: { contains: q } },
+              { name: { contains: q } },
+              { masterProduct: { is: { name: { contains: q } } } },
+            ],
+          }
+        : {}),
+    },
     select: {
       id: true,
       sku: true,

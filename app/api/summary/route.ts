@@ -25,17 +25,19 @@ function startOfToday(): Date {
  * - oversell        : jumlah varian di mana total qty order AKTIF (status ∉
  *                     CANCELLED/COMPLETED) melebihi stock tersisa varian
  */
-export const GET = withAuth(async () => {
-  const data = await cached("summary", CACHE_TTL_MS, async () => {
+export const GET = withAuth(async (req) => {
+  const businessId = req.businessId;
+  const data = await cached(`summary:${businessId}`, CACHE_TTL_MS, async () => {
     const startToday = startOfToday();
 
     const [accountsCount, activeSku, criticalCount, newOrders, readyToShip, completedOrders, committed, variantsStock] =
       await Promise.all([
-        prisma.platformAccount.count(),
-        prisma.productVariant.count(),
+        prisma.platformAccount.count({ where: { businessId } }),
+        prisma.productVariant.count({ where: { masterProduct: { businessId } } }),
 
         prisma.productVariant
           .findMany({
+            where: { masterProduct: { businessId } },
             select: {
               stock: true,
               safetyStock: true,
@@ -51,29 +53,31 @@ export const GET = withAuth(async () => {
 
         prisma.order.count({
           where: {
+            account: { businessId },
             createTime: { gte: startToday },
             status: { not: "CANCELLED" },
           },
         }),
 
         prisma.order.count({
-          where: { status: "AWAITING_SHIPMENT" },
+          where: { account: { businessId }, status: "AWAITING_SHIPMENT" },
         }),
 
         prisma.order.count({
-          where: { status: "COMPLETED" },
+          where: { account: { businessId }, status: "COMPLETED" },
         }),
 
         prisma.orderItem.groupBy({
           by: ["variantId"],
           where: {
             variantId: { not: null },
-            order: { status: { notIn: ["CANCELLED", "COMPLETED"] } },
+            order: { status: { notIn: ["CANCELLED", "COMPLETED"] }, account: { businessId } },
           },
           _sum: { qty: true },
         }),
 
         prisma.productVariant.findMany({
+          where: { masterProduct: { businessId } },
           select: { id: true, stock: true },
         }),
       ]);

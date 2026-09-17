@@ -7,12 +7,12 @@ import { retrySingleSyncJob, SyncJobRetryError } from "@/lib/services/sync-job.s
 // sama dengan processDueSyncJobs): BUKAN job baru, BUKAN logika duplikat.
 // Guard: 404 job hilang; 422 SUCCESS/tidak eligible; 409 sedang diproses
 // (claim atomik → spam-klik bersamaan hanya 1 yang jalan).
-export const POST = withAuth(async (_req, ctx) => {
+export const POST = withAuth(async (req, ctx) => {
   const id = ctx?.params ? (await ctx.params).id : null;
   if (!id) return NextResponse.json({ error: "Id hilang." }, { status: 400 });
 
   try {
-    const job = await retrySingleSyncJob(id);
+    const job = await retrySingleSyncJob(id, { businessId: req.businessId });
     return NextResponse.json({ job });
   } catch (err) {
     if (err instanceof SyncJobRetryError) {

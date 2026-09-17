@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { withAuth } from "@/lib/utils/api";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { updateMappingPrice } from "@/lib/services/pricing.service";
 
 // PATCH /api/products/pricing/[variantId]/marketplace/[channelId]
 // Body: { price: number | null } — set/bersihkan harga override per toko.
 //   price angka  → override harga tayang marketplace tsb.
 //   price null   → hapus override, kembali ke harga default varian.
-export const PATCH = withAuth(async (req: NextRequest, ctx) => {
+export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const params = ctx?.params ? await ctx.params : null;
   const variantId = params?.variantId;
   const channelId = params?.channelId;
@@ -26,7 +27,12 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 
   // Pastikan mapping milik varian ini (jaga-jaga bila id tak valid).
   const mapping = await prisma.productMapping.findFirst({
-    where: { id: channelId, variantId },
+    where: {
+      id: channelId,
+      variantId,
+      account: { businessId: req.businessId },
+      variant: { masterProduct: { businessId: req.businessId } },
+    },
     select: { id: true },
   });
   if (!mapping) {
@@ -38,7 +44,8 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 
   const result = await updateMappingPrice(
     channelId,
-    body.price === null ? null : Number(body.price)
+    body.price === null ? null : Number(body.price),
+    req.businessId
   );
   if (!result.ok) {
     return NextResponse.json(

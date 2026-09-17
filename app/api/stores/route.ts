@@ -7,9 +7,11 @@ const AUTHORIZE_PATH: Record<string, string> = {
   TIKTOK_SHOP: "/api/auth/tiktok/authorize",
 };
 
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   try {
     const accounts = await prisma.platformAccount.findMany({
+      where: { businessId: req.businessId },
+      include: { business: { select: { id: true, name: true } } },
       orderBy: { createdAt: "asc" },
     });
 
@@ -23,6 +25,11 @@ export const GET = withAuth(async () => {
         id: acc.id,
         name: acc.label,
         platform: acc.platform,
+        businessId: acc.businessId,
+        businessName: acc.business.name,
+        isFrozen: acc.isFrozen,
+        frozenReason: acc.frozenReason,
+        lastSyncAt: acc.updatedAt.toISOString(),
         status: !hasToken ? "disconnected" : expired ? "expired" : "connected",
         connectedAt: acc.createdAt.toISOString(),
         tokenExpiresAt: acc.tokenExpiresAt?.toISOString() ?? null,

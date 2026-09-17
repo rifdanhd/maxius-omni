@@ -17,13 +17,14 @@ export const GET = withAuth(async (req) => {
     url.searchParams.get("to")
   );
   const filters = {
+    businessId: req.businessId,
     fromMs,
     toMs,
     platform: platform && VALID_PLATFORMS.has(platform) ? platform : null,
     accountId: url.searchParams.get("accountId"),
   };
   const data = await cached(
-    `winning:${fromMs}:${toMs}:${filters.platform ?? "-"}:${filters.accountId ?? "-"}:${groupBy}:${url.searchParams.get("limit") ?? "20"}`,
+    `winning:${req.businessId}:${fromMs}:${toMs}:${filters.platform ?? "-"}:${filters.accountId ?? "-"}:${groupBy}:${url.searchParams.get("limit") ?? "20"}`,
     CACHE_TTL_MS,
     () => getWinning(filters, groupBy, Number(url.searchParams.get("limit") ?? 20))
   );

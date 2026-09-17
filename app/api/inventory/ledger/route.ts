@@ -12,6 +12,7 @@ export const GET = withAuth(async (req) => {
 
   const entries = await prisma.stockLedger.findMany({
     where: {
+      variant: { masterProduct: { businessId: req.businessId } },
       ...(variantId ? { variantId } : {}),
       ...(reason ? { reason } : {}),
     },

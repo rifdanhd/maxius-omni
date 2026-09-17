@@ -53,6 +53,7 @@ const opnameInclude = {
 
 /** createStockOpname — snapshot stok sistem utk varian terpilih (atau semua). */
 export async function createStockOpname(params: {
+  businessId: string;
   variantIds?: string[];
   all?: boolean;
   note?: string | null;
@@ -66,12 +67,18 @@ export async function createStockOpname(params: {
   }
 
   const variants = await prisma.productVariant.findMany({
-    where: wantsAll ? {} : { id: { in: ids } },
+    where: {
+      masterProduct: { businessId: params.businessId },
+      ...(wantsAll ? {} : { id: { in: ids } }),
+    },
     select: { id: true, stock: true },
     orderBy: { id: "asc" },
   });
   if (variants.length === 0) {
     return { ok: false, reason: "Tidak ada varian yang cocok." };
+  }
+  if (!wantsAll && variants.length !== ids.length) {
+    return { ok: false, reason: "Sebagian varian tidak ditemukan di brand ini." };
   }
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -102,10 +109,21 @@ export async function createStockOpname(params: {
   return { ok: false, reason: "Gagal membuat kode opname unik." };
 }
 
+/** Opname harus milik brand peminta (opname dibangun single-brand). */
+async function isOpnameOutOfBrand(opnameId: string, businessId: string): Promise<boolean> {
+  const items = await prisma.stockOpnameItem.findMany({
+    where: { opnameId },
+    select: { variant: { select: { masterProduct: { select: { businessId: true } } } } },
+  });
+  if (items.length === 0) return true;
+  return items.some((i) => i.variant.masterProduct.businessId !== businessId);
+}
+
 /** recordCount — simpan hasil hitung fisik per varian (boleh bertahap). */
 export async function recordOpnameCounts(params: {
   opnameId: string;
   counts: Array<{ variantId: string; countedStock: number }>;
+  businessId?: string;
 }): Promise<{ ok: boolean; reason?: string; opname?: unknown }> {
   const counts = (params.counts ?? []).filter(
     (c) => typeof c?.variantId === "string" && Number.isFinite(Number(c?.countedStock))
@@ -116,6 +134,9 @@ export async function recordOpnameCounts(params: {
 
   const opname = await prisma.stockOpname.findUnique({ where: { id: params.opnameId } });
   if (!opname) return { ok: false, reason: "Opname tidak ditemukan." };
+  if (params.businessId && (await isOpnameOutOfBrand(params.opnameId, params.businessId))) {
+    return { ok: false, reason: "Opname tidak ditemukan." };
+  }
   if (opname.status === OPNAME_STATUSES.COMPLETED) {
     return { ok: false, reason: "Opname sudah difinalisasi — tidak bisa diubah." };
   }
@@ -155,9 +176,13 @@ export async function recordOpnameCounts(params: {
 export async function cancelStockOpname(params: {
   opnameId: string;
   userId?: string | null;
+  businessId?: string;
 }): Promise<{ ok: boolean; reason?: string; opname?: unknown }> {
   const opname = await prisma.stockOpname.findUnique({ where: { id: params.opnameId } });
   if (!opname) return { ok: false, reason: "Opname tidak ditemukan." };
+  if (params.businessId && (await isOpnameOutOfBrand(params.opnameId, params.businessId))) {
+    return { ok: false, reason: "Opname tidak ditemukan." };
+  }
   if (opname.status === OPNAME_STATUSES.COMPLETED) {
     return { ok: false, reason: "Opname sudah difinalisasi — tidak bisa dibatalkan." };
   }
@@ -189,6 +214,7 @@ export async function cancelStockOpname(params: {
 export async function finalizeStockOpname(params: {
   opnameId: string;
   userId?: string | null;
+  businessId?: string;
 }): Promise<{
   ok: boolean;
   reason?: string;
@@ -202,6 +228,9 @@ export async function finalizeStockOpname(params: {
     include: { items: true },
   });
   if (!opname) return { ok: false, reason: "Opname tidak ditemukan." };
+  if (params.businessId && (await isOpnameOutOfBrand(params.opnameId, params.businessId))) {
+    return { ok: false, reason: "Opname tidak ditemukan." };
+  }
   if (opname.status === OPNAME_STATUSES.COMPLETED) {
     return { ok: false, reason: "Opname sudah difinalisasi." };
   }
@@ -292,12 +321,18 @@ export async function finalizeStockOpname(params: {
 }
 
 /** List opname dgn ringkasan item + filter status (utk tab & badge). */
-export async function listStockOpnames(params: { status?: string | null }): Promise<unknown> {
+export async function listStockOpnames(params: {
+  businessId: string;
+  status?: string | null;
+}): Promise<unknown> {
   const status = params.status && Object.values(OPNAME_STATUSES).includes(params.status as OpnameStatus)
     ? params.status
     : undefined;
   const opnames = await prisma.stockOpname.findMany({
-    where: status ? { status } : undefined,
+    where: {
+      ...(status ? { status } : {}),
+      items: { some: { variant: { masterProduct: { businessId: params.businessId } } } },
+    },
     include: {
       items: { select: { countedStock: true, systemStock: true } },
       user: { select: { id: true, username: true } },

@@ -85,7 +85,7 @@ const vC = await mkVariant("OPN-C", 7);
 
 let opname1: { id: string; code: string };
 await ok("create: snapshot stok sistem saat dibuat (bukan live)", async () => {
-  const r = await createStockOpname({
+  const r = await createStockOpname({ businessId: "business-default", 
     variantIds: [vA.id, vB.id],
     note: "hitung fisik",
     userId: user.id,
@@ -148,7 +148,7 @@ await rejects("finalisasi opname CANCELLED ditolak", () =>
 // Opname lengkap: A (snapshot 8) → fisik 6; B (snapshot 5) → fisik 5; C (7) → fisik 12
 let opname2: { id: string; code: string };
 await ok("finalisasi lengkap: selisih dikoreksi via jalur central-stock", async () => {
-  const r0 = await createStockOpname({
+  const r0 = await createStockOpname({ businessId: "business-default", 
     variantIds: [vA.id, vB.id, vC.id],
     userId: user.id,
   });
@@ -194,7 +194,7 @@ await ok("finalisasi lengkap: selisih dikoreksi via jalur central-stock", async 
 await ok("finalisasi GANDA bersamaan → idempoten, stok tidak terkoreksi 2×", async () => {
   // Reset: buat opname baru dgn selisih, lalu finalize dua-duanya bersamaan.
   const vD = await mkVariant("OPN-D", 20);
-  const r0 = await createStockOpname({ variantIds: [vD.id], userId: user.id });
+  const r0 = await createStockOpname({ businessId: "business-default",  variantIds: [vD.id], userId: user.id });
   const oid = (r0.opname as { id: string }).id;
   await recordOpnameCounts({ opnameId: oid, counts: [{ variantId: vD.id, countedStock: 15 }] });
   const [r1, r2] = await Promise.allSettled([
@@ -212,7 +212,7 @@ await ok("finalisasi GANDA bersamaan → idempoten, stok tidak terkoreksi 2×", 
 });
 
 await rejects("countedStock negatif ditolak", () =>
-  createStockOpname({ variantIds: [vA.id] }).then(async (r) => {
+  createStockOpname({ businessId: "business-default",  variantIds: [vA.id] }).then(async (r) => {
     const oid = (r.opname as { id: string }).id;
     const rr = await recordOpnameCounts({
       opnameId: oid,
@@ -271,7 +271,7 @@ await ok("jalur lama (adjustStockManually) tetap bekerja pasca-refactor", async 
 });
 
 await ok("list: union ledger + oversell, terbaru di atas", async () => {
-  const { items, nextCursor } = await listInventoryHistory({ limit: 50 });
+  const { items, nextCursor } = await listInventoryHistory({ businessId: "business-default",  limit: 50 });
   // 2 opname(opname2) + 1 opname(OPN-D) + 1 manual + 1 oversell = 5 minimal.
   assert.ok(items.length >= 5, `dapat ${items.length} baris`);
   assert.ok(nextCursor === null || typeof nextCursor === "string");
@@ -290,7 +290,7 @@ await ok("list: union ledger + oversell, terbaru di atas", async () => {
 });
 
 await ok("oversell di history: changeQty null, orderNo terbaca dari message", async () => {
-  const { items } = await listInventoryHistory({ source: "synclog", limit: 10 });
+  const { items } = await listInventoryHistory({ businessId: "business-default",  source: "synclog", limit: 10 });
   const ov = items.find((i) => i.eventKind === "OVERSELL");
   assert.ok(ov, "oversell ada");
   assert.equal(ov.changeQty, null);
@@ -299,7 +299,7 @@ await ok("oversell di history: changeQty null, orderNo terbaca dari message", as
 });
 
 await ok("sebelum→sesudah konsisten (before = after − change)", async () => {
-  const { items } = await listInventoryHistory({ source: "ledger", limit: 100 });
+  const { items } = await listInventoryHistory({ businessId: "business-default",  source: "ledger", limit: 100 });
   for (const it of items) {
     if (it.changeQty !== null && it.changeQty !== 0) {
       assert.equal(it.stockBefore! + it.changeQty, it.stockAfter, it.id);
@@ -308,14 +308,14 @@ await ok("sebelum→sesudah konsisten (before = after − change)", async () => 
 });
 
 await ok("filter q (SKU) hanya mengembalikan varian terkait", async () => {
-  const { items } = await listInventoryHistory({ q: "HIST-OVERSELL", limit: 50 });
+  const { items } = await listInventoryHistory({ businessId: "business-default",  q: "HIST-OVERSELL", limit: 50 });
   assert.ok(items.length > 0);
   assert.ok(items.every((i) => i.sku === "HIST-OVERSELL"));
 });
 
 await ok("filter tanggal from/to mengurangi hasil", async () => {
-  const all = await listInventoryHistory({ limit: 100 });
-  const emptyFuture = await listInventoryHistory({
+  const all = await listInventoryHistory({ businessId: "business-default",  limit: 100 });
+  const emptyFuture = await listInventoryHistory({ businessId: "business-default", 
     from: new Date(Date.now() + 86_400_000 * 2).toISOString(),
     to: new Date(Date.now() + 86_400_000 * 3).toISOString(),
     limit: 100,
@@ -329,7 +329,7 @@ await ok("cursor pagination: walk sampai habis TANPA dobel & TANPA skip", async 
   let cursor: string | null = null;
   let pages = 0;
   do {
-    const { items, nextCursor } = await listInventoryHistory({ limit: 3, cursor });
+    const { items, nextCursor } = await listInventoryHistory({ businessId: "business-default",  limit: 3, cursor });
     seen.push(...items.map((i) => `${i.source}:${i.id}`));
     cursor = nextCursor;
     pages++;
@@ -337,14 +337,14 @@ await ok("cursor pagination: walk sampai habis TANPA dobel & TANPA skip", async 
   } while (cursor);
   assert.equal(new Set(seen).size, seen.length, "tidak ada dobel");
   // Bandingkan dengan satu halaman besar (set sama).
-  const all = await listInventoryHistory({ limit: 100 });
+  const all = await listInventoryHistory({ businessId: "business-default",  limit: 100 });
   const allKeys = new Set(all.items.map((i) => `${i.source}:${i.id}`));
   assert.equal(seen.length, allKeys.size, "jumlah sama dgn ambil semua");
   for (const k of seen) assert.ok(allKeys.has(k), `${k} hilang dari hasil full`);
 });
 
 await ok("counts agregasi DB-level", async () => {
-  const counts = await getInventoryHistoryCounts();
+  const counts = await getInventoryHistoryCounts("business-default");
   assert.ok((counts.OPNAME ?? 0) >= 2);
   assert.ok((counts.OVERSELL ?? 0) >= 1);
   assert.ok((counts.MANUAL ?? 0) >= 1);

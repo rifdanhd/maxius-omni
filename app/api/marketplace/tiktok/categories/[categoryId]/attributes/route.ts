@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { prisma } from "@/lib/db/prisma";
 import {
   getCategoryAttributes,
@@ -8,7 +8,7 @@ import {
 
 // GET /api/marketplace/tiktok/categories/[categoryId]/attributes?accountId=...
 //   Skema atribut (wajib & opsional) untuk kategori TikTok terpilih.
-export const GET = withAuth(async (req: NextRequest, ctx) => {
+export const GET = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const categoryId = ctx?.params ? (await ctx.params).categoryId ?? null : null;
   if (!categoryId) return NextResponse.json({ error: "Category id hilang." }, { status: 400 });
 
@@ -17,9 +17,10 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
   let acc = accountId
     ? await prisma.platformAccount.findUnique({ where: { id: accountId } })
     : null;
+  if (acc && acc.businessId !== req.businessId) acc = null;
   if (!acc?.accessToken) {
     acc = await prisma.platformAccount.findFirst({
-      where: { platform: "TIKTOK_SHOP", accessToken: { not: null } },
+      where: { platform: "TIKTOK_SHOP", accessToken: { not: null }, businessId: req.businessId },
     });
   }
   if (!acc?.accessToken) {

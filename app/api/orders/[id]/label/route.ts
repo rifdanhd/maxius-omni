@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 
 /**
@@ -12,14 +13,14 @@ import { getShippingDocument } from "@/lib/integrations/tiktokShop";
  * Mengembalikan doc_url (PDF/PNG, valid 24 jam) + tracking_number paket.
  */
 export const GET = withAuth(
-  async (_req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
+  async (req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
     const { id } = (await ctx?.params) ?? {};
 
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
         account: {
-          select: { accessToken: true, shopCipher: true },
+          select: { accessToken: true, shopCipher: true, businessId: true },
         },
         shipments: {
           select: { externalId: true, trackingNo: true, status: true },
@@ -28,6 +29,11 @@ export const GET = withAuth(
     });
 
     if (!order) {
+      return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+    }
+    try {
+      assertSameBrand(order.account.businessId, req.businessId);
+    } catch {
       return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
     }
 

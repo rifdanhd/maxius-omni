@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertAccountMappingsInBrand } from "@/lib/services/business-scope.service";
 import { createPromotion } from "@/lib/services/promotion-write.service-create";
 
 /**
@@ -29,6 +30,12 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
       { error: "accountId dan mappingIds wajib diisi." },
       { status: 400 }
     );
+  }
+
+  try {
+    await assertAccountMappingsInBrand(body.accountId, body.mappingIds, req.businessId);
+  } catch {
+    return NextResponse.json({ error: "Toko / mapping tidak ditemukan di brand ini." }, { status: 404 });
   }
 
   const result = await createPromotion({

@@ -72,5 +72,15 @@ export async function GET(req: NextRequest) {
       maxAge: 1800,
     });
   }
+  const businessId = searchParams.get("businessId")?.trim();
+  if (businessId) {
+    res.cookies.set("maxius_oauth_brand", businessId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 1800,
+    });
+  }
   return res;
 }

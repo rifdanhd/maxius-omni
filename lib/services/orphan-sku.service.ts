@@ -21,6 +21,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 export type OrphanSku = {
   channelSku: string;
@@ -44,10 +45,14 @@ export type OrphanSku = {
  * Hanya order non-CANCELLED yang dihitung — order batal tidak menambah kebutuhan
  * mapping (analytics juga mengecualikan CANCELLED).
  */
-export async function findOrphanSkus(): Promise<OrphanSku[]> {
+export async function findOrphanSkus(businessId: string): Promise<OrphanSku[]> {
   const rows = await prisma.orderItem.groupBy({
     by: ["channelSku"],
-    where: { variantId: null, channelSku: { not: "" }, order: { status: { not: "CANCELLED" } } },
+    where: {
+      variantId: null,
+      channelSku: { not: "" },
+      order: { status: { not: "CANCELLED" }, ...businessWhere.order(businessId) },
+    },
     _sum: { qty: true },
     _count: { orderId: true },
     _min: { id: true },
@@ -60,7 +65,11 @@ export async function findOrphanSkus(): Promise<OrphanSku[]> {
   const results = await Promise.all(
     rows.map(async (r) => {
       const sample = await prisma.orderItem.findFirst({
-        where: { channelSku: r.channelSku, variantId: null, order: { status: { not: "CANCELLED" } } },
+        where: {
+          channelSku: r.channelSku,
+          variantId: null,
+          order: { status: { not: "CANCELLED" }, ...businessWhere.order(businessId) },
+        },
         orderBy: [{ order: { createTime: "desc" } }, { id: "desc" }],
         select: {
           productName: true,
@@ -162,6 +171,7 @@ export type MapToNewMasterResult = {
  * reason INIT supaya ada titik nol audit.
  */
 export async function mapOrphanToNewMaster(params: {
+  businessId: string;
   accountId: string;
   channelSku: string;
   newProductName?: string;
@@ -190,6 +200,7 @@ export async function mapOrphanToNewMaster(params: {
     const product = await tx.masterProduct.create({
       data: {
         name: params.newProductName?.trim() || params.channelSku,
+        businessId: params.businessId,
         ...(params.category?.trim() ? { category: params.category.trim() } : {}),
         threshold: settings.lowStockDefaultThreshold,
         variants: {

@@ -75,13 +75,13 @@ await mkJob({ channelSku: "CH-OK", newSellable: 100, status: "SUCCESS", retryCou
 
 console.log("=== PHASE B.1: Mismatch View ===");
 await ok("default mismatch → FAILED + PENDING retry>=1 saja", async () => {
-  const { rows } = await listMismatchSyncJobs({});
+  const { rows } = await listMismatchSyncJobs({ businessId: "business-default", });
   const skus = rows.map((r) => r.channelSku).sort();
   assert.deepEqual(skus, ["CH-FAIL", "CH-RETRY"]);
 });
 
 await ok("join display lengkap + centralStock = effectiveStock(100,10) = 90", async () => {
-  const { rows } = await listMismatchSyncJobs({ status: "FAILED" });
+  const { rows } = await listMismatchSyncJobs({ businessId: "business-default",  status: "FAILED" });
   assert.equal(rows.length, 1);
   const r = rows[0];
   assert.equal(r.variant.productName, "Kaos Kaki Test");
@@ -96,31 +96,31 @@ await ok("join display lengkap + centralStock = effectiveStock(100,10) = 90", as
 });
 
 await ok("filter eksplisit per status", async () => {
-  const failed = await listMismatchSyncJobs({ status: "FAILED" });
+  const failed = await listMismatchSyncJobs({ businessId: "business-default",  status: "FAILED" });
   assert.equal(failed.rows.length, 1);
-  const pending = await listMismatchSyncJobs({ status: "PENDING" });
+  const pending = await listMismatchSyncJobs({ businessId: "business-default",  status: "PENDING" });
   assert.equal(pending.rows.map((r) => r.channelSku).sort().join(","), "CH-FRESH,CH-RETRY");
-  const success = await listMismatchSyncJobs({ status: "SUCCESS" });
+  const success = await listMismatchSyncJobs({ businessId: "business-default",  status: "SUCCESS" });
   assert.equal(success.rows.length, 1);
-  const all = await listMismatchSyncJobs({ status: "all" });
+  const all = await listMismatchSyncJobs({ businessId: "business-default",  status: "all" });
   assert.equal(all.rows.length, 4);
 });
 
 await ok("search q: SKU produk & channelSku", async () => {
-  const bySku = await listMismatchSyncJobs({ status: "all", q: "TST-S-H" });
+  const bySku = await listMismatchSyncJobs({ businessId: "business-default",  status: "all", q: "TST-S-H" });
   assert.equal(bySku.rows.length, 4);
-  const byChannel = await listMismatchSyncJobs({ status: "all", q: "CH-FAIL" });
+  const byChannel = await listMismatchSyncJobs({ businessId: "business-default",  status: "all", q: "CH-FAIL" });
   assert.equal(byChannel.rows.length, 1);
   assert.equal(byChannel.rows[0].channelSku, "CH-FAIL");
-  const miss = await listMismatchSyncJobs({ status: "all", q: "TIDAK-ADA-XYZ" });
+  const miss = await listMismatchSyncJobs({ businessId: "business-default",  status: "all", q: "TIDAK-ADA-XYZ" });
   assert.equal(miss.rows.length, 0);
 });
 
 await ok("cursor pagination stabil (limit 2 → 2+2, tanpa dobel/hilang)", async () => {
-  const p1 = await listMismatchSyncJobs({ status: "all", limit: 2 });
+  const p1 = await listMismatchSyncJobs({ businessId: "business-default",  status: "all", limit: 2 });
   assert.equal(p1.rows.length, 2);
   assert.ok(p1.nextCursor);
-  const p2 = await listMismatchSyncJobs({ status: "all", limit: 2, cursor: p1.nextCursor });
+  const p2 = await listMismatchSyncJobs({ businessId: "business-default",  status: "all", limit: 2, cursor: p1.nextCursor });
   assert.equal(p2.rows.length, 2);
   const ids = [...p1.rows, ...p2.rows].map((r) => r.id);
   assert.equal(new Set(ids).size, 4);

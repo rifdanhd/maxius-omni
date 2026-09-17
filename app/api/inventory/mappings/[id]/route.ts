@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
 
 /**
@@ -19,13 +20,29 @@ export const PATCH = withAuth(
       return NextResponse.json({ error: "Varian target wajib diisi." }, { status: 400 });
     }
 
-    const mapping = await prisma.productMapping.findUnique({ where: { id } });
+    const mapping = await prisma.productMapping.findUnique({
+      where: { id },
+      include: { account: { select: { businessId: true } } },
+    });
     if (!mapping) {
       return NextResponse.json({ error: "Mapping tidak ditemukan." }, { status: 404 });
     }
+    try {
+      assertSameBrand(mapping.account.businessId, req.businessId);
+    } catch {
+      return NextResponse.json({ error: "Mapping tidak ditemukan." }, { status: 404 });
+    }
 
-    const variant = await prisma.productVariant.findUnique({ where: { id: variantId } });
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+      include: { masterProduct: { select: { businessId: true } } },
+    });
     if (!variant) {
+      return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
+    }
+    try {
+      assertSameBrand(variant.masterProduct.businessId, req.businessId);
+    } catch {
       return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
     }
 
@@ -55,12 +72,20 @@ export const PATCH = withAuth(
 );
 
 export const DELETE = withAuth(
-  async (_req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
+  async (req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
     const { id } = (await ctx?.params) ?? {};
     if (!id) return NextResponse.json({ error: "ID mapping wajib." }, { status: 400 });
 
-    const mapping = await prisma.productMapping.findUnique({ where: { id } });
+    const mapping = await prisma.productMapping.findUnique({
+      where: { id },
+      include: { account: { select: { businessId: true } } },
+    });
     if (!mapping) {
+      return NextResponse.json({ error: "Mapping tidak ditemukan." }, { status: 404 });
+    }
+    try {
+      assertSameBrand(mapping.account.businessId, req.businessId);
+    } catch {
       return NextResponse.json({ error: "Mapping tidak ditemukan." }, { status: 404 });
     }
 

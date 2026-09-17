@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import {
   setListingActive,
   syncTikTokMapping,
@@ -21,7 +23,7 @@ async function getMappingId(
   return ctx?.params ? (await ctx.params).mappingId ?? null : null;
 }
 
-export const PATCH = withAuth(async (req: NextRequest, ctx) => {
+export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const mappingId = await getMappingId(ctx);
   if (!mappingId) return NextResponse.json({ error: "Mapping id hilang." }, { status: 400 });
 
@@ -30,19 +32,19 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     return NextResponse.json({ error: "Body harus memuat field aktif: boolean." }, { status: 400 });
   }
 
-  const result = await setListingActive(mappingId, body.active!);
+  const result = await setListingActive(mappingId, body.active!, req.businessId);
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.reason }, { status: 400 });
   }
   return NextResponse.json({ ok: true });
 });
 
-export const POST = withAuth(async (_req: NextRequest, ctx) => {
+export const POST = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const mappingId = await getMappingId(ctx);
   if (!mappingId) return NextResponse.json({ error: "Mapping id hilang." }, { status: 400 });
 
   try {
-    const result = await syncTikTokMapping(mappingId);
+    const result = await syncTikTokMapping(mappingId, req.businessId);
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.reason }, { status: 400 });
     }
@@ -53,13 +55,26 @@ export const POST = withAuth(async (_req: NextRequest, ctx) => {
   }
 });
 
-export const PUT = withAuth(async (req: NextRequest, ctx) => {
+export const PUT = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const mappingId = await getMappingId(ctx);
   if (!mappingId) return NextResponse.json({ error: "Mapping id hilang." }, { status: 400 });
 
   const body = (await req.json().catch(() => null)) as SubmitEditInput | null;
   if (!body || typeof body !== "object") {
     return NextResponse.json({ ok: false, error: "Body tidak valid." }, { status: 400 });
+  }
+
+  const mappingBrand = await prisma.productMapping.findUnique({
+    where: { id: mappingId },
+    select: { account: { select: { businessId: true } } },
+  });
+  if (!mappingBrand) {
+    return NextResponse.json({ ok: false, error: "Mapping tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertSameBrand(mappingBrand.account.businessId, req.businessId);
+  } catch {
+    return NextResponse.json({ ok: false, error: "Mapping tidak ditemukan." }, { status: 404 });
   }
 
   const result = await submitTikTokEdit(mappingId, body);

@@ -115,6 +115,7 @@ export const GET = withAuth(async (req) => {
   const nowIso = new Date().toISOString();
 
   const search = q ? `%${escapeLike(q)}%` : null;
+  const businessId = req.businessId;
 
   const keyset = cursor
     ? Prisma.sql`AND (mp.name, pv.sku, pv.id) > (${cursor.name}, ${cursor.sku}, ${cursor.id})`
@@ -152,20 +153,24 @@ export const GET = withAuth(async (req) => {
       FROM "ProductMapping" pm
       JOIN "PromotionActivityItem" pai ON pai."productMappingId" = pm.id
       JOIN "PromotionActivity" pa ON pa.id = pai."activityId"
+      JOIN "PlatformAccount" pa_acc ON pa_acc.id = pa."accountId"
       WHERE pa.status NOT IN (${Prisma.join(PROMO_TERMINAL_STATUSES)})
         AND pa."startsAt" <= ${nowIso}
         AND pa."endsAt" >= ${nowIso}
+        AND pa_acc."businessId" = ${businessId}
       GROUP BY pm."variantId"
     ) pr ON pr.vid = pv.id
     LEFT JOIN (
       SELECT oi."variantId" AS vid, SUM(oi.qty) AS "orderedQty"
       FROM "OrderItem" oi
       JOIN "Order" o ON o.id = oi."orderId"
+      JOIN "PlatformAccount" oa ON oa.id = o."accountId"
       WHERE oi."variantId" IS NOT NULL
         AND o.status NOT IN (${Prisma.join(DEDUCTED_OR_TERMINAL)})
+        AND oa."businessId" = ${businessId}
       GROUP BY oi."variantId"
     ) ord ON ord.vid = pv.id
-    WHERE 1 = 1
+    WHERE mp."businessId" = ${businessId}
     ${searchFilter}
     ${tabFilter}
     ${keyset}
@@ -184,10 +189,13 @@ export const GET = withAuth(async (req) => {
       SUM(CASE WHEN (pv.stock - pv."safetyStock") <= 0 THEN 1 ELSE 0 END) AS "empty",
       SUM(CASE WHEN (pv.stock - pv."safetyStock") > 0 AND ${lowStockSql("pv", "mp")}
         THEN 1 ELSE 0 END) AS "low",
-      (SELECT COUNT(*) FROM "SyncLog"
-        WHERE kind = 'central_stock_deduct' AND "handledAt" IS NULL) AS "oversells"
+      (SELECT COUNT(*) FROM "SyncLog" sl
+        JOIN "PlatformAccount" sl_acc ON sl_acc.id = sl."accountId"
+        WHERE sl.kind = 'central_stock_deduct' AND sl."handledAt" IS NULL
+          AND sl_acc."businessId" = ${businessId}) AS "oversells"
     FROM "ProductVariant" pv
     JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
+    WHERE mp."businessId" = ${businessId}
   `;
 
   const c = counts[0] ?? { all: 0, empty: 0, low: 0, oversells: 0 };

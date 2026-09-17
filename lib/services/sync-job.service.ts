@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { syncStockToMarketplaces } from "@/lib/services/sync.service";
 import { isDeduplicationFailure } from "@/lib/services/stock-guard.policy";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 /** Error internal: hasil push aktual channel = gagal (bukan exception dispatch). */
 class SyncPushFailedError extends Error {
@@ -204,6 +205,8 @@ export async function processDueSyncJobs(opts?: {
   pusher?: SyncJobPusher;
   now?: Date;
   limit?: number;
+  /** Bila diisi, hanya job milik akun brand ini yang diproses (worker global: kosong = semua brand). */
+  businessId?: string;
 }): Promise<{ processed: number; succeeded: number; pendingRetry: number; failed: number }> {
   const now = opts?.now ?? new Date();
   const pusher = opts?.pusher ?? defaultPusher;
@@ -214,6 +217,7 @@ export async function processDueSyncJobs(opts?: {
       status: { in: [SYNC_JOB_STATUSES.PENDING, SYNC_JOB_STATUSES.FAILED] },
       retryCount: { lt: SYNC_JOB_MAX_RETRIES },
       OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
+      ...(opts?.businessId ? businessWhere.syncJob(opts.businessId) : {}),
     },
     orderBy: { createdAt: "asc" },
     take: opts?.limit ?? 50,
@@ -264,13 +268,20 @@ export class SyncJobRetryError extends Error {
  */
 export async function retrySingleSyncJob(
   jobId: string,
-  opts?: { pusher?: SyncJobPusher; now?: Date }
+  opts?: { pusher?: SyncJobPusher; now?: Date; businessId?: string }
 ): Promise<{ id: string; status: string; retryCount: number; lastError: string | null }> {
   const now = opts?.now ?? new Date();
   const pusher = opts?.pusher ?? defaultPusher;
 
-  const job = await prisma.syncJob.findUnique({ where: { id: jobId } });
+  const job = await prisma.syncJob.findUnique({
+    where: { id: jobId },
+    include: { account: { select: { businessId: true } } },
+  });
   if (!job) {
+    throw new SyncJobRetryError("NOT_FOUND", "SyncJob tidak ditemukan.");
+  }
+  // Verifikasi brand akun: job milik brand lain → 404 yang sama (anti tebak ID).
+  if (opts?.businessId && job.account.businessId !== opts.businessId) {
     throw new SyncJobRetryError("NOT_FOUND", "SyncJob tidak ditemukan.");
   }
   if (job.status === SYNC_JOB_STATUSES.SUCCESS) {

@@ -1,21 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { prisma } from "@/lib/db/prisma";
 import { uploadProductImage } from "@/lib/integrations/tiktokShop";
 
 // POST /api/marketplace/tiktok/images/upload (multipart: "file", ops. "accountId", "useCase")
 //   Upload gambar ke Tokopedia | Shop (MainImage dsb). Semua gambar produk TikTok
 //   WAJIB lewat API ini, dialihkan di sini sebagai proksi.
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   const sp = req.nextUrl.searchParams;
   const accountId = sp.get("accountId") ?? undefined;
 
   let acc = accountId
     ? await prisma.platformAccount.findUnique({ where: { id: accountId } })
     : null;
+  if (acc && acc.businessId !== req.businessId) acc = null;
   if (!acc?.accessToken) {
     acc = await prisma.platformAccount.findFirst({
-      where: { platform: "TIKTOK_SHOP", accessToken: { not: null } },
+      where: { platform: "TIKTOK_SHOP", accessToken: { not: null }, businessId: req.businessId },
     });
   }
   if (!acc?.accessToken) {

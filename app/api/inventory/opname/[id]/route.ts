@@ -16,6 +16,7 @@ export const PATCH = withAuth(async (req, ctx) => {
   const result = await recordOpnameCounts({
     opnameId: id,
     counts: Array.isArray(body?.counts) ? body.counts : [],
+    businessId: req.businessId,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.reason ?? "Gagal." }, { status: 400 });
@@ -34,7 +35,7 @@ export const POST = withAuth(async (req, ctx) => {
   const action = body?.action;
 
   if (action === "finalize") {
-    const result = await finalizeStockOpname({ opnameId: id, userId: req.user.id });
+    const result = await finalizeStockOpname({ opnameId: id, userId: req.user.id, businessId: req.businessId });
     if (!result.ok) {
       return NextResponse.json({ error: result.reason ?? "Gagal." }, { status: 400 });
     }
@@ -42,7 +43,7 @@ export const POST = withAuth(async (req, ctx) => {
   }
 
   if (action === "cancel") {
-    const result = await cancelStockOpname({ opnameId: id, userId: req.user.id });
+    const result = await cancelStockOpname({ opnameId: id, userId: req.user.id, businessId: req.businessId });
     if (!result.ok) {
       return NextResponse.json({ error: result.reason ?? "Gagal." }, { status: 400 });
     }

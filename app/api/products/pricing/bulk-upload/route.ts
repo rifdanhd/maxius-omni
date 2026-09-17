@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   processBulkPrice,
   BulkPriceRow,
@@ -16,7 +16,7 @@ import {
 //                         menghapus override (dengan store + header harga kosong).
 //   - store      (opsional) Label toko utk override per marketplace.
 //   - channel_sku (opsional) SKU marketplace utk verifikasi mapping.
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
   const body = (await req.json().catch(() => ({}))) as { csv?: string };
   if (!body.csv || typeof body.csv !== "string" || !body.csv.trim()) {
     return NextResponse.json(
@@ -75,7 +75,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     );
   }
 
-  const result = await processBulkPrice(rows);
+  const result = await processBulkPrice(rows, req.businessId);
   return NextResponse.json(result, { status: result.ok ? 200 : 207 });
 });
 

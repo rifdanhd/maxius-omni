@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   getShopeeAccounts,
   listShopeeProducts,
 } from "@/lib/services/marketplace-shopee.service";
 
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const sp = req.nextUrl.searchParams;
   const accountIds = sp
     .get("accountIds")
@@ -15,12 +15,13 @@ export const GET = withAuth(async (req: NextRequest) => {
 
   const [result, accounts] = await Promise.all([
     listShopeeProducts({
+      businessId: req.businessId,
       search: sp.get("search") ?? undefined,
       accountIds,
       page: Number(sp.get("page") ?? 1),
       pageSize: Number(sp.get("pageSize") ?? 20),
     }),
-    getShopeeAccounts(),
+    getShopeeAccounts(req.businessId),
   ]);
 
   return NextResponse.json({ ...result, accounts });

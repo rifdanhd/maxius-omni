@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 
 /**
  * GET /api/orders/[id]/tracking — timeline tracking tersimpan untuk modal Lacak.
@@ -11,10 +12,23 @@ import { withAuth } from "@/lib/utils/api";
  * fallback ke timeline simulasi lama.
  */
 export const GET = withAuth(
-  async (_req, ctx?: { params: Promise<{ id?: string }> }) => {
+  async (req, ctx?: { params: Promise<{ id?: string }> }) => {
     const { id } = (await ctx?.params) ?? {};
     if (!id) {
       return NextResponse.json({ error: "Order id wajib diisi." }, { status: 400 });
+    }
+
+    const orderBrand = await prisma.order.findUnique({
+      where: { id },
+      select: { account: { select: { businessId: true } } },
+    });
+    if (!orderBrand) {
+      return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+    }
+    try {
+      assertSameBrand(orderBrand.account.businessId, req.businessId);
+    } catch {
+      return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
     }
 
     const events = await prisma.shipmentTrackingEvent.findMany({

@@ -33,7 +33,7 @@ export type StockAlert = StockAlertRow & {
  * threshold produk induk). Query via $queryRaw (fragmen lowStockSql) supaya
  * perbandingan arithmetic di DB — aman untuk puluhan ribu SKU.
  */
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   // Gate notifikasi stok menipis (Pengaturan Inventori). Channel EMAIL belum
   // ada di sistem (tidak ada provider) — bell in-app ini satu-satunya channel;
   // kalau dimatikan, endpoint tetap ada tapi tidak mengeluarkan alert.
@@ -42,7 +42,8 @@ export const GET = withAuth(async () => {
     return NextResponse.json({ count: 0, alerts: [] });
   }
 
-  const data = await cached("stock-alerts", CACHE_TTL_MS, async () => {
+  const businessId = req.businessId;
+  const data = await cached(`stock-alerts:${businessId}`, CACHE_TTL_MS, async () => {
     const rows = await prisma.$queryRaw<StockAlertRow[]>`
       SELECT
         pv.id            AS variantId,
@@ -55,7 +56,7 @@ export const GET = withAuth(async () => {
         pv."minStock"    AS "minStock"
       FROM "ProductVariant" pv
       JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
-      WHERE ${lowStockSql("pv", "mp")}
+      WHERE mp."businessId" = ${businessId} AND ${lowStockSql("pv", "mp")}
       ORDER BY (pv.stock - pv."safetyStock") ASC, mp.name ASC
     `;
 

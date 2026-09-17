@@ -187,7 +187,7 @@ const { getAnalyticsAggregated } = await import("@/lib/services/analytics-agg.se
 
 /* ─────────────── Benchmark ─────────────── */
 await analyticsOld(); // warm-up (JIT + buffer cache)
-await getAnalyticsAggregated();
+await getAnalyticsAggregated("business-default");
 
 const N = 5;
 const oldTimes: number[] = [];
@@ -211,7 +211,7 @@ for (let i = 0; i < N; i++) {
   global.gc?.();
   const m2 = process.memoryUsage().heapUsed;
   const t2 = performance.now();
-  const rNew = await getAnalyticsAggregated();
+  const rNew = await getAnalyticsAggregated("business-default");
   const t3 = performance.now();
   global.gc?.();
   const m3 = process.memoryUsage().heapUsed;

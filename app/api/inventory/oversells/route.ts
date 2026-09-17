@@ -34,9 +34,9 @@ function parseAttempts(payload: string | null): DeductAttempt[] {
  * Fresh tanpa cache (badge real-time); satu baris per entri SyncLog dengan
  * agregat SKU + total qty gagal dari payload deductionsAttempted.
  */
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req) => {
   const logs = await prisma.syncLog.findMany({
-    where: { kind: "central_stock_deduct" },
+    where: { kind: "central_stock_deduct", account: { businessId: req.businessId } },
     include: { account: { select: { label: true, platform: true } } },
     orderBy: { createdAt: "desc" },
     take: 200,
@@ -53,7 +53,7 @@ export const GET = withAuth(async () => {
   }
 
   const variants = await prisma.productVariant.findMany({
-    where: { id: { in: [...variantIds] } },
+    where: { id: { in: [...variantIds] }, masterProduct: { businessId: req.businessId } },
     select: { id: true, sku: true, name: true, masterProduct: { select: { name: true } } },
   });
   const variantById = new Map(variants.map((v) => [v.id, v]));

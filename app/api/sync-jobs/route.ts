@@ -8,6 +8,7 @@ import { listMismatchSyncJobs } from "@/lib/services/sync-mismatch.service";
 export const GET = withAuth(async (req) => {
   const url = new URL(req.url);
   const result = await listMismatchSyncJobs({
+    businessId: req.businessId,
     status: url.searchParams.get("status"),
     q: url.searchParams.get("q"),
     limit: Number(url.searchParams.get("limit") ?? 50),

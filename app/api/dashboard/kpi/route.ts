@@ -8,7 +8,9 @@ const CACHE_TTL_MS = 60_000;
 // GET /api/dashboard/kpi — KPI operasional read-only (PHASE C.1):
 // Central Stock, Stok Kritis, Stock Mismatch, Sync Error, Store Health.
 // Melengkapi /api/analytics + /api/summary (tidak mengubah keduanya).
-export const GET = withAuth(async () => {
-  const data = await cached("dashboard-kpi", CACHE_TTL_MS, getDashboardKpi);
+export const GET = withAuth(async (req) => {
+  const data = await cached(`dashboard-kpi:${req.businessId}`, CACHE_TTL_MS, () =>
+    getDashboardKpi(req.businessId)
+  );
   return NextResponse.json(data);
 });

@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 /**
  * FITUR 2 — Riwayat Inventori: SATU tampilan untuk setiap pergerakan stok.
@@ -50,6 +51,7 @@ function endOfDay(d: Date): Date {
  * (pelajaran TUGAS 2).
  */
 export async function listInventoryHistory(params: {
+  businessId: string;
   cursor?: string | null;
   limit?: number;
   from?: string | null;
@@ -70,7 +72,12 @@ export async function listInventoryHistory(params: {
   if (q) {
     const variants = await prisma.productVariant.findMany({
       where: {
-        OR: [{ sku: { contains: q } }, { name: { contains: q } }, { masterProduct: { is: { name: { contains: q } } } }],
+        AND: [
+          businessWhere.variant(params.businessId),
+          {
+            OR: [{ sku: { contains: q } }, { name: { contains: q } }, { masterProduct: { is: { name: { contains: q } } } }],
+          },
+        ],
       },
       select: { id: true },
       take: 200,
@@ -114,6 +121,7 @@ export async function listInventoryHistory(params: {
 
   const ledgerWhere: Prisma.StockLedgerWhereInput = {
     AND: [
+      businessWhere.ledger(params.businessId),
       feedWhere(prevL),
       ...(from || to ? [{ createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }] : []),
       ...(variantIds ? [{ variantId: { in: variantIds } }] : []),
@@ -123,6 +131,7 @@ export async function listInventoryHistory(params: {
     kind: "central_stock_deduct",
     status: "skipped",
     AND: [
+      businessWhere.syncLog(params.businessId),
       feedWhere(prevS),
       ...(from || to ? [{ createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }] : []),
     ],
@@ -169,7 +178,7 @@ export async function listInventoryHistory(params: {
   ].slice(0, 100);
   const oversellVariants = oversellVariantIds.length
     ? await prisma.productVariant.findMany({
-        where: { id: { in: oversellVariantIds } },
+        where: { id: { in: oversellVariantIds }, ...businessWhere.variant(params.businessId) },
         select: { id: true, sku: true, name: true, masterProduct: { select: { name: true } } },
       })
     : [];
@@ -319,13 +328,14 @@ function parseOversellPayload(payload: string | null): {
 }
 
 /** Agregasi ringan utk filter chips (DB-level, bukan tarik semua baris). */
-export async function getInventoryHistoryCounts(): Promise<Record<string, number>> {
+export async function getInventoryHistoryCounts(businessId: string): Promise<Record<string, number>> {
   const [byKind, oversell] = await Promise.all([
     prisma.stockLedger.groupBy({
       by: ["reason"],
+      where: businessWhere.ledger(businessId),
       _count: { _all: true },
     }),
-    prisma.syncLog.count({ where: { kind: "central_stock_deduct", status: "skipped" } }),
+    prisma.syncLog.count({ where: { kind: "central_stock_deduct", status: "skipped", ...businessWhere.syncLog(businessId) } }),
   ]);
   const counts: Record<string, number> = { OVERSELL: oversell };
   for (const g of byKind) {

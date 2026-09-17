@@ -22,6 +22,7 @@ export type GallerySort =
   | "images_desc";
 
 export interface GalleryParams {
+  businessId: string;
   search?: string;
   sort?: GallerySort;
   category?: string;
@@ -55,12 +56,12 @@ export interface ImageRow {
 const requiredImages = (variantCount: number) => Math.max(1, variantCount);
 
 export async function listGallery(
-  params: GalleryParams = {}
+  params: GalleryParams
 ): Promise<{ rows: GalleryRow[]; total: number; page: number; pageSize: number }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
 
-  const where: Prisma.MasterProductWhereInput = {};
+  const where: Prisma.MasterProductWhereInput = { businessId: params.businessId };
   const search = params.search?.trim();
   if (search) {
     where.OR = [
@@ -129,7 +130,15 @@ export async function listGallery(
  * Bila galeri masih kosong tapi MasterProduct.imageUrl terisi (hasil backfill
  * dari order), gambar tersebut di-seed otomatis sebagai cover agar tampil.
  */
-export async function listProductImages(productId: string): Promise<ImageRow[]> {
+export async function listProductImages(
+  productId: string,
+  businessId: string
+): Promise<ImageRow[]> {
+  const productBrand = await prisma.masterProduct.findUnique({
+    where: { id: productId },
+    select: { businessId: true },
+  });
+  if (!productBrand || productBrand.businessId !== businessId) return [];
   const existing = await prisma.productImage.findMany({
     where: { masterProductId: productId },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -184,13 +193,16 @@ export function normalizeImageInputs(body: unknown): { url: string; error?: stri
 
 export async function addImages(
   productId: string,
-  entries: { url: string }[]
+  entries: { url: string }[],
+  businessId: string
 ): Promise<AddImagesResult> {
   const product = await prisma.masterProduct.findUnique({
     where: { id: productId },
-    select: { id: true },
+    select: { id: true, businessId: true },
   });
-  if (!product) return { ok: false, added: 0, reasons: [{ index: 0, reason: "Produk tidak ditemukan." }] };
+  if (!product || product.businessId !== businessId) {
+    return { ok: false, added: 0, reasons: [{ index: 0, reason: "Produk tidak ditemukan." }] };
+  }
 
   const nextOrder = await prisma.productImage.aggregate({
     where: { masterProductId: productId },
@@ -251,10 +263,15 @@ async function promoteCover(productId: string, imageId: string) {
 
 export async function deleteImage(
   productId: string,
-  imageId: string
+  imageId: string,
+  businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
   const img = await prisma.productImage.findFirst({
-    where: { id: imageId, masterProductId: productId },
+    where: {
+      id: imageId,
+      masterProductId: productId,
+      masterProduct: { businessId },
+    },
   });
   if (!img) return { ok: false, reason: "Gambar tidak ditemukan pada produk ini." };
 
@@ -299,10 +316,15 @@ export type UpdateImageAction = {
 export async function updateImage(
   productId: string,
   imageId: string,
-  action: UpdateImageAction
+  action: UpdateImageAction,
+  businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
   const img = await prisma.productImage.findFirst({
-    where: { id: imageId, masterProductId: productId },
+    where: {
+      id: imageId,
+      masterProductId: productId,
+      masterProduct: { businessId },
+    },
   });
   if (!img) return { ok: false, reason: "Gambar tidak ditemukan pada produk ini." };
 
@@ -344,8 +366,9 @@ export async function updateImage(
 }
 
 /** Riwayat aktivitas gambar sederhana (dari createdAt/updatedAt existing). */
-export async function listImageHistory(limit = 100) {
+export async function listImageHistory(limit = 100, businessId?: string) {
   const rows = await prisma.productImage.findMany({
+    where: businessId ? { masterProduct: { businessId } } : undefined,
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     take: limit,
     select: {

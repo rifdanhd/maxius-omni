@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { withAuth } from "@/lib/utils/api";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 
 // PATCH /api/products/[productId] — edit sebagian produk master.
 // Body (minimal satu field):
@@ -8,7 +9,7 @@ import { withAuth } from "@/lib/utils/api";
 //   { isActive: boolean } — nonaktifkan (soft delete, sembunyi dari list
 //     default) / aktifkan kembali. TIDAK menghapus data apa pun: varian,
 //     mapping, ledger, dan order tetap utuh.
-export const PATCH = withAuth(async (req: NextRequest, ctx) => {
+export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
   const productId = ctx?.params ? (await ctx.params).productId : null;
   if (!productId) {
     return NextResponse.json({ error: "Product id hilang." }, { status: 400 });
@@ -47,6 +48,11 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 
   const product = await prisma.masterProduct.findUnique({ where: { id: productId } });
   if (!product) {
+    return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertSameBrand(product.businessId, req.businessId);
+  } catch {
     return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
   }
 

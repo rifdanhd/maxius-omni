@@ -61,6 +61,7 @@ export const POST = withAuth(async (req) => {
     where: {
       id: { in: orderIds.map(String) },
       status: { in: ["AWAITING_SHIPMENT", "AWAITING_COLLECTION"] },
+      account: { businessId: req.businessId },
     },
     include: {
       account: { select: { id: true, accessToken: true, shopCipher: true } },

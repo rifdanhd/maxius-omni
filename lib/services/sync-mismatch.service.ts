@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { effectiveStock } from "@/lib/services/stock-level.policy";
 import { SYNC_JOB_MAX_RETRIES } from "@/lib/services/sync-job.service";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 /**
  * PHASE B.1 — Stock Mismatch View (read-only).
@@ -54,14 +55,14 @@ export type MismatchRow = {
  * Predikat SAMA dengan filter "mismatch" di atas (FAILED + PENDING retry>=1),
  * hanya COUNT tanpa rows — dipakai kartu "Stock Mismatch", bukan query baru.
  */
-export async function countMismatchSyncJobs(): Promise<{
+export async function countMismatchSyncJobs(businessId: string): Promise<{
   total: number;
   failed: number;
   pendingRetry: number;
 }> {
   const [failed, pendingRetry] = await Promise.all([
-    prisma.syncJob.count({ where: { status: "FAILED" } }),
-    prisma.syncJob.count({ where: { status: "PENDING", retryCount: { gte: 1 } } }),
+    prisma.syncJob.count({ where: { status: "FAILED", ...businessWhere.syncJob(businessId) } }),
+    prisma.syncJob.count({ where: { status: "PENDING", retryCount: { gte: 1 }, ...businessWhere.syncJob(businessId) } }),
   ]);
   return { total: failed + pendingRetry, failed, pendingRetry };
 }
@@ -83,6 +84,7 @@ function decodeCursor(cursor: string | null | undefined): { c: Date; i: string }
 }
 
 export async function listMismatchSyncJobs(params: {
+  businessId: string;
   status?: string | null;
   q?: string | null;
   limit?: number;
@@ -113,10 +115,15 @@ export async function listMismatchSyncJobs(params: {
   if (q) {
     const variants = await prisma.productVariant.findMany({
       where: {
-        OR: [
-          { sku: { contains: q } },
-          { name: { contains: q } },
-          { masterProduct: { is: { name: { contains: q } } } },
+        AND: [
+          businessWhere.variant(params.businessId),
+          {
+            OR: [
+              { sku: { contains: q } },
+              { name: { contains: q } },
+              { masterProduct: { is: { name: { contains: q } } } },
+            ],
+          },
         ],
       },
       select: { id: true },
@@ -143,7 +150,7 @@ export async function listMismatchSyncJobs(params: {
 
   const jobs = await prisma.syncJob.findMany({
     where: {
-      AND: [statusWhere, qWhere, cursorWhere],
+      AND: [businessWhere.syncJob(params.businessId), statusWhere, qWhere, cursorWhere],
     },
     include: {
       variant: {

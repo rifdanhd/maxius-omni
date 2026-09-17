@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 
 /**
  * POST /api/inventory/oversells/:id/handle — tandai entri oversell sudah
@@ -15,9 +16,19 @@ export const POST = withAuth(async (req: AuthenticatedRequest, ctx) => {
 
   const existing = await prisma.syncLog.findUnique({
     where: { id },
-    select: { id: true, kind: true, handledAt: true },
+    select: {
+      id: true,
+      kind: true,
+      handledAt: true,
+      account: { select: { businessId: true } },
+    },
   });
   if (!existing || existing.kind !== "central_stock_deduct") {
+    return NextResponse.json({ error: "Entri oversell tidak ditemukan." }, { status: 404 });
+  }
+  try {
+    assertSameBrand(existing.account.businessId, req.businessId);
+  } catch {
     return NextResponse.json({ error: "Entri oversell tidak ditemukan." }, { status: 404 });
   }
 

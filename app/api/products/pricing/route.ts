@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { listPricing, PricingSort } from "@/lib/services/pricing.service";
 
 // GET /api/products/pricing?search=&sort=&store=&category=&priceMin=&priceMax=&page=&pageSize=
 // Daftar produk+varian dengan harga default & harga per marketplace.
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const sp = req.nextUrl.searchParams;
 
   const sort = sp.get("sort") as PricingSort | null;
@@ -17,6 +17,7 @@ export const GET = withAuth(async (req: NextRequest) => {
   const pageSize = Number(sp.get("pageSize") ?? 20);
 
   const result = await listPricing({
+    businessId: req.businessId,
     search: sp.get("search") ?? undefined,
     sort: sort && validSorts.includes(sort) ? sort : undefined,
     storeIds: sp.get("store")?.split(",").filter(Boolean) || undefined,

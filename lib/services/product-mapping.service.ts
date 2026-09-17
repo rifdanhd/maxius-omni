@@ -1,4 +1,5 @@
 import { prisma as defaultPrisma } from "@/lib/db/prisma";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -69,10 +70,16 @@ export function deleteProductMapping(id: string, prisma: PrismaLike = defaultPri
 
 /**
  * getProductMappingsByAccount — ambil semua mapping milik satu akun.
+ * businessId (trailing, wajib): akun harus milik brand ini, mapping brand
+ * lain tidak akan terbaca walau accountId-nya ditebak.
  */
-export function getProductMappingsByAccount(accountId: string, prisma: PrismaLike = defaultPrisma) {
+export function getProductMappingsByAccount(
+  accountId: string,
+  prisma: PrismaLike = defaultPrisma,
+  businessId: string
+) {
   return prisma.productMapping.findMany({
-    where: { accountId },
+    where: { accountId, ...businessWhere.mapping(businessId) },
     include: { variant: { include: { masterProduct: true } } },
   });
 }

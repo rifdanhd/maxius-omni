@@ -64,6 +64,7 @@ export function parseReportRange(
 }
 
 export type ReportFilters = {
+  businessId: string;
   fromMs: number;
   toMs: number;
   platform?: string | null; // "SHOPEE" | "TIKTOK_SHOP" | null (semua)
@@ -74,6 +75,14 @@ function accountFilter(f: ReportFilters) {
   if (f.accountId) return Prisma.sql`AND o."accountId" = ${f.accountId}`;
   if (f.platform) return Prisma.sql`AND pa.platform = ${f.platform}`;
   return Prisma.sql``;
+}
+
+/** Scoping brand utk query mentah: pa = join outer, pa2 = join dalam CTE revenue. */
+function businessFilter(f: ReportFilters) {
+  return Prisma.sql`AND pa."businessId" = ${f.businessId}`;
+}
+function businessFilterCte(f: ReportFilters) {
+  return Prisma.sql`AND pa2."businessId" = ${f.businessId}`;
 }
 
 const num = (v: unknown): number =>
@@ -106,6 +115,7 @@ export async function getWinning(
 ): Promise<WinningRow[]> {
   const lim = Math.min(100, Math.max(1, Math.floor(limit) || 20));
   const acct = accountFilter(filters);
+  const biz = businessFilter(filters);
 
   if (groupBy === "product") {
     const rows = await prisma.$queryRaw<
@@ -130,6 +140,8 @@ export async function getWinning(
       WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
+        ${biz}
+        ${biz}
       GROUP BY mp.id
       ORDER BY qty DESC
       LIMIT ${lim}
@@ -177,6 +189,7 @@ export async function getWinning(
     WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
       AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
       ${acct}
+      ${biz}
     GROUP BY oi."variantId", oi."channelSku"
     ORDER BY qty DESC
     LIMIT ${lim}
@@ -223,6 +236,8 @@ export async function getOmset(
   granularity: "day" | "week" | "month" = "day"
 ): Promise<OmsetReport> {
   const acct = accountFilter(filters);
+  const biz = businessFilter(filters);
+  const bizCte = businessFilterCte(filters);
   const bucketExpr =
     granularity === "month"
       ? Prisma.sql`to_char(o."createTime" AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM')`
@@ -237,7 +252,9 @@ export async function getOmset(
                SUM(oi.qty) AS units
         FROM "OrderItem" oi
         JOIN "Order" o2 ON o2.id = oi."orderId"
+        JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
         WHERE o2."createTime" >= ${asTs(filters.fromMs)} AND o2."createTime" < ${asTs(filters.toMs)}
+          ${bizCte}
         GROUP BY oi."orderId"
       )
       SELECT ${bucketExpr} AS bucket,
@@ -250,6 +267,7 @@ export async function getOmset(
       WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
+        ${biz}
       GROUP BY bucket
       ORDER BY bucket
     `),
@@ -259,7 +277,9 @@ export async function getOmset(
                SUM(oi.qty) AS units
         FROM "OrderItem" oi
         JOIN "Order" o2 ON o2.id = oi."orderId"
+        JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
         WHERE o2."createTime" >= ${asTs(filters.fromMs)} AND o2."createTime" < ${asTs(filters.toMs)}
+          ${bizCte}
         GROUP BY oi."orderId"
       )
       SELECT pa.platform AS platform,
@@ -272,6 +292,7 @@ export async function getOmset(
       WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
+        ${biz}
       GROUP BY pa.platform
       ORDER BY revenue DESC
     `),
@@ -281,7 +302,9 @@ export async function getOmset(
                SUM(oi.qty) AS units
         FROM "OrderItem" oi
         JOIN "Order" o2 ON o2.id = oi."orderId"
+        JOIN "PlatformAccount" pa2 ON pa2.id = o2."accountId"
         WHERE o2."createTime" >= ${asTs(filters.fromMs)} AND o2."createTime" < ${asTs(filters.toMs)}
+          ${bizCte}
         GROUP BY oi."orderId"
       )
       SELECT o."accountId" AS accountId,
@@ -294,6 +317,7 @@ export async function getOmset(
       WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
+        ${biz}
       GROUP BY o."accountId"
       ORDER BY revenue DESC
     `),
@@ -310,6 +334,7 @@ export async function getOmset(
       WHERE o."createTime" >= ${asTs(filters.fromMs)} AND o."createTime" < ${asTs(filters.toMs)}
         AND o.status NOT IN (${Prisma.join(OMSET_EXCLUDE_STATUSES)})
         ${acct}
+        ${biz}
       GROUP BY mp.category
       ORDER BY revenue DESC
     `),
@@ -318,7 +343,7 @@ export async function getOmset(
   const accounts =
     byAccount.length > 0
       ? await prisma.platformAccount.findMany({
-          where: { id: { in: byAccount.map((r) => r.accountId) } },
+          where: { id: { in: byAccount.map((r) => r.accountId) }, businessId: filters.businessId },
           select: { id: true, label: true, platform: true },
         })
       : [];
