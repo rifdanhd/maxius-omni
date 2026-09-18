@@ -112,7 +112,9 @@ export const GET = withAuth(async (req) => {
     200
   );
   const cursor = parseCursor(url.searchParams.get("cursor"));
-  const nowIso = new Date().toISOString();
+  // Date (bukan ISO string): Prisma bind sbg timestamp — banding
+  // timestamp <= text gagal di Postgres (dulu lolos di SQLite).
+  const now = new Date();
 
   const search = q ? `%${escapeLike(q)}%` : null;
   const businessId = req.businessId;
@@ -134,13 +136,13 @@ export const GET = withAuth(async (req) => {
 
   const rows = await prisma.$queryRaw<RawRow[]>`
     SELECT
-      pv.id            AS variantId,
+      pv.id            AS "variantId",
       pv.sku           AS sku,
-      pv.name          AS variantName,
-      mp.id            AS productId,
-      mp.name          AS productName,
+      pv.name          AS "variantName",
+      mp.id            AS "productId",
+      mp.name          AS "productName",
       pv.stock         AS stock,
-      pv."safetyStock" AS safetyStock,
+      pv."safetyStock" AS "safetyStock",
       COALESCE(pr."promoActive", 0) AS "promoActive",
       COALESCE(ord."orderedQty", 0) AS "orderedQty",
       pv."minStock"    AS "minStock",
@@ -155,8 +157,8 @@ export const GET = withAuth(async (req) => {
       JOIN "PromotionActivity" pa ON pa.id = pai."activityId"
       JOIN "PlatformAccount" pa_acc ON pa_acc.id = pa."accountId"
       WHERE pa.status NOT IN (${Prisma.join(PROMO_TERMINAL_STATUSES)})
-        AND pa."startsAt" <= ${nowIso}
-        AND pa."endsAt" >= ${nowIso}
+        AND pa."startsAt" <= ${now}
+        AND pa."endsAt" >= ${now}
         AND pa_acc."businessId" = ${businessId}
       GROUP BY pm."variantId"
     ) pr ON pr.vid = pv.id

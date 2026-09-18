@@ -1,14 +1,20 @@
 import { test, expect, request as baseRequest } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
-const DB = `${ROOT}/prisma/dev.db`;
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/stock-${n}.png`;
 const SEED_ID = 'e2e-seed-oversell-001';
+const ACCT_ID = 'e2e-stockpage-acct';
+const MP_ID = 'e2e-stockpage-mp';
+const VAR_ID = 'e2e-stockpage-var';
 
 function sql(q: string) {
-  return execSync(`sqlite3 ${DB} "${q}"`, { encoding: 'utf8' }).trim();
+  return execFileSync(
+    'psql',
+    ['-h', 'localhost', '-U', 'udan', '-d', 'maxius_dev', '-v', 'ON_ERROR_STOP=1', '-tAc', q],
+    { encoding: 'utf8' }
+  ).trim();
 }
 
 async function login(page: Page) {
@@ -16,7 +22,7 @@ async function login(page: Page) {
   await page.getByPlaceholder('Masukkan username').fill('admin');
   await page.getByPlaceholder('••••••••').fill('admin123');
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
-  await page.waitForURL('/', { timeout: 30_000, waitUntil: 'commit' });
+  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
 }
 
@@ -31,18 +37,35 @@ async function apiToken(): Promise<string> {
 }
 
 test.beforeAll(() => {
-  const acct = sql('SELECT id FROM PlatformAccount LIMIT 1;');
-  const vid = sql('SELECT id FROM ProductVariant LIMIT 1;');
   sql(
-    `INSERT OR REPLACE INTO SyncLog (id, direction, kind, status, message, payload, accountId, createdAt) ` +
+    `INSERT INTO "PlatformAccount" (id, platform, label, "businessId", "createdAt", "updatedAt") ` +
+      `VALUES ('${ACCT_ID}','TIKTOK_SHOP','E2E StockPage Acct TMP','business-default',NOW(),NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "MasterProduct" (id, name, "businessId") ` +
+      `VALUES ('${MP_ID}','E2E StockPage Master TMP','business-default') ` +
+      `ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "ProductVariant" (id, sku, stock, "safetyStock", "masterProductId", "createdAt", "updatedAt") ` +
+      `VALUES ('${VAR_ID}','E2E-STOCKPAGE-SKU',10,0,'${MP_ID}',NOW(),NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "SyncLog" (id, direction, kind, status, message, payload, "accountId", "createdAt") ` +
       `VALUES ('${SEED_ID}','in','central_stock_deduct','skipped','e2e seed oversell',` +
-      `'{"orderId":"e2e-order-001","deductionsAttempted":[{"variantId":"${vid}","qty":2}]}',` +
-      `'${acct}','2026-09-11T10:00:00.000Z');`
+      `'{"orderId":"e2e-order-001","deductionsAttempted":[{"variantId":"${VAR_ID}","qty":2}]}',` +
+      `'${ACCT_ID}',NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
   );
 });
 
 test.afterAll(() => {
-  sql(`DELETE FROM SyncLog WHERE id='${SEED_ID}';`);
+  sql(`DELETE FROM "SyncLog" WHERE id='${SEED_ID}';`);
+  sql(`DELETE FROM "ProductVariant" WHERE id='${VAR_ID}';`);
+  sql(`DELETE FROM "MasterProduct" WHERE id='${MP_ID}';`);
+  sql(`DELETE FROM "PlatformAccount" WHERE id='${ACCT_ID}';`);
 });
 
 test('B: halaman Stok Varian end-to-end', async ({ page }) => {

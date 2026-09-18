@@ -23,7 +23,7 @@ async function login(page: import('@playwright/test').Page) {
   await page.getByPlaceholder('Masukkan username').fill('admin');
   await page.getByPlaceholder('••••••••').fill('admin123');
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
-  await page.waitForURL('/', { timeout: 30_000, waitUntil: 'commit' });
+  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
 }
 

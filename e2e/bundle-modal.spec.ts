@@ -1,16 +1,59 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { execFileSync } from 'child_process';
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/bundle-${n}.png`;
 const BUNDLE_NAME = `Paket Duo Kaos Kaki (E2E ${Date.now()})`;
+
+function sql(q: string) {
+  return execFileSync(
+    'psql',
+    ['-h', 'localhost', '-U', 'udan', '-d', 'maxius_dev', '-v', 'ON_ERROR_STOP=1', '-tAc', q],
+    { encoding: 'utf8' }
+  ).trim();
+}
+
+// Fixture komponen: 2 master single + 1 varian masing-masing (mandiri,
+// tidak tergantung data dev lain).
+test.beforeAll(() => {
+  for (const [mp, v, sku] of [
+    ['e2e-bundle-mp-1', 'e2e-bundle-var-1', 'E2E-BUNDLE-1'],
+    ['e2e-bundle-mp-2', 'e2e-bundle-var-2', 'E2E-BUNDLE-2'],
+  ]) {
+    sql(
+      `INSERT INTO "MasterProduct" (id, name, "businessId") ` +
+        `VALUES ('${mp}',${
+          mp.endsWith('1')
+            ? "'Kaos kaki polos hitam (E2E TMP)'"
+            : "'Kaos kaki motif garis (E2E TMP)'"
+        },'business-default') ON CONFLICT (id) DO NOTHING;`
+    );
+    sql(
+      `INSERT INTO "ProductVariant" (id, sku, stock, "safetyStock", "masterProductId", "createdAt", "updatedAt") ` +
+        `VALUES ('${v}','${sku}',10,0,'${mp}',NOW(),NOW()) ON CONFLICT (id) DO NOTHING;`
+    );
+  }
+});
+
+test.afterAll(() => {
+  // Hapus bundle hasil test + fixture (bundle tidak punya varian sendiri;
+  // hapus via nama unik; item ikut cascade).
+  sql(`DELETE FROM "MasterProduct" WHERE name = '${BUNDLE_NAME}';`);
+  for (const v of ['e2e-bundle-var-1', 'e2e-bundle-var-2']) {
+    sql(`DELETE FROM "ProductVariant" WHERE id='${v}';`);
+  }
+  for (const mp of ['e2e-bundle-mp-1', 'e2e-bundle-mp-2']) {
+    sql(`DELETE FROM "MasterProduct" WHERE id='${mp}';`);
+  }
+});
 
 async function login(page: Page) {
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill('admin');
   await page.getByPlaceholder('••••••••').fill('admin123');
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
-  await page.waitForURL('/', { timeout: 30_000, waitUntil: 'commit' });
+  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
 }
 
 async function openBundleModal(page: Page) {

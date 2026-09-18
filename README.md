@@ -1,97 +1,134 @@
-# Dashboard Sinkronisasi Stok (Shopee + TikTok Shop)
+# Maxius Omni — Platform Sinkronisasi Stok Omnichannel
 
-Prototipe full-stack: frontend React + backend Node/Express + login, buat
-latihan sebelum disambungkan ke API Shopee/TikTok Shop yang asli.
+Live di **https://maxius.id/**.
 
-## Struktur folder
+Platform Next.js (App Router) + Prisma untuk mengelola banyak brand yang
+punya toko di beberapa marketplace (TikTok Shop, Shopee; slot Tokopedia
+disiapkan). Satu stok pusat per varian disinkronkan real-time via webhook —
+mencegah oversell (refund/penalti) dan tampilan stok basi (lost sales).
 
-```
-stock-sync-project/
-├── backend/     Express API + auth + logika sinkronisasi stok
-└── frontend/    React + Vite, dashboard + halaman login
-```
+> `docs/PRD.md`, `docs/FLOWS.md`, `docs/dev-notes.md` adalah dokumen
+> fase single-brand awal — masih berguna untuk alur inti, tapi konsep
+> multi-brand (Business, AppCredential) hanya didokumentasikan di sini
+> dan di komentar skema `prisma/schema.prisma`.
 
-## Cara menjalankan
+## Arsitektur
 
-### 1. Jalankan backend
+- **Frontend + backend menyatu**: Next.js 16 App Router (`app/`).
+  Halaman di `app/(dashboard)/`, API di `app/api/`, logika DB di `lib/`.
+- **Database**: PostgreSQL via Prisma (`@prisma/client` v5.22.0).
+  Koneksi memakai `POSTGRES_URL` (format `postgresql://` standar).
+- **Auth**: JWT (8 jam) di `localStorage["token"]` + `Authorization: Bearer`
+  via `lib/utils/api-client.ts` (client) dan `withAuth` di
+  `lib/utils/api.ts` (server). Guard halaman di `(dashboard)/layout.tsx`.
+- **Stok**: dilacak per **varian** (`ProductVariant`), satu angka pusat.
+  Tiap varian dipetakan ke SKU/ID berbeda per akun marketplace
+  (`ProductMapping`) — ID antar platform tidak pernah dianggap sama.
+- **Sync**: webhook order (Shopee/TikTok, verifikasi HMAC) → potong stok
+  central (`central-stock.service.ts`, idempoten via `StockLedger`) →
+  push ke listing lain via antrean batch (`stock-push-queue.service.ts`,
+  debounce 8 dtk) + `SyncJob` state machine untuk retry.
+- **Multi-brand (fase 1)**: 5 brand = 5 baris `Business`
+  (Maxius, Raxen, Kaos Kaki Sport, Den Sport, Geto.bdg).
+  1 user akses semua brand via `UserBusiness` (tanpa role granular).
+  Brand aktif di `localStorage["activeBusinessId"]`, dikirim otomatis
+  sebagai `?businessId=` oleh `authFetch`, divalidasi di `withAuth`
+  (`resolveRequestBusiness` → 403 bila bukan haknya).
+- **Kredensial app** (`AppCredential`): Shopee `partner_id/key`,
+  TikTok `app_key/secret/service_id` per-App, bukan hardcode env.
+  Baris `Legacy ENV` (secret null) = baca dari env seperti dulu —
+  akun existing otomatis ter-link ke sini saat migrasi.
+  Pilih credential ISV Shopee nanti = tambah 1 baris + pakai untuk
+  authorize/sync berikutnya, tanpa refactor.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+## Proteksi Shopee (penting)
 
-Backend jalan di `http://localhost:4000`.
+- App "Third-party Partner Platform" (ISV) masih **under review**.
+  `SHOPEE_AUTHORIZE_ENABLED` (default `false`) memblokir total endpoint
+  authorize + callback Shopee sampai diset `true` manual di env server
+  setelah ISV approved.
+- UI (`AddMarketplaceModal`, tombol Hubungkan-ulang) meminta konfirmasi
+  manual sebelum authorize Shopee apa pun.
+- `PlatformAccount.isFrozen` + `frozenReason`: akun dibekukan DITOLAK di
+  authorize-ulang, refresh token, push stok, dan webhook (push diabaikan
+  + dicatat). Jangan authorize toko yang sedang bersengketa via kode apa pun.
 
-### 2. Jalankan frontend (di terminal terpisah)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend jalan di `http://localhost:5173`. Buka di browser.
-
-### 3. Login
-
-- Username: `admin`
-- Password: `admin123`
-
-Ganti kredensial ini di `backend/data/store.js` sebelum dipakai serius.
-
-## Cara kerja sinkronisasi stok (8 akun, konsep Produk Master)
-
-Sistem ini sekarang punya 8 akun (5 Shopee + 3 TikTok Shop) dan konsep
-**Produk Master**: satu produk fisik (misal "Kaos kaki polos hitam") punya
-SATU angka stok pusat, tapi bisa terdaftar dengan **kode SKU yang berbeda**
-di tiap akun — persis seperti kondisi nyata, karena tiap listing marketplace
-punya SKU sendiri-sendiri.
-
-Mapping "akun X pakai SKU Y untuk produk Z" disimpan di
-`backend/data/store.js` (lihat field `mappings` pada tiap `masterProducts`).
-Baik form "Simulasikan penjualan" di dashboard, maupun endpoint webhook
-(`/api/webhooks/{account-id}`), sama-sama memanggil fungsi `recordSale()` di
-`backend/data/syncService.js`, yang:
-
-1. Mencari produk master mana yang cocok dengan kombinasi `accountId` + `channelSku`
-2. Mengurangi stok pusat produk itu
-3. Mencatat log yang bilang "tersinkron ke N listing lain"
-
-Coba simulasikan order dari marketplace lewat terminal (ganti `{account-id}`
-dengan salah satu dari: `shopee-1` s/d `shopee-5`, `tiktok-1` s/d `tiktok-3`):
+## Menjalankan lokal
 
 ```bash
-curl -X POST http://localhost:4000/api/webhooks/tiktok-3 \
-  -H "Content-Type: application/json" \
-  -d '{"channelSku":"TTS3-BLK-A","qty":2}'
+# 1. Postgres lokal + ENV (jangan pernah isi POSTGRES_URL production di sini)
+createdb maxius_dev
+# .env (gitignored): POSTGRES_URL="postgresql://<user>@localhost:5432/maxius_dev"
+
+# 2. Migrasi + seed fondasi (5 brand, admin, kredensial Legacy ENV)
+npx prisma migrate dev
+npx tsx scripts/seed-production.mts
+
+# 3. Jalan
+npm run dev        # http://localhost:3000 (admin/admin123)
+npm run build      # verifikasi production
+npx tsc --noEmit   # cek tipe
 ```
 
-Dashboard akan otomatis menampilkan perubahan stok dalam beberapa detik
-(polling tiap 5 detik). Halaman **Produk Master** (menu sidebar) menampilkan
-tiap produk beserta SKU-nya di semua akun — klik baris produk untuk expand.
+## Env vars
 
-## Langkah berikutnya untuk hubungkan ke API asli
+| Var | Wajib | Keterangan |
+| --- | ----- | ---------- |
+| `POSTGRES_URL` | ya | `postgresql://...` (bukan URL accelerate) |
+| `JWT_SECRET` | ya | secret JWT |
+| `PII_ENC_KEY` | ya | AES-256-GCM untuk PII pembeli |
+| `TIKTOK_APP_KEY` / `TIKTOK_APP_SECRET` | ya | kredensial legacy TikTok (dipakai bila akun menunjuk Legacy ENV) |
+| `TIKTOK_SERVICE_ID` | opsional | service_id OAuth seller resmi |
+| `TIKTOK_REDIRECT_URI` | ya | callback TikTok terdaftar |
+| `SHOPEE_PARTNER_ID` / `SHOPEE_PARTNER_KEY` | bila pakai Shopee | kredensial legacy Shopee |
+| `SHOPEE_REDIRECT_URI` | bila pakai Shopee | callback Shopee terdaftar |
+| `SHOPEE_API_BASE` / `SHOPEE_AUTH_BASE` | opsional | override (sandbox) |
+| `SHOPEE_AUTHORIZE_ENABLED` | — | `true` HANYA setelah ISV approved (default false = blokir) |
 
-1. Daftar developer account di Shopee Open Platform dan TikTok Shop Partner
-   Center, buat aplikasi, dan dapatkan API key/secret.
-2. Ganti isi `backend/data/store.js` dari data in-memory ke database asli
-   (Postgres, MySQL, MongoDB, dll) supaya data tidak hilang saat server
-   restart.
-3. Di `backend/routes/webhooks.js`, tambahkan verifikasi signature yang
-   dikirim tiap platform, supaya bukan sembarang orang bisa memanggil
-   endpoint ini.
-4. Di `backend/data/syncService.js`, pada bagian komentar `TODO`, tambahkan
-   pemanggilan API "update stock" ke platform lain (misalnya kalau order
-   masuk dari Shopee, panggil TikTok Shop API untuk update stok, dan
-   sebaliknya).
-5. Daftarkan URL webhook backend kamu (setelah di-deploy ke server publik,
-   bukan localhost) di dashboard developer masing-masing platform.
+## Deploy (VPS)
 
-## Catatan keamanan
+```bash
+git pull origin main
+npm install            # postinstall: prisma generate
+npx prisma migrate deploy   # JANGAN db push / migrate dev ke production
+npm run build
+pm2 restart all        # / systemctl sesuai setup
+```
 
-- `JWT_SECRET` di `backend/middleware/auth.js` pakai nilai default untuk
-  development. Sebelum deploy, set environment variable `JWT_SECRET` ke nilai
-  acak yang panjang.
-- Data saat ini disimpan di memory (`backend/data/store.js`) dan akan hilang
-  setiap server restart. Ini untuk mempermudah belajar/prototyping.
+Rollback skema: `npx prisma migrate resolve --rolled-back <nama_migrasi>`
+lalu `migrate deploy` ulang (detail per milestone di bawah).
+
+## Migrasi multi-brand (M1–M3)
+
+- `.../multi_brand_phase1` (DDL): tabel `AppCredential`, `UserBusiness`;
+  kolom `PlatformAccount.appCredentialId/appCredential?`,
+  `isFrozen` + `frozenReason`. Additive-only.
+- `.../multi_brand_phase1_data` (data, idempotent): rename Business
+  `business-default` → "Maxius" (id tetap, FK tak tersentuh); insert 4
+  brand (id deterministik `business-*`); seed 2 kredensial Legacy ENV;
+  arahkan akun existing ke kredensialnya; link semua user × semua brand.
+  Rollback data: hapus baris `business-*` baru + kredensial legacy +
+  `UserBusiness` (jangan hapus `business-default`), lalu resolve migrasi.
+
+## Testing
+
+- `npx playwright test` — 7 spec di `e2e/` (butuh Postgres lokal +
+  `npm run dev`; seed SQL via `psql`, bukan sqlite).
+- `npx tsx scripts/test-*.integration.mts` — acceptance per fase
+  (DB temp per-file, `"business-default"` sebagai brand uji).
+- `npx tsx scripts/e2e-stock-push-sandbox.mts` — push stok vs sandbox
+  TikTok asli (butuh kredensial sandbox).
+
+## Struktur penting
+
+- `app/page.tsx` — landing publik; dashboard di `/dashboard`.
+- `app/(dashboard)/` — inventory, products, orders, promotions (TikTok),
+  market, settings/accounts (Connected Accounts per brand + kolom
+  frozen/sync terakhir).
+- `components/layout/BrandSwitcher.tsx` — dropdown brand di topbar.
+- `lib/services/business-scope.service.ts` — SATU-SATUNYA pola scoping
+  (`businessWhere`, `assertSameBrand`, `resolveRequestBusiness`).
+- `lib/services/app-credential.service.ts` — resolver kredensial per-App,
+  flag authorize, guard frozen, webhook multi-secret.
+- `lib/integrations/{shopee,tiktokShop}.ts` — client API (kredensial
+  sebagai param opsional di ekor; default env).

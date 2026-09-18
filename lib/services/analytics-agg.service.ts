@@ -212,8 +212,8 @@ export async function getAnalyticsAggregated(businessId: string) {
   // master (variantId NULL) tetap terpisah per channelSku, bukan menumpuk
   // jadi satu baris "unknown".
   const productRows = await prisma.$queryRaw<ProductRow[]>(Prisma.sql`
-    SELECT oi."variantId" AS variantId,
-           oi."channelSku" AS channelSku,
+    SELECT oi."variantId" AS "variantId",
+           oi."channelSku" AS "channelSku",
            MAX(v.sku) AS sku,
            MAX(mp.name) AS name,
            SUM(oi.qty) AS qty,

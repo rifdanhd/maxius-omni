@@ -128,7 +128,7 @@ export async function getWinning(
         orders: bigint;
       }>
     >(Prisma.sql`
-      SELECT mp.id AS productId, MAX(mp.name) AS productName, MAX(mp.category) AS category,
+      SELECT mp.id AS "productId", MAX(mp.name) AS "productName", MAX(mp.category) AS category,
              SUM(oi.qty) AS qty,
              SUM(COALESCE(oi.price, 0) * oi.qty) AS revenue,
              COUNT(DISTINCT o.id) AS orders
@@ -174,9 +174,9 @@ export async function getWinning(
       orders: bigint;
     }>
   >(Prisma.sql`
-    SELECT oi."variantId" AS variantId, oi."channelSku" AS channelSku,
-           MAX(v.sku) AS sku, MAX(v.name) AS variantName,
-           MAX(mp.id) AS productId, MAX(mp.name) AS productName,
+    SELECT oi."variantId" AS "variantId", oi."channelSku" AS "channelSku",
+           MAX(v.sku) AS sku, MAX(v.name) AS "variantName",
+           MAX(mp.id) AS "productId", MAX(mp.name) AS "productName",
            MAX(mp.category) AS category,
            SUM(oi.qty) AS qty,
            SUM(COALESCE(oi.price, 0) * oi.qty) AS revenue,
@@ -307,7 +307,7 @@ export async function getOmset(
           ${bizCte}
         GROUP BY oi."orderId"
       )
-      SELECT o."accountId" AS accountId,
+      SELECT o."accountId" AS "accountId",
              COUNT(DISTINCT o.id) AS orders,
              SUM(COALESCE(r.rev, o.amount, 0)) AS revenue,
              SUM(COALESCE(r.units, 0)) AS units

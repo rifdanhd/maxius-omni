@@ -12,15 +12,20 @@ import { execFileSync } from 'child_process';
  */
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
-const DB = `${ROOT}/prisma/dev.db`;
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/stock-in-${n}.png`;
 const MP_ID = 'e2e-stockin-mp';
 const VAR_ID = 'e2e-stockin-var';
 const SKU = 'E2E-STOCKIN-SKU';
 
+// DB dev lokal = Postgres (POSTGRES_URL). ON_ERROR_STOP agar seed gagal
+// terdengar (bukan diam-diam lanjut dengan data kosong).
 function sql(q: string) {
   // execFileSync + args: tanpa shell, supaya kutip SQL utuh.
-  return execFileSync('sqlite3', [DB, q], { encoding: 'utf8' }).trim();
+  return execFileSync(
+    'psql',
+    ['-h', 'localhost', '-U', 'udan', '-d', 'maxius_dev', '-v', 'ON_ERROR_STOP=1', '-tAc', q],
+    { encoding: 'utf8' }
+  ).trim();
 }
 
 async function login(page: Page) {
@@ -28,26 +33,27 @@ async function login(page: Page) {
   await page.getByPlaceholder('Masukkan username').fill('admin');
   await page.getByPlaceholder('••••••••').fill('admin123');
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
-  await page.waitForURL('/', { timeout: 30_000, waitUntil: 'commit' });
+  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
 }
 
 test.beforeAll(() => {
-  const now = Date.now();
   sql(
-    `INSERT INTO MasterProduct (id, name, type, status, isActive, threshold) ` +
-      `VALUES ('${MP_ID}','E2E StockIn Master TMP','single','active',1,20);`
+    `INSERT INTO "MasterProduct" (id, name, "businessId") ` +
+      `VALUES ('${MP_ID}','E2E StockIn Master TMP','business-default') ` +
+      `ON CONFLICT (id) DO NOTHING;`
   );
   sql(
-    `INSERT INTO ProductVariant (id, sku, stock, safetyStock, masterProductId, createdAt, updatedAt) ` +
-      `VALUES ('${VAR_ID}','${SKU}',0,0,'${MP_ID}',${now},${now});`
+    `INSERT INTO "ProductVariant" (id, sku, stock, "safetyStock", "masterProductId", "createdAt", "updatedAt") ` +
+      `VALUES ('${VAR_ID}','${SKU}',0,0,'${MP_ID}',NOW(),NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
   );
 });
 
 test.afterAll(() => {
-  sql(`DELETE FROM StockLedger WHERE variantId='${VAR_ID}';`);
-  sql(`DELETE FROM ProductVariant WHERE id='${VAR_ID}';`);
-  sql(`DELETE FROM MasterProduct WHERE id='${MP_ID}';`);
+  sql(`DELETE FROM "StockLedger" WHERE "variantId"='${VAR_ID}';`);
+  sql(`DELETE FROM "ProductVariant" WHERE id='${VAR_ID}';`);
+  sql(`DELETE FROM "MasterProduct" WHERE id='${MP_ID}';`);
 });
 
 test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => {

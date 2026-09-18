@@ -10,7 +10,7 @@ async function login(page: Page, username = 'admin', password = 'admin123') {
   await page.getByPlaceholder('••••••••').fill(password);
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
   // waitUntil commit: tahan terhadap pantulan load pasca-login.
-  await page.waitForURL('/', { timeout: 30_000, waitUntil: 'commit' });
+  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
 }
 
@@ -19,7 +19,7 @@ test('C1: token invalid sejak awal -> langsung ke /login, tanpa admin panel', as
     localStorage.setItem('token', 'INVALID.EXPIRED.TEST');
     localStorage.setItem('username', 'testghost');
   });
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.waitForURL('**/login**', { timeout: 15_000 });
   expect(page.url()).toContain('/login');
   // Admin panel tidak boleh tampil: sidebar & konten dashboard absen.
@@ -49,7 +49,7 @@ test('C2: API 401 dari dalam halaman -> redirect /login?reason=session_expired',
 test('C3: tanpa token sama sekali -> /login', async ({ page }) => {
   await page.goto('/login');
   await page.evaluate(() => localStorage.clear());
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.waitForURL('**/login**', { timeout: 15_000 });
   expect(page.url()).toContain('/login');
   await page.screenshot({ path: SHOT('c3-no-token') });

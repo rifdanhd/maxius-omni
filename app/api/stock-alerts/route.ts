@@ -46,12 +46,12 @@ export const GET = withAuth(async (req) => {
   const data = await cached(`stock-alerts:${businessId}`, CACHE_TTL_MS, async () => {
     const rows = await prisma.$queryRaw<StockAlertRow[]>`
       SELECT
-        pv.id            AS variantId,
-        pv.sku           AS variantSku,
+        pv.id            AS "variantId",
+        pv.sku           AS "variantSku",
         pv.stock         AS stock,
-        pv."safetyStock" AS safetyStock,
-        mp.id            AS productId,
-        mp.name          AS productName,
+        pv."safetyStock" AS "safetyStock",
+        mp.id            AS "productId",
+        mp.name          AS "productName",
         mp.threshold     AS threshold,
         pv."minStock"    AS "minStock"
       FROM "ProductVariant" pv

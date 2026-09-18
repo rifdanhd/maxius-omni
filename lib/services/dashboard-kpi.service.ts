@@ -90,8 +90,8 @@ export async function getDashboardKpi(businessId: string): Promise<DashboardKpi>
         safetyStock: number;
       }>
     >`
-      SELECT pv.id AS variantId, pv.sku AS sku, pv.name AS variantName,
-             mp.name AS productName, pv.stock AS stock, pv."safetyStock" AS safetyStock
+      SELECT pv.id AS "variantId", pv.sku AS sku, pv.name AS "variantName",
+             mp.name AS "productName", pv.stock AS stock, pv."safetyStock" AS "safetyStock"
       FROM "ProductVariant" pv
       JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
       WHERE ${lowStockSql("pv", "mp")} AND mp."businessId" = ${businessId}
