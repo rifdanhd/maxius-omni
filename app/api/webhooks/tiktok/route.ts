@@ -8,6 +8,7 @@ import {
   restoreStockForCanceledOrder,
 } from "@/lib/services/central-stock.service";
 import { resolveTiktokCreds } from "@/lib/services/app-credential.service";
+import { upsertTikTokReturn } from "@/lib/services/return-ingest.service";
 
 async function listActiveTiktokSecrets(): Promise<Array<{ appKey: string; appSecret: string }>> {
   const rows = await prisma.appCredential.findMany({
@@ -174,6 +175,15 @@ export async function POST(req: NextRequest) {
           break;
         case 5:
           await handleProductStatusChange(account.id, rawBody, payload);
+          break;
+        // Return & Refund: 12 = return status change, 64 = aftersales request
+        // status, 65 = RMA status, 67 = refund success. Semua → funnel ingest
+        // retur yang sama (idempoten per return_id).
+        case 12:
+        case 64:
+        case 65:
+        case 67:
+          await handleReturnStatusChange(account.id, rawBody, payload);
           break;
         default:
           await logSync({
@@ -382,6 +392,53 @@ async function handleOrderStatusChange(
     kind: "order_status_change",
     status: "success",
     message: `${externalOrderId}: ${mapping.rawStatus} -> ${orderStatus}`,
+    payload: rawBody,
+  });
+}
+
+/**
+ * handleReturnStatusChange — webhook Return & Refund TikTok (type 12/64/65/67).
+ * Payload.data membawa return_id + return_status (type 12) atau id/status
+ * aftersales (64/65/67). Ingest idempoten; kegagalan ingest tidak menggagalkan
+ * webhook (SyncLog error, TikTok tetap menerima 200).
+ */
+async function handleReturnStatusChange(
+  accountId: string,
+  rawBody: string,
+  payload: WebhookPayload
+) {
+  const data = payload.data ?? {};
+  const returnId = data.return_id ? String(data.return_id) : null;
+  const aftersaleId = data.aftersale_id ? String(data.aftersale_id) : null;
+  const id = returnId ?? aftersaleId;
+
+  if (!id) {
+    await logSync({
+      accountId,
+      kind: "return_status_change",
+      status: "error",
+      errorMessage: "payload.data kurang return_id/aftersale_id",
+      payload: rawBody,
+    });
+    return;
+  }
+
+  // Payload mentah disimpan apa adanya di ReturnRequest.rawPayload — mapper
+  // di return-ingest.service menangani variasi antar type (12 vs 64/65/67).
+  const returnIdResult = await upsertTikTokReturn(accountId, {
+    return_id: id,
+    order_id: data.order_id,
+    return_status: data.return_status ?? data.status,
+    ...data,
+  });
+
+  await logSync({
+    accountId,
+    kind: "return_status_change",
+    status: returnIdResult ? "success" : "skipped",
+    message: returnIdResult
+      ? `retur ${id} di-ingest (type ${payload.type})`
+      : `retur ${id} tanpa return_id valid`,
     payload: rawBody,
   });
 }

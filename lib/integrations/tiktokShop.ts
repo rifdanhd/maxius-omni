@@ -344,6 +344,49 @@ export async function deactivatePromotionActivity(
  * Path & param divalidasi dari SDK orderV202309Api (POST /order/202309/orders/search).
  * Kirim body kosong untuk return semua order; shop_cipher inject via callApi sebelum sign.
  */
+/**
+ * searchReturns — daftar retur/refund buyer (Return & Refund API 202309).
+ * POST /return/202309/returns/search — butuh scope seller.return_refund.basic.
+ * Filter: return_id (satu), order_id_list, return_status list, create_time range.
+ * Response: data.returns[] + next_page_token (paging kursor).
+ */
+export async function searchReturns(
+  accessToken: string,
+  shopCipher?: string,
+  opts: {
+    returnId?: string;
+    orderIdList?: string[];
+    returnStatus?: string[];
+    createTimeFrom?: number;
+    createTimeTo?: number;
+    pageSize?: number;
+    pageToken?: string;
+  } = {}
+) {
+  const body: Record<string, unknown> = {};
+  if (opts.returnId) body.return_id = opts.returnId;
+  if (opts.orderIdList?.length) body.order_id_list = opts.orderIdList;
+  if (opts.returnStatus?.length) body.return_status = opts.returnStatus;
+  if (opts.createTimeFrom) body.create_time_from = opts.createTimeFrom;
+  if (opts.createTimeTo) body.create_time_to = opts.createTimeTo;
+  if (opts.pageToken) body.page_token = opts.pageToken;
+  const result = await callApi(
+    "POST",
+    "/return/202309/returns/search",
+    accessToken,
+    { page_size: opts.pageSize ?? 20 },
+    Object.keys(body).length > 0 ? body : null,
+    shopCipher
+  );
+  const data = result.data as
+    | { returns?: Array<Record<string, unknown>>; next_page_token?: string }
+    | undefined;
+  return {
+    returns: data?.returns ?? [],
+    nextPageToken: data?.next_page_token ?? null,
+  };
+}
+
 export async function getOrders(
   accessToken: string,
   shopCipher?: string,

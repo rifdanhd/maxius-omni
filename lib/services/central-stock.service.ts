@@ -44,15 +44,27 @@ export const STOCK_REASONS = {
   // secara langsung — angka tayang berubah lewat push effectiveStock).
   // changeQty selalu 0, stockAfter = stok fisik saat perubahan.
   SAFETY_STOCK_CHANGE: "SAFETY_STOCK_CHANGE",
+  // Barang retur diterima kembali di gudang (konfirmasi manual admin dari
+  // halaman Kelola Pengembalian). referenceId = ReturnItem.id.
+  RETURN_RESTOCK: "RETURN_RESTOCK",
 } as const;
 export type StockReason = (typeof STOCK_REASONS)[keyof typeof STOCK_REASONS];
 
-/** Status order TikTok yang membatalkan pemotongan (stok direstore). */
-export const CANCEL_STATUSES = new Set<string>(["CANCELLED"]);
+/**
+ * Status order yang membatalkan pemotongan (stok direstore) — order batal
+ * ATAU di-refund setelah dikirim (BUGFIX: REFUNDED sebelumnya tidak pernah
+ * me-restore stok, padahal barang tidak jadi terjual).
+ */
+export const CANCEL_STATUSES = new Set<string>(["CANCELLED", "REFUNDED"]);
 
-/** cancelReasonForStatus — status order batal → reason ledger restore (atau null). */
+/**
+ * cancelReasonForStatus — status order batal/refund → reason ledger restore
+ * (atau null). Reason DIBEDAKAN per status supaya audit trail jelas
+ * asal-usulnya: ORDER_CANCELLED vs ORDER_REFUNDED.
+ */
 export function cancelReasonForStatus(status: string): StockReason | null {
   if (status === "CANCELLED") return STOCK_REASONS.ORDER_CANCELLED;
+  if (status === "REFUNDED") return STOCK_REASONS.ORDER_REFUNDED;
   return null;
 }
 
@@ -359,7 +371,7 @@ export async function restoreStockForCanceledOrder(
             changeQty,
             reason,
             referenceId: order.id,
-            note: `Restore order ${order.orderNo} (status ${order.status}, dibatalkan)`,
+            note: `Restore order ${order.orderNo} (status ${order.status}, batal/refund)`,
             stockAfter,
             accountId: order.accountId,
           },

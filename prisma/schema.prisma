@@ -117,6 +117,8 @@ model PlatformAccount {
   stockLedger         StockLedger[]
   promotionActivities PromotionActivity[]
   PromotionAuditLog   PromotionAuditLog[]
+  returnRequests      ReturnRequest[]
+  ReturnAuditLogs     ReturnAuditLog[]
 
   @@unique([platform, externalShopId])
 }
@@ -146,8 +148,8 @@ model MasterProduct {
   business     Business @relation(fields: [businessId], references: [id])
   threshold    Int      @default(20)
 
-  variants ProductVariant[]
-  images   ProductImage[]
+  variants    ProductVariant[]
+  images      ProductImage[]
   // Komposisi bundle (hanya terisi bila type = "bundle").
   bundleItems BundleItem[]
 }
@@ -181,7 +183,7 @@ model ProductVariant {
   safetyStock Int     @default(0)
   // Batas stok minimum per varian (halaman Inventori). Null = ikut threshold
   // produk induk (MasterProduct.threshold) — konsisten dgn /api/stock-alerts.
-  minStock Int?
+  minStock    Int?
   // Toggle notifikasi saat varian masuk kategori Stok Menipis. Toggle saja:
   // belum ada infrastruktur email di project (tanpa provider), jadi belum
   // ada pengiriman aktif — lihat InventorySetting.notifyLowStockEmail.
@@ -197,16 +199,17 @@ model ProductVariant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  masterProductId String
-  masterProduct   MasterProduct    @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
-  mappings        ProductMapping[]
-  salesLogs       SalesLog[]
-  orderItems      OrderItem[]
-  stockLedger     StockLedger[]
-  syncJobs        SyncJob[]
+  masterProductId  String
+  masterProduct    MasterProduct     @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  mappings         ProductMapping[]
+  salesLogs        SalesLog[]
+  orderItems       OrderItem[]
+  stockLedger      StockLedger[]
+  syncJobs         SyncJob[]
   stockOpnameItems StockOpnameItem[]
   // Bundle yang memakai varian ini sebagai komponen.
-  usedInBundles   BundleItem[]
+  usedInBundles    BundleItem[]
+  returnItems      ReturnItem[]
 
   @@unique([masterProductId, sku])
 }
@@ -339,6 +342,7 @@ model Order {
   items         OrderItem[]
   orderMappings PlatformOrderMapping[]
   shipments     Shipment[]
+  returns       ReturnRequest[]
 
   @@index([createTime, status])
   @@index([accountId, createTime])
@@ -589,11 +593,11 @@ model SyncLog {
 // central berubah (via pushVariantStockToOthers — satu-satunya funnel).
 // status (validasi di kode, SQLite tanpa enum): PENDING | PROCESSING | SUCCESS | FAILED.
 model SyncJob {
-  id          String  @id @default(uuid())
+  id          String    @id @default(uuid())
   channelSku  String
   newSellable Int
-  status      String  @default("PENDING")
-  retryCount  Int     @default(0)
+  status      String    @default("PENDING")
+  retryCount  Int       @default(0)
   nextRetryAt DateTime?
   lastError   String?
 
@@ -677,9 +681,9 @@ model StockLedger {
 //               (jalur atomic central-stock, reason STOCK_OPNAME)
 //   CANCELLED   dibatalkan sebelum finalisasi — TIDAK menyentuh stok
 model StockOpname {
-  id     String @id @default(uuid())
+  id     String  @id @default(uuid())
   // Kode referensi manusiawi utk ledger/history: OPN-YYYYMMDD-XXXX.
-  code   String @unique
+  code   String  @unique
   status String
   note   String?
 
@@ -700,7 +704,7 @@ model StockOpname {
 // varian dimasukkan ke opname (bukan live) — selisih dihitung thd snapshot ini
 // agar angka konsisten walau stok bergerak selama opname berlangsung.
 model StockOpnameItem {
-  id        String @id @default(cuid())
+  id        String         @id @default(cuid())
   opnameId  String
   opname    StockOpname    @relation(fields: [opnameId], references: [id], onDelete: Cascade)
   variantId String
@@ -711,6 +715,125 @@ model StockOpnameItem {
 
   @@unique([opnameId, variantId])
   @@index([variantId])
+}
+
+// FITUR RETUR — 1 baris per pengajuan retur/refund dari platform (Shopee
+// return_sn / TikTok return_id). Model generik utk kedua platform: status
+// platform asli disimpan di rawStatus, status ternormalisasi di `status`
+// (validasi di kode, tanpa enum):
+//   PENDING_SELLER | APPROVED | REJECTED | PLATFORM_DECIDED | IN_TRANSIT |
+//   RECEIVED | REFUNDED | DISPUTED | CANCELLED | UNKNOWN
+// Ingest TikTok via webhook (type 12/64/65/67), Shopee via polling
+// get_return_list (tidak ada push retur di Shopee).
+model ReturnRequest {
+  id        String          @id @default(uuid())
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // return_id (TikTok) / return_sn (Shopee). Bisa >1 retur per order.
+  externalReturnId String
+  externalOrderId  String?
+  // Null bila order eksternal belum pernah di-sync ke Order lokal.
+  orderId          String?
+  order            Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Status ternormalisasi (lihat komentar model) + status asli platform.
+  status     String
+  rawStatus  String
+  rawPayload String?
+
+  // RETURN_REFUND | REFUND_ONLY
+  type          String?
+  // NORMAL | IN_TRANSIT | ON_THE_SPOT (Shopee Return Refund Request Type).
+  requestType   String?
+  reason        String?
+  reasonText    String?
+  solution      String?
+  refundAmount  Float?
+  currency      String?
+  // JSON: array URL foto/video bukti buyer.
+  buyerEvidence String?
+  // JSON: detail negosiasi/compensation Shopee (fase 2).
+  negotiation   String?
+
+  // Keputusan platform (JUDGING Shopee / auto-approve TikTok), bukan seller.
+  isPlatformAutoApproved Boolean   @default(false)
+  // SLA seller (Shopee due_date / TikTok window) — sumber badge warning UI.
+  slaDueDate             DateTime?
+
+  firstSeenAt     DateTime  @default(now())
+  lastSyncedAt    DateTime?
+  statusChangedAt DateTime?
+
+  items     ReturnItem[]
+  auditLogs ReturnAuditLog[]
+
+  @@unique([accountId, externalReturnId])
+  @@index([accountId, status])
+  @@index([slaDueDate])
+}
+
+// Per SKU dalam retur. variantId di-resolve via OrderItem/ProductMapping;
+// null = ORPHAN (ditandai di UI, dipetakan manual seperti pola order).
+// restock: murni internal — admin konfirmasi barang diterima gudang lalu
+// "Terima & Tambah Stok" menulis StockLedger reason RETURN_RESTOCK dengan
+// referenceId = ReturnItem.id (idempoten via unique constraint ledger).
+model ReturnItem {
+  id       String        @id @default(uuid())
+  returnId String
+  return   ReturnRequest @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  // sku_id (TikTok) / model_id (Shopee) versi string.
+  externalSkuId String?
+  channelSku    String
+  productName   String?
+  skuName       String?
+  imageUrl      String?
+  qty           Int
+  price         Float?
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  restockedAt     DateTime?
+  restockLedgerId String?
+
+  @@unique([returnId, channelSku])
+  @@index([variantId])
+}
+
+// Audit aksi WRITE retur (approve/reject/confirm ke platform) — pola
+// PromotionAuditLog: PENDING sebelum call, lalu diupdate setelah response.
+// Aksi restock internal juga tercatat di sini (action RESTOCK, result SUCCESS).
+model ReturnAuditLog {
+  id        String          @id @default(uuid())
+  accountId String
+  account   PlatformAccount @relation(fields: [accountId], references: [id])
+
+  returnId         String?
+  returnRequest    ReturnRequest? @relation(fields: [returnId], references: [id], onDelete: SetNull)
+  externalReturnId String?
+
+  userId   String
+  username String
+
+  // APPROVE | REJECT | CONFIRM | RESTOCK
+  action      String
+  // Request yang dikirim ke platform (JSON) — untuk investigasi insiden.
+  payloadSent String?
+
+  // PENDING | SUCCESS | PLATFORM_ERROR | UNVERIFIED
+  resultStatus    String
+  platformError   String?
+  platformMessage String?
+  requestId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId, createdAt])
+  @@index([returnId])
+  @@index([resultStatus])
 }
 
 // Pengaturan Inventori — SINGLETON (satu baris id "inventory-default",

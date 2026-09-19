@@ -480,6 +480,63 @@ export async function updatePrice(
 // Format base string sesuai dokumen Push Mechanism resmi.
 // creds opsional: webhook multi-credential mencoba tiap secret via
 // listActiveShopeeSecrets() di route (satu per satu ke fungsi ini).
+/**
+ * getReturnList — daftar pengajuan retur/refund (module v2.returns).
+ * Shopee TIDAK menyediakan push/webhook retur → sumber data = polling API ini.
+ * Params: time range (create_time_ge/lt, epoch detik), page_no/page_size,
+ * dan filter opsional (status, negosiasi, bukti, kompensasi).
+ */
+export async function getReturnList(
+  accessToken: string,
+  shopId: string | number,
+  opts: {
+    createTimeFrom?: number;
+    createTimeTo?: number;
+    pageNo?: number;
+    pageSize?: number;
+  } = {},
+  creds?: ShopeeCreds
+): Promise<{ returnList: Array<Record<string, unknown>>; more: boolean }> {
+  const body: Record<string, unknown> = {
+    pagination: {
+      ...(opts.pageNo ? { offset: (opts.pageNo - 1) * (opts.pageSize ?? 100) } : {}),
+      limit: opts.pageSize ?? 100,
+    },
+  };
+  if (opts.createTimeFrom) body.create_time_ge = opts.createTimeFrom;
+  if (opts.createTimeTo) body.create_time_lt = opts.createTimeTo;
+  const result = await postShopApi(
+    "/api/v2/returns/get_return_list",
+    accessToken,
+    shopId,
+    body,
+    creds
+  );
+  return {
+    returnList: (result.return_list as Array<Record<string, unknown>> | undefined) ?? [],
+    more: result.more === true,
+  };
+}
+
+/**
+ * getReturnDetail — detail 1 retur by return_sn (alasan, bukti foto/video,
+ * item per model_id, status, SLA, negosiasi, reverse logistics).
+ */
+export async function getReturnDetail(
+  accessToken: string,
+  shopId: string | number,
+  returnSn: string,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  return postShopApi(
+    "/api/v2/returns/get_return_detail",
+    accessToken,
+    shopId,
+    { return_sn: returnSn },
+    creds
+  );
+}
+
 export function verifyPushSignature(
   rawBody: string,
   authHeader: string | null,
