@@ -300,7 +300,7 @@ export default function ProductMappingPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Mapping Stok Terpusat</h1>
@@ -410,7 +410,7 @@ export default function ProductMappingPage() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-2">Stok Awal</label>
                   <input
@@ -550,9 +550,9 @@ export default function ProductMappingPage() {
           <h2 className="font-semibold text-gray-900">Daftar Mapping ({mappings.length})</h2>
         </div>
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Memuat mapping...</div>
+          <div className="p-4 md:p-8 text-center text-gray-500">Memuat mapping...</div>
         ) : mappings.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">Belum ada mapping. Tambahkan di atas.</div>
+          <div className="p-4 md:p-8 text-center text-gray-500">Belum ada mapping. Tambahkan di atas.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -755,9 +755,9 @@ export default function ProductMappingPage() {
           </div>
         )}
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Memuat varian...</div>
+          <div className="p-4 md:p-8 text-center text-gray-500">Memuat varian...</div>
         ) : variants.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">Belum ada varian stok pusat.</div>
+          <div className="p-4 md:p-8 text-center text-gray-500">Belum ada varian stok pusat.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -853,7 +853,7 @@ export default function ProductMappingPage() {
               </tbody>
             </table>
             {ledger.length === 0 && (
-              <div className="p-8 text-center text-gray-500">Belum ada mutasi stok.</div>
+              <div className="p-4 md:p-8 text-center text-gray-500">Belum ada mutasi stok.</div>
             )}
           </div>
         </div>

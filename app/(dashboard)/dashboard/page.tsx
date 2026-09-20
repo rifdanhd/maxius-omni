@@ -127,13 +127,12 @@ export default function DashboardPage() {
   const avgDailyCompletedOrders = m ? m.completedOrders.current / 7 : 0;
 
   return (
-    <div className="p-8">
-      {/* Section: Yang Perlu Dilakukan */}
-      <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
+    <div className="p-4 md:p-8">
+      <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-800">Yang Perlu Dilakukan</h2>
         </div>
-        <div className="p-6 grid grid-cols-4 gap-4">
+        <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ActionCard title="Pesanan Baru" value={summary.newOrders.toString()} />
           <ActionCard title="Siap Dikirim" value={summary.readyToShip.toString()} />
           <ActionCard title="Stok Menipis" value={summary.criticalStock.toString()} />
@@ -141,112 +140,77 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Section: Kesehatan Operasional (PHASE C.1) */}
-      <div className="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-800">Kesehatan Operasional</h2>
           <span className="text-xs text-gray-500">Stok central & sinkronisasi marketplace</span>
         </div>
-        <div className="p-6 grid grid-cols-4 gap-4">
-          <ActionCard
-            title="Stok Central (Siap Jual)"
-            value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"}
-          />
-          <ActionCard
-            title="Stok Kritis"
-            value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"}
-          />
-          <ActionCard
-            title="Stok Mismatch"
-            value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"}
-          />
-          <ActionCard
-            title="Sync Error (7 hari)"
-            value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"}
-          />
+        <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <ActionCard title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
+          <ActionCard title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} />
+          <ActionCard title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} />
+          <ActionCard title="Sync Error (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} />
         </div>
         {opsKpi && opsKpi.storeHealth.length > 0 && (
-          <div className="px-6 pb-6">
+          <div className="px-4 md:px-6 pb-6">
             <h3 className="text-sm font-bold text-gray-700 mb-2">Kesehatan Toko</h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="py-2 pr-3">Toko</th>
-                  <th className="px-3 py-2">Platform</th>
-                  <th className="px-3 py-2 text-center">Token</th>
-                  <th className="px-3 py-2 text-center">Error 7d</th>
-                  <th className="px-3 py-2 text-center">Mismatch</th>
-                  <th className="px-3 py-2 text-center">SKU Belum Mapping</th>
-                  <th className="px-3 py-2">Aktivitas Terakhir</th>
-                </tr>
-              </thead>
-              <tbody>
-                {opsKpi.storeHealth.map((s) => {
-                  const lastActive = s.lastOrderAt ?? s.lastSyncAt;
-                  const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0 || s.orphanSkus > 0;
-                  return (
-                    <tr key={s.accountId} className="border-b border-gray-100 last:border-0">
-                      <td className="py-2 pr-3 font-medium text-gray-900">
-                        <span
-                          className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-amber-500" : "bg-emerald-500"}`}
-                          title={unhealthy ? "Perlu perhatian" : "Sehat"}
-                        />
-                        {s.label}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">{s.platform}</td>
-                      <td className="px-3 py-2 text-center">
-                        {s.hasToken ? (
-                          <span className="text-emerald-600 font-semibold">OK</span>
-                        ) : (
-                          <span className="text-red-600 font-semibold">Hilang</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center text-gray-700">{s.errors7d}</td>
-                      <td className="px-3 py-2 text-center text-gray-700">{s.mismatch}</td>
-                      <td className="px-3 py-2 text-center">
-                        {s.orphanSkus > 0 ? (
-                          <a
-                            href="/products/mapping"
-                            className="font-semibold text-amber-600 hover:underline"
-                            title="Order memuat SKU yang belum ter-mapping — buka halaman Mapping"
-                          >
-                            {s.orphanSkus}
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">0</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 text-xs">
-                        {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                    <th className="py-2 pr-3">Toko</th>
+                    <th className="px-3 py-2">Platform</th>
+                    <th className="px-3 py-2 text-center">Token</th>
+                    <th className="px-3 py-2 text-center">Error 7d</th>
+                    <th className="px-3 py-2 text-center">Mismatch</th>
+                    <th className="px-3 py-2 text-center">SKU Belum Mapping</th>
+                    <th className="px-3 py-2">Aktivitas Terakhir</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {opsKpi.storeHealth.map((s) => {
+                    const lastActive = s.lastOrderAt ?? s.lastSyncAt;
+                    const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0 || s.orphanSkus > 0;
+                    return (
+                      <tr key={s.accountId} className="border-b border-gray-100 last:border-0">
+                        <td className="py-2 pr-3 font-medium text-gray-900">
+                          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-amber-500" : "bg-emerald-500"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
+                          {s.label}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{s.platform}</td>
+                        <td className="px-3 py-2 text-center">
+                          {s.hasToken ? <span className="text-emerald-600 font-semibold">OK</span> : <span className="text-red-600 font-semibold">Hilang</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center text-gray-700">{s.errors7d}</td>
+                        <td className="px-3 py-2 text-center text-gray-700">{s.mismatch}</td>
+                        <td className="px-3 py-2 text-center">
+                          {s.orphanSkus > 0 ? <a href="/products/mapping" className="font-semibold text-amber-600 hover:underline">{s.orphanSkus}</a> : <span className="text-gray-400">0</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">
+                          {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Section: Panduan Awal */}
-      <div className="mb-8 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div 
-          className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-          onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}
-        >
+      <div className="mb-6 md:mb-8 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
           <div>
             <h2 className="text-lg font-bold text-gray-800">Panduan Awal</h2>
             <p className="text-sm text-gray-500 mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
           </div>
           {panduanAwalOpen ? <ChevronUp className="text-gray-400" /> : <ChevronDown className="text-gray-400" />}
         </div>
-        
         {panduanAwalOpen && (
-          <div className="p-6 border-t border-gray-100">
-            <div className="bg-blue-50 text-blue-600 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">
-              1/6 Selesai
-            </div>
-            
+          <div className="p-4 md:p-6 border-t border-gray-100">
+            <div className="bg-blue-50 text-blue-600 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">1/6 Selesai</div>
             <div className="space-y-2">
               <div className="flex items-center justify-between py-2 border-b border-gray-100">
                 <div className="flex items-center gap-3">
@@ -255,7 +219,6 @@ export default function DashboardPage() {
                 </div>
                 <ChevronDown size={16} className="text-gray-400" />
               </div>
-              
               <div className="py-2 border-b border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -264,8 +227,7 @@ export default function DashboardPage() {
                   </div>
                   <ChevronUp size={16} className="text-gray-400" />
                 </div>
-                
-                <div className="ml-8 bg-gray-50 rounded-lg p-5 flex border border-gray-100">
+                <div className="ml-8 bg-gray-50 rounded-lg p-4 md:p-5 flex border border-gray-100 flex-col md:flex-row">
                   <div className="flex-1">
                     <h3 className="text-base font-bold text-gray-900 mb-2">Tambah produk kamu ke marketplace</h3>
                     <p className="text-sm text-gray-600 mb-6">Tambah produk master ke semua marketplace kamu. <a href="#" className="text-blue-600 hover:underline">Lebih Lanjut</a></p>
@@ -274,15 +236,14 @@ export default function DashboardPage() {
                       <a href="#" className="text-sm font-semibold text-[#2a3a8c] hover:underline">Kaitkan Produk Marketplace ke Master</a>
                     </div>
                   </div>
-                  <div className="w-64 shrink-0 rounded-lg overflow-hidden relative shadow-sm border border-gray-200 bg-white flex items-center justify-center">
-                      <div className="absolute inset-0 bg-[#42509f] opacity-90 p-4">
-                        <div className="text-white text-xs font-bold mb-2 flex items-center gap-2"><span className="bg-yellow-400 text-gray-900 px-1 py-0.5 rounded text-[10px]">Step 2</span></div>
-                        <div className="text-white font-bold text-sm leading-tight">How to publish product to Marketplace</div>
-                      </div>
+                  <div className="w-full md:w-64 shrink-0 rounded-lg overflow-hidden relative shadow-sm border border-gray-200 bg-white flex items-center justify-center mt-4 md:mt-0">
+                    <div className="absolute inset-0 bg-[#42509f] opacity-90 p-4">
+                      <div className="text-white text-xs font-bold mb-2 flex items-center gap-2"><span className="bg-yellow-400 text-gray-900 px-1 py-0.5 rounded text-[10px]">Step 2</span></div>
+                      <div className="text-white font-bold text-sm leading-tight">How to publish product to Marketplace</div>
+                    </div>
                   </div>
                 </div>
               </div>
-              
               <div className="flex items-center justify-between py-2 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded-full border-2 border-gray-200 border-dashed"></div>
@@ -295,94 +256,59 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Section: Analisis Bisnis */}
       <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-                <h2 className="text-lg font-bold text-gray-800">Analisis Bisnis</h2>
-                <p className="text-xs text-gray-500 mt-1">Pembaruan terakhir pada {new Date().toLocaleString()}</p>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Analisis Bisnis</h2>
+            <p className="text-xs text-gray-500 mt-1">Pembaruan terakhir pada {new Date().toLocaleString()}</p>
+          </div>
+          <button className="border border-gray-200 bg-white px-3 py-1.5 rounded-md text-sm text-gray-600 font-medium hover:bg-gray-50 flex items-center gap-2">
+            Waktu Pesanan Dibuat <ChevronDown size={14}/>
+          </button>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="p-4 md:p-5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-lg font-bold text-gray-800">
+              Penjualan <Info size={14} className="text-gray-400" />
             </div>
-            <button className="border border-gray-200 bg-white px-3 py-1.5 rounded-md text-sm text-gray-600 font-medium hover:bg-gray-50 flex items-center gap-2">
-              Waktu Pesanan Dibuat <ChevronDown size={14}/>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none bg-white font-medium">
+                <option>Semua Marketplace</option>
+              </select>
+              <select className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none bg-white font-medium">
+                <option>{analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}</option>
+              </select>
+              <div className="text-sm text-gray-600 font-medium flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100">
+                Perbandingan: <span className="text-gray-900">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span> <ChevronDown size={14}/>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                  Penjualan <Info size={14} className="text-gray-400" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <select className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none bg-white font-medium">
-                    <option>Semua Marketplace</option>
-                  </select>
-                  <select className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none bg-white font-medium">
-                    <option>{analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}</option>
-                  </select>
-                  <div className="text-sm text-gray-600 font-medium flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100">
-                    Perbandingan: <span className="text-gray-900">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span> <ChevronDown size={14}/>
-                  </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-4 divide-x divide-gray-100">
-                <MetricTab 
-                  active={activeTab === 'potensi'} 
-                  onClick={() => setActiveTab('potensi')}
-                  title="Potensi Penjualan" 
-                  value={m ? formatRp(m.revenue.current) : "Rp0"} 
-                  trend={m ? trendLabel(m.revenue.changePct) : undefined} 
-                  trendUp={m ? trendUp(m.revenue.changePct) : false}
-                  subtext={`Total pesanan: ${potentialOrders}`} 
-                />
-                <MetricTab 
-                  active={activeTab === 'terjual'} 
-                  onClick={() => setActiveTab('terjual')}
-                  title="Produk Terjual" 
-                  value={m ? m.units.current.toString() : "0"} 
-                  trend={m ? trendLabel(m.units.changePct) : undefined} 
-                  trendUp={m ? trendUp(m.units.changePct) : false}
-                  subtext={`Rata-rata terjual harian: ${avgDailyUnits.toFixed(1)}`} 
-                />
-                <MetricTab 
-                  active={activeTab === 'penjualan'} 
-                  onClick={() => setActiveTab('penjualan')}
-                  title="Penjualan Selesai" 
-                  value={m ? formatRp(m.completedRevenue.current) : "Rp0"} 
-                  trend={m ? trendLabel(m.completedRevenue.changePct) : undefined} 
-                  trendUp={m ? trendUp(m.completedRevenue.changePct) : false}
-                  subtext={`Rata-rata penjualan: ${m ? formatRp(m.completedRevenue.current / 7) : "Rp0"}`} 
-                />
-                <MetricTab 
-                  active={activeTab === 'pesanan'} 
-                  onClick={() => setActiveTab('pesanan')}
-                  title="Pesanan Selesai" 
-                  value={m ? m.completedOrders.current.toString() : summary.completedOrders.toString()} 
-                  trend={m ? trendLabel(m.completedOrders.changePct) : undefined} 
-                  trendUp={m ? trendUp(m.completedOrders.changePct) : false}
-                  subtext={`Rata-rata pesanan harian: ${avgDailyCompletedOrders.toFixed(1)}`} 
-                />
-            </div>
-
-            <div className="p-6 h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dx={-10} />
-                    <Tooltip 
-                      contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                    />
-                    <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px', fontSize: '12px'}} />
-                    <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
-                    <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="#93c5fd" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100">
+            <MetricTab active={activeTab === 'potensi'} onClick={() => setActiveTab('potensi')} title="Potensi Penjualan" value={m ? formatRp(m.revenue.current) : "Rp0"} trend={m ? trendLabel(m.revenue.changePct) : undefined} trendUp={m ? trendUp(m.revenue.changePct) : false} subtext={`Total pesanan: ${potentialOrders}`} />
+            <MetricTab active={activeTab === 'terjual'} onClick={() => setActiveTab('terjual')} title="Produk Terjual" value={m ? m.units.current.toString() : "0"} trend={m ? trendLabel(m.units.changePct) : undefined} trendUp={m ? trendUp(m.units.changePct) : false} subtext={`Rata-rata terjual harian: ${avgDailyUnits.toFixed(1)}`} />
+            <MetricTab active={activeTab === 'penjualan'} onClick={() => setActiveTab('penjualan')} title="Penjualan Selesai" value={m ? formatRp(m.completedRevenue.current) : "Rp0"} trend={m ? trendLabel(m.completedRevenue.changePct) : undefined} trendUp={m ? trendUp(m.completedRevenue.changePct) : false} subtext={`Rata-rata penjualan: ${m ? formatRp(m.completedRevenue.current / 7) : "Rp0"}`} />
+            <MetricTab active={activeTab === 'pesanan'} onClick={() => setActiveTab('pesanan')} title="Pesanan Selesai" value={m ? m.completedOrders.current.toString() : summary.completedOrders.toString()} trend={m ? trendLabel(m.completedOrders.changePct) : undefined} trendUp={m ? trendUp(m.completedOrders.changePct) : false} subtext={`Rata-rata pesanan harian: ${avgDailyCompletedOrders.toFixed(1)}`} />
           </div>
+
+          <div className="p-4 md:p-6 h-[250px] md:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dx={-10} />
+                <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px', fontSize: '12px'}} />
+                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
+                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="#93c5fd" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 text-base font-bold text-gray-800 border-b border-gray-100 pb-4 mb-4">
               Toko Teratas <Info size={14} className="text-gray-400" />

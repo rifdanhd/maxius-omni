@@ -295,9 +295,9 @@ export default function InventoryStockPage() {
           </div>
 
           {loading ? (
-            <p className="p-8 text-center text-sm text-gray-500">Memuat…</p>
+            <p className="p-4 md:p-8 text-center text-sm text-gray-500">Memuat…</p>
           ) : rows.length === 0 ? (
-            <p className="p-8 text-center text-sm text-gray-500">Tidak ada varian di tab ini.</p>
+            <p className="p-4 md:p-8 text-center text-sm text-gray-500">Tidak ada varian di tab ini.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -482,9 +482,9 @@ export default function InventoryStockPage() {
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           {loading ? (
-            <p className="p-8 text-center text-sm text-gray-500">Memuat…</p>
+            <p className="p-4 md:p-8 text-center text-sm text-gray-500">Memuat…</p>
           ) : entries.length === 0 ? (
-            <p className="p-8 text-center text-sm text-gray-500">
+            <p className="p-4 md:p-8 text-center text-sm text-gray-500">
               Tidak ada kejadian oversell tercatat (SyncLog kind central_stock_deduct kosong).
             </p>
           ) : (

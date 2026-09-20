@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -8,7 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Home, ShoppingBag, Package, Warehouse, Tag, MessageSquare,
   Users, BarChart2, Settings, ChevronDown, ChevronUp, ClipboardList,
-  Compass, Grid2x2, BookOpen, Boxes, MessageCircle, Rss, ArrowLeftToLine, ArrowRightToLine, LogOut
+  Compass, Grid2x2, BookOpen, Boxes, MessageCircle, Rss, ArrowLeftToLine, ArrowRightToLine, LogOut, Menu
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -53,9 +53,9 @@ const MENU: MenuItem[] = [
       { key: "riwayat-inventori", label: "Riwayat Inventori", href: "/inventory/history" },
     ],
   },
-  { 
-    key: "wms", 
-    icon: Warehouse, 
+  {
+    key: "wms",
+    icon: Warehouse,
     label: "WMS",
     children: [
       { key: "inbound", label: "Inbound", href: "/wms/inbound" },
@@ -106,7 +106,6 @@ function isMenuGroup(item: MenuItem): item is MenuGroup {
   return "children" in item;
 }
 
-// Cache session-level agar submenu marketplace tidak fetch ulang tiap render/remount.
 let accountsCache: ConnectedPlatform[] | null = null;
 
 export default function Sidebar() {
@@ -116,6 +115,39 @@ export default function Sidebar() {
   const [marketplaceOpen, setMarketplaceOpen] = useState(true);
   const [platforms, setPlatforms] = useState<ConnectedPlatform[]>(() => accountsCache ?? []);
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Auto-close mobile sidebar on resize to desktop
+  useEffect(() => {
+    if (!isMobile) setMobileOpen(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    const handler = () => setMobileOpen((v) => !v);
+    window.addEventListener("toggle-sidebar", handler);
+    return () => window.removeEventListener("toggle-sidebar", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      document.body.style.overflow = '';
+      return;
+    }
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobile, mobileOpen]);
 
   useEffect(() => {
     if (accountsCache) return;
@@ -136,209 +168,177 @@ export default function Sidebar() {
         // Sidebar tetap render; submenu kosong hingga fetch berhasil.
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   async function handleLogout() {
-    try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: { "ngrok-skip-browser-warning": "true" },
-      });
-    } catch {
-      // Bersihkan localStorage tetap jalan meski API tidak tercapai.
-    }
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     router.push("/login");
   }
 
-  function toggleGroup(key: string) {
+  const toggleGroup = useCallback((key: string) => {
     if (collapsed) setCollapsed(false);
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
+  }, [collapsed]);
 
-  function isItemActive(item: MenuItem) {
+  const isItemActive = useCallback((item: MenuItem) => {
     if (isMenuLink(item)) return pathname === item.href;
     return item.children.some((c) => c.href === pathname);
-  }
+  }, [pathname]);
 
-  function platformActive(href: string) {
+  const platformActive = useCallback((href: string) => {
     return pathname === href || pathname.startsWith(`${href}/`);
-  }
+  }, [pathname]);
+
+  const sidebarBase = "fixed inset-y-0 left-0 z-40 flex flex-col bg-white border-r border-gray-200 transition-all duration-300";
+  const sidebarWidth = isMobile ? (mobileOpen ? "w-72" : "w-0 opacity-0 pointer-events-none") : (collapsed ? "w-20" : "w-64");
 
   return (
-    <aside className={`${collapsed ? 'w-20' : 'w-64'} shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen transition-all duration-300`}>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-        <div className="h-14 flex items-center justify-center shrink-0 relative aspect-[278/307]">
-          <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id Logo" fill className="object-contain" priority />
+    <>
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside className={`${sidebarBase} ${sidebarWidth}`}>
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 shrink-0">
+          <div className="h-14 flex items-center justify-center shrink-0 relative aspect-[278/307]">
+            <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id Logo" fill className="object-contain" priority />
+          </div>
+          {!collapsed && !isMobile && <span className="font-bold text-gray-900 text-xl">Maxius.id</span>}
+          {isMobile && mobileOpen && <span className="font-bold text-gray-900 text-lg ml-2">Maxius.id</span>}
         </div>
-        {!collapsed && <span className="font-bold text-gray-900 text-xl">Maxius.id</span>}
-      </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 hide-scrollbar">
-        
-        {/* Menu Items */}
-        {MENU.map((item) => {
-          const hasChildren = isMenuGroup(item);
-          const active = isItemActive(item);
-          const open = openGroups[item.key] && !collapsed;
+        <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 hide-scrollbar">
+          {MENU.map((item) => {
+            const hasChildren = isMenuGroup(item);
+            const active = isItemActive(item);
+            const open = (openGroups[item.key] ?? false) && !collapsed;
 
-          const buttonContent = (
-            <span className={`flex items-center ${collapsed ? 'justify-center w-full' : 'gap-3 w-full'}`}>
-              <item.icon size={18} className={active ? "text-gray-900" : "text-gray-500 group-hover:text-gray-700"} />
-              {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
-              {!collapsed && hasChildren && (open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />)}
-            </span>
-          );
+            const buttonContent = (
+              <span className={`flex items-center ${collapsed ? 'justify-center w-full' : 'gap-3 w-full'}`}>
+                <item.icon size={18} className={active ? "text-gray-900" : "text-gray-500 group-hover:text-gray-700"} />
+                {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
+                {!collapsed && hasChildren && (open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />)}
+              </span>
+            );
 
-          const className = "w-full flex items-center px-3 py-2.5 rounded-lg text-sm transition-colors group " +
-            (active
-              ? (collapsed ? "bg-gray-100 text-gray-900 justify-center" : "bg-gray-100 text-gray-900 font-medium border-l-[3px] border-gray-900")
-              : (collapsed ? "text-gray-600 hover:bg-gray-50 justify-center" : "text-gray-600 hover:bg-gray-50 font-medium"));
+            const className = "w-full flex items-center px-3 py-2.5 rounded-lg text-sm transition-colors group " +
+              (active
+                ? (collapsed ? "bg-gray-100 text-gray-900 justify-center" : "bg-gray-100 text-gray-900 font-medium border-l-[3px] border-gray-900")
+                : (collapsed ? "text-gray-600 hover:bg-gray-50 justify-center" : "text-gray-600 hover:bg-gray-50 font-medium"));
 
-          return (
-            <div key={item.key}>
-              {isMenuGroup(item) ? (
-                <button
-                  onClick={() => toggleGroup(item.key)}
-                  className={className}
-                  title={collapsed ? item.label : undefined}
-                >
-                  {buttonContent}
-                </button>
-              ) : (
-                <Link href={item.href} className={className} title={collapsed ? item.label : undefined}>
-                  {buttonContent}
-                </Link>
-              )}
+            return (
+              <div key={item.key}>
+                {isMenuGroup(item) ? (
+                  <button
+                    onClick={() => toggleGroup(item.key)}
+                    className={className}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    {buttonContent}
+                  </button>
+                ) : (
+                  <Link href={item.href} className={className} title={collapsed ? item.label : undefined}>
+                    {buttonContent}
+                  </Link>
+                )}
 
-              {/* Submenus */}
-              {"children" in item && open && !collapsed && (
-                <div className="mt-1 ml-9 flex flex-col gap-1 mb-2">
-                  {item.children.map((child) => {
-                    if ("submenu" in child && child.submenu) {
-                      const mpActive = platforms.some((p) => platformActive(p.href));
-                      return (
-                        <div key={child.key}>
-                          <button
-                            onClick={() => setMarketplaceOpen((v) => !v)}
-                            className={
-                              "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors group " +
-                              (mpActive
-                                ? "text-gray-900 font-semibold"
-                                : "text-gray-500 hover:text-gray-900")
-                            }
-                          >
-                            <span className="flex-1 text-left">{child.label}</span>
-                            {marketplaceOpen ? (
-                              <ChevronUp size={16} className="text-gray-400" />
-                            ) : (
-                              <ChevronDown size={16} className="text-gray-400" />
-                            )}
-                          </button>
-                          {marketplaceOpen && (
-                            <div className="mt-1 ml-2 flex flex-col gap-1">
-                              {platforms.length > 0 ? (
-                                platforms.map((p) => (
-                                  <Link
-                                    key={p.key}
-                                    href={p.href}
-                                    className={
+                {"children" in item && open && !collapsed && (
+                  <div className="mt-1 ml-9 flex flex-col gap-1 mb-2">
+                    {item.children.map((child) => {
+                      if ("submenu" in child && child.submenu) {
+                        const mpActive = platforms.some((p) => platformActive(p.href));
+                        return (
+                          <div key={child.key}>
+                            <button
+                              onClick={() => setMarketplaceOpen((v) => !v)}
+                              className={
+                                "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors group " +
+                                (mpActive ? "text-gray-900 font-semibold" : "text-gray-500 hover:text-gray-900")
+                              }
+                            >
+                              <span className="flex-1 text-left">{child.label}</span>
+                              {marketplaceOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                            </button>
+                            {marketplaceOpen && (
+                              <div className="mt-1 ml-2 flex flex-col gap-1">
+                                {platforms.length > 0 ? (
+                                  platforms.map((p) => (
+                                    <Link key={p.key} href={p.href} className={
                                       "text-left px-3 py-1.5 rounded-lg text-sm transition-colors block " +
-                                      (platformActive(p.href)
-                                        ? "text-gray-900 font-semibold"
-                                        : "text-gray-400 hover:text-gray-900")
-                                    }
-                                  >
-                                    {p.label}
-                                  </Link>
-                                ))
-                              ) : (
-                                <span className="px-3 py-1.5 text-xs text-gray-400 italic">
-                                  Belum ada channel terhubung.
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    return (
-                      <Link
-                        key={child.key}
-                        href={child.href!}
-                        className={
+                                      (platformActive(p.href) ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-gray-900")
+                                    }>
+                                      {p.label}
+                                    </Link>
+                                  ))
+                                ) : (
+                                  <span className="px-3 py-1.5 text-xs text-gray-400 italic">Belum ada channel terhubung.</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <Link key={child.key} href={child.href!} className={
                           "text-left px-3 py-2 rounded-lg text-sm transition-colors block " +
-                          (pathname === child.href
-                            ? "text-gray-900 font-semibold"
-                            : "text-gray-500 hover:text-gray-900")
-                        }
-                      >
-                        {child.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
+                          (pathname === child.href ? "text-gray-900 font-semibold" : "text-gray-500 hover:text-gray-900")
+                        }>
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
 
-      {/* Footer Actions */}
-      <div className="px-3 pb-3 pt-2 border-t border-gray-100 flex flex-col gap-2 bg-white">
-        {!collapsed ? (
-          <div className="flex items-center gap-2">
-            <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 transition-colors">
-              <MessageCircle size={14} /> Contact Us
-            </button>
-            <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 transition-colors">
-              <Rss size={14} /> Follow Channel
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <button className="w-full flex justify-center text-gray-700 bg-gray-100 rounded-lg py-2 hover:bg-gray-200 transition-colors" title="Contact Us">
-              <MessageCircle size={16} />
-            </button>
-            <button className="w-full flex justify-center text-gray-700 bg-gray-100 rounded-lg py-2 hover:bg-gray-200 transition-colors" title="Follow Channel">
-              <Rss size={16} />
-            </button>
-          </div>
-        )}
-        
-<button
-            onClick={() => setCollapsed(!collapsed)}
-            className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors mt-2`}
-            title={collapsed ? "Tampilkan Menu" : "Sembunyikan Menu"}
-          >
+        {/* Footer Actions */}
+        <div className="px-3 pb-3 pt-2 border-t border-gray-100 flex flex-col gap-2 bg-white">
+          {!collapsed && !isMobile ? (
+            <div className="flex items-center gap-2">
+              <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 transition-colors">
+                <MessageCircle size={14} /> Contact Us
+              </button>
+              <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 transition-colors">
+                <Rss size={14} /> Follow Channel
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <button className="w-full flex justify-center text-gray-700 bg-gray-100 rounded-lg py-2 hover:bg-gray-200 transition-colors" title="Contact Us">
+                <MessageCircle size={16} />
+              </button>
+              <button className="w-full flex justify-center text-gray-700 bg-gray-100 rounded-lg py-2 hover:bg-gray-200 transition-colors" title="Follow Channel">
+                <Rss size={16} />
+              </button>
+            </div>
+          )}
+
+          <button onClick={() => setCollapsed(!collapsed)} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors mt-2`} title={collapsed ? "Tampilkan Menu" : "Sembunyikan Menu"}>
             {collapsed ? <ArrowRightToLine size={18} /> : <ArrowLeftToLine size={18} />}
             {!collapsed && "Sembunyikan Menu"}
           </button>
 
-          <button
-            onClick={handleLogout}
-            className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors`}
-            title={collapsed ? "Keluar" : undefined}
-          >
-            <LogOut size={18} />
-            {!collapsed && "Keluar"}
+          <button onClick={handleLogout} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors`} title={collapsed ? "Keluar" : undefined}>
+            <LogOut size={18} /> {!collapsed && "Keluar"}
           </button>
-      </div>
+        </div>
+      </aside>
 
       <style jsx>{`
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-    </aside>
+    </>
   );
 }

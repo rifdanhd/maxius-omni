@@ -1097,7 +1097,7 @@ function BundleModal({
               className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none"
             />
           </label>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
               Kategori (opsional)
               <input

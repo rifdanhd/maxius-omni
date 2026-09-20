@@ -221,7 +221,7 @@ export default function SalesReportPage() {
       ) : (
         <>
           {/* Ringkasan */}
-          <div className="mb-4 grid grid-cols-3 gap-4">
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="text-sm font-medium text-gray-500">Total Omset</div>
               <div className="mt-1 text-2xl font-bold text-blue-600">
@@ -327,7 +327,7 @@ export default function SalesReportPage() {
           </div>
 
           {/* Breakdown */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-1 md:grid-cols-3">
             <BreakdownCard title="Per Marketplace" rows={omset?.byPlatform ?? []} />
             <BreakdownCard title="Per Akun" rows={omset?.byAccount ?? []} />
             <BreakdownCard title="Per Kategori" rows={omset?.byCategory ?? []} />

@@ -326,7 +326,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
               Belum ada gambar. Unggah gambar pertama produk ini.
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {images.map((img, i) => (
                 <div key={img.id} className="group relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

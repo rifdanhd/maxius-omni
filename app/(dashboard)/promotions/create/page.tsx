@@ -479,7 +479,7 @@ export default function PromotionCreatePage() {
 
   if (createResult) {
     return (
-      <div className="p-8 max-w-3xl mx-auto">
+      <div className="p-4 md:p-8 max-w-3xl mx-auto">
         {createResult.ok && createResult.resultStatus === "SUCCESS" ? (
           <div className="bg-white border border-emerald-200 rounded-xl shadow-sm p-6">
             <div className="flex items-start gap-3 text-emerald-700">
@@ -572,7 +572,7 @@ export default function PromotionCreatePage() {
   /* ------------------------------ Wizard ------------------------------ */
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <Link href="/promotions" className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#2a3a8c] mb-2">
         <ChevronLeft size={14} /> Kembali ke daftar promosi
       </Link>
@@ -982,7 +982,7 @@ export default function PromotionCreatePage() {
         <div className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Ringkasan</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <p>
                 <span className="text-gray-500">Toko:</span>{" "}
                 <b>{accounts.find((a) => a.id === accountId)?.label ?? "-"}</b>

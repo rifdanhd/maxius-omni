@@ -7,7 +7,7 @@ export default function SettingsAccountsPage() {
   const [activeTab, setActiveTab] = useState('integrasi');
 
   return (
-    <div className="p-8 font-sans">
+    <div className="p-4 md:p-8 font-sans">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col min-h-[600px]">
         {/* Tabs */}
         <div className="flex items-center border-b border-gray-200 px-2">

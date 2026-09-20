@@ -1006,7 +1006,7 @@ export default function TikTokEditPage() {
           <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
             Atur dan terapkan ke semua Varian
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
             <input
               type="number"
               min={0}
@@ -1107,7 +1107,7 @@ export default function TikTokEditPage() {
 
       {/* D. Foto Produk */}
       <Section title="D. Unggah Foto Produk" icon={ImagePlus} index={4} error={fieldErrors.images}>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 sm:grid-cols-5 gap-3">
           {images.map((img) => (
             <div key={img.uid} className="relative group aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-50">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1200,7 +1200,7 @@ export default function TikTokEditPage() {
 
       {/* F. Pengiriman & Garansi */}
       <Section title="F. Pengiriman & Garansi" icon={Check} index={6}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <Field label="Berat Produk" required error={fieldErrors.weight}>
             <div className="flex gap-2">
               <input
@@ -1229,7 +1229,7 @@ export default function TikTokEditPage() {
         </div>
 
         <Field label="Ukuran Produk" required>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {(["length", "width", "height"] as const).map((k) => (
               <div key={k}>
                 <label className="text-[11px] text-gray-500 mb-1 block capitalize">{k === "length" ? "Panjang" : k === "width" ? "Lebar" : "Tinggi"} (cm)</label>

@@ -378,7 +378,7 @@ export default function ProductCopyPage() {
                 </div>
               )}
 
-              <div className="grid gap-5 lg:grid-cols-2">
+              <div className="grid gap-5 lg:grid-cols-1 md:grid-cols-2">
                 {/* Gambar */}
                 <div>
                   <label className="font-semibold text-gray-700 text-sm flex items-center gap-1.5 mb-1.5">
@@ -388,7 +388,7 @@ export default function ProductCopyPage() {
                     Centang gambar yang ingin dipakai ({selected.size} dipilih)
                   </p>
                   {parsed && parsed.images.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                       {parsed.images.map((src) => {
                         const on = selected.has(src);
                         return (
@@ -431,7 +431,7 @@ export default function ProductCopyPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {!hasVariantMode() && (
                       <div>
                         <label className="font-semibold text-gray-700 text-sm block mb-1.5">
