@@ -11,6 +11,7 @@ import {
   Compass, Grid2x2, BookOpen, Boxes, MessageCircle, Rss, ArrowLeftToLine, ArrowRightToLine, LogOut, Menu
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 type MenuChild = { key: string; label: string; href?: string; submenu?: boolean };
 type MenuGroup = { key: string; icon: LucideIcon; label: string; children: MenuChild[] };
@@ -106,14 +107,12 @@ function isMenuGroup(item: MenuItem): item is MenuGroup {
   return "children" in item;
 }
 
-let accountsCache: ConnectedPlatform[] | null = null;
-
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ produk: true });
   const [marketplaceOpen, setMarketplaceOpen] = useState(true);
-  const [platforms, setPlatforms] = useState<ConnectedPlatform[]>(() => accountsCache ?? []);
+  const [platforms, setPlatforms] = useState<ConnectedPlatform[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -150,7 +149,6 @@ export default function Sidebar() {
   }, [isMobile, mobileOpen]);
 
   useEffect(() => {
-    if (accountsCache) return;
     let cancelled = false;
     (async () => {
       try {
@@ -161,7 +159,6 @@ export default function Sidebar() {
         if (!res.ok) return;
         const d = (await res.json()) as { platforms?: ConnectedPlatform[] };
         if (!cancelled && d.platforms) {
-          accountsCache = d.platforms;
           setPlatforms(d.platforms);
         }
       } catch {
@@ -175,6 +172,7 @@ export default function Sidebar() {
     try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    useAuthStore.getState().auth.reset();
     router.push("/login");
   }
 
