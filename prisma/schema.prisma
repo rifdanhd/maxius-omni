@@ -1,628 +1,135 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  // Pakai POSTGRES_URL (format postgres:// standar) dari Vercel Storage.
-  // JANGAN pakai DATABASE_URL — di Storage Prisma Postgres, var itu berisi
-  // URL accelerate (prisma+postgres://) yang butuh extension khusus dan
-  // ditolak Prisma Client plain ("the URL must start with postgresql://").
   url      = env("POSTGRES_URL")
 }
 
-model User {
-  id           String @id @default(uuid())
-  username     String @unique
-  passwordHash String
-
-  // izin melihat PII pembeli penuh. Default true = pemilik (user lama).
-  // true  → modal detail menampilkan nama/HP/alamat asli (dicatat PiiAccessLog).
-  // false → nama/HP/alamat selalu di-mask di semua tampilan.
-  canViewFullPii Boolean @default(true)
-
-  stockLedgers StockLedger[]
-  stockOpnames StockOpname[]
-
-  businesses UserBusiness[]
-}
-
-// Akses user ke brand (fase 1: semua user akses semua brand, tanpa role).
-model UserBusiness {
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@id([userId, businessId])
-}
-
-// Kredensial aplikasi partner per platform (ISV / Seller app).
-// Shopee: clientId=partner_id, clientSecret=partner_key.
-// TikTok Shop: clientId=app_key, clientSecret=app_secret, serviceId=service_id.
-// Secret disimpan plaintext — konsisten dgn accessToken/refreshToken existing.
-// Baris "Legacy ENV" = baca dari env (kolom secret null), dipakai akun lama.
 model AppCredential {
-  id           String  @id @default(uuid())
-  platform     String
-  label        String
-  clientId     String?
-  clientSecret String?
-  serviceId    String?
-  isActive     Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  accounts PlatformAccount[]
+  id              String            @id
+  platform        String
+  label           String
+  clientId        String?
+  clientSecret    String?
+  serviceId       String?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  PlatformAccount PlatformAccount[]
 
   @@unique([platform, label])
 }
 
-// 1 bisnis utama; "business-default" dibuat saat migrasi data.
-model Business {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  accounts PlatformAccount[]
-  products MasterProduct[]
-  users    UserBusiness[]
-}
-
-// 1 baris per akun per platform.
-// SQLite tidak mendukung enum Prisma → platform di-validasi di kode:
-// "SHOPEE" | "TOKOPEDIA" | "TIKTOK_SHOP"
-model PlatformAccount {
-  id         String   @id @default(uuid())
-  businessId String   @default("business-default")
-  business   Business @relation(fields: [businessId], references: [id])
-
-  platform String
-  label    String
-
-  // Kredensial app partner yg dipakai akun ini. Null = "Legacy ENV" (env).
-  appCredentialId String?
-  appCredential   AppCredential? @relation(fields: [appCredentialId], references: [id], onDelete: SetNull)
-
-  // Proteksi: akun dibekukan (mis. sengketa dgn Shopee Support).
-  // Akun frozen DITOLAK di authorize/refresh/sync/push.
-  isFrozen     Boolean @default(false)
-  frozenReason String?
-
-  appKey         String?
-  accessToken    String?
-  refreshToken   String?
-  tokenExpiresAt DateTime?
-  scope          String?
-  externalShopId String?
-  shopCipher     String?
-
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  mappings            ProductMapping[]
-  salesLogs           SalesLog[]
-  syncLogs            SyncLog[]
-  syncJobs            SyncJob[]
-  orders              Order[]
-  orderMappings       PlatformOrderMapping[]
-  shipments           Shipment[]
-  stockLedger         StockLedger[]
-  promotionActivities PromotionActivity[]
-  PromotionAuditLog   PromotionAuditLog[]
-  returnRequests      ReturnRequest[]
-  ReturnAuditLogs     ReturnAuditLog[]
-
-  @@unique([platform, externalShopId])
-}
-
-model MasterProduct {
-  id           String   @id @default(uuid())
-  name         String
-  // Kategori produk (opsional, string bebas). Dipakai untuk filter di halaman.
-  category     String?
-  // URL gambar produk (opsional).
-  imageUrl     String?
-  // Tipe produk (validasi di kode, SQLite tanpa enum): "single" (default,
-  // produk satuan biasa) atau "bundle" (paket gabungan beberapa varian lain
-  // via BundleItem; bundle tidak punya varian jual sendiri).
-  type         String   @default("single")
-  // Status siklus hidup produk master: "active" (default) atau "draft".
-  // Draft = hasil import Product Copy yang belum di-review/divariankan.
-  status       String   @default("active")
-  // Visibilitas produk (soft delete): false = "Nonaktif" — disembunyikan dari
-  // list default tapi SELURUH data historis (varian, mapping, ledger, order)
-  // tetap utuh. Terpisah dari `status` karena ortogonal (produk draft pun
-  // bisa dinonaktifkan tanpa kehilangan status draft-nya).
-  isActive     Boolean  @default(true)
-  // Jejak asal data (URL halaman produk sumber) bila produk dibuat via Product Copy.
-  importedFrom String?
-  businessId   String   @default("business-default")
-  business     Business @relation(fields: [businessId], references: [id])
-  threshold    Int      @default(20)
-
-  variants    ProductVariant[]
-  images      ProductImage[]
-  // Komposisi bundle (hanya terisi bila type = "bundle").
-  bundleItems BundleItem[]
-}
-
-// Galeri gambar per produk induk. Satu gambar bisa ditandai sebagai cover;
-// cover disinkronkan ke MasterProduct.imageUrl (dipakai Kelola Harga &
-// Produk Master). Urutan tampilan memakai `order` (naik), bukan createdAt.
-model ProductImage {
-  id              String        @id @default(cuid())
-  masterProduct   MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
-  masterProductId String
-  // URL gambar atau data URL (base64) bila diunggah dari file lokal.
-  url             String
-  isCover         Boolean       @default(false)
-  order           Int           @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Parent memiliki banyak varian (warna/ukuran); stok dilacak di varian.
-// safetyStock = buffer opsional: stok yang boleh tampil ke marketplace ialah
-// max(0, stock - safetyStock), jadi tidak pernah oversell dgn menjual buffer.
-model ProductVariant {
-  id          String  @id @default(uuid())
-  sku         String
-  stock       Int
-  // Label varian untuk tampilan (mis. "Hitam - M"). Null = gunakan SKU.
-  name        String?
-  // Buffer pelepas stok (opsional). 0 = nonaktif.
-  safetyStock Int     @default(0)
-  // Batas stok minimum per varian (halaman Inventori). Null = ikut threshold
-  // produk induk (MasterProduct.threshold) — konsisten dgn /api/stock-alerts.
-  minStock    Int?
-  // Toggle notifikasi saat varian masuk kategori Stok Menipis. Toggle saja:
-  // belum ada infrastruktur email di project (tanpa provider), jadi belum
-  // ada pengiriman aktif — lihat InventorySetting.notifyLowStockEmail.
-  notifyEmail Boolean @default(false)
-
-  // Harga default varian (dalam Rupiah). Null = belum di-set.
-  // Harga tayang di tiap marketplace = override mapping (ProductMapping.price)
-  // bila diisi, selain itu mengikuti harga default ini.
-  price          Float?
-  // Terakhir kali harga default diubah (null = belum pernah di-set).
-  priceUpdatedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  masterProductId  String
-  masterProduct    MasterProduct     @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
-  mappings         ProductMapping[]
-  salesLogs        SalesLog[]
-  orderItems       OrderItem[]
-  stockLedger      StockLedger[]
-  syncJobs         SyncJob[]
-  stockOpnameItems StockOpnameItem[]
-  // Bundle yang memakai varian ini sebagai komponen.
-  usedInBundles    BundleItem[]
-  returnItems      ReturnItem[]
-
-  @@unique([masterProductId, sku])
-}
-
-// BundleItem — komposisi produk bundle: 1 baris = "bundle ini memuat
-// componentVariant sebanyak qty". Komponen selalu ProductVariant milik master
-// SINGLE (tanpa bundle-bersarang, validasi di kode) supaya tidak ada rekursi.
-// Hapus bundle → item ikut terhapus (Cascade). Varian komponen yang dipakai
-// bundle tidak bisa dihapus (Restrict) — lepas dulu dari bundle-nya.
 model BundleItem {
-  id String @id @default(cuid())
-
-  bundleProductId String
-  bundleProduct   MasterProduct @relation(fields: [bundleProductId], references: [id], onDelete: Cascade)
-
+  id                 String         @id
+  bundleProductId    String
   componentVariantId String
-  componentVariant   ProductVariant @relation(fields: [componentVariantId], references: [id], onDelete: Restrict)
-
-  qty Int
-
-  createdAt DateTime @default(now())
+  qty                Int
+  createdAt          DateTime       @default(now())
+  MasterProduct      MasterProduct  @relation(fields: [bundleProductId], references: [id], onDelete: Cascade)
+  ProductVariant     ProductVariant @relation(fields: [componentVariantId], references: [id])
 
   @@unique([bundleProductId, componentVariantId])
   @@index([componentVariantId])
 }
 
-// Mapping varian → SKU/ID eksternal per platform account.
-// @default("") hanya untuk bootstrap migrasi (di-backfill dengan nilai nyata).
-model ProductMapping {
-  id         String @id @default(uuid())
-  channelSku String
-
-  variantId String         @default("")
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  // Harga override per toko/marketplace (Rupiah). Null = mengikuti harga
-  // default varian (ProductVariant.price). Tidak memengaruhi varian lain.
-  price          Float?
-  // Terakhir kali harga override diubah (null = belum pernah di-set).
-  priceUpdatedAt DateTime?
-
-  // Status & snapshot listing marketplace (hasil sync TikTok Shop).
-  // platformStatus = status asli API (ACTIVE/ACTIVATE, SELLER_DEACTIVATED,
-  // PLATFORM_DEACTIVATED, FREEZE, DELETED, DRAFT, PENDING, FAILED, SCHEDULED).
-  // platformProductId = ID produk TikTok (utk activate/deactivate & grouping).
-  // platformStatusRaw = payload produk mentah dari API (debug).
-  // platformStock = total stok tersedia (sum inventory semua gudang).
-  platformProductId String?
-  platformStatus    String?
-  // JSON string: payload produk mentah dari API (null = belum pernah sync).
-  platformStatusRaw String?
-  platformStock     Int?
-  platformTitle     String?
-  lastSyncedAt      DateTime?
-
-  promotionActivityItems PromotionActivityItem[]
-  promotionAuditLogs     PromotionAuditLog[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([accountId, variantId])
-  @@unique([accountId, channelSku])
+model Business {
+  id              String            @id
+  name            String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  MasterProduct   MasterProduct[]
+  PlatformAccount PlatformAccount[]
+  UserBusiness    UserBusiness[]
 }
 
-model SalesLog {
-  id         String   @id @default(uuid())
-  time       DateTime @default(now())
-  qty        Int
-  stockAfter Int
-  critical   Boolean
-  text       String
-  channelSku String
+model InventorySetting {
+  id                       String   @id @default("inventory-default")
+  lowStockDefaultThreshold Int      @default(20)
+  notifyLowStock           Boolean  @default(true)
+  notifyLowStockEmail      Boolean  @default(false)
+  syncPushTokopedia        Boolean  @default(true)
+  syncPushShopee           Boolean  @default(true)
+  syncPushTiktok           Boolean  @default(true)
+  opnameReminderFrequency  String   @default("monthly")
+  updatedAt                DateTime
+}
 
-  variantId String         @default("")
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
-
-  @@index([variantId, time])
+model MasterProduct {
+  id             String           @id
+  name           String
+  category       String?
+  imageUrl       String?
+  type           String           @default("single")
+  status         String           @default("active")
+  isActive       Boolean          @default(true)
+  importedFrom   String?
+  businessId     String           @default("business-default")
+  threshold      Int              @default(20)
+  BundleItem     BundleItem[]
+  Business       Business         @relation(fields: [businessId], references: [id])
+  ProductImage   ProductImage[]
+  ProductVariant ProductVariant[]
 }
 
 model Order {
-  id         String    @id @default(uuid())
-  orderNo    String
-  status     String
-  buyerName  String?
-  buyerEmail String?
-  amount     Float?
-  currency   String?
-  createTime DateTime?
-  paidTime   DateTime?
-
-  // Waktu SLA dari payload TikTok (nullable: tidak semua order/platform memilikinya).
-  // shippingDueTime: order auto-cancelled bila belum AWAITING_COLLECTION sebelum waktu ini.
-  // rtsSlaTime: batas terakhir shipping dari platform.
-  // ttsSlaTime: batas terakhir collection dari platform.
-  // recommendedShippingTime: waktu shipping yang direkomendasikan (SEA).
+  id                      String                 @id
+  orderNo                 String
+  status                  String
+  buyerName               String?
+  buyerEmail              String?
+  amount                  Float?
+  currency                String?
+  createTime              DateTime?
+  paidTime                DateTime?
   shippingDueTime         DateTime?
   rtsSlaTime              DateTime?
   ttsSlaTime              DateTime?
   recommendedShippingTime DateTime?
+  buyerNote               String?
+  sellerNote              String?
+  isCod                   Boolean?
+  paymentMethodName       String?
+  paymentJson             String?
+  recipientName           String?
+  recipientPhone          String?
+  recipientAddress        String?
+  piiAnonymizedAt         DateTime?
+  accountId               String
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime
+  PlatformAccount         PlatformAccount        @relation(fields: [accountId], references: [id])
+  OrderItem               OrderItem[]
+  PlatformOrderMapping    PlatformOrderMapping[]
+  ReturnRequest           ReturnRequest[]
+  Shipment                Shipment[]
 
-  // Data pembeli (PII). Phone/alamat terenkripsi AES-256-GCM; hanya decrypt
-  // saat user.canViewFullPii. piiAnonymizedAt diisi ketika retensi 90 hari
-  // habis (job scripts/anonymize-pii.cjs) — semua field PII lalu di-null-kan.
-  buyerNote         String?
-  // Catatan penjual (diisi saat "Atur Pengiriman"); ikut dicetak di label/picking list.
-  sellerNote        String?
-  isCod             Boolean?
-  paymentMethodName String?
-  // JSON mentah object `payment` dari TikTok (breakdown sisi pembeli).
-  // Disimpan mentah karena struktur berbeda antar platform (Shopee/Tokopedia).
-  paymentJson       String?
-  recipientName     String?
-  recipientPhone    String?
-  recipientAddress  String?
-  piiAnonymizedAt   DateTime?
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  items         OrderItem[]
-  orderMappings PlatformOrderMapping[]
-  shipments     Shipment[]
-  returns       ReturnRequest[]
-
-  @@index([createTime, status])
   @@index([accountId, createTime])
+  @@index([createTime, status])
 }
 
 model OrderItem {
-  id          String  @id @default(uuid())
-  qty         Int
-  price       Float?
-  channelSku  String
-  productId   String?
-  imageUrl    String?
-  // nama & label variasi dari payload platform (TikTok: product_name/sku_name).
-  productName String?
-  skuName     String?
-
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  id             String          @id
+  qty            Int
+  price          Float?
+  channelSku     String
+  productId      String?
+  imageUrl       String?
+  productName    String?
+  skuName        String?
+  orderId        String
+  variantId      String?
+  Order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ProductVariant ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@index([orderId])
   @@index([variantId, channelSku])
 }
 
-model PlatformOrderMapping {
-  id                    String @id @default(uuid())
-  externalOrderId       String
-  rawStatus             String
-  // Epoch seconds dari payload.data.update_time webhook TikTok terakhir yang
-  // DIPROSES. Dipakai sebagai guard idempotency (retry/out-of-order delivery).
-  lastWebhookUpdateTime Int?
-
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
-
-  @@unique([accountId, externalOrderId])
-}
-
-model Shipment {
-  id         String    @id @default(uuid())
-  externalId String?
-  carrier    String?
-  trackingNo String?
-  status     String
-  shippedAt  DateTime?
-
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
-
-  trackingEvents ShipmentTrackingEvent[]
-
-  @@unique([accountId, orderId, externalId])
-}
-
-model ShipmentTrackingEvent {
-  id          String   @id @default(uuid())
-  shipmentId  String
-  // action_code dari TikTok (sandbox terverifikasi: 20101). Int — kalau TikTok
-  // nanti mengirim kode non-numerik, cukup ubah ke String di migrasi lanjutan.
-  actionCode  Int?
-  // Deskripsi asli dari TikTok (bahasa Inggris). Bagian dari kunci dedupe.
-  description String
-  // Waktu event. PENTING: source TikTok = epoch MILIDETIK; service ingest
-  // yang konversi ke Date (÷1000) — unit salah = semua event tak terdedupe.
-  eventTime   DateTime
-
-  createdAt DateTime @default(now())
-
-  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-
-  // Dedupe fallback (TAHAP 0: TikTok TIDAK memberi event id unik).
-  // Ingest idempotent via createMany({ skipDuplicates: true }) / upsert.
-  @@unique([shipmentId, eventTime, description])
-  @@index([shipmentId, eventTime])
-}
-
-model PromotionActivity {
-  id String @id @default(uuid())
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  // Tervalidasi runtime: Get Activity mengembalikan activity_id sebagai String.
-  externalActivityId String
-  // Tervalidasi runtime pada DIRECT_DISCOUNT PRODUCT.
-  title              String
-  activityType       String
-  status             String
-  productLevel       String
-  durationType       String?
-
-  // Tervalidasi runtime: Get Activity mengembalikan begin_time/end_time
-  // dalam Unix epoch detik; service ingest menormalisasi ke DateTime.
-  startsAt DateTime
-  endsAt   DateTime
-
-  // Tervalidasi runtime: Get Activity mengembalikan create_time/update_time
-  // dalam Unix epoch milidetik; service ingest menormalisasi ke DateTime.
-  sourceCreatedAt    DateTime?
-  sourceUpdatedAt    DateTime?
-  // Audit nilai API asli agar unit dan presisi tetap utuh.
-  sourceCreatedEpoch String?
-  sourceCreatedUnit  String?
-  sourceUpdatedEpoch String?
-  sourceUpdatedUnit  String?
-
-  // Write dikonfirmasi dengan Get by ID, bukan Search, karena Search eventual consistent.
-  lastConfirmedAt DateTime?
-  rawPayload      String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  items PromotionActivityItem[]
-
-  @@unique([accountId, externalActivityId])
-  @@index([accountId, status])
-  @@index([accountId, startsAt])
-}
-
-model PromotionActivityItem {
-  id String @id @default(uuid())
-
-  activityId String
-  activity   PromotionActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-
-  // PRODUCT: "<platformProductId>:"; VARIATION: "<platformProductId>:<platformSkuId>".
-  externalItemKey   String
-  // Tervalidasi runtime pada PRODUCT: products[].id adalah TikTok product ID.
-  platformProductId String
-  // PRODUCT tidak mengembalikan SKU. VARIATION belum tervalidasi runtime;
-  // asumsi dokumentasi: SKU TikTok akan disimpan di sini setelah diuji ulang.
-  platformSkuId     String?
-
-  // Best-effort: activity remote dapat menunjuk listing yang belum di-mapping di Maxius.
-  productMappingId String?
-  productMapping   ProductMapping? @relation(fields: [productMappingId], references: [id], onDelete: SetNull)
-
-  // Tervalidasi runtime pada DIRECT_DISCOUNT: "10", yaitu String.
-  discount              String?
-  // DIRECT_DISCOUNT PRODUCT mengembalikan currency tanpa amount; amount nullable.
-  activityPriceAmount   String?
-  activityPriceCurrency String?
-  quantityLimit         Int?
-  quantityPerUser       Int?
-  usedQuantity          Int?
-  // Struktur item VARIATION belum tervalidasi runtime.
-  rawPayload            String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([activityId, externalItemKey])
-  @@index([platformProductId])
-  @@index([platformSkuId])
-  @@index([productMappingId])
-}
-
-// PromotionAuditLog — audit trail tindakan WRITE promotion (fitur buat activity
-// DIRECT_DISCOUNT dari Maxius). Beda dari monitoring: ini mengubah harga jual
-// nyata, jadi SETIAP create/attach/remove/deactivate dari Maxius tercatat:
-// siapa (userId+username snapshot), kapan, activity apa, payload, hasil.
-//
-// Pola penulisan: baris dibuat dengan resultStatus=PENDING SEBELUM call TikTok
-// (intent), lalu diupdate setelah response + konfirmasi Get by ID menjadi
-// SUCCESS | TIKTOK_ERROR | UNVERIFIED | PARTIAL.
-// UNVERIFIED = create sukses menurut response tapi Get by ID gagal/tidak cocok
-// → WAJIB memicu alert admin (banner halaman promosi + SyncLog) supaya bisa
-// segera di-deactivate manual; jangan sampai jadi zombie activity.
-//
-// userId SENGAJA tanpa FK (snapshot username disimpan) — audit harus tetap
-// utuh meski user dihapus. accountId FK Restrict (default) = akun yang punya
-// riwayat audit tidak bisa dihapus sembarangan (konsisten pola SyncLog).
-model PromotionAuditLog {
-  id        String          @id @default(uuid())
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
-
-  userId   String
-  username String
-
-  // CREATE_ACTIVITY | ATTACH_PRODUCTS | REMOVE_PRODUCTS | DEACTIVATE
-  action             String
-  externalActivityId String?
-  activityTitle      String?
-
-  // Request yang dikirim ke TikTok (JSON) — untuk investigasi insiden.
-  payloadSent String?
-
-  // PENDING | SUCCESS | TIKTOK_ERROR | UNVERIFIED | PARTIAL
-  resultStatus  String
-  tiktokCode    Int?
-  tiktokMessage String?
-  requestId     String?
-
-  // Ringkasan before/after item [{productId, discount, priceBefore, priceAfter}].
-  itemsBefore String?
-  itemsAfter  String?
-
-  // Untuk attach yang di-batch (batas 300 SKU/call).
-  batchIndex Int?
-  batchTotal Int?
-
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  ProductMapping   ProductMapping? @relation(fields: [productMappingId], references: [id])
-  productMappingId String?
-
-  @@index([accountId, createdAt])
-  @@index([userId, createdAt])
-  @@index([externalActivityId])
-  @@index([resultStatus])
-}
-
-model SyncLog {
-  id           String  @id @default(uuid())
-  direction    String
-  kind         String
-  status       String
-  message      String?
-  errorMessage String?
-  payload      String?
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
-
-  // Penanganan manual oversell (halaman Inventori > tab Oversells).
-  // Null = "Belum ditangani". Diisi saat admin menekan "Tandai sudah ditangani".
-  handledAt DateTime?
-  handledBy String?
-
-  createdAt DateTime @default(now())
-}
-
-// SyncJob — state machine push stok per (varian, akun, channelSku).
-// Beda dari SyncLog (append-only history, tidak pernah dimutasi): baris ini
-// DIMUTASI (PENDING → PROCESSING → SUCCESS, atau PENDING → … → FAILED +
-// retryCount/nextRetryAt/lastError) sehingga bisa di-query ulang untuk retry
-// otomatis & UI mismatch (PHASE B). Dibuat oleh enqueueSyncJobs() setiap stok
-// central berubah (via pushVariantStockToOthers — satu-satunya funnel).
-// status (validasi di kode, SQLite tanpa enum): PENDING | PROCESSING | SUCCESS | FAILED.
-model SyncJob {
-  id          String    @id @default(uuid())
-  channelSku  String
-  newSellable Int
-  status      String    @default("PENDING")
-  retryCount  Int       @default(0)
-  nextRetryAt DateTime?
-  lastError   String?
-
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  variantId String
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Coalesce level DB: hanya SATU job PENDING per (varian, akun, channelSku).
-  // Perubahan beruntun meng-update baris yang sama (nilai terakhir menang),
-  // bukan menumpuk baris. Baris SUCCESS/FAILED lama tetap tersimpan (histori).
-  @@unique([variantId, accountId, channelSku, status])
-  @@index([status, nextRetryAt])
-  @@index([variantId])
-}
-
-// Audit akses PII & aksi retensi. readonly — tidak ada route yang menulis.
-// READ_ORDER_DETAIL: user menampilkan detail order (bukan hanya status) di modal.
-// ANONYMIZE: job retensi menghapus PII order lama / hapus manual atas permintaan buyer.
 model PiiAccessLog {
-  id        String   @id @default(uuid())
+  id        String   @id
   userId    String
   username  String
   orderId   String?
@@ -631,234 +138,422 @@ model PiiAccessLog {
   detail    String?
   createdAt DateTime @default(now())
 
-  @@index([userId])
   @@index([orderId])
+  @@index([userId])
 }
 
-// StockLedger — audit trail stok gudang bersama (central inventory).
-// Setiap perubahan stok PhysicalVariant dicatat di sini; referenceId untuk
-// reason ORDER diisi order.id sehingga per-hitung bisa di-idempoten-kan
-// (webhook retry/out-of-order tidak akan memotong dua kali).
-// reason (validasi di kode): ORDER | ORDER_CANCELLED | ORDER_REFUNDED | SALE | STOCK_IN | MANUAL_ADJUSTMENT | SYNC_CORRECTION | STOCK_OPNAME | INIT
-model StockLedger {
-  id          String  @id @default(uuid())
-  changeQty   Int // negatif = pengurangan
-  reason      String
-  referenceId String? // mis. order.id utk reason ORDER / ORDER_CANCELLED
-  note        String?
-  stockAfter  Int
+model PlatformAccount {
+  id                   String                 @id
+  businessId           String                 @default("business-default")
+  platform             String
+  label                String
+  appKey               String?
+  accessToken          String?
+  refreshToken         String?
+  tokenExpiresAt       DateTime?
+  scope                String?
+  externalShopId       String?
+  shopCipher           String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  appCredentialId      String?
+  frozenReason         String?
+  isFrozen             Boolean                @default(false)
+  Order                Order[]
+  AppCredential        AppCredential?         @relation(fields: [appCredentialId], references: [id])
+  Business             Business               @relation(fields: [businessId], references: [id])
+  PlatformOrderMapping PlatformOrderMapping[]
+  ProductMapping       ProductMapping[]
+  PromotionActivity    PromotionActivity[]
+  PromotionAuditLog    PromotionAuditLog[]
+  ReturnAuditLog       ReturnAuditLog[]
+  ReturnRequest        ReturnRequest[]
+  SalesLog             SalesLog[]
+  Shipment             Shipment[]
+  StockLedger          StockLedger[]
+  SyncJob              SyncJob[]
+  SyncLog              SyncLog[]
 
-  variantId String
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  // accountId opsional: toko/akun pemicu (null utk penyesuaian manual global).
-  accountId String?
-  account   PlatformAccount? @relation(fields: [accountId], references: [id])
-
-  // userId opsional: admin yang melakukan penyesuaian manual (reason MANUAL_ADJUSTMENT).
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  // ANTI-OVERSELL (TUGAS 1): satu order hanya boleh memotong/restore stok
-  // SEKALI per varian — unique ini adalah kunci idempotency LEVEL DATABASE.
-  // Dua webhook/sync bersamaan utk order yang sama saling gugur: create ledger
-  // kedua gagal unique constraint → transaksi rollback → stok tidak terpotong
-  // dua kali. (reason MANUAL_ADJUSTMENT/SALE/INIT referenceId-nya null — SQLite
-  // unique menganggap NULL ≠ NULL, jadi baris tidak ber-reference aman.)
-  @@unique([reason, referenceId, variantId])
-  @@index([variantId, createdAt])
-  @@index([reason, referenceId])
+  @@unique([platform, externalShopId])
 }
 
-// FITUR STOK OPNAME — hitung fisik ulang stok gudang utk sebagian/semua varian,
-// lalu koreksi selisih dgn jejak. Single-gudang (tidak ada model Warehouse) →
-// tanpa pemilihan gudang. Alur status:
-//   PENDING     baru dibuat, varian ter-snapshot, belum ada input hitung
-//   IN_PROGRESS sedang dihitung (≥1 item sudah punya countedStock)
-//   COMPLETED   difinalisasi — selisih dikoreksi via adjustStockManually
-//               (jalur atomic central-stock, reason STOCK_OPNAME)
-//   CANCELLED   dibatalkan sebelum finalisasi — TIDAK menyentuh stok
-model StockOpname {
-  id     String  @id @default(uuid())
-  // Kode referensi manusiawi utk ledger/history: OPN-YYYYMMDD-XXXX.
-  code   String  @unique
-  status String
-  note   String?
+model PlatformOrderMapping {
+  id                    String          @id
+  externalOrderId       String
+  rawStatus             String
+  lastWebhookUpdateTime Int?
+  orderId               String
+  accountId             String
+  PlatformAccount       PlatformAccount @relation(fields: [accountId], references: [id])
+  Order                 Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  startedAt   DateTime  @default(now())
-  finalizedAt DateTime?
-  cancelledAt DateTime?
-
-  // Admin yang membuat & yang memfinalisasi (bisa beda orang).
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
-
-  items StockOpnameItem[]
-
-  @@index([status, startedAt])
+  @@unique([accountId, externalOrderId])
 }
 
-// Satu baris per varian per opname. systemStock = SNAPSHOT stok sistem saat
-// varian dimasukkan ke opname (bukan live) — selisih dihitung thd snapshot ini
-// agar angka konsisten walau stok bergerak selama opname berlangsung.
-model StockOpnameItem {
-  id        String         @id @default(cuid())
-  opnameId  String
-  opname    StockOpname    @relation(fields: [opnameId], references: [id], onDelete: Cascade)
-  variantId String
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+model ProductImage {
+  id              String        @id
+  masterProductId String
+  url             String
+  isCover         Boolean       @default(false)
+  order           Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  MasterProduct   MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+}
 
-  systemStock  Int // snapshot stok sistem saat dibuat
-  countedStock Int? // hasil hitung fisik admin (null = belum dihitung)
+model ProductMapping {
+  id                    String                  @id
+  channelSku            String
+  variantId             String                  @default("")
+  accountId             String
+  price                 Float?
+  priceUpdatedAt        DateTime?
+  platformProductId     String?
+  platformStatus        String?
+  platformStatusRaw     String?
+  platformStock         Int?
+  platformTitle         String?
+  lastSyncedAt          DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  PlatformAccount       PlatformAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ProductVariant        ProductVariant          @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  PromotionActivityItem PromotionActivityItem[]
+  PromotionAuditLog     PromotionAuditLog[]
 
-  @@unique([opnameId, variantId])
+  @@unique([accountId, channelSku])
+  @@unique([accountId, variantId])
+}
+
+model ProductVariant {
+  id              String            @id
+  sku             String
+  stock           Int
+  name            String?
+  safetyStock     Int               @default(0)
+  minStock        Int?
+  notifyEmail     Boolean           @default(false)
+  price           Float?
+  priceUpdatedAt  DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  masterProductId String
+  BundleItem      BundleItem[]
+  OrderItem       OrderItem[]
+  ProductMapping  ProductMapping[]
+  MasterProduct   MasterProduct     @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  ReturnItem      ReturnItem[]
+  SalesLog        SalesLog[]
+  StockLedger     StockLedger[]
+  StockOpnameItem StockOpnameItem[]
+  SyncJob         SyncJob[]
+
+  @@unique([masterProductId, sku])
+}
+
+model PromotionActivity {
+  id                    String                  @id
+  accountId             String
+  externalActivityId    String
+  title                 String
+  activityType          String
+  status                String
+  productLevel          String
+  durationType          String?
+  startsAt              DateTime
+  endsAt                DateTime
+  sourceCreatedAt       DateTime?
+  sourceUpdatedAt       DateTime?
+  sourceCreatedEpoch    String?
+  sourceCreatedUnit     String?
+  sourceUpdatedEpoch    String?
+  sourceUpdatedUnit     String?
+  lastConfirmedAt       DateTime?
+  rawPayload            String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  PlatformAccount       PlatformAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  PromotionActivityItem PromotionActivityItem[]
+
+  @@unique([accountId, externalActivityId])
+  @@index([accountId, startsAt])
+  @@index([accountId, status])
+}
+
+model PromotionActivityItem {
+  id                    String            @id
+  activityId            String
+  externalItemKey       String
+  platformProductId     String
+  platformSkuId         String?
+  productMappingId      String?
+  discount              String?
+  activityPriceAmount   String?
+  activityPriceCurrency String?
+  quantityLimit         Int?
+  quantityPerUser       Int?
+  usedQuantity          Int?
+  rawPayload            String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime
+  PromotionActivity     PromotionActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  ProductMapping        ProductMapping?   @relation(fields: [productMappingId], references: [id])
+
+  @@unique([activityId, externalItemKey])
+  @@index([platformProductId])
+  @@index([platformSkuId])
+  @@index([productMappingId])
+}
+
+model PromotionAuditLog {
+  id                 String          @id
+  accountId          String
+  userId             String
+  username           String
+  action             String
+  externalActivityId String?
+  activityTitle      String?
+  payloadSent        String?
+  resultStatus       String
+  tiktokCode         Int?
+  tiktokMessage      String?
+  requestId          String?
+  itemsBefore        String?
+  itemsAfter         String?
+  batchIndex         Int?
+  batchTotal         Int?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime
+  productMappingId   String?
+  PlatformAccount    PlatformAccount @relation(fields: [accountId], references: [id])
+  ProductMapping     ProductMapping? @relation(fields: [productMappingId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([externalActivityId])
+  @@index([resultStatus])
+  @@index([userId, createdAt])
+}
+
+model ReturnAuditLog {
+  id               String          @id
+  accountId        String
+  returnId         String?
+  externalReturnId String?
+  userId           String
+  username         String
+  action           String
+  payloadSent      String?
+  resultStatus     String
+  platformError    String?
+  platformMessage  String?
+  requestId        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime
+  PlatformAccount  PlatformAccount @relation(fields: [accountId], references: [id])
+  ReturnRequest    ReturnRequest?  @relation(fields: [returnId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([resultStatus])
+  @@index([returnId])
+}
+
+model ReturnItem {
+  id              String          @id
+  returnId        String
+  externalSkuId   String?
+  channelSku      String
+  productName     String?
+  skuName         String?
+  imageUrl        String?
+  qty             Int
+  price           Float?
+  variantId       String?
+  restockedAt     DateTime?
+  restockLedgerId String?
+  ReturnRequest   ReturnRequest   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  ProductVariant  ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@unique([returnId, channelSku])
   @@index([variantId])
 }
 
-// FITUR RETUR — 1 baris per pengajuan retur/refund dari platform (Shopee
-// return_sn / TikTok return_id). Model generik utk kedua platform: status
-// platform asli disimpan di rawStatus, status ternormalisasi di `status`
-// (validasi di kode, tanpa enum):
-//   PENDING_SELLER | APPROVED | REJECTED | PLATFORM_DECIDED | IN_TRANSIT |
-//   RECEIVED | REFUNDED | DISPUTED | CANCELLED | UNKNOWN
-// Ingest TikTok via webhook (type 12/64/65/67), Shopee via polling
-// get_return_list (tidak ada push retur di Shopee).
 model ReturnRequest {
-  id        String          @id @default(uuid())
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  // return_id (TikTok) / return_sn (Shopee). Bisa >1 retur per order.
-  externalReturnId String
-  externalOrderId  String?
-  // Null bila order eksternal belum pernah di-sync ke Order lokal.
-  orderId          String?
-  order            Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
-
-  // Status ternormalisasi (lihat komentar model) + status asli platform.
-  status     String
-  rawStatus  String
-  rawPayload String?
-
-  // RETURN_REFUND | REFUND_ONLY
-  type          String?
-  // NORMAL | IN_TRANSIT | ON_THE_SPOT (Shopee Return Refund Request Type).
-  requestType   String?
-  reason        String?
-  reasonText    String?
-  solution      String?
-  refundAmount  Float?
-  currency      String?
-  // JSON: array URL foto/video bukti buyer.
-  buyerEvidence String?
-  // JSON: detail negosiasi/compensation Shopee (fase 2).
-  negotiation   String?
-
-  // Keputusan platform (JUDGING Shopee / auto-approve TikTok), bukan seller.
-  isPlatformAutoApproved Boolean   @default(false)
-  // SLA seller (Shopee due_date / TikTok window) — sumber badge warning UI.
+  id                     String           @id
+  accountId              String
+  externalReturnId       String
+  externalOrderId        String?
+  orderId                String?
+  status                 String
+  rawStatus              String
+  rawPayload             String?
+  type                   String?
+  requestType            String?
+  reason                 String?
+  reasonText             String?
+  solution               String?
+  refundAmount           Float?
+  currency               String?
+  buyerEvidence          String?
+  negotiation            String?
+  isPlatformAutoApproved Boolean          @default(false)
   slaDueDate             DateTime?
-
-  firstSeenAt     DateTime  @default(now())
-  lastSyncedAt    DateTime?
-  statusChangedAt DateTime?
-
-  items     ReturnItem[]
-  auditLogs ReturnAuditLog[]
+  firstSeenAt            DateTime         @default(now())
+  lastSyncedAt           DateTime?
+  statusChangedAt        DateTime?
+  ReturnAuditLog         ReturnAuditLog[]
+  ReturnItem             ReturnItem[]
+  PlatformAccount        PlatformAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  Order                  Order?           @relation(fields: [orderId], references: [id])
 
   @@unique([accountId, externalReturnId])
   @@index([accountId, status])
   @@index([slaDueDate])
 }
 
-// Per SKU dalam retur. variantId di-resolve via OrderItem/ProductMapping;
-// null = ORPHAN (ditandai di UI, dipetakan manual seperti pola order).
-// restock: murni internal — admin konfirmasi barang diterima gudang lalu
-// "Terima & Tambah Stok" menulis StockLedger reason RETURN_RESTOCK dengan
-// referenceId = ReturnItem.id (idempoten via unique constraint ledger).
-model ReturnItem {
-  id       String        @id @default(uuid())
-  returnId String
-  return   ReturnRequest @relation(fields: [returnId], references: [id], onDelete: Cascade)
+model SalesLog {
+  id              String          @id
+  time            DateTime        @default(now())
+  qty             Int
+  stockAfter      Int
+  critical        Boolean
+  text            String
+  channelSku      String
+  variantId       String          @default("")
+  accountId       String
+  PlatformAccount PlatformAccount @relation(fields: [accountId], references: [id])
+  ProductVariant  ProductVariant  @relation(fields: [variantId], references: [id])
 
-  // sku_id (TikTok) / model_id (Shopee) versi string.
-  externalSkuId String?
-  channelSku    String
-  productName   String?
-  skuName       String?
-  imageUrl      String?
-  qty           Int
-  price         Float?
+  @@index([variantId, time])
+}
 
-  variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+model Shipment {
+  id                    String                  @id
+  externalId            String?
+  carrier               String?
+  trackingNo            String?
+  status                String
+  shippedAt             DateTime?
+  orderId               String
+  accountId             String
+  PlatformAccount       PlatformAccount         @relation(fields: [accountId], references: [id])
+  Order                 Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ShipmentTrackingEvent ShipmentTrackingEvent[]
 
-  restockedAt     DateTime?
-  restockLedgerId String?
+  @@unique([accountId, orderId, externalId])
+}
 
-  @@unique([returnId, channelSku])
+model ShipmentTrackingEvent {
+  id          String   @id
+  shipmentId  String
+  actionCode  Int?
+  description String
+  eventTime   DateTime
+  createdAt   DateTime @default(now())
+  Shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, eventTime, description])
+  @@index([shipmentId, eventTime])
+}
+
+model StockLedger {
+  id              String           @id
+  changeQty       Int
+  reason          String
+  referenceId     String?
+  note            String?
+  stockAfter      Int
+  variantId       String
+  accountId       String?
+  userId          String?
+  createdAt       DateTime         @default(now())
+  PlatformAccount PlatformAccount? @relation(fields: [accountId], references: [id])
+  User            User?            @relation(fields: [userId], references: [id])
+  ProductVariant  ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([reason, referenceId, variantId])
+  @@index([reason, referenceId])
+  @@index([variantId, createdAt])
+}
+
+model StockOpname {
+  id              String            @id
+  code            String            @unique
+  status          String
+  note            String?
+  startedAt       DateTime          @default(now())
+  finalizedAt     DateTime?
+  cancelledAt     DateTime?
+  userId          String?
+  User            User?             @relation(fields: [userId], references: [id])
+  StockOpnameItem StockOpnameItem[]
+
+  @@index([status, startedAt])
+}
+
+model StockOpnameItem {
+  id             String         @id
+  opnameId       String
+  variantId      String
+  systemStock    Int
+  countedStock   Int?
+  StockOpname    StockOpname    @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  ProductVariant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([opnameId, variantId])
   @@index([variantId])
 }
 
-// Audit aksi WRITE retur (approve/reject/confirm ke platform) — pola
-// PromotionAuditLog: PENDING sebelum call, lalu diupdate setelah response.
-// Aksi restock internal juga tercatat di sini (action RESTOCK, result SUCCESS).
-model ReturnAuditLog {
-  id        String          @id @default(uuid())
-  accountId String
-  account   PlatformAccount @relation(fields: [accountId], references: [id])
+model SyncJob {
+  id              String          @id
+  channelSku      String
+  newSellable     Int
+  status          String          @default("PENDING")
+  retryCount      Int             @default(0)
+  nextRetryAt     DateTime?
+  lastError       String?
+  accountId       String
+  variantId       String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  PlatformAccount PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ProductVariant  ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  returnId         String?
-  returnRequest    ReturnRequest? @relation(fields: [returnId], references: [id], onDelete: SetNull)
-  externalReturnId String?
-
-  userId   String
-  username String
-
-  // APPROVE | REJECT | CONFIRM | RESTOCK
-  action      String
-  // Request yang dikirim ke platform (JSON) — untuk investigasi insiden.
-  payloadSent String?
-
-  // PENDING | SUCCESS | PLATFORM_ERROR | UNVERIFIED
-  resultStatus    String
-  platformError   String?
-  platformMessage String?
-  requestId       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([accountId, createdAt])
-  @@index([returnId])
-  @@index([resultStatus])
+  @@unique([variantId, accountId, channelSku, status])
+  @@index([status, nextRetryAt])
+  @@index([variantId])
 }
 
-// Pengaturan Inventori — SINGLETON (satu baris id "inventory-default",
-// auto-dibuat saat pertama dibaca). Kolom eksplisit, bukan key-value, agar
-// type-safe & mudah dimigrasi.
-// - lowStockDefaultThreshold: ambang AWAL utk produk BARU (MasterProduct.
-//   threshold per-produk tetap sumber kebenaran utk produk existing — dapat
-//   diubah per produk di halaman Produk Master).
-// - notifyLowStock: gate in-app NotificationBell (/api/stock-alerts).
-//   notifyLowStockEmail disimpan tapi belum aktif — sistem belum punya
-//   infrastruktur email (tidak ada provider di repo).
-// - syncPush*: gate auto-push stok ke platform tsb di sync.service (dipakai
-//   saat adjustment manual/opname). Shopee & Tokopedia belum punya integrasi
-//   push — toggle disimpan utk saat integrasinya siap.
-// - opnameReminderFrequency: preferensi pengingat opname rutin. Belum ada
-//   infrastruktur cron di project — hanya preferensi, job-nya task terpisah.
-model InventorySetting {
-  id                       String  @id @default("inventory-default")
-  lowStockDefaultThreshold Int     @default(20)
-  notifyLowStock           Boolean @default(true)
-  notifyLowStockEmail      Boolean @default(false)
-  syncPushTokopedia        Boolean @default(true)
-  syncPushShopee           Boolean @default(true)
-  syncPushTiktok           Boolean @default(true)
-  opnameReminderFrequency  String  @default("monthly")
+model SyncLog {
+  id              String          @id
+  direction       String
+  kind            String
+  status          String
+  message         String?
+  errorMessage    String?
+  payload         String?
+  accountId       String
+  handledAt       DateTime?
+  handledBy       String?
+  createdAt       DateTime        @default(now())
+  PlatformAccount PlatformAccount @relation(fields: [accountId], references: [id])
+}
 
-  updatedAt DateTime @updatedAt
+model User {
+  id             String         @id
+  username       String         @unique
+  passwordHash   String
+  canViewFullPii Boolean        @default(true)
+  StockLedger    StockLedger[]
+  StockOpname    StockOpname[]
+  UserBusiness   UserBusiness[]
+}
+
+model UserBusiness {
+  userId     String
+  businessId String
+  createdAt  DateTime @default(now())
+  Business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, businessId])
 }

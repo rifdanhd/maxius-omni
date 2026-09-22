@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-const ACCESS_TOKEN = 'thisisjustarandomstring'
+const ACCESS_TOKEN = 'token'
 
 interface AuthUser {
   accountNo: string
@@ -49,7 +49,7 @@ export const useAuthStore = create<AuthState>()((set) => {
       accessToken: initToken,
       setAccessToken: (accessToken) =>
         set((state) => {
-          setStorageItem(ACCESS_TOKEN, JSON.stringify(accessToken))
+          setStorageItem(ACCESS_TOKEN, accessToken)
           return { ...state, auth: { ...state.auth, accessToken } }
         }),
       resetAccessToken: () =>

@@ -90,6 +90,11 @@ export default function LandingPage() {
 
       <main>
         <section className="max-w-6xl mx-auto px-6 pt-16 pb-12 text-center">
+          <div className="flex justify-center mb-4">
+            <span className="relative h-16 w-16 block">
+              <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id" fill className="object-contain" priority />
+            </span>
+          </div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1 mb-5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Live — maxius.id sudah online

@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Loader2 } from "lucide-react";
+import { useAuthStore } from "@/stores/auth-store";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -58,8 +59,13 @@ function LoginForm() {
 
       const data = await res.json();
 
+      if (!data.token) {
+        throw new Error("Server tidak mengembalikan token.");
+      }
+
       localStorage.setItem("token", data.token);
       localStorage.setItem("username", data.user.username);
+      useAuthStore.getState().auth.setAccessToken(data.token);
 
       // Redirect hanya setelah token tersimpan
       router.push("/dashboard");
