@@ -1,186 +1,129 @@
 import {
-  Construction,
-  LayoutDashboard,
-  Monitor,
-  Bug,
-  ListTodo,
-  FileX,
-  HelpCircle,
-  Lock,
-  Bell,
-  Package,
-  Palette,
-  ServerOff,
-  Settings,
-  Wrench,
-  UserCog,
-  UserX,
-  Users,
-  MessagesSquare,
-  ShieldCheck,
-  AudioWaveform,
-  Command,
-  GalleryVerticalEnd,
+  Home, Package, ShoppingBag, Boxes, Warehouse, Tag,
+  MessageSquare, Users, BarChart2, Settings, ClipboardList,
+  Compass, Grid2x2, BookOpen,
+  ArrowDownToLine, ArrowUpToLine,
+  Receipt, Clock, Store, Plug, AlertTriangle,
+  Command, GalleryVerticalEnd,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
   user: {
-    name: 'John Doe',
-    email: 'john@example.com',
-    avatar: '/avatars/shadcn.jpg',
+    name: 'Maxius User',
+    email: '',
+    avatar: '/avatars/default.png',
   },
   teams: [
     {
-      name: 'Shadcn Admin',
+      name: 'Maxius',
       logo: Command,
-      plan: 'Next.js + ShadcnUI',
-    },
-    {
-      name: 'Acme Inc',
-      logo: GalleryVerticalEnd,
-      plan: 'Enterprise',
-    },
-    {
-      name: 'Acme Corp.',
-      logo: AudioWaveform,
-      plan: 'Startup',
+      plan: 'Platform',
     },
   ],
   navGroups: [
     {
-      title: 'General',
+      title: 'Utama',
       items: [
         {
           title: 'Dashboard',
-          url: '/',
-          icon: LayoutDashboard,
+          url: '/dashboard',
+          icon: Home,
         },
         {
-          title: 'Tasks',
-          url: '/tasks',
-          icon: ListTodo,
+          title: 'Pesanan',
+          icon: ShoppingBag,
+          items: [
+            { title: 'Kelola Pesanan', url: '/orders', icon: Package },
+            { title: 'Kelola Pengembalian', url: '/orders/returns', icon: Boxes },
+          ],
         },
+      ],
+    },
+    {
+      title: 'Produk',
+      items: [
         {
-          title: 'Apps',
-          url: '/apps',
+          title: 'Produk',
           icon: Package,
-        },
-        {
-          title: 'Chats',
-          url: '/chats',
-          badge: '3',
-          icon: MessagesSquare,
-        },
-        {
-          title: 'Users',
-          url: '/users',
-          icon: Users,
-        },
-      ],
-    },
-    {
-      title: 'Pages',
-      items: [
-        {
-          title: 'Auth',
-          icon: ShieldCheck,
           items: [
-            {
-              title: 'Sign In',
-              url: '/sign-in',
-            },
-            {
-              title: 'Sign In (2 Col)',
-              url: '/sign-in-2',
-            },
-            {
-              title: 'Sign Up',
-              url: '/sign-up',
-            },
-            {
-              title: 'Forgot Password',
-              url: '/forgot-password',
-            },
-            {
-              title: 'OTP',
-              url: '/otp',
-            },
-          ],
-        },
-        {
-          title: 'Errors',
-          icon: Bug,
-          items: [
-            {
-              title: 'Unauthorized',
-              url: '/errors/unauthorized',
-              icon: Lock,
-            },
-            {
-              title: 'Forbidden',
-              url: '/errors/forbidden',
-              icon: UserX,
-            },
-            {
-              title: 'Not Found',
-              url: '/errors/not-found',
-              icon: FileX,
-            },
-            {
-              title: 'Internal Server Error',
-              url: '/errors/internal-server-error',
-              icon: ServerOff,
-            },
-            {
-              title: 'Maintenance Error',
-              url: '/errors/maintenance-error',
-              icon: Construction,
-            },
+            { title: 'Produk Master', url: '/products', icon: Package },
+            { title: 'Mapping Stok Terpusat', url: '/products/mapping', icon: Boxes },
+            { title: 'Kelola Harga', url: '/products/prices', icon: Tag },
+            { title: 'Kelola Gambar', url: '/products/images', icon: GalleryVerticalEnd },
+            { title: 'Product Copy', url: '/products/copy', icon: ClipboardList },
+            { title: 'Produk Marketplace', url: '/products/marketplace', icon: Compass },
+            { title: 'Shopee', url: '/products/marketplace/shopee', icon: ShoppingBag },
+            { title: 'TikTok Shop', url: '/products/marketplace/tiktok', icon: Compass },
+            { title: 'Tokopedia', url: '/products/marketplace/tokopedia', icon: Store },
           ],
         },
       ],
     },
     {
-      title: 'Other',
+      title: 'Stok & Inventori',
       items: [
         {
-          title: 'Settings',
+          title: 'Inventori',
+          icon: Boxes,
+          items: [
+            { title: 'Stok Varian', url: '/inventory', icon: Package },
+            { title: 'Stok Mismatch', url: '/inventory/mismatch', icon: AlertTriangle },
+            { title: 'Pengaturan Inventori', url: '/inventory/settings', icon: Settings },
+            { title: 'Stok Opname', url: '/inventory/opname', icon: ClipboardList },
+            { title: 'Riwayat Inventori', url: '/inventory/history', icon: Clock },
+          ],
+        },
+        {
+          title: 'WMS',
+          icon: Warehouse,
+          items: [
+            { title: 'Inbound', url: '/wms/inbound', icon: ArrowDownToLine },
+            { title: 'Outbound', url: '/wms/outbound', icon: ArrowUpToLine },
+            { title: 'Gudang', url: '/wms/warehouse', icon: Warehouse },
+            { title: 'Kelola Rak', url: '/wms/racks', icon: Grid2x2 },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'Bisnis',
+      items: [
+        { title: 'Promosi', url: '/promotions', icon: Tag },
+        { title: 'Chat', url: '/chat', icon: MessageSquare },
+        { title: 'Daftar Pelanggan', url: '/customers', icon: Users },
+      ],
+    },
+    {
+      title: 'Laporan',
+      items: [
+        { title: 'Laporan Penjualan', url: '/reports/sales', icon: Receipt },
+        { title: 'Laporan Stok', url: '/reports/stock', icon: BarChart2 },
+      ],
+    },
+    {
+      title: 'Lainnya',
+      items: [
+        {
+          title: 'Pengaturan',
           icon: Settings,
           items: [
-            {
-              title: 'Profile',
-              url: '/settings',
-              icon: UserCog,
-            },
-            {
-              title: 'Account',
-              url: '/settings/account',
-              icon: Wrench,
-            },
-            {
-              title: 'Appearance',
-              url: '/settings/appearance',
-              icon: Palette,
-            },
-            {
-              title: 'Notifications',
-              url: '/settings/notifications',
-              icon: Bell,
-            },
-            {
-              title: 'Display',
-              url: '/settings/display',
-              icon: Monitor,
-            },
+            { title: 'Pengaturan Toko', url: '/settings/accounts', icon: Store },
+            { title: 'Kelola Pengguna', url: '/settings/users', icon: Users },
           ],
         },
+        { title: 'Log Aktivitas', url: '/logs', icon: ClipboardList },
+        { title: 'Market', url: '/market', icon: Compass },
         {
-          title: 'Help Center',
-          url: '/help-center',
-          icon: HelpCircle,
+          title: 'Aplikasi',
+          icon: Grid2x2,
+          items: [
+            { title: 'Koneksi API', url: '/apps/api-connections', icon: Plug },
+          ],
         },
+        { title: 'Pusat Edukasi', url: '/education', icon: BookOpen },
       ],
     },
   ],
 }
+

@@ -18,6 +18,17 @@ import { sidebarData } from "./data/sidebar-data";
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout();
+  const accessToken = useAuthStore((state) => state.auth.accessToken);
+  const authUser = useAuthStore((state) => state.auth.user);
+  const displayName = authUser?.accountNo ?? (accessToken ? "User" : "Masuk");
+  const userEmail = authUser?.email ?? "";
+
+  const user = {
+    name: displayName,
+    email: userEmail,
+    avatar: "/avatars/default.png",
+  };
+
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
@@ -29,7 +40,7 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={sidebarData.user} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
