@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma as defaultPrisma } from "@/lib/db/prisma";
 import { businessWhere } from "@/lib/services/business-scope.service";
 
@@ -22,7 +24,7 @@ function validate(input: MappingInput) {
  */
 export function createProductMapping(input: MappingInput, prisma: PrismaLike = defaultPrisma) {
   validate(input);
-  return prisma.productMapping.create({ data: input });
+  return prisma.productMapping.create({ data: { id: crypto.randomUUID(), updatedAt: new Date(), ...input } });
 }
 
 /**
@@ -44,7 +46,7 @@ export async function bulkCreateProductMappings(
       result.skipped += 1;
       continue;
     }
-    await prisma.productMapping.create({ data: input });
+    await prisma.productMapping.create({ data: { id: crypto.randomUUID(), updatedAt: new Date(), ...input } });
     result.created += 1;
   }
   return result;

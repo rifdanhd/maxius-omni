@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import {
   STOCK_REASONS,
@@ -32,7 +34,7 @@ export async function restockReturnItem(
       qty: true,
       variantId: true,
       restockedAt: true,
-      return: {
+      returnRequest: {
         select: {
           id: true,
           externalReturnId: true,
@@ -45,7 +47,7 @@ export async function restockReturnItem(
   if (!item) return { ok: false, reason: "item retur tidak ditemukan" };
   if (item.restockedAt) return { ok: true, already: true };
   if (!item.variantId) return { ok: false, reason: "SKU retur belum ter-mapping ke varian" };
-  if (item.return.account.isFrozen) return { ok: false, reason: "akun platform dibekukan" };
+  if (item.returnRequest.account.isFrozen) return { ok: false, reason: "akun platform dibekukan" };
 
   const variant = await prisma.productVariant.findUnique({
     where: { id: item.variantId },
@@ -67,13 +69,14 @@ export async function restockReturnItem(
       stockAfter = v.stock;
       const ledger = await tx.stockLedger.create({
         data: {
+          id: crypto.randomUUID(),
           variantId: variant.id,
           changeQty,
           reason: STOCK_REASONS.RETURN_RESTOCK,
           referenceId: item.id,
-          note: `Retur ${item.return.externalReturnId} diterima gudang (oleh ${user.username})`,
+          note: `Retur ${item.returnRequest.externalReturnId} diterima gudang (oleh ${user.username})`,
           stockAfter,
-          accountId: item.return.accountId,
+          accountId: item.returnRequest.accountId,
           userId: user.id,
         },
       });
@@ -84,9 +87,11 @@ export async function restockReturnItem(
       });
       await tx.returnAuditLog.create({
         data: {
-          accountId: item.return.accountId,
-          returnId: item.return.id,
-          externalReturnId: item.return.externalReturnId,
+          id: crypto.randomUUID(),
+          accountId: item.returnRequest.accountId,
+          updatedAt: new Date(),
+          returnId: item.returnRequest.id,
+          externalReturnId: item.returnRequest.externalReturnId,
           userId: user.id,
           username: user.username,
           action: "RESTOCK",
@@ -109,7 +114,7 @@ export async function restockReturnItem(
 
   void ledgerId;
   // Dorong stok baru ke listing platform lain (non-blokir, pola restore order).
-  pushVariantStockToOthers(variant.id, item.return.accountId).catch((err) =>
+  pushVariantStockToOthers(variant.id, item.returnRequest.accountId).catch((err) =>
     console.error(`[ReturnRestock] push error varian ${variant.id}:`, err)
   );
 

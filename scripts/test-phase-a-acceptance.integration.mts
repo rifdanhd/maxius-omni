@@ -23,6 +23,7 @@
  *
  * Jalankan:  npx tsx scripts/test-phase-a-acceptance.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -71,19 +72,21 @@ const variant = await prisma.productVariant.create({
   data: { sku: "ORT-S-H", stock: 0, masterProductId: master.id },
 });
 await prisma.productMapping.create({
-  data: { channelSku: "SKU-172839", variantId: variant.id, accountId: shopeeAcc.id },
+  data: { id: crypto.randomUUID(), channelSku: "SKU-172839", variantId: variant.id, accountId: shopeeAcc.id, updatedAt: new Date() },
 });
 await prisma.productMapping.create({
-  data: { channelSku: "928372", variantId: variant.id, accountId: tiktokAcc.id },
+  data: { id: crypto.randomUUID(), channelSku: "928372", variantId: variant.id, accountId: tiktokAcc.id, updatedAt: new Date() },
 });
 
 async function mkOrder(accountId: string, orderNo: string, variantId: string, qty: number, channelSku: string) {
   return prisma.order.create({
     data: {
+      id: crypto.randomUUID(),
       orderNo,
       status: "AWAITING_SHIPMENT",
       accountId,
-      items: { create: { qty, channelSku, variantId } },
+      updatedAt: new Date(),
+      items: { create: { id: crypto.randomUUID(), qty, channelSku, variantId } },
     },
   });
 }

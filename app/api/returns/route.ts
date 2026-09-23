@@ -19,7 +19,7 @@ export const GET = withAuth(async (req) => {
 
   const whereStatus =
     tab === "warehouse"
-      ? { status: { in: ["IN_TRANSIT", "RECEIVED", "APPROVED", "REFUNDED"] }, items: { none: { restockedAt: { not: null }, variantId: { not: null } } } }
+      ? { status: { in: ["IN_TRANSIT", "RECEIVED", "APPROVED", "REFUNDED"] }, returnItem: { none: { restockedAt: { not: null }, variantId: { not: null } } } }
       : statusParam
         ? { status: { in: statusParam.split(",").map((s) => s.trim()).filter(Boolean) } }
         : {};
@@ -32,8 +32,8 @@ export const GET = withAuth(async (req) => {
           { externalReturnId: { contains: q } },
           { externalOrderId: { contains: q } },
           { reasonText: { contains: q } },
-          { items: { some: { channelSku: { contains: q } } } },
-          { items: { some: { productName: { contains: q } } } },
+          { returnItem: { some: { channelSku: { contains: q } } } },
+          { returnItem: { some: { productName: { contains: q } } } },
         ],
       }
     : {};
@@ -47,7 +47,7 @@ export const GET = withAuth(async (req) => {
       where,
       include: {
         account: { select: { id: true, platform: true, label: true } },
-        items: {
+        returnItem: {
           include: {
             variant: { select: { sku: true, name: true, masterProduct: { select: { name: true } } } },
           },

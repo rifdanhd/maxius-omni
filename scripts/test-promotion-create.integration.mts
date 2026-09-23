@@ -16,6 +16,7 @@
  *
  * Jalankan:  npx tsx scripts/test-promotion-create.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -69,7 +70,7 @@ async function makeVariantSku(sku: string, price: number | null, productId: stri
     data: { sku, stock: 10, price, masterProductId: master.id },
   });
   return prisma.productMapping.create({
-    data: { channelSku: sku, variantId: variant.id, accountId: account.id, price: overridePrice, platformProductId: productId, platformTitle: `Listing ${sku}` },
+    data: { id: crypto.randomUUID(), channelSku: sku, variantId: variant.id, accountId: account.id, price: overridePrice, platformProductId: productId, platformTitle: `Listing ${sku}`, updatedAt: new Date() },
   });
 }
 
@@ -81,7 +82,7 @@ const mForeign = await (async () => {
     data: { platform: "TIKTOK_SHOP", label: "Toko Lain", businessId: business.id },
   });
   const v = await prisma.productVariant.create({ data: { sku: "SKU-F", stock: 1, price: 10000, masterProductId: master.id } });
-  return prisma.productMapping.create({ data: { channelSku: "SKU-F", variantId: v.id, accountId: acc2.id, platformProductId: "PF" } });
+  return prisma.productMapping.create({ data: { id: crypto.randomUUID(), channelSku: "SKU-F", variantId: v.id, accountId: acc2.id, platformProductId: "PF", updatedAt: new Date() } });
 })();
 
 // Activity AKTIF yang memuat P1 → overlap G3 untuk mapping m1.
@@ -95,7 +96,8 @@ const activeAct = await prisma.promotionActivity.create({
     productLevel: "PRODUCT",
     startsAt: new Date(NOW - 86400000),
     endsAt: new Date(NOW + 5 * 86400000),
-    items: { create: { externalItemKey: "P1:", platformProductId: "P1" } },
+    updatedAt: new Date(),
+    items: { create: { id: crypto.randomUUID(), externalItemKey: "P1:", platformProductId: "P1", updatedAt: new Date() } },
   },
 });
 
@@ -110,7 +112,8 @@ await prisma.promotionActivity.create({
     productLevel: "PRODUCT",
     startsAt: new Date(NOW - 10 * 86400000),
     endsAt: new Date(NOW - 5 * 86400000),
-    items: { create: { externalItemKey: "P2:", platformProductId: "P2" } },
+    updatedAt: new Date(),
+    items: { create: { id: crypto.randomUUID(), externalItemKey: "P2:", platformProductId: "P2", updatedAt: new Date() } },
   },
 });
 
@@ -341,7 +344,7 @@ await ok("getPromotionAlerts: UNVERIFIED muncul di alert", async () => {
 });
 await ok("getPromotionAlerts: PENDING segar TIDAK alert; PENDING >30 menit → STALE_PENDING", async () => {
   const fresh = await prisma.promotionAuditLog.create({
-    data: { accountId: account.id, userId: "u", username: "tester", action: "CREATE_ACTIVITY", resultStatus: "PENDING" },
+    data: { id: crypto.randomUUID(), accountId: account.id, userId: "u", username: "tester", action: "CREATE_ACTIVITY", resultStatus: "PENDING", updatedAt: new Date() },
   });
   let alerts = await getPromotionAlerts();
   assert.ok(!alerts.some((a) => a.auditLogId === fresh.id), "PENDING segar = sedang jalan, bukan alert");

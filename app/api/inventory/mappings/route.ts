@@ -121,6 +121,7 @@ export const POST = withAuth(async (req) => {
 
     await prisma.stockLedger.create({
       data: {
+        id: crypto.randomUUID(),
         variantId,
         changeQty: newStock,
         reason: STOCK_REASONS.INIT,
@@ -153,7 +154,7 @@ export const POST = withAuth(async (req) => {
       });
       if (newImageUrl) {
         await tx.productImage.create({
-          data: { masterProductId: product.id, url: newImageUrl, isCover: true, order: 0 },
+          data: { id: crypto.randomUUID(), updatedAt: new Date(), masterProductId: product.id, url: newImageUrl, isCover: true, order: 0 },
         });
       }
       return variant;
@@ -163,6 +164,7 @@ export const POST = withAuth(async (req) => {
     // Catat stok awal sebagai titik nol audit.
     await prisma.stockLedger.create({
       data: {
+        id: crypto.randomUUID(),
         variantId,
         changeQty: newStock,
         reason: STOCK_REASONS.INIT,
@@ -174,7 +176,7 @@ export const POST = withAuth(async (req) => {
 
   try {
     const mapping = await prisma.productMapping.create({
-      data: { accountId, channelSku, variantId },
+      data: { id: crypto.randomUUID(), accountId, channelSku, variantId, updatedAt: new Date() },
       include: mappingInclude,
     });
     // Backfill OrderItem historis yang masih orphan utk SKU ini — analytics

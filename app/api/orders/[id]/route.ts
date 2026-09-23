@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
@@ -120,6 +121,7 @@ export const GET = withAuth(
   if (allowFull) {
     await prisma.piiAccessLog.create({
       data: {
+        id: crypto.randomUUID(),
         userId: req.user.id,
         username: req.user.username,
         orderId: order.id,

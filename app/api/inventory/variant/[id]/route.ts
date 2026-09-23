@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
@@ -94,6 +95,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
     // referenceId unik per perubahan (unique reason+referenceId+variantId).
     await prisma.stockLedger.create({
       data: {
+        id: crypto.randomUUID(),
         variantId: id,
         changeQty: 0,
         reason: STOCK_REASONS.SAFETY_STOCK_CHANGE,

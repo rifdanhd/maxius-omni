@@ -4,6 +4,7 @@
  * DB fixture ASLI (SQLite temp + migrate deploy) — tanpa mock prisma.
  * Jalankan: npx tsx scripts/test-orphan-sku.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -42,22 +43,24 @@ const acctB = await prisma.platformAccount.create({
 const master = await prisma.masterProduct.create({
   data: {
     name: "Master Lama",
-    variants: { create: [{ sku: "MASTER-1", stock: 5 }, { sku: "MASTER-2", stock: 7 }] },
+    productVariant: { create: [{ sku: "MASTER-1", stock: 5 }, { sku: "MASTER-2", stock: 7 }] },
   },
-  include: { variants: true },
+  include: { productVariant: true },
 });
-const variant = master.variants.find((v) => v.sku === "MASTER-1");
-const variant2 = master.variants.find((v) => v.sku === "MASTER-2");
+const variant = master.productVariant.find((v) => v.sku === "MASTER-1");
+const variant2 = master.productVariant.find((v) => v.sku === "MASTER-2");
 assert.ok(variant && variant2, "varian fixture harus ada");
 
 async function mkOrder(acctId: string, status: string, items: Array<{ channelSku: string; qty: number; productName: string }>) {
   return prisma.order.create({
     data: {
+      id: crypto.randomUUID(),
       orderNo: `T${Math.random().toString(36).slice(2, 10)}`,
       status,
       accountId: acctId,
       createTime: new Date(),
-      items: { create: items.map((i) => ({ ...i, price: 1000 })) },
+      updatedAt: new Date(),
+      items: { create: items.map((i) => ({ id: crypto.randomUUID(), ...i, price: 1000 })) },
     },
     include: { items: true },
   });
@@ -95,7 +98,7 @@ ok("deteksi: 3 orphan (SKU-X 3pcs/2order, SKU-Z, SKU-Q), CANCELLED dikecualikan"
 /* 2. Mapping row sudah ada (order mendahului mapping) → existingMappingId terisi.
  *    Pakai variant2 supaya varian MASTER-1 tetap bebas utk kasus lain. */
 const existingMapping = await prisma.productMapping.create({
-  data: { accountId: acctA.id, channelSku: "SKU-Z", variantId: variant2!.id },
+  data: { id: crypto.randomUUID(), accountId: acctA.id, channelSku: "SKU-Z", variantId: variant2!.id, updatedAt: new Date() },
 });
 const orphans2 = await findOrphanSkus("business-default");
 const z = orphans2.find((o) => o.channelSku === "SKU-Z");

@@ -858,9 +858,11 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
         imageUrl,
         status: "draft",
         importedFrom: input.sourceUrl ? String(input.sourceUrl).trim() : null,
-        variants: { create: variantsForCreate },
-        images: {
+        productVariant: { create: variantsForCreate },
+        productImage: {
           create: images.map((url, i) => ({
+            id: crypto.randomUUID(),
+            updatedAt: new Date(),
             url,
             isCover: i === 0,
             order: i,

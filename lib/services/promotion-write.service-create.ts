@@ -14,6 +14,8 @@
  * gagal / tidak cocok) → WAJIB memicu alert admin (lihat lib/services/
  * promotion-alert.service.ts), bukan SUCCESS palsu.
  */
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import {
   MAX_PRODUCTS_PER_BATCH,
@@ -335,6 +337,7 @@ export async function createPromotion(
   // crash di tengah tetap meninggalkan jejak intent yang bisa dilihat admin.
   const audit = await prisma.promotionAuditLog.create({
     data: {
+      id: crypto.randomUUID(),
       accountId: req.accountId,
       userId: req.userId,
       username: req.username,
@@ -343,6 +346,7 @@ export async function createPromotion(
       payloadSent,
       resultStatus: "PENDING",
       itemsBefore: JSON.stringify(products.map((p) => ({ productId: p.platformProductId, discount: p.discount, priceBefore: p.priceBefore }))),
+      updatedAt: new Date(),
     },
   });
 

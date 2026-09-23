@@ -18,6 +18,8 @@
  *  - Semua pembuatan varian baru mencatat StockLedger reason INIT (stok awal
  *    0 / yang diminta user) — audit trail tetap utuh, tidak ada UPDATE diam.
  */
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
@@ -149,7 +151,7 @@ export async function mapOrphanToVariant(params: {
 
   const mapping = await prisma.productMapping.upsert({
     where: { accountId_channelSku: { accountId: params.accountId, channelSku: params.channelSku } },
-    create: { accountId: params.accountId, channelSku: params.channelSku, variantId: params.variantId },
+    create: { id: crypto.randomUUID(), accountId: params.accountId, channelSku: params.channelSku, variantId: params.variantId, updatedAt: new Date() },
     update: { variantId: params.variantId },
     select: { id: true },
   });
@@ -203,27 +205,30 @@ export async function mapOrphanToNewMaster(params: {
         businessId: params.businessId,
         ...(params.category?.trim() ? { category: params.category.trim() } : {}),
         threshold: settings.lowStockDefaultThreshold,
-        variants: {
+        productVariant: {
           create: [{ sku, stock, safetyStock }],
         },
       },
-      select: { id: true, variants: { select: { id: true } } },
+      select: { id: true, productVariant: { select: { id: true } } },
     });
-    const variant = product.variants[0];
+    const variant = product.productVariant[0];
     if (!variant) throw new Error("Gagal membuat varian baru.");
 
     const mapping = await tx.productMapping.create({
       data: {
+        id: crypto.randomUUID(),
         accountId: params.accountId,
         channelSku: params.channelSku,
         variantId: variant.id,
         ...(params.platformTitle ? { platformTitle: params.platformTitle } : {}),
+        updatedAt: new Date(),
       },
       select: { id: true },
     });
 
     await tx.stockLedger.create({
       data: {
+        id: crypto.randomUUID(),
         variantId: variant.id,
         changeQty: stock,
         reason: STOCK_REASONS.INIT,

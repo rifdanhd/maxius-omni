@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { getPackageTracking } from "@/lib/integrations/tiktokShop";
 import { NON_FINAL_ORDER_STATUSES } from "@/lib/services/shipment-reconcile.service";
@@ -92,6 +93,7 @@ export async function ingestOrderTrackingEvents(input: {
 
     const seen = new Set<string>();
     const rows: Array<{
+      id: string;
       shipmentId: string;
       actionCode: number | null;
       description: string;
@@ -117,6 +119,7 @@ export async function ingestOrderTrackingEvents(input: {
       // agar kolom Int? tetap bersih; kalau TikTok nanti kirim non-numerik, ubah ke String.
       const code = Number(ev.action_code);
       rows.push({
+        id: crypto.randomUUID(),
         shipmentId: shipment.id,
         actionCode: Number.isFinite(code) && code !== 0 ? code : null,
         description,

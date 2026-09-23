@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import {
   getPromotionActivity,
@@ -79,6 +80,7 @@ async function storeItem(
       },
     },
     create: {
+      id: crypto.randomUUID(),
       activityId,
       externalItemKey: itemKey(productId, skuId),
       platformProductId: productId,
@@ -91,6 +93,7 @@ async function storeItem(
       quantityPerUser: asNumber(source.quantity_per_user) ?? asNumber(product.quantity_per_user),
       usedQuantity: asNumber(source.used_quantity) ?? asNumber(product.used_quantity),
       rawPayload: JSON.stringify(source),
+    updatedAt: new Date(),
     },
     update: {
       platformSkuId: skuId,
@@ -102,6 +105,7 @@ async function storeItem(
       quantityPerUser: asNumber(source.quantity_per_user) ?? asNumber(product.quantity_per_user),
       usedQuantity: asNumber(source.used_quantity) ?? asNumber(product.used_quantity),
       rawPayload: JSON.stringify(source),
+    updatedAt: new Date(),
     },
   });
   return true;
@@ -127,6 +131,7 @@ async function storeConfirmedActivity(accountId: string, payload: RemoteObject) 
   const activity = await prisma.promotionActivity.upsert({
     where: { accountId_externalActivityId: { accountId, externalActivityId } },
     create: {
+      id: crypto.randomUUID(),
       accountId,
       externalActivityId,
       title,
@@ -144,6 +149,7 @@ async function storeConfirmedActivity(accountId: string, payload: RemoteObject) 
       sourceUpdatedUnit: updatedEpoch === null ? null : "milliseconds",
       lastConfirmedAt: new Date(),
       rawPayload: JSON.stringify(data),
+    updatedAt: new Date(),
     },
     update: {
       title,
@@ -161,6 +167,7 @@ async function storeConfirmedActivity(accountId: string, payload: RemoteObject) 
       sourceUpdatedUnit: updatedEpoch === null ? null : "milliseconds",
       lastConfirmedAt: new Date(),
       rawPayload: JSON.stringify(data),
+    updatedAt: new Date(),
     },
   });
 

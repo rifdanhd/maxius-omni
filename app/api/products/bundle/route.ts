@@ -118,9 +118,9 @@ export const POST = withAuth(async (req) => {
     return tx.masterProduct.findUniqueOrThrow({
       where: { id: product.id },
       include: {
-        bundleItems: {
+        bundleItem: {
           include: {
-            componentVariant: {
+            variant: {
               select: {
                 id: true,
                 sku: true,

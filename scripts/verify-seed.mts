@@ -4,11 +4,11 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const [users, accounts, products, variants, mappings] = await Promise.all([
+  const [users, accounts, products, variants, productMapping] = await Promise.all([
     prisma.user.count(),
     prisma.platformAccount.findMany({ select: { id: true, platform: true, label: true, accessToken: true } }),
     prisma.masterProduct.findMany({
-      include: { variants: { include: { mappings: true } } },
+      include: { productVariant: { include: { productMapping: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.productVariant.count(),
@@ -20,11 +20,11 @@ async function main() {
   for (const a of accounts) {
     console.log(`  - [${a.platform}] ${a.label} (id=${a.id}, token=${a.accessToken ? "ada" : "kosong"})`);
   }
-  console.log(`Produk master: ${products.length}, varian: ${variants}, mapping: ${mappings}`);
+  console.log(`Produk master: ${products.length}, varian: ${variants}, mapping: ${productMapping}`);
   for (const p of products) {
-    const v = p.variants[0];
+    const v = p.productVariant[0];
     console.log(
-      `  - ${p.name} (${p.type}, ${p.status}, isActive=${p.isActive}) → varian SKU=${v?.sku} stock=${v?.stock} threshold=${p.threshold}, mapping=${v?.mappings.length}`
+      `  - ${p.name} (${p.type}, ${p.status}, isActive=${p.isActive}) → varian SKU=${v?.sku} stock=${v?.stock} threshold=${p.threshold}, mapping=${v?.productMapping?.length ?? 0}`
     );
   }
 

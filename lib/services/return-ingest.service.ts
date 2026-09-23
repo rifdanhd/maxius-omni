@@ -190,7 +190,7 @@ export async function upsertTikTokReturn(
       firstSeenAt: toDate(raw.create_time) ?? new Date(),
       lastSyncedAt: new Date(),
       statusChangedAt: statusChanged ? new Date() : null,
-      items: {
+      returnItem: {
         create: items.map((it) => ({
           externalSkuId: it.externalSkuId,
           channelSku: it.channelSku,
@@ -341,7 +341,7 @@ export async function upsertShopeeReturn(
       firstSeenAt: toDate(source.create_time) ?? new Date(),
       lastSyncedAt: new Date(),
       statusChangedAt: statusChanged ? new Date() : null,
-      items: {
+      returnItem: {
         create: items.map((it) => ({
           externalSkuId: it.externalSkuId,
           channelSku: it.channelSku,

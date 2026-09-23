@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { syncStockToMarketplaces } from "@/lib/services/sync.service";
 import { enqueueSyncJobs } from "@/lib/services/sync-job.service";
@@ -109,14 +110,14 @@ export async function pushVariantStockToOthers(
     select: {
       stock: true,
       safetyStock: true,
-      mappings: { select: { accountId: true, channelSku: true } },
+       productMapping: { select: { accountId: true, channelSku: true } },
     },
   });
   if (!variant) return;
 
-  const targets = excludeAccountId
-    ? variant.mappings.filter((m) => m.accountId !== excludeAccountId)
-    : variant.mappings;
+   const targets = excludeAccountId
+     ? variant.productMapping.filter((m) => m.accountId !== excludeAccountId)
+     : variant.productMapping;
   if (targets.length === 0) return;
 
   const newStock = effectiveStock(variant.stock, variant.safetyStock);
@@ -269,19 +270,20 @@ async function atomicDeduct(
     where: { id: entry.variantId },
     select: { stock: true },
   });
-  await tx.stockLedger.create({
-    data: {
-      variantId: entry.variantId,
-      changeQty: -entry.qty,
-      reason: STOCK_REASONS.ORDER,
-      // referenceId WAJIB terisi (order id) — bagian dari kunci idempotency
-      // unique (reason, referenceId, variantId).
-      referenceId: orderId,
-      note: entry.note,
-      stockAfter: after.stock,
-      accountId: entry.accountId,
-    },
-  });
+   await tx.stockLedger.create({
+     data: {
+       id: crypto.randomUUID(),
+       variantId: entry.variantId,
+       changeQty: -entry.qty,
+       reason: STOCK_REASONS.ORDER,
+       // referenceId WAJIB terisi (order id) — bagian dari kunci idempotency
+       // unique (reason, referenceId, variantId).
+       referenceId: orderId,
+       note: entry.note ?? null,
+       stockAfter: after.stock,
+       accountId: entry.accountId ?? null,
+     },
+   });
   return { variantId: entry.variantId, changeQty: -entry.qty, stockAfter: after.stock };
 }
 
@@ -365,17 +367,18 @@ export async function restoreStockForCanceledOrder(
         });
         // Unique (reason, referenceId, variantId) → restore ganda bersamaan
         // saling gugur (rollback), stok tidak bertambah dua kali.
-        await tx.stockLedger.create({
-          data: {
-            variantId: d.variantId,
-            changeQty,
-            reason,
-            referenceId: order.id,
-            note: `Restore order ${order.orderNo} (status ${order.status}, batal/refund)`,
-            stockAfter,
-            accountId: order.accountId,
-          },
-        });
+         await tx.stockLedger.create({
+           data: {
+             id: crypto.randomUUID(),
+                          variantId: d.variantId,
+             changeQty,
+             reason,
+             referenceId: order.id,
+             note: `Restore order ${order.orderNo} (status ${order.status}, batal/refund)`,
+             stockAfter,
+             accountId: order.accountId,
+           },
+         });
         restores.push({ variantId: d.variantId, changeQty, stockAfter });
       }
     });
@@ -439,18 +442,19 @@ export async function adjustStockAbsoluteInTx(
     where: { id: variant.id },
     data: { stock: newStock },
   });
-  await tx.stockLedger.create({
-    data: {
-      variantId: variant.id,
-      changeQty,
-      reason: params.reason,
-      referenceId: params.referenceId ?? null,
-      note: params.note?.trim() || `Sesuaikan stok ${variant.sku}`,
-      stockAfter: newStock,
-      accountId: null,
-      userId: params.userId ?? null,
-    },
-  });
+   await tx.stockLedger.create({
+     data: {
+       id: crypto.randomUUID(),
+       variantId: variant.id,
+       changeQty,
+       reason: params.reason,
+       referenceId: params.referenceId ?? null,
+       note: params.note?.trim() || `Sesuaikan stok ${variant.sku}`,
+       stockAfter: newStock,
+       accountId: null,
+       userId: params.userId ?? null,
+     },
+   });
   return { ok: true, changeQty, stockAfter: newStock };
 }
 
@@ -557,18 +561,19 @@ async function adjustStockIncrement(
         where: { id: params.variantId },
         select: { stock: true, sku: true },
       });
-      await tx.stockLedger.create({
-        data: {
-          variantId: params.variantId,
-          changeQty: qty,
-          reason: ledgerReason,
-          referenceId: null,
-          note: params.note?.trim() || `Barang masuk +${qty} pcs (${after.sku})`,
-          stockAfter: after.stock,
-          accountId: null,
-          userId: params.adjustedByUserId ?? null,
-        },
-      });
+       await tx.stockLedger.create({
+         data: {
+           id: crypto.randomUUID(),
+                      variantId: params.variantId,
+           changeQty: qty,
+           reason: ledgerReason,
+           referenceId: null,
+           note: params.note?.trim() || `Barang masuk +${qty} pcs (${after.sku})`,
+           stockAfter: after.stock,
+           accountId: null,
+           userId: params.adjustedByUserId ?? null,
+         },
+       });
       return after.stock;
     });
   } catch {

@@ -11,9 +11,9 @@ export const GET = withAuth(async (req) => {
   const products = await prisma.masterProduct.findMany({
     where: includeInactive ? undefined : { isActive: true },
     include: {
-      variants: {
+      productVariant: {
         include: {
-          mappings: {
+          productMapping: {
             include: {
               account: { select: { id: true, platform: true, label: true } },
             },
@@ -22,9 +22,9 @@ export const GET = withAuth(async (req) => {
       },
       // Komposisi bundle (kosong utk produk single) — aditif, konsumen lama
       // yang hanya membaca variants/mappings tidak terpengaruh.
-      bundleItems: {
+      bundleItem: {
         include: {
-          componentVariant: {
+          variant: {
             select: {
               id: true,
               sku: true,

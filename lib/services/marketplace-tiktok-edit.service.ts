@@ -196,7 +196,7 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
     where: { id: mappingId },
     include: {
       account: true,
-      variant: { include: { masterProduct: { include: { images: { orderBy: { order: "asc" } }, variants: true } } } },
+      variant: { include: { masterProduct: { include: { productImage: { orderBy: { order: "asc" } }, productVariant: true } } } },
     },
   });
   if (!m) throw new Error("Mapping tidak ditemukan.");
@@ -249,7 +249,7 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
 
   // Susun varian dari TikTok skus + cocokkan ke varian local master.
   const master = m.variant.masterProduct;
-  const masterVariants = master.variants ?? [];
+  const masterVariants = master.productVariant ?? [];
   const skus = (detail.skus as Array<Record<string, unknown>> | undefined) ?? [];
   const singleMappingVariantId = skus.length <= 1 ? m.variantId : undefined;
 
@@ -308,7 +308,7 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
     if (uri) images.push({ id: `t${i}`, uri, src: uri });
   }
   if (images.length === 0) {
-    for (const gi of master.images ?? []) {
+    for (const gi of master.productImage ?? []) {
       images.push({ id: `g-${gi.id}`, dataUrl: gi.url, name: `galeri-${gi.order}.jpg`, src: gi.url });
     }
   }

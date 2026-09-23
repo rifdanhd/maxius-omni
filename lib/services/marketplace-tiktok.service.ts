@@ -316,31 +316,31 @@ type SyncAccountResult = {
 export async function syncTikTokListings(businessId: string): Promise<SyncAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: "TIKTOK_SHOP", businessId },
-    include: {
-      mappings: {
-        include: {
-          variant: { select: { id: true, sku: true, masterProductId: true } },
-        },
-      },
-    },
-  });
+include: {
+       productMapping: {
+         include: {
+           variant: { select: { id: true, sku: true, masterProductId: true } },
+         },
+       },
+     },
+   });
 
-  const results: SyncAccountResult[] = [];
-  for (const account of accounts) {
-    const base = { accountId: account.id, label: account.label };
-    if (!account.accessToken || !account.shopCipher) {
-      results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [] });
-      continue;
-    }
+   const results: SyncAccountResult[] = [];
+   for (const account of accounts) {
+     const base = { accountId: account.id, label: account.label };
+     if (!account.accessToken || !account.shopCipher) {
+       results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [] });
+       continue;
+     }
 
-    const products = await enumerateAccountProducts(account);
-    const skuKeys = buildSkuKeyMap(products);
-    const matchedProductIds = new Set<string>();
-    let synced = 0;
-    let notFound = 0;
-    let deleted = 0;
+     const products = await enumerateAccountProducts(account);
+     const skuKeys = buildSkuKeyMap(products);
+     const matchedProductIds = new Set<string>();
+     let synced = 0;
+     let notFound = 0;
+     let deleted = 0;
 
-    for (const m of account.mappings) {
+     for (const m of account.productMapping) {
       const product = skuKeys.get(m.channelSku) ?? null;
       if (product) matchedProductIds.add(String(product.id ?? ""));
       if (!product) {
@@ -395,24 +395,24 @@ export async function getTikTokUnmapped(
 ): Promise<Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }>> {
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: "TIKTOK_SHOP", businessId, ...(accountId ? { id: accountId } : {}) },
-    include: {
-      mappings: { select: { channelSku: true } },
-    },
-  });
-  const out: Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }> = [];
-  for (const account of accounts) {
-    if (!account.accessToken || !account.shopCipher) {
-      out.push({ accountId: account.id, label: account.label, unmapped: [] });
-      continue;
-    }
-    const products = await enumerateAccountProducts(account);
-    out.push({
-      accountId: account.id,
-      label: account.label,
-      unmapped: findUnmappedProducts(
-        products,
-        account.mappings.map((m) => m.channelSku)
-      ),
+include: {
+       productMapping: { select: { channelSku: true } },
+     },
+   });
+   const out: Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }> = [];
+   for (const account of accounts) {
+     if (!account.accessToken || !account.shopCipher) {
+       out.push({ accountId: account.id, label: account.label, unmapped: [] });
+       continue;
+     }
+     const products = await enumerateAccountProducts(account);
+     out.push({
+       accountId: account.id,
+       label: account.label,
+       unmapped: findUnmappedProducts(
+         products,
+         account.productMapping.map((m) => m.channelSku)
+       ),
     });
   }
   return out;

@@ -16,6 +16,7 @@
  *
  * Jalankan:  npx tsx --env-file=.env scripts/test-inventory-settings.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -72,7 +73,7 @@ const acc = await prisma.platformAccount.create({
 const accShopee = await prisma.platformAccount.create({
   data: { platform: "SHOPEE", label: "Toko Shopee Settings", businessId: business.id },
 });
-const user = await prisma.user.create({ data: { username: "admin-settings", passwordHash: "x" } });
+const user = await prisma.user.create({ data: { id: crypto.randomUUID(), username: "admin-settings", passwordHash: "x" } });
 const jwtSecret = process.env.JWT_SECRET;
 assert.ok(jwtSecret, "JWT_SECRET harus ada di .env utk test handler");
 const token = jwt.sign({ sub: user.id, username: user.username }, jwtSecret, { expiresIn: "10m" });

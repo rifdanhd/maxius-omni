@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma as defaultPrisma } from "@/lib/db/prisma";
 import { getOrders } from "@/lib/integrations/tiktokShop";
 import { reconcileShipmentTracking } from "@/lib/services/shipment-reconcile.service";
@@ -291,6 +293,7 @@ export async function syncOrdersTikTok(
       await prisma.$transaction(async (tx) => {
         const order = await tx.order.create({
           data: {
+            id: crypto.randomUUID(),
             orderNo: externalOrderId,
             status: raw.status ?? "UNKNOWN",
             buyerName: raw.buyer_nickname || recipient.recipientName || raw.buyer_email || null,
@@ -311,6 +314,7 @@ export async function syncOrdersTikTok(
             accountId,
             items: {
               create: lineItems.map((item) => ({
+                id: crypto.randomUUID(),
                 channelSku: item.channelSku,
                 productId: item.productId,
                 imageUrl: item.imageUrl,
@@ -326,6 +330,7 @@ export async function syncOrdersTikTok(
         createdOrderId = order.id;
         await tx.platformOrderMapping.create({
           data: {
+            id: crypto.randomUUID(),
             externalOrderId,
             rawStatus: raw.status ?? "UNKNOWN",
             orderId: order.id,
@@ -341,7 +346,7 @@ export async function syncOrdersTikTok(
         for (const item of lineItems) {
           if (!item.variantId || !item.imageUrl) continue;
           const product = await prisma.masterProduct.findFirst({
-            where: { variants: { some: { id: item.variantId } } },
+            where: { productVariant: { some: { id: item.variantId } } },
             select: { id: true, imageUrl: true },
           });
           if (product && !product.imageUrl) {

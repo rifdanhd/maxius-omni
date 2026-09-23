@@ -17,6 +17,7 @@
  * (kaos kaki + akun tiktok-1..3) untuk testing lokal saja.
  */
 import { PrismaClient } from "@prisma/client";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -43,7 +44,7 @@ async function main() {
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
-    create: { username: "admin", passwordHash, canViewFullPii: true },
+    create: { id: crypto.randomUUID(), username: "admin", passwordHash, canViewFullPii: true },
   });
   console.log(`✅ User: username=${admin.username} (password awal: admin123)`);
 

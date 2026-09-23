@@ -42,30 +42,40 @@ export function withAuth(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    let payload;
     try {
-      const payload = verifyToken(token);
-      // Inject user ke request object. Legacy token (sebelum fitur PII) tidak punya
-      // canViewFullPii → default true (perilaku lama = akses penuh, user admin).
-      const user = {
-        id: payload.sub as string,
-        username: payload.username as string,
-        canViewFullPii: payload.canViewFullPii !== false,
-      };
-      (req as AuthenticatedRequest).user = user;
-      try {
-        (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id);
-      } catch (e) {
-        if (e instanceof BusinessScopeError) {
-          return Response.json({ error: e.message }, { status: 403 });
-        }
-        throw e;
-      }
-      return handler(req as AuthenticatedRequest, ctx);
+      payload = verifyToken(token);
     } catch {
       return Response.json(
         { error: "Token tidak valid atau sudah kadaluarsa." },
         { status: 401 }
       );
+    }
+
+    // Inject user ke request object. Legacy token (sebelum fitur PII) tidak punya
+    // canViewFullPii → default true (perilaku lama = akses penuh, user admin).
+    const user = {
+      id: payload.sub as string,
+      username: payload.username as string,
+      canViewFullPii: payload.canViewFullPii !== false,
+    };
+    (req as AuthenticatedRequest).user = user;
+
+    try {
+      (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id);
+    } catch (e) {
+      if (e instanceof BusinessScopeError) {
+        return Response.json({ error: e.message }, { status: 403 });
+      }
+      console.error("[withAuth] resolveRequestBusiness error:", e);
+      return Response.json({ error: "Terjadi kesalahan server." }, { status: 500 });
+    }
+
+    try {
+      return await handler(req as AuthenticatedRequest, ctx);
+    } catch (e) {
+      console.error("[withAuth] handler error:", e);
+      return Response.json({ error: "Terjadi kesalahan server." }, { status: 500 });
     }
   };
 }

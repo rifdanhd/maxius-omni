@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
+import crypto from "crypto";
+import { prisma } from "@/lib/db/prisma";
 
 /**
  * Kelola Gambar — galeri gambar per produk induk (MasterProduct).
@@ -66,7 +67,7 @@ export async function listGallery(
   if (search) {
     where.OR = [
       { name: { contains: search } },
-      { variants: { some: { sku: { contains: search } } } },
+      { productVariant: { some: { sku: { contains: search } } } },
     ];
   }
   if (params.category?.trim()) {
@@ -76,23 +77,23 @@ export async function listGallery(
   const products = await prisma.masterProduct.findMany({
     where,
     include: {
-      _count: { select: { variants: true, images: true } },
-      images: { where: { isCover: true }, select: { url: true }, take: 1 },
+      _count: { select: { productVariant: true, productImage: true } },
+      productImage: { where: { isCover: true }, select: { url: true }, take: 1 },
     },
   });
 
   let rows: GalleryRow[] = products.map((p) => {
-    const variantCount = p._count.variants;
-    const totalImages = p._count.images;
-    const required = requiredImages(variantCount);
-    return {
-      id: p.id,
-      name: p.name,
-      category: p.category,
-      imageUrl: p.images[0]?.url ?? null,
-      variantCount,
-      totalImages,
-      coverCount: p.images.length,
+     const variantCount = p._count.productVariant;
+     const totalImages = p._count.productImage;
+     const required = requiredImages(variantCount);
+     return {
+       id: p.id,
+       name: p.name,
+       category: p.category,
+       imageUrl: p.productImage[0]?.url ?? null,
+       variantCount,
+       totalImages,
+       coverCount: p.productImage.length,
       required,
       complete: totalImages >= required,
     };
@@ -150,14 +151,9 @@ export async function listProductImages(
     select: { imageUrl: true },
   });
   if (product?.imageUrl) {
-    const created = await prisma.productImage.create({
-      data: {
-        masterProductId: productId,
-        url: product.imageUrl,
-        isCover: true,
-        order: 0,
-      },
-    });
+     const created = await prisma.productImage.create({
+       data: { id: crypto.randomUUID(), updatedAt: new Date(), masterProductId: productId, url: product.imageUrl, isCover: true, order: 0 },
+     });
     return [created];
   }
   return [];
@@ -217,9 +213,9 @@ export async function addImages(
       result.reasons.push({ index: i, reason: "Tidak ada URL valid pada entri ini." });
       continue;
     }
-    const created = await prisma.productImage.create({
-      data: { masterProductId: productId, url: e.url, order: base++ },
-    });
+     const created = await prisma.productImage.create({
+       data: { id: crypto.randomUUID(), updatedAt: new Date(), masterProductId: productId, url: e.url, order: base++ },
+     });
     // Gambar pertama otomatis jadi cover & disinkronkan ke MasterProduct.imageUrl.
     if (created.order === 0) {
       await promoteCover(productId, created.id);

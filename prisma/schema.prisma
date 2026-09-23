@@ -8,7 +8,7 @@ datasource db {
 }
 
 model AppCredential {
-  id              String            @id
+  id              String            @id @default(cuid())
   platform        String
   label           String
   clientId        String?
@@ -16,33 +16,35 @@ model AppCredential {
   serviceId       String?
   isActive        Boolean           @default(true)
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime
-  PlatformAccount PlatformAccount[]
+  updatedAt       DateTime @updatedAt
+  account         PlatformAccount[]
 
   @@unique([platform, label])
 }
 
 model BundleItem {
-  id                 String         @id
+  id                 String         @id @default(cuid())
   bundleProductId    String
   componentVariantId String
   qty                Int
   createdAt          DateTime       @default(now())
-  MasterProduct      MasterProduct  @relation(fields: [bundleProductId], references: [id], onDelete: Cascade)
-  ProductVariant     ProductVariant @relation(fields: [componentVariantId], references: [id])
+  masterProduct      MasterProduct  @relation(fields: [bundleProductId], references: [id], onDelete: Cascade)
+  variant            ProductVariant @relation(fields: [componentVariantId], references: [id])
 
   @@unique([bundleProductId, componentVariantId])
   @@index([componentVariantId])
 }
 
 model Business {
-  id              String            @id
+  id              String            @id @default(cuid())
   name            String
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime
-  MasterProduct   MasterProduct[]
-  PlatformAccount PlatformAccount[]
-  UserBusiness    UserBusiness[]
+  updatedAt       DateTime @updatedAt
+  masterProduct   MasterProduct[]
+  account         PlatformAccount[]
+  userBusiness    UserBusiness[]
+
+  @@index([id])
 }
 
 model InventorySetting {
@@ -54,11 +56,11 @@ model InventorySetting {
   syncPushShopee           Boolean  @default(true)
   syncPushTiktok           Boolean  @default(true)
   opnameReminderFrequency  String   @default("monthly")
-  updatedAt                DateTime
+  updatedAt                DateTime @updatedAt
 }
 
 model MasterProduct {
-  id             String           @id
+  id             String           @id @default(cuid())
   name           String
   category       String?
   imageUrl       String?
@@ -68,10 +70,12 @@ model MasterProduct {
   importedFrom   String?
   businessId     String           @default("business-default")
   threshold      Int              @default(20)
-  BundleItem     BundleItem[]
-  Business       Business         @relation(fields: [businessId], references: [id])
-  ProductImage   ProductImage[]
-  ProductVariant ProductVariant[]
+  bundleItem     BundleItem[]
+  business       Business         @relation(fields: [businessId], references: [id])
+  productImage   ProductImage[]
+  productVariant ProductVariant[]
+
+  @@index([businessId])
 }
 
 model Order {
@@ -99,12 +103,12 @@ model Order {
   piiAnonymizedAt         DateTime?
   accountId               String
   createdAt               DateTime               @default(now())
-  updatedAt               DateTime
-  PlatformAccount         PlatformAccount        @relation(fields: [accountId], references: [id])
-  OrderItem               OrderItem[]
-  PlatformOrderMapping    PlatformOrderMapping[]
-  ReturnRequest           ReturnRequest[]
-  Shipment                Shipment[]
+  updatedAt               DateTime @updatedAt
+  account                 PlatformAccount        @relation(fields: [accountId], references: [id])
+  items                   OrderItem[]
+  orderMappings           PlatformOrderMapping[]
+  returnRequest           ReturnRequest[]
+  shipments               Shipment[]
 
   @@index([accountId, createTime])
   @@index([createTime, status])
@@ -121,8 +125,8 @@ model OrderItem {
   skuName        String?
   orderId        String
   variantId      String?
-  Order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  ProductVariant ProductVariant? @relation(fields: [variantId], references: [id])
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant        ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@index([orderId])
   @@index([variantId, channelSku])
@@ -143,7 +147,7 @@ model PiiAccessLog {
 }
 
 model PlatformAccount {
-  id                   String                 @id
+  id                   String                 @id @default(cuid())
   businessId           String                 @default("business-default")
   platform             String
   label                String
@@ -155,24 +159,24 @@ model PlatformAccount {
   externalShopId       String?
   shopCipher           String?
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   appCredentialId      String?
   frozenReason         String?
   isFrozen             Boolean                @default(false)
-  Order                Order[]
-  AppCredential        AppCredential?         @relation(fields: [appCredentialId], references: [id])
-  Business             Business               @relation(fields: [businessId], references: [id])
-  PlatformOrderMapping PlatformOrderMapping[]
-  ProductMapping       ProductMapping[]
-  PromotionActivity    PromotionActivity[]
-  PromotionAuditLog    PromotionAuditLog[]
-  ReturnAuditLog       ReturnAuditLog[]
-  ReturnRequest        ReturnRequest[]
-  SalesLog             SalesLog[]
-  Shipment             Shipment[]
-  StockLedger          StockLedger[]
-  SyncJob              SyncJob[]
-  SyncLog              SyncLog[]
+  orders               Order[]
+  appCredential        AppCredential?         @relation(fields: [appCredentialId], references: [id])
+  business             Business               @relation(fields: [businessId], references: [id])
+  orderMappings        PlatformOrderMapping[]
+  productMapping       ProductMapping[]
+  promotionActivity    PromotionActivity[]
+  promotionAuditLog    PromotionAuditLog[]
+  returnAuditLog       ReturnAuditLog[]
+  returnRequest        ReturnRequest[]
+  salesLog             SalesLog[]
+  shipment             Shipment[]
+  stockLedger          StockLedger[]
+  syncJob              SyncJob[]
+  syncLog              SyncLog[]
 
   @@unique([platform, externalShopId])
 }
@@ -184,8 +188,8 @@ model PlatformOrderMapping {
   lastWebhookUpdateTime Int?
   orderId               String
   accountId             String
-  PlatformAccount       PlatformAccount @relation(fields: [accountId], references: [id])
-  Order                 Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  account               PlatformAccount @relation(fields: [accountId], references: [id])
+  order                 Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, externalOrderId])
 }
@@ -197,12 +201,12 @@ model ProductImage {
   isCover         Boolean       @default(false)
   order           Int           @default(0)
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime
-  MasterProduct   MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  updatedAt       DateTime @updatedAt
+  masterProduct   MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
 }
 
 model ProductMapping {
-  id                    String                  @id
+  id                    String                  @id @default(cuid())
   channelSku            String
   variantId             String                  @default("")
   accountId             String
@@ -216,17 +220,17 @@ model ProductMapping {
   lastSyncedAt          DateTime?
   createdAt             DateTime                @default(now())
   updatedAt             DateTime
-  PlatformAccount       PlatformAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  ProductVariant        ProductVariant          @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  PromotionActivityItem PromotionActivityItem[]
-  PromotionAuditLog     PromotionAuditLog[]
+  account               PlatformAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  variant               ProductVariant          @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  promotionActivityItem PromotionActivityItem[]
+  promotionAuditLog     PromotionAuditLog[]
 
   @@unique([accountId, channelSku])
   @@unique([accountId, variantId])
 }
 
 model ProductVariant {
-  id              String            @id
+  id              String            @id @default(cuid())
   sku             String
   stock           Int
   name            String?
@@ -236,23 +240,23 @@ model ProductVariant {
   price           Float?
   priceUpdatedAt  DateTime?
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime @updatedAt
   masterProductId String
-  BundleItem      BundleItem[]
-  OrderItem       OrderItem[]
-  ProductMapping  ProductMapping[]
-  MasterProduct   MasterProduct     @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
-  ReturnItem      ReturnItem[]
-  SalesLog        SalesLog[]
-  StockLedger     StockLedger[]
-  StockOpnameItem StockOpnameItem[]
-  SyncJob         SyncJob[]
+  bundleItem      BundleItem[]
+  orderItem       OrderItem[]
+  productMapping  ProductMapping[]
+  masterProduct   MasterProduct     @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  returnItem      ReturnItem[]
+  salesLog        SalesLog[]
+  stockLedger     StockLedger[]
+  stockOpnameItem StockOpnameItem[]
+  syncJob         SyncJob[]
 
   @@unique([masterProductId, sku])
 }
 
 model PromotionActivity {
-  id                    String                  @id
+  id                    String                  @id @default(cuid())
   accountId             String
   externalActivityId    String
   title                 String
@@ -272,8 +276,8 @@ model PromotionActivity {
   rawPayload            String?
   createdAt             DateTime                @default(now())
   updatedAt             DateTime
-  PlatformAccount       PlatformAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  PromotionActivityItem PromotionActivityItem[]
+  account               PlatformAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  items                 PromotionActivityItem[]
 
   @@unique([accountId, externalActivityId])
   @@index([accountId, startsAt])
@@ -281,7 +285,7 @@ model PromotionActivity {
 }
 
 model PromotionActivityItem {
-  id                    String            @id
+  id                    String            @id @default(cuid())
   activityId            String
   externalItemKey       String
   platformProductId     String
@@ -296,8 +300,8 @@ model PromotionActivityItem {
   rawPayload            String?
   createdAt             DateTime          @default(now())
   updatedAt             DateTime
-  PromotionActivity     PromotionActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  ProductMapping        ProductMapping?   @relation(fields: [productMappingId], references: [id])
+  activity              PromotionActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  productMapping        ProductMapping?   @relation(fields: [productMappingId], references: [id])
 
   @@unique([activityId, externalItemKey])
   @@index([platformProductId])
@@ -325,8 +329,8 @@ model PromotionAuditLog {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime
   productMappingId   String?
-  PlatformAccount    PlatformAccount @relation(fields: [accountId], references: [id])
-  ProductMapping     ProductMapping? @relation(fields: [productMappingId], references: [id])
+  account            PlatformAccount @relation(fields: [accountId], references: [id])
+  productMapping     ProductMapping? @relation(fields: [productMappingId], references: [id])
 
   @@index([accountId, createdAt])
   @@index([externalActivityId])
@@ -349,8 +353,8 @@ model ReturnAuditLog {
   requestId        String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime
-  PlatformAccount  PlatformAccount @relation(fields: [accountId], references: [id])
-  ReturnRequest    ReturnRequest?  @relation(fields: [returnId], references: [id])
+  account          PlatformAccount @relation(fields: [accountId], references: [id])
+  returnRequest    ReturnRequest?  @relation(fields: [returnId], references: [id])
 
   @@index([accountId, createdAt])
   @@index([resultStatus])
@@ -358,7 +362,7 @@ model ReturnAuditLog {
 }
 
 model ReturnItem {
-  id              String          @id
+  id              String          @id @default(cuid())
   returnId        String
   externalSkuId   String?
   channelSku      String
@@ -370,15 +374,15 @@ model ReturnItem {
   variantId       String?
   restockedAt     DateTime?
   restockLedgerId String?
-  ReturnRequest   ReturnRequest   @relation(fields: [returnId], references: [id], onDelete: Cascade)
-  ProductVariant  ProductVariant? @relation(fields: [variantId], references: [id])
+  returnRequest   ReturnRequest   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  variant        ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@unique([returnId, channelSku])
   @@index([variantId])
 }
 
 model ReturnRequest {
-  id                     String           @id
+  id                     String           @id @default(cuid())
   accountId              String
   externalReturnId       String
   externalOrderId        String?
@@ -400,10 +404,10 @@ model ReturnRequest {
   firstSeenAt            DateTime         @default(now())
   lastSyncedAt           DateTime?
   statusChangedAt        DateTime?
-  ReturnAuditLog         ReturnAuditLog[]
-  ReturnItem             ReturnItem[]
-  PlatformAccount        PlatformAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  Order                  Order?           @relation(fields: [orderId], references: [id])
+  returnAuditLog         ReturnAuditLog[]
+  returnItem             ReturnItem[]
+  account                PlatformAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  order                  Order?           @relation(fields: [orderId], references: [id])
 
   @@unique([accountId, externalReturnId])
   @@index([accountId, status])
@@ -411,7 +415,7 @@ model ReturnRequest {
 }
 
 model SalesLog {
-  id              String          @id
+  id              String          @id @default(cuid())
   time            DateTime        @default(now())
   qty             Int
   stockAfter      Int
@@ -420,14 +424,14 @@ model SalesLog {
   channelSku      String
   variantId       String          @default("")
   accountId       String
-  PlatformAccount PlatformAccount @relation(fields: [accountId], references: [id])
-  ProductVariant  ProductVariant  @relation(fields: [variantId], references: [id])
+  account         PlatformAccount @relation(fields: [accountId], references: [id])
+  variant        ProductVariant  @relation(fields: [variantId], references: [id])
 
   @@index([variantId, time])
 }
 
 model Shipment {
-  id                    String                  @id
+  id                    String                  @id @default(cuid())
   externalId            String?
   carrier               String?
   trackingNo            String?
@@ -435,9 +439,9 @@ model Shipment {
   shippedAt             DateTime?
   orderId               String
   accountId             String
-  PlatformAccount       PlatformAccount         @relation(fields: [accountId], references: [id])
-  Order                 Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  ShipmentTrackingEvent ShipmentTrackingEvent[]
+  account               PlatformAccount         @relation(fields: [accountId], references: [id])
+  order                 Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  trackingEvents        ShipmentTrackingEvent[]
 
   @@unique([accountId, orderId, externalId])
 }
@@ -449,7 +453,7 @@ model ShipmentTrackingEvent {
   description String
   eventTime   DateTime
   createdAt   DateTime @default(now())
-  Shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
   @@unique([shipmentId, eventTime, description])
   @@index([shipmentId, eventTime])
@@ -466,9 +470,9 @@ model StockLedger {
   accountId       String?
   userId          String?
   createdAt       DateTime         @default(now())
-  PlatformAccount PlatformAccount? @relation(fields: [accountId], references: [id])
-  User            User?            @relation(fields: [userId], references: [id])
-  ProductVariant  ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  account         PlatformAccount? @relation(fields: [accountId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
+  variant        ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@unique([reason, referenceId, variantId])
   @@index([reason, referenceId])
@@ -476,7 +480,7 @@ model StockLedger {
 }
 
 model StockOpname {
-  id              String            @id
+  id              String            @id @default(cuid())
   code            String            @unique
   status          String
   note            String?
@@ -484,8 +488,8 @@ model StockOpname {
   finalizedAt     DateTime?
   cancelledAt     DateTime?
   userId          String?
-  User            User?             @relation(fields: [userId], references: [id])
-  StockOpnameItem StockOpnameItem[]
+  user            User?             @relation(fields: [userId], references: [id])
+  items           StockOpnameItem[]
 
   @@index([status, startedAt])
 }
@@ -496,15 +500,15 @@ model StockOpnameItem {
   variantId      String
   systemStock    Int
   countedStock   Int?
-  StockOpname    StockOpname    @relation(fields: [opnameId], references: [id], onDelete: Cascade)
-  ProductVariant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  opname         StockOpname    @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@unique([opnameId, variantId])
   @@index([variantId])
 }
 
 model SyncJob {
-  id              String          @id
+  id              String          @id @default(cuid())
   channelSku      String
   newSellable     Int
   status          String          @default("PENDING")
@@ -514,9 +518,9 @@ model SyncJob {
   accountId       String
   variantId       String
   createdAt       DateTime        @default(now())
-  updatedAt       DateTime
-  PlatformAccount PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  ProductVariant  ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  updatedAt       DateTime @updatedAt
+  account         PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  variant        ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@unique([variantId, accountId, channelSku, status])
   @@index([status, nextRetryAt])
@@ -524,7 +528,7 @@ model SyncJob {
 }
 
 model SyncLog {
-  id              String          @id
+  id              String          @id @default(cuid())
   direction       String
   kind            String
   status          String
@@ -535,7 +539,7 @@ model SyncLog {
   handledAt       DateTime?
   handledBy       String?
   createdAt       DateTime        @default(now())
-  PlatformAccount PlatformAccount @relation(fields: [accountId], references: [id])
+  account         PlatformAccount @relation(fields: [accountId], references: [id])
 }
 
 model User {
@@ -543,17 +547,17 @@ model User {
   username       String         @unique
   passwordHash   String
   canViewFullPii Boolean        @default(true)
-  StockLedger    StockLedger[]
-  StockOpname    StockOpname[]
-  UserBusiness   UserBusiness[]
+  stockLedger    StockLedger[]
+  stockOpname    StockOpname[]
+  userBusiness   UserBusiness[]
 }
 
 model UserBusiness {
   userId     String
   businessId String
   createdAt  DateTime @default(now())
-  Business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, businessId])
 }

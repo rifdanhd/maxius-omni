@@ -15,6 +15,7 @@
  *
  * Jalankan:  npx tsx scripts/test-stock-in-push.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -49,10 +50,10 @@ const variant = await prisma.productVariant.create({
   data: { sku: "PUSH-IN-1", stock: 0, masterProductId: master.id },
 });
 await prisma.productMapping.create({
-  data: { channelSku: "SKU-PUSH-1", variantId: variant.id, accountId: shopeeAcc.id },
+  data: { id: crypto.randomUUID(), channelSku: "SKU-PUSH-1", variantId: variant.id, accountId: shopeeAcc.id, updatedAt: new Date() },
 });
 await prisma.productMapping.create({
-  data: { channelSku: "PUSH-928", variantId: variant.id, accountId: tiktokAcc.id },
+  data: { id: crypto.randomUUID(), channelSku: "PUSH-928", variantId: variant.id, accountId: tiktokAcc.id, updatedAt: new Date() },
 });
 
 async function waitJobs(variantId: string, count: number) {

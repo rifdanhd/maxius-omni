@@ -13,9 +13,9 @@ export const POST = withAuth(async (req) => {
   // Pastikan item retur milik brand yang sama (guard multi-brand).
   const item = await prisma.returnItem.findUnique({
     where: { id: body.itemId },
-    select: { return: { select: { account: { select: { businessId: true } } } } },
+    select: { returnRequest: { select: { account: { select: { businessId: true } } } } },
   });
-  if (!item || item.return.account.businessId !== req.businessId) {
+  if (!item || item.returnRequest.account.businessId !== req.businessId) {
     return NextResponse.json({ error: "Item retur tidak ditemukan." }, { status: 404 });
   }
 

@@ -76,11 +76,11 @@ export async function listPricing(
     where.OR = [
       { sku: { contains: search } },
       { masterProduct: { name: { contains: search } } },
-      { mappings: { some: { channelSku: { contains: search } } } },
+      { productMapping: { some: { channelSku: { contains: search } } } },
     ];
   }
   if (params.storeIds && params.storeIds.length > 0) {
-    where.mappings = { some: { accountId: { in: params.storeIds } } };
+    where.productMapping = { some: { accountId: { in: params.storeIds } } };
   }
   if (params.priceMin !== undefined || params.priceMax !== undefined) {
     where.price = {
@@ -93,7 +93,7 @@ export async function listPricing(
     where,
     include: {
       masterProduct: { select: { id: true, name: true, category: true, imageUrl: true } },
-      mappings: {
+      productMapping: {
         include: { account: { select: { id: true, label: true, platform: true } } },
       },
     },
@@ -107,9 +107,9 @@ export async function listPricing(
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
     product: v.masterProduct,
-    markets: v.mappings.map((m) => ({
+    markets: v.productMapping.map((m) => ({
       id: m.id,
-      accountId: m.account.id,
+      accountId: m.accountId,
       accountLabel: m.account.label,
       platform: m.account.platform,
       channelSku: m.channelSku,
@@ -172,12 +172,12 @@ export async function updateVariantDefaultPrice(
 
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
-    include: {
-      masterProduct: { select: { businessId: true } },
-      mappings: { select: { id: true, accountId: true, channelSku: true, price: true } },
-    },
-  });
-  if (!variant || variant.masterProduct.businessId !== businessId) {
+     include: {
+       masterProduct: { select: { businessId: true } },
+       productMapping: { select: { id: true, accountId: true, channelSku: true, price: true } },
+     },
+   });
+   if (!variant || variant.masterProduct.businessId !== businessId) {
     return { ok: false, reason: "Varian tidak ditemukan." };
   }
 
@@ -188,7 +188,7 @@ export async function updateVariantDefaultPrice(
   });
 
   // Hanya marketplace tanpa override yang harga efektifnya berubah.
-  const targets = variant.mappings
+  const targets = variant.productMapping
     .filter((m) => m.price === null)
     .map((m) => ({ accountId: m.accountId, channelSku: m.channelSku }));
 
@@ -294,20 +294,20 @@ export async function processBulkPrice(
         // Override per toko — cari mapping varian oleh toko tsb.
         const variant = await prisma.productVariant.findFirst({
           where: { sku: r.sku, masterProduct: { businessId } },
-          include: {
-            mappings: {
-              include: { account: { select: { id: true, label: true } } },
-            },
-          },
-        });
-        if (!variant) {
-          result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan.` });
-          continue;
-        }
-        const store = r.store.trim().toLowerCase();
-        const mapping = variant.mappings.find(
-          (m) =>
-            m.account.label.trim().toLowerCase() === store ||
+           include: {
+             productMapping: {
+               include: { account: { select: { id: true, label: true } } },
+             },
+           },
+         });
+         if (!variant) {
+           result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan.` });
+           continue;
+         }
+         const store = r.store.trim().toLowerCase();
+         const mapping = variant.productMapping.find(
+           (m) =>
+             m.account.label.trim().toLowerCase() === store ||
             (r.channelSku && m.channelSku.trim().toLowerCase() === r.channelSku!.trim().toLowerCase())
         );
         if (!mapping) {

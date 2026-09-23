@@ -14,6 +14,7 @@
  *
  * Jalankan: npx tsx scripts/test-phase-c-kpi.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -90,9 +91,10 @@ await mkLog(tiktokAcc.id, "stock_push", "success", 0);
 
 const order = await prisma.order.create({
   data: {
+    id: crypto.randomUUID(),
     orderNo: "KPI-1", status: "AWAITING_SHIPMENT", accountId: tiktokAcc.id,
     createTime: new Date(),
-    items: { create: { qty: 2, channelSku: "TT-1", variantId: vA.id, price: 50000 } },
+    items: { create: { id: crypto.randomUUID(), qty: 2, channelSku: "TT-1", variantId: vA.id, price: 50000 } },
   },
 });
 

@@ -18,6 +18,7 @@
  *
  * Jalankan: npx tsx scripts/test-phase-c-reports.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -63,8 +64,9 @@ const now = new Date();
 async function mkOrder(accountId: string, orderNo: string, status: string, items: Array<{ variantId?: string; channelSku: string; qty: number; price?: number }>, amount?: number) {
   return prisma.order.create({
     data: {
+      id: crypto.randomUUID(),
       orderNo, status, accountId, createTime: now, amount,
-      items: { create: items.map((i) => ({ ...i })) },
+      items: { create: items.map((i) => ({ id: crypto.randomUUID(), ...i })) },
     },
   });
 }

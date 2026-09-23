@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import {
   STOCK_REASONS,
@@ -91,6 +92,7 @@ export async function createStockOpname(params: {
           userId: params.userId ?? null,
           items: {
             create: variants.map((v) => ({
+              id: crypto.randomUUID(),
               variantId: v.id,
               systemStock: v.stock,
               countedStock: null,

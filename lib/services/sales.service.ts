@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS, pushVariantStockToOthers } from "@/lib/services/central-stock.service";
 
@@ -89,6 +91,7 @@ export async function recordSale({
   // wajib tercatat di StockLedger.
   await prisma.stockLedger.create({
     data: {
+      id: crypto.randomUUID(),
       variantId: variant.id,
       changeQty: -quantity,
       reason: STOCK_REASONS.SALE,

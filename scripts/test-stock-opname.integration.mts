@@ -14,6 +14,7 @@
  *
  * Jalankan:  npx tsx scripts/test-stock-opname.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -70,7 +71,7 @@ const acc = await prisma.platformAccount.create({
 const master = await prisma.masterProduct.create({
   data: { name: "Produk Opname", businessId: business.id },
 });
-const user = await prisma.user.create({ data: { username: "admin-opname", passwordHash: "x" } });
+const user = await prisma.user.create({ data: { id: crypto.randomUUID(), username: "admin-opname", passwordHash: "x" } });
 
 async function mkVariant(sku: string, stock: number) {
   return prisma.productVariant.create({ data: { sku, stock, masterProductId: master.id } });
@@ -230,15 +231,17 @@ console.log("=== FITUR 2: Riwayat Inventori ===");
 // penyesuaian manual (jalur lama), opname (sudah ada di atas).
 const oversellVariant = await mkVariant("HIST-OVERSELL", 1);
 await prisma.productMapping.create({
-  data: { channelSku: "HIST-OVERSELL-ACC", variantId: oversellVariant.id, accountId: acc.id },
+  data: { id: crypto.randomUUID(), channelSku: "HIST-OVERSELL-ACC", variantId: oversellVariant.id, accountId: acc.id, updatedAt: new Date() },
 });
 const oversellOrder = await prisma.order.create({
   data: {
+    id: crypto.randomUUID(),
     orderNo: "HIST-OV-1",
     status: "AWAITING_SHIPMENT",
     accountId: acc.id,
+    updatedAt: new Date(),
     items: {
-      create: { qty: 2, channelSku: "HIST-OVERSELL-ACC", variantId: oversellVariant.id },
+      create: { id: crypto.randomUUID(), qty: 2, channelSku: "HIST-OVERSELL-ACC", variantId: oversellVariant.id },
     },
   },
 });

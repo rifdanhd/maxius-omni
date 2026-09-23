@@ -13,6 +13,7 @@
  *
  * Jalankan:  npx tsx scripts/test-stock-guard.integration.mts
  */
+import crypto from "crypto";
 import assert from "node:assert";
 import { execSync } from "node:child_process";
 import path from "node:path";
@@ -26,6 +27,7 @@ execSync("npx prisma migrate deploy", {
 });
 
 const { prisma } = await import("@/lib/db/prisma");
+const now = new Date();
 const {
   deductStockForOrder,
   restoreStockForCanceledOrder,
@@ -63,19 +65,21 @@ async function makeVariantWithOrders(sku: string, stock: number, qtyPerOrder: nu
     data: { sku, stock, masterProductId: master.id },
   });
   await prisma.productMapping.create({
-    data: { channelSku: `${sku}-A`, variantId: variant.id, accountId: accA.id },
+    data: { id: crypto.randomUUID(), channelSku: `${sku}-A`, variantId: variant.id, accountId: accA.id, updatedAt: new Date() },
   });
   await prisma.productMapping.create({
-    data: { channelSku: `${sku}-B`, variantId: variant.id, accountId: accB.id },
+    data: { id: crypto.randomUUID(), channelSku: `${sku}-B`, variantId: variant.id, accountId: accB.id, updatedAt: new Date() },
   });
   const mkOrder = async (platform: "TIKTOK_SHOP" | "SHOPEE", label: string) => {
     const account = platform === "TIKTOK_SHOP" ? accA : accB;
     const order = await prisma.order.create({
       data: {
+        id: crypto.randomUUID(),
         orderNo: label,
         status: "AWAITING_SHIPMENT",
         accountId: account.id,
-        items: { create: { qty: qtyPerOrder, channelSku: `${sku}-${platform === "TIKTOK_SHOP" ? "A" : "B"}`, variantId: variant.id } },
+        updatedAt: now,
+        items: { create: { id: crypto.randomUUID(), qty: qtyPerOrder, channelSku: `${sku}-${platform === "TIKTOK_SHOP" ? "A" : "B"}`, variantId: variant.id } },
       },
     });
     return order;
@@ -181,13 +185,15 @@ await ok("order 2 varian (A cukup, B kurang) → TIDAK ADA yang terpotong", asyn
   const vB = await prisma.productVariant.create({ data: { sku: "MULTI-B", stock: 2, masterProductId: master.id } });
   const order = await prisma.order.create({
     data: {
+      id: crypto.randomUUID(),
       orderNo: "MULTI-1",
       status: "AWAITING_SHIPMENT",
       accountId: accA.id,
+      updatedAt: now,
       items: {
         create: [
-          { qty: 3, channelSku: "MULTI-A", variantId: vA.id },
-          { qty: 5, channelSku: "MULTI-B", variantId: vB.id },
+          { id: crypto.randomUUID(), qty: 3, channelSku: "MULTI-A", variantId: vA.id },
+          { id: crypto.randomUUID(), qty: 5, channelSku: "MULTI-B", variantId: vB.id },
         ],
       },
     },
