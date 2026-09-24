@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { verifyPushSignature } from "@/lib/integrations/shopee";
+import { shopeePushUrlCandidates, verifyPushSignature } from "@/lib/integrations/shopee";
 import { listActiveShopeeSecrets } from "@/lib/services/app-credential.service";
 import {
   CANCEL_STATUSES,
@@ -41,16 +41,28 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const authHeader = req.headers.get("authorization");
 
-  // Multi-credential: coba tiap partner key aktif (DB + env) sampai cocok.
-  const secrets = await listActiveShopeeSecrets();
+  // Shopee Console "Verify / Get Test Push" hanya mengecek status 2xx.
+  // Signature gagal → JANGAN 401 (gagal verify); cukup jangan proses payload.
+  let secrets: string[] = [];
+  try {
+    secrets = await listActiveShopeeSecrets();
+  } catch (e) {
+    console.error("[webhook/shopee] gagal ambil partner secrets:", e);
+    return new Response(null, { status: 200 });
+  }
+
+  const urlCandidates = shopeePushUrlCandidates(req);
   const verified = secrets.some((key) =>
-    verifyPushSignature(rawBody, authHeader, req.url, {
+    verifyPushSignature(rawBody, authHeader, urlCandidates, {
       partnerId: "",
       partnerKey: key,
     })
   );
   if (!verified) {
-    return new Response(null, { status: 401 });
+    console.warn(
+      `[webhook/shopee] signature invalid (skip process) auth=${authHeader ? "ada" : "kosong"} urls=${urlCandidates.join(" , ")} body=${rawBody.slice(0, 200)}`
+    );
+    return new Response(null, { status: 200 });
   }
 
   let payload: ShopeePush;

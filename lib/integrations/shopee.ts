@@ -537,26 +537,92 @@ export async function getReturnDetail(
   );
 }
 
+function pushAuthCandidates(authHeader: string): string[] {
+  const raw = authHeader.trim();
+  const out = new Set<string>();
+  for (const v of [raw, raw.toLowerCase()]) {
+    out.add(v);
+    out.add(v.replace(/^sha256[=\s]+/i, ""));
+  }
+  return [...out];
+}
+
+function pushUrlVariants(url: string): string[] {
+  const out = new Set<string>([url]);
+  if (url.endsWith("/")) out.add(url.slice(0, -1));
+  else out.add(`${url}/`);
+  if (url.startsWith("https://")) out.add(`http://${url.slice("https://".length)}`);
+  if (url.startsWith("http://")) out.add(`https://${url.slice("http://".length)}`);
+  const noWww = url.replace(/^(https?:)\/\/www\./i, "$1//");
+  if (noWww !== url) out.add(noWww);
+  const withWww = url.replace(/^(https?:)\/\//i, "$1//www.");
+  if (withWww !== url) out.add(withWww);
+  return [...out];
+}
+
+/** Base string Shopee: `<callback_url>|<raw_body>` (opsional: raw body saja). */
 export function verifyPushSignature(
   rawBody: string,
   authHeader: string | null,
-  requestUrl?: string,
+  requestUrl?: string | string[],
   creds?: ShopeeCreds
 ): boolean {
   const key = creds?.partnerKey ?? process.env.SHOPEE_PARTNER_KEY ?? "";
   if (!key) return false;
   if (!authHeader) return false;
-  const candidates = requestUrl ? [`${requestUrl}|${rawBody}`, rawBody] : [rawBody];
-  const target = authHeader.trim().toLowerCase();
-  for (const base of candidates) {
-    const computed = crypto.createHmac("sha256", key).update(base).digest("hex");
-    try {
-      const a = Buffer.from(computed, "hex");
-      const b = Buffer.from(target, "hex");
-      if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
-    } catch {
-      if (computed === target) return true;
+
+  const urls = requestUrl
+    ? (Array.isArray(requestUrl) ? requestUrl : [requestUrl]).flatMap(pushUrlVariants)
+    : [];
+  const candidates: string[] = [rawBody];
+  for (const u of urls) {
+    candidates.push(`${u}|${rawBody}`);
+  }
+
+  const targets = pushAuthCandidates(authHeader);
+  for (const target of targets) {
+    for (const base of candidates) {
+      const computed = crypto.createHmac("sha256", key).update(base).digest("hex");
+      try {
+        const a = Buffer.from(computed, "hex");
+        const b = Buffer.from(target, "hex");
+        if (a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b)) return true;
+      } catch {
+        if (computed === target) return true;
+      }
     }
   }
   return false;
+}
+
+/** URL callback utk signature — lengkapi http(s)/host dari header proxy (nginx). */
+export function shopeePushUrlCandidates(req: {
+  url: string;
+  headers: Headers;
+}): string[] {
+  const out = new Set<string>();
+  if (req.url) out.add(req.url);
+  try {
+    const u = new URL(req.url);
+    out.add(u.origin + u.pathname);
+  } catch {
+    /* ignore */
+  }
+  const host =
+    req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    req.headers.get("host")?.trim();
+  let path = "/api/webhooks/shopee";
+  try {
+    path = new URL(req.url).pathname || path;
+  } catch {
+    /* ignore */
+  }
+  if (host) {
+    const proto =
+      req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+    out.add(`${proto}://${host}${path}`);
+    out.add(`https://${host}${path}`);
+    out.add(`http://${host}${path}`);
+  }
+  return [...out];
 }
