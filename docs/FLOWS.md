@@ -377,7 +377,7 @@ sequenceDiagram
 | `ORDER` | Stok dikurangi saat order masuk | Webhook `AWAITING_SHIPMENT` / Order sync |
 | `ORDER_CANCELLED` | Stok dikembalikan saat order dibatalkan | Webhook `CANCELLED` / Order sync |
 | `ORDER_REFUNDED` | Stok dikembalikan saat refund | Webhook status refund |
-| `SALE` | Penjualan langsung (legacy) | Legacy webhook `/api/webhooks/:accountId` |
+| `SALE` | Penjualan langsung | `/api/sales` (withAuth) — legacy `/api/webhooks/:accountId` sudah dihapus |
 | `MANUAL_ADJUSTMENT` | Koreksi manual (stock opname) | User adjustment |
 | `SYNC_CORRECTION` | Koreksi sinkronisasi | Reconciliation job |
 | `INIT` | Inisialisasi stok awal | Seed / first-time setup |
