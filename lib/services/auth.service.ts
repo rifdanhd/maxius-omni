@@ -2,11 +2,15 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/db/prisma";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const rawJwtSecret = process.env.JWT_SECRET;
 
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET belum diisi di file .env");
+if (!rawJwtSecret || rawJwtSecret === "change-this-to-a-long-random-string" || rawJwtSecret.length < 32) {
+  throw new Error(
+    "JWT_SECRET belum di-set dengan benar. Generate: openssl rand -base64 32 (minimal 32 char, jangan placeholder)."
+  );
 }
+
+const JWT_SECRET: string = rawJwtSecret;
 
 export interface AuthUser {
   id: string;
