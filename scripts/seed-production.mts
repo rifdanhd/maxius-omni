@@ -3,7 +3,7 @@
  *
  * Hanya membuat baris fondasi, TANPA data dummy:
  *   1. 5 Business fase 1 (business-default = "Maxius" + 4 brand lain)
- *   2. User admin (admin/admin123 — GANTI password setelah login pertama)
+ *   2. User admin (password RANDOM dicetak sekali ke terminal — ganti setelah login)
  *   3. InventorySetting id="inventory-default" (singleton pengaturan inventori)
  *   4. AppCredential "Legacy ENV" per platform (secret null = baca dari env)
  *   5. UserBusiness: semua user akses semua brand (fase 1, tanpa role)
@@ -40,13 +40,22 @@ async function main() {
   }
   console.log(`✅ Business: ${brands.map((b) => b.name).join(", ")}`);
 
-  const passwordHash = bcrypt.hashSync("admin123", 10);
+  // Password RANDOM — dicetak SEKALI ke terminal ini saja, tidak disimpan di
+  // file/log manapun. Operator wajib mencatatnya lalu ganti setelah login pertama.
+  const adminPassword = crypto.randomBytes(18).toString("base64url");
+  const passwordHash = bcrypt.hashSync(adminPassword, 10);
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
     create: { id: crypto.randomUUID(), username: "admin", passwordHash, canViewFullPii: true },
   });
-  console.log(`✅ User: username=${admin.username} (password awal: admin123)`);
+  const adminCreated = admin.passwordHash === passwordHash;
+  if (adminCreated) {
+    console.log(`✅ User: username=admin`);
+    console.log(`\n⚠️  PASSWORD ADMIN (cetak sekali, catat sekarang):\n\n   ${adminPassword}\n`);
+  } else {
+    console.log(`✅ User: username=admin (sudah ada — password TIDAK diubah)`);
+  }
 
   const setting = await prisma.inventorySetting.upsert({
     where: { id: "inventory-default" },
