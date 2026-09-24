@@ -151,9 +151,6 @@ function LoginForm() {
           </button>
         </form>
 
-        <p className="text-xs text-center text-gray-400 mt-8">
-          Default login: <span className="font-semibold text-gray-500">admin / admin123</span>
-        </p>
       </div>
 
       <style jsx>{`
