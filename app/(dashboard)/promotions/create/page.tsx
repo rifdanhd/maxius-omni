@@ -34,6 +34,12 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
+import {
+  applyVariantPrice,
+  isSameVariant,
+  setVariantDraft,
+  variantIdentityKey,
+} from "@/lib/services/promotion-listing-identity";
 
 /* ------------------------------ Types (bentuk response API) ------------------------------ */
 
@@ -41,7 +47,8 @@ type TikTokAccount = { id: string; label: string };
 
 type ListingVariant = {
   mappingId: string;
-  variantId: string;
+  /** null = listing belum di-mapping. JANGAN dipakai sebagai key/matching (lihat promotion-listing-identity). */
+  variantId: string | null;
   sku: string;
   channelSku: string;
   price: number | null;
@@ -269,6 +276,11 @@ export default function PromotionCreatePage() {
 
   const step1Problem = useMemo(() => {
     if (selected.length === 0) return "Pilih minimal 1 produk.";
+    // Unmapped (variantId null) tidak bisa set harga dari sini — pesan harus
+    // menunjuk ke mapping, bukan ke kolom harga yang tidak akan muncul.
+    const unmappedCount = missingPrices.reduce((n, x) => n + x.variants.filter((v) => !v.variantId).length, 0);
+    if (unmappedCount > 0)
+      return `${unmappedCount} varian belum di-mapping ke varian — hubungkan varian dulu (menu Mapping) sebelum set harga.`;
     if (missingPrices.length > 0)
       return `${missingPrices.length} produk masih belum punya harga — isi harga di daftar di atas dulu.`;
     return null;
@@ -314,14 +326,21 @@ export default function PromotionCreatePage() {
   /* ------------------------------ Actions ------------------------------ */
 
   async function savePrice(variant: ListingVariant) {
-    const raw = priceDraft[variant.variantId];
+    const key = variantIdentityKey(variant);
+    if (!variant.variantId) {
+      setPriceError(
+        `SKU "${variant.channelSku}" belum di-mapping ke varian — hubungkan varian dulu (menu Mapping) sebelum set harga.`
+      );
+      return;
+    }
+    const raw = priceDraft[key];
     const value = Number(raw);
     if (!raw || !Number.isFinite(value) || value <= 0) {
       setPriceError("Harga harus angka lebih dari 0 (contoh: 100000).");
       return;
     }
     setPriceError(null);
-    setPriceSavingFor(variant.variantId);
+    setPriceSavingFor(key);
     try {
       const r = await authFetch(`/api/products/pricing/${variant.variantId}`, {
         method: "PATCH",
@@ -334,11 +353,7 @@ export default function PromotionCreatePage() {
       }
       // Update lokal — tidak perlu refetch daftar.
       setListings((prev) =>
-        prev.map((l) =>
-          l.key.includes(variant.channelSku) || l.variants.some((v) => v.variantId === variant.variantId)
-            ? { ...l, variants: l.variants.map((v) => (v.variantId === variant.variantId ? { ...v, price: value } : v)) }
-            : l
-        )
+        prev.map((l) => (l.variants.some((v) => isSameVariant(v, variant)) ? { ...l, variants: applyVariantPrice(l.variants, variant, value) } : l))
       );
     } catch (e) {
       console.error("[Promosi] gagal simpan harga:", e);
@@ -710,32 +725,40 @@ export default function PromotionCreatePage() {
                         {isSelected &&
                           listing.variants
                             .filter((v) => v.price === null)
-                            .map((v) => (
-                              <div key={v.variantId} className="mt-2 ml-7 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
-                                <p className="text-[11px] font-bold text-amber-800">
-                                  Produk belum punya harga — isi dulu agar bisa dipromosikan (SKU: {v.sku})
-                                </p>
-                                <div className="mt-1.5 flex items-center gap-2">
-                                  <span className="text-xs text-gray-500">Rp</span>
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    value={priceDraft[v.variantId] ?? ""}
-                                    onChange={(e) => setPriceDraft((prev) => ({ ...prev, [v.variantId]: e.target.value }))}
-                                    placeholder="100000"
-                                    className="border border-gray-300 rounded-md px-2 py-1 text-sm w-32 text-right outline-none"
-                                  />
-                                  <button
-                                    onClick={() => savePrice(v)}
-                                    disabled={priceSavingFor === v.variantId}
-                                    className="rounded-md bg-[#2a3a8c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 disabled:opacity-60 flex items-center gap-1"
-                                  >
-                                    {priceSavingFor === v.variantId && <Loader2 size={12} className="animate-spin" />}
-                                    Simpan harga
-                                  </button>
+                            .map((v) =>
+                              v.variantId ? (
+                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
+                                  <p className="text-[11px] font-bold text-amber-800">
+                                    Produk belum punya harga — isi dulu agar bisa dipromosikan (SKU: {v.sku})
+                                  </p>
+                                  <div className="mt-1.5 flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">Rp</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      value={priceDraft[variantIdentityKey(v)] ?? ""}
+                                      onChange={(e) => setPriceDraft((prev) => setVariantDraft(prev, v, e.target.value))}
+                                      placeholder="100000"
+                                      className="border border-gray-300 rounded-md px-2 py-1 text-sm w-32 text-right outline-none"
+                                    />
+                                    <button
+                                      onClick={() => savePrice(v)}
+                                      disabled={priceSavingFor === variantIdentityKey(v)}
+                                      className="rounded-md bg-[#2a3a8c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 disabled:opacity-60 flex items-center gap-1"
+                                    >
+                                      {priceSavingFor === variantIdentityKey(v) && <Loader2 size={12} className="animate-spin" />}
+                                      Simpan harga
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              ) : (
+                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
+                                  <p className="text-[11px] font-bold text-amber-800">
+                                    Belum di-mapping ke varian — hubungkan varian dulu (menu Mapping) sebelum set harga. (SKU: {v.sku})
+                                  </p>
+                                </div>
+                              )
+                            )}
                       </div>
                     );
                   })}

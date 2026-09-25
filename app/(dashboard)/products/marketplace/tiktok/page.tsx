@@ -32,7 +32,7 @@ type TabKey =
 
 type VariantRow = {
   mappingId: string;
-  variantId: string;
+  variantId: string | null;
   sku: string;
   channelSku: string;
   status: string | null;

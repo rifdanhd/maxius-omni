@@ -2,6 +2,7 @@
  * [TEST] Null-variant:
  *   Batch 1 — listing Shopee & TikTok null-safe + recordSale throw path.
  *   Batch 2 — pricing override, promotion preview/create, TikTok edit load/submit.
+ *   Batch 3 — draft harga promo: key/matching per mappingId (bukan variantId mentah).
  *
  * Jalankan: npx tsx scripts/test-null-variant.mts
  */
@@ -15,6 +16,9 @@ const { previewPromotion } = await import("@/lib/services/promotion-write.servic
 const { revalidateForCreate } = await import("@/lib/services/promotion-write.service-create");
 const { loadTikTokEditData, submitTikTokEdit } = await import(
   "@/lib/services/marketplace-tiktok-edit.service"
+);
+const { applyVariantPrice, isSameVariant, setVariantDraft, variantIdentityKey } = await import(
+  "@/lib/services/promotion-listing-identity"
 );
 
 let passed = 0;
@@ -183,6 +187,24 @@ try {
   ok(loadErr.includes("belum terhubung ke varian"), `edit load unmapped → throw jelas, bukan TypeError (dapat: "${loadErr}")`);
   const sub = await submitTikTokEdit("b2-tt-noprice", {} as unknown as Parameters<typeof submitTikTokEdit>[1]);
   ok(sub.ok === false && (sub.error ?? "").includes("belum terhubung ke varian"), `edit submit unmapped → ok:false (dapat: "${sub.error ?? ""}")`);
+
+  console.log("=== Batch 3: draft harga promo tidak tabrakan antar unmapped ===");
+  type Row = { mappingId: string; variantId: string | null; channelSku: string; price: number | null };
+  const unmappedA: Row = { mappingId: "b3-map-a", variantId: null, channelSku: "SKU-A", price: null };
+  const unmappedB: Row = { mappingId: "b3-map-b", variantId: null, channelSku: "SKU-B", price: null };
+  ok(unmappedA.variantId === unmappedB.variantId, "referensi: variantId mentah memang sama (null === null) — inilah bug lama");
+  ok(variantIdentityKey(unmappedA) !== variantIdentityKey(unmappedB), "key draft per-mapping → dua unmapped tidak kembar");
+  ok(!isSameVariant(unmappedA, unmappedB), "matching per-mapping → dua unmapped tidak dianggap varian yang sama");
+
+  let draft = setVariantDraft({}, unmappedA, "100000");
+  draft = setVariantDraft(draft, unmappedB, "250000");
+  ok(draft[variantIdentityKey(unmappedA)] === "100000" && draft[variantIdentityKey(unmappedB)] === "250000", "draft kedua unmapped tersimpan terpisah");
+  const draftWithoutA = setVariantDraft({ [variantIdentityKey(unmappedB)]: "250000" }, unmappedA, "100000");
+  ok(draftWithoutA[variantIdentityKey(unmappedB)] === "250000", "menulis draft A tidak menimpa draft B");
+
+  const variants: Row[] = [unmappedA, unmappedB];
+  const updated = applyVariantPrice(variants, unmappedA, 100000);
+  ok(updated[0].price === 100000 && updated[1].price === null, "update harga A → hanya A berubah, B tetap tanpa harga");
 
   console.log(`\nALL ${passed} ASSERTIONS PASS`);
 } finally {

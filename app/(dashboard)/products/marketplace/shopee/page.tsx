@@ -18,7 +18,7 @@ type ShopeeListingRow = {
   key: string;
   accountId: string;
   accountLabel: string;
-  variantId: string;
+  variantId: string | null;
   platformProductId: string | null;
   platformTitle: string | null;
   status: string | null;
@@ -279,7 +279,7 @@ export default function ShopeeMarketplacePage() {
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
                     <PackageOpen size={28} className="mx-auto mb-2" />
-                    Tidak ada produk Shopee ditemukan. Klik <b>"Sync Semua"</b> untuk menarik data dari Shopee.
+                    Tidak ada produk Shopee ditemukan. Klik <b>&quot;Sync Semua&quot;</b> untuk menarik data dari Shopee.
                   </td>
                 </tr>
               ) : (
