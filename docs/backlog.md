@@ -4,7 +4,7 @@ Item deferred/known-limitation yang ditunda sampai kondisinya material.
 Setiap entri: konteks, kenapa ditunda, dan keputusan yang harus dibuat
 produk/bisnis sebelum implementasi (jangan diputuskan sepihak implementer).
 
-## Tab TikTok Salah Klasifikasi Produk Unmapped — Prioritas: Tinggi
+## Tab TikTok Salah Klasifikasi Produk Unmapped — Prioritas: Tinggi — SELESAI (Batch 4, `0e21bcc`)
 
 Sejak `ProductMapping.variantId` boleh NULL (unmapped), listing TikTok tetap
 menampilkan mapping tanpa varian (benar — harus tetap bisa di-map), tetapi
@@ -14,23 +14,44 @@ produk unmapped jatuh ke tab **"out" (Stok habis)**.
 
 Risiko: admin bisa salah asumsi barang habis padahal cuma belum di-mapping →
 restock/restock-quantity keliru, dan listing yang butuh tindakan mapping jadi
-tersembunyi di tab yang salah. Produk unmapped seharusnya beda kategori dari
-"attention" (perlu tindakan mapping), bukan "out".
+tersembunyi di tab yang salah.
 
-Status: ditunda — logic `tabOf()` sengaja TIDAK diubah saat null-variant
-refactor (Batch 1, commit `a2e02d7`) supaya perubahan perilaku tidak
-menyelinap di commit mekanis.
+Root cause (bukan sekadar gejala tab): caller mengirim
+`variantStock: m.variant?.stock ?? 0` — "tidak ada data" diubah jadi fakta
+"stok 0", lalu `platformStock ?? variantStock` menghasilkan 0 → `<= 0` → "out".
 
-Keputusan desain yang harus dibuat dulu sebelum implementasi:
-1. Tambah kategori tab baru khusus unmapped (butuh update filter + counts di
-   `listTikTokProducts` + tab bar di UI), atau
-2. Ubah logic `tabOf()`: `variant = NULL` → paksa kategori tertentu tanpa
-   kategori baru (lebih murah, tapi "unmapped" jadi kecampur makna dengan
-   "attention").
+Keputusan desain (dipilih 2026-09-25): **Opsi 1 — tab baru khusus unmapped.**
 
-Scope teknis kalau dikerjakan: `tabOf()` + `counts` di
-`lib/services/marketplace-tiktok.service.ts` (baris 524-537, 683-692) dan tab
-bar di `app/(dashboard)/products/marketplace/tiktok/page.tsx`.
+- `tabOf()`: `variantStock === null` → tab **`unmapped` ("Belum Terhubung")**
+  dicek paling awal, sebelum `status` — jadi tidak lagi tercampur ke
+  "attention" (FREEZE / belum pernah sync) dan tidak dihitung dari stok tanpa
+  sumber.
+- Listing campur (banyak SKU per `platformProductId`): 1 SKU unmapped →
+  seluruh listing masuk "Belum Terhubung", supaya tidak disembunyikan di tab
+  lain. Varian mapped di dalamnya tetap memakai tab statusnya sendiri.
+- Scope dikerjakan: `TIKTOK_TABS` + `TIKTOK_TAB_LABELS` + `tabOf()` + `counts`
+  di `lib/services/marketplace-tiktok.service.ts`, `TabKey` + label tab di
+  `app/(dashboard)/products/marketplace/tiktok/page.tsx`. Filter route &
+  payload `tabs` ikut otomatis (diturunkan dari `TIKTOK_TABS`).
+- Trade-off yang diterima: unmapped dengan status FREEZE/PENDING/failed kini
+  tampil di "Belum Terhubung", bukan di tab statusnya (aksi pertama = mapping).
+- Test: `scripts/test-null-variant.mts` bagian "Batch 4" (8 assertion,
+  dibuktikan merah dulu → hijau).
+
+Flag sisa (belum dikerjakan, butuh keputusan kalau material):
+
+1. Kolom **Stok** masih `platformStock ?? variant.stock ?? 0` (display-only,
+   keputusan Batch 1): unmapped tanpa `platformStock` tampil `0` — makna
+   "belum ada data" vs "habis" masih samar di kolom, walau tab sudah benar.
+2. Tab listing non-unmapped masih diambil dari **mapping pertama** dalam grup
+   (pre-existing): listing dengan 1 SKU FREEZE + 1 SKU ACTIVE bisa menampilkan
+   tab FREEZE saja — aturan "ada yang unmapped" baru menambal kasus unmapped.
+3. `tabOf()` masih menerima param `lastSyncedAt` yang tidak dipakai (dead
+   param, sengaja tidak dihapus agar diff tetap fokus).
+4. Dua konsep "belum ter-mapping" berdampingan di UI: panel discovery
+   (`getTikTokUnmapped` = SKU di TikTok tanpa baris mapping) vs tab baru
+   ("Belum Terhubung" = mapping ada, `variantId` NULL). Perlu keputusan produk
+   kalau membingungkan admin.
 
 ## Ingest Refund/Return TikTok — Prioritas: Rendah
 
