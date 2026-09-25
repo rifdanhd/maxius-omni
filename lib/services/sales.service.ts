@@ -44,6 +44,11 @@ export async function recordSale({
   }
 
   const variant = mapping.variant;
+  if (!variant) {
+    throw new Error(
+      `SKU "${channelSku}" belum di-mapping ke varian untuk akun ini — penjualan tidak dapat mengurangi stok pusat.`
+    );
+  }
   const product = variant.masterProduct;
 
   // ANTI-OVERSELL (TUGAS 1): pengurangan memakai SATU statement atomik
