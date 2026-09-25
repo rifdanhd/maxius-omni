@@ -25,6 +25,7 @@ type TabKey =
   | "active"
   | "out"
   | "archived"
+  | "unmapped"
   | "attention"
   | "pending"
   | "draft"
@@ -181,7 +182,7 @@ export default function TikTokMarketplacePage() {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState<Record<TabKey, number>>({
-    all: 0, active: 0, out: 0, archived: 0, attention: 0, pending: 0, draft: 0, failed: 0,
+    all: 0, active: 0, out: 0, archived: 0, unmapped: 0, attention: 0, pending: 0, draft: 0, failed: 0,
   });
   const [accounts, setAccounts] = useState<ListResponse["accounts"]>([]);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -537,6 +538,7 @@ export default function TikTokMarketplacePage() {
             active: "Aktif",
             out: "Habis",
             archived: "Diarsipkan",
+            unmapped: "Belum Terhubung",
             attention: "Perlu Tindakan",
             pending: "Pending",
             draft: "Draf",

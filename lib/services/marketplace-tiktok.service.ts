@@ -25,6 +25,7 @@ export const TIKTOK_TABS = [
   "active",
   "out",
   "archived",
+  "unmapped",
   "attention",
   "pending",
   "draft",
@@ -37,6 +38,7 @@ export const TIKTOK_TAB_LABELS: Record<TikTokTabKey, string> = {
   active: "Aktif",
   out: "Habis",
   archived: "Diarsipkan",
+  unmapped: "Belum Terhubung",
   attention: "Perlu Tindakan",
   pending: "Pending",
   draft: "Draf",
@@ -524,9 +526,15 @@ export async function setListingActive(
 function tabOf(v: {
   status: string | null;
   platformStock: number | null;
-  variantStock: number;
+  /** Stok varian lokal — null = varian lokal belum ada (mapping belum terhubung). */
+  variantStock: number | null;
   lastSyncedAt: Date | null;
 }): TikTokTabKey | null {
+  // Unmapped = kategori sendiri ("Belum Terhubung"): jangan dicampur ke
+  // "attention" (FREEZE/belum pernah sync) dan jangan dihitung dari stok yang
+  // tak punya sumber — `variantStock ?? 0` dulu membuat ACTIVE+platformStock
+  // NULL+varian NULL jatuh ke "out" seolah-olah barang habis.
+  if (v.variantStock === null) return "unmapped";
   if (!v.status) return "attention"; // belum pernah di-sync → perlu tindakan
   const tab = mapTikTokStatusToTab(v.status);
   if (tab && tab === "active") {
@@ -595,7 +603,7 @@ export async function listTikTokProducts(
       const tab = tabOf({
         status: m.platformStatus,
         platformStock: m.platformStock,
-        variantStock: m.variant?.stock ?? 0,
+        variantStock: m.variant?.stock ?? null,
         lastSyncedAt: m.lastSyncedAt,
       });
       row = {
@@ -634,7 +642,7 @@ export async function listTikTokProducts(
       tab: tabOf({
         status: m.platformStatus,
         platformStock: m.platformStock,
-        variantStock: m.variant?.stock ?? 0,
+        variantStock: m.variant?.stock ?? null,
         lastSyncedAt: m.lastSyncedAt,
       }),
       price: effPrice,
@@ -646,6 +654,10 @@ export async function listTikTokProducts(
     };
     row.variants.push(variantRow);
     row.variantCount += 1;
+    // Listing campur (banyak SKU per platformProductId): 1 SKU unmapped →
+    // seluruh listing masuk "Belum Terhubung" — jangan disembunyikan di tab
+    // lain walau varian mapped-nya aktif.
+    if (variantRow.tab === "unmapped") row.tab = "unmapped";
     row.priceMin =
       row.priceMin === null || effPrice === null
         ? row.priceMin ?? null
@@ -685,6 +697,7 @@ export async function listTikTokProducts(
     active: rows.filter((r) => r.tab === "active").length,
     out: rows.filter((r) => r.tab === "out").length,
     archived: rows.filter((r) => r.tab === "archived").length,
+    unmapped: rows.filter((r) => r.tab === "unmapped").length,
     attention: rows.filter((r) => r.tab === "attention").length,
     pending: rows.filter((r) => r.tab === "pending").length,
     draft: rows.filter((r) => r.tab === "draft").length,

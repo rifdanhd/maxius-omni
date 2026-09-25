@@ -3,6 +3,7 @@
  *   Batch 1 — listing Shopee & TikTok null-safe + recordSale throw path.
  *   Batch 2 — pricing override, promotion preview/create, TikTok edit load/submit.
  *   Batch 3 — draft harga promo: key/matching per mappingId (bukan variantId mentah).
+ *   Batch 4 — tab TikTok: produk unmapped tidak salah jatuh ke tab "Habis" (backlog).
  *
  * Jalankan: npx tsx scripts/test-null-variant.mts
  */
@@ -27,6 +28,13 @@ const ok = (cond: boolean, label: string) => {
   passed++;
   console.log(`  ✓ ${label}`);
 };
+
+/**
+ * Widening ke string — assertion tab bisa ditulis SEBELUM tipe TikTokTabKey
+ * diperkaya (run merah), tetap valid sesudahnya tanpa `as`.
+ */
+const tabStr = (r: { tab: string | null } | undefined) => r?.tab ?? "(tidak ada baris)";
+const countOf = (counts: Record<string, number>, key: string) => counts[key] ?? -1;
 
 /* ── Fixture ── */
 const BIZ = "b1-test-null-variant";
@@ -77,7 +85,19 @@ await prisma.productMapping.create({
 });
 // unmapped TAPI punya harga override mapping
 await prisma.productMapping.create({
-  data: { id: "b2-tt-override", channelSku: "B2-TT-OVERRIDE", variantId: null, accountId: "b2-acct-tiktok", price: 50000, platformProductId: "B2-P2", platformStatus: "ACTIVE", updatedAt: new Date() },
+  data: { id: "b2-tt-override", channelSku: "B2-TT-OVERRIDE", variantId: null, accountId: "b2-acct-tiktok", platformProductId: "B2-P2", platformStatus: "ACTIVE", price: 50000, updatedAt: new Date() },
+});
+
+// Batch 4 — listing campur 1 platformProductId: 1 varian mapped + 1 unmapped.
+await prisma.masterProduct.create({ data: { id: "b4-master", name: "B4 Product", businessId: BIZ2 } });
+await prisma.productVariant.create({
+  data: { id: "b4-var", sku: "B4-SKU-1", stock: 10, price: 7000, masterProductId: "b4-master" },
+});
+await prisma.productMapping.create({
+  data: { id: "b4-tt-mapped", channelSku: "B4-TT-MAPPED", variantId: "b4-var", accountId: "b2-acct-tiktok", platformProductId: "B4-P1", platformStatus: "ACTIVE", updatedAt: new Date() },
+});
+await prisma.productMapping.create({
+  data: { id: "b4-tt-unmapped", channelSku: "B4-TT-UNMAPPED", variantId: null, accountId: "b2-acct-tiktok", platformProductId: "B4-P1", platformStatus: "ACTIVE", updatedAt: new Date() },
 });
 
 try {
@@ -102,10 +122,14 @@ try {
   ok(tkNullVar.price === null, "tiktok unmapped: price null (tanpa variant, tanpa override)");
   ok(tkNullVar.stock === 7, "tiktok unmapped: stock = platformStock (precedence)");
   ok(tkNull.master?.name === null, "tiktok unmapped: master null");
-  ok(tkNull.tab === "active" && tkNull.stockTotal === 7, "tiktok unmapped: tab dari status, stockTotal 7");
+  ok(tkNull.tab === "unmapped" && tkNull.stockTotal === 7, 'tiktok unmapped: tab "Belum Terhubung" (bukan ikut status), stockTotal 7');
   const tkRealVar = tkReal.variants.find((v) => v.mappingId === "b1-map-ttk-real")!;
   ok(tkRealVar.sku === "B1-SKU-1" && tkRealVar.price === 1000 && tkRealVar.stock === 42, "tiktok mapped: sku/price/stock normal");
   ok(tkReal.master?.name === "B1 Product", "tiktok mapped: master normal");
+  ok(
+    tkReal.tab === "active" && tkReal.stockTotal === 42,
+    "tiktok mapped: platformStock NULL → pakai stok varian (42): tab aktif, bukan out/unmapped"
+  );
 
   console.log("=== recordSale throw path (mapping ada, variant NULL) ===");
   let threw = "";
@@ -206,13 +230,46 @@ try {
   const updated = applyVariantPrice(variants, unmappedA, 100000);
   ok(updated[0].price === 100000 && updated[1].price === null, "update harga A → hanya A berubah, B tetap tanpa harga");
 
+  console.log("=== Batch 4: tab TikTok — produk unmapped tidak salah klasifikasi (backlog) ===");
+  // Skenario backlog: platformStatus=ACTIVE + platformStock=NULL + variant=NULL.
+  const list4 = await listTikTokProducts({ businessId: BIZ2 });
+  const rowNoprice = list4.rows.find((r) => r.variants.some((v) => v.mappingId === "b2-tt-noprice"));
+  ok(
+    tabStr(rowNoprice) === "unmapped",
+    `ACTIVE + platformStock NULL + variant NULL → tab "unmapped", bukan "out" (dapat: "${tabStr(rowNoprice)}")`
+  );
+  ok(
+    tabStr(list4.rows.find((r) => r.variants.some((v) => v.mappingId === "b2-tt-override"))) === "unmapped",
+    'unmapped + harga override → tab "unmapped" (bukan ikut status harga)'
+  );
+  ok(
+    tabStr(rowNoprice?.variants.find((v) => v.mappingId === "b2-tt-noprice")) === "unmapped",
+    'variant row ikut tab "unmapped"'
+  );
+  ok(list4.counts.out === 0, `counts.out = 0 — tak ada lagi yang jatuh ke tab "Habis" (dapat: ${list4.counts.out})`);
+  ok(countOf(list4.counts, "unmapped") === 3, `counts.unmapped = 3 (noprice, override, listing campur) — dapat: ${countOf(list4.counts, "unmapped")}`);
+  const onlyUnmapped = await listTikTokProducts({ businessId: BIZ2, tab: "unmapped" });
+  ok(
+    onlyUnmapped.total === countOf(list4.counts, "unmapped") && onlyUnmapped.rows.every((r) => r.tab === "unmapped"),
+    `filter tab=unmapped → ${onlyUnmapped.total} baris, semua unmapped, cocok dg counts`
+  );
+  const mixed = list4.rows.find((r) => r.variants.some((v) => v.mappingId === "b4-tt-mapped"));
+  ok(
+    tabStr(mixed) === "unmapped",
+    `listing campur (1 mapped + 1 unmapped) → tab "unmapped", tidak disembunyikan di "Aktif" (dapat: "${tabStr(mixed)}")`
+  );
+  ok(
+    tabStr(mixed?.variants.find((v) => v.mappingId === "b4-tt-mapped")) === "active",
+    `varian mapped di listing campur tetap tab "active" (dapat: "${tabStr(mixed?.variants.find((v) => v.mappingId === "b4-tt-mapped"))}")`
+  );
+
   console.log(`\nALL ${passed} ASSERTIONS PASS`);
 } finally {
   /* ── Cleanup ── */
   const accts = ["b1-acct-shopee", "b1-acct-tiktok", "b2-acct-tiktok"];
   await prisma.productMapping.deleteMany({ where: { accountId: { in: accts } } });
-  await prisma.productVariant.deleteMany({ where: { masterProductId: "b1-master" } });
-  await prisma.masterProduct.delete({ where: { id: "b1-master" } }).catch(() => {});
+  await prisma.productVariant.deleteMany({ where: { masterProductId: { in: ["b1-master", "b4-master"] } } });
+  await prisma.masterProduct.deleteMany({ where: { id: { in: ["b1-master", "b4-master"] } } });
   await prisma.platformAccount.deleteMany({ where: { id: { in: accts } } });
   await prisma.business.delete({ where: { id: BIZ } }).catch(() => {});
   await prisma.business.delete({ where: { id: BIZ2 } }).catch(() => {});
