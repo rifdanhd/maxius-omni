@@ -4,6 +4,7 @@ import {
   getAuthorizeCredential,
   resolveTiktokCreds,
 } from "@/lib/services/app-credential.service";
+import { appOrigin } from "@/lib/utils/request-origin";
 
 // Format resmi seller OAuth (ROW/ID): service_id — lihat
 // partner.tiktokshop.com > Seller authorization guide.
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     );
   } catch {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_env", req.url),
+      new URL("/settings/accounts?error=missing_env", appOrigin(req)),
     );
   }
   let creds;
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     creds = resolveTiktokCreds(credential);
   } catch {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_env", req.url),
+      new URL("/settings/accounts?error=missing_env", appOrigin(req)),
     );
   }
   const redirectUri =
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   if (!redirectUri || (!creds.serviceId && !creds.appKey)) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_env", req.url),
+      new URL("/settings/accounts?error=missing_env", appOrigin(req)),
     );
   }
 

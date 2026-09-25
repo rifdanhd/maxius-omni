@@ -6,6 +6,7 @@ import {
   resolveTiktokCreds,
 } from "@/lib/services/app-credential.service";
 import { TIKTOK_OAUTH_CRED_COOKIE } from "../authorize/route";
+import { appOrigin } from "@/lib/utils/request-origin";
 
 const TIKTOK_TOKEN_URL = "https://auth.tiktok-shops.com/api/v2/token/get";
 const PLATFORM = "TIKTOK_SHOP";
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(
         `/settings/accounts?error=${encodeURIComponent(error ?? "missing_code")}`,
-        req.url,
+        appOrigin(req),
       ),
     );
   }
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   const gotState = searchParams.get("state");
   if (expectedState && gotState !== expectedState) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=invalid_state", req.url),
+      new URL("/settings/accounts?error=invalid_state", appOrigin(req)),
     );
   }
 
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     );
   } catch {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_env", req.url),
+      new URL("/settings/accounts?error=missing_env", appOrigin(req)),
     );
   }
   let creds;
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
     creds = resolveTiktokCreds(credential);
   } catch {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_env", req.url),
+      new URL("/settings/accounts?error=missing_env", appOrigin(req)),
     );
   }
   const appKey = creds.appKey;
@@ -78,14 +79,14 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("[TikTok OAuth] Token request failed:", e);
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=token_request_failed", req.url),
+      new URL("/settings/accounts?error=token_request_failed", appOrigin(req)),
     );
   }
 
   if (!tokenRes.ok) {
     console.error(`[TikTok OAuth] Token endpoint HTTP ${tokenRes.status}`);
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=token_exchange_failed", req.url),
+      new URL("/settings/accounts?error=token_exchange_failed", appOrigin(req)),
     );
   }
 
@@ -108,7 +109,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(
         `/settings/accounts?error=${encodeURIComponent(tokenJson?.message ?? "token_exchange_failed")}`,
-        req.url,
+        appOrigin(req),
       ),
     );
   }
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
   const data = tokenJson.data ?? {};
   if (!data.access_token || !data.refresh_token) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=token_missing", req.url),
+      new URL("/settings/accounts?error=token_missing", appOrigin(req)),
     );
   }
 
@@ -191,7 +192,7 @@ export async function GET(req: NextRequest) {
         console.warn(
           `[TikTok OAuth] authorize ditolak utk shop ${shop.id}: akun dibekukan (${existing.frozenReason ?? "tanpa alasan"}).`
         );
-        return NextResponse.redirect(new URL("/settings/accounts?error=account_frozen", req.url));
+        return NextResponse.redirect(new URL("/settings/accounts?error=account_frozen", appOrigin(req)));
       }
       await prisma.platformAccount.upsert({
         where: {
@@ -235,11 +236,11 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("[TikTok OAuth] Failed to save credential:", e);
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=save_failed", req.url),
+      new URL("/settings/accounts?error=save_failed", appOrigin(req)),
     );
   }
 
   return NextResponse.redirect(
-    new URL("/settings/accounts?success=true", req.url),
+    new URL("/settings/accounts?success=true", appOrigin(req)),
   );
 }

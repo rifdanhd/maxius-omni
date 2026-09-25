@@ -6,6 +6,7 @@ import {
   isShopeeAuthorizeEnabled,
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
+import { appOrigin } from "@/lib/utils/request-origin";
 
 export const SHOPEE_OAUTH_CRED_COOKIE = "shopee_oauth_cred";
 export const OAUTH_BRAND_COOKIE = "maxius_oauth_brand";
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   // (SHOPEE_AUTHORIZE_ENABLED=true di env server).
   if (!isShopeeAuthorizeEnabled()) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=shopee_authorize_disabled", req.url)
+      new URL("/settings/accounts?error=shopee_authorize_disabled", appOrigin(req))
     );
   }
   try {
@@ -60,6 +61,6 @@ export async function GET(req: NextRequest) {
     return res;
   } catch (e) {
     console.error("[Shopee OAuth] authorize gagal:", e instanceof Error ? e.message : e);
-    return NextResponse.redirect(new URL("/settings/accounts?error=shopee_missing_env", req.url));
+    return NextResponse.redirect(new URL("/settings/accounts?error=shopee_missing_env", appOrigin(req)));
   }
 }

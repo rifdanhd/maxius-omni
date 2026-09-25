@@ -177,7 +177,17 @@ export async function getAccessTokenByCode(
   const r = (data.response ?? {}) as Record<string, unknown>;
   const accessToken = r.access_token as string | undefined;
   const refreshToken = r.refresh_token as string | undefined;
-  if (!accessToken || !refreshToken) throw new Error("[Shopee] Token Shopee tak lengkap.");
+  if (!accessToken || !refreshToken) {
+    // Body gagal sering jadi satu-satunya petunjuk (code dipakai ganda,
+    // redirect_uri/partner tak cocok, dst) — token disensor dulu.
+    const raw = JSON.stringify(data).replace(
+      /"(access_token|refresh_token)"\s*:\s*"[^"]*"/g,
+      '"$1":"***"'
+    );
+    throw new Error(
+      `[Shopee] Token Shopee tak lengkap. http_${res.status} request_id=${data.request_id ?? "-"} body=${raw.slice(0, 500)}`
+    );
+  }
   return {
     accessToken,
     refreshToken,

@@ -7,13 +7,14 @@ import {
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
 import { SHOPEE_OAUTH_CRED_COOKIE, OAUTH_BRAND_COOKIE } from "../authorize/route";
+import { appOrigin } from "@/lib/utils/request-origin";
 
 const PLATFORM = "SHOPEE";
 
 export async function GET(req: NextRequest) {
   if (!isShopeeAuthorizeEnabled()) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=shopee_authorize_disabled", req.url)
+      new URL("/settings/accounts?error=shopee_authorize_disabled", appOrigin(req))
     );
   }
   const { searchParams } = new URL(req.url);
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(
         `/settings/accounts?error=${encodeURIComponent(error ?? "missing_code")}`,
-        req.url,
+        appOrigin(req),
       ),
     );
   }
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
   const gotState = searchParams.get("state");
   if (expectedState && gotState !== expectedState) {
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=invalid_state", req.url),
+      new URL("/settings/accounts?error=invalid_state", appOrigin(req)),
     );
   }
 
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
     );
   } catch (e) {
     console.error("[Shopee OAuth] credential tidak valid:", e instanceof Error ? e.message : e);
-    return NextResponse.redirect(new URL("/settings/accounts?error=shopee_missing_env", req.url));
+    return NextResponse.redirect(new URL("/settings/accounts?error=shopee_missing_env", appOrigin(req)));
   }
   const creds = resolveShopeeCreds(credential);
 
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
     token = await getAccessTokenByCode(code, shopId ?? undefined, creds);
   } catch (e) {
     console.error("[Shopee OAuth] Token exchange gagal:", e instanceof Error ? e.message : e);
-    return NextResponse.redirect(new URL("/settings/accounts?error=shopee_token_exchange_failed", req.url));
+    return NextResponse.redirect(new URL("/settings/accounts?error=shopee_token_exchange_failed", appOrigin(req)));
   }
 
   const shopIds = token.shopIdList?.length
@@ -91,7 +92,7 @@ export async function GET(req: NextRequest) {
           console.warn(
             `[Shopee OAuth] authorize ditolak utk shop ${sid}: akun dibekukan (${existing.frozenReason ?? "tanpa alasan"}).`
           );
-          return NextResponse.redirect(new URL("/settings/accounts?error=account_frozen", req.url));
+          return NextResponse.redirect(new URL("/settings/accounts?error=account_frozen", appOrigin(req)));
         }
         let label = `Shopee (${sid})`;
         try {
@@ -136,8 +137,8 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {
     console.error("[Shopee OAuth] Gagal simpan kredensial:", e);
-    return NextResponse.redirect(new URL("/settings/accounts?error=save_failed", req.url));
+    return NextResponse.redirect(new URL("/settings/accounts?error=save_failed", appOrigin(req)));
   }
 
-  return NextResponse.redirect(new URL("/settings/accounts?success=true", req.url));
+  return NextResponse.redirect(new URL("/settings/accounts?success=true", appOrigin(req)));
 }
