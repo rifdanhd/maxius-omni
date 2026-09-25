@@ -4,6 +4,34 @@ Item deferred/known-limitation yang ditunda sampai kondisinya material.
 Setiap entri: konteks, kenapa ditunda, dan keputusan yang harus dibuat
 produk/bisnis sebelum implementasi (jangan diputuskan sepihak implementer).
 
+## Tab TikTok Salah Klasifikasi Produk Unmapped — Prioritas: Tinggi
+
+Sejak `ProductMapping.variantId` boleh NULL (unmapped), listing TikTok tetap
+menampilkan mapping tanpa varian (benar — harus tetap bisa di-map), tetapi
+`tabOf()` menghitung `variantStock` dengan fallback `?? 0`. Kombinasi
+`platformStatus = ACTIVE` + `platformStock = NULL` + `variant = NULL` membuat
+produk unmapped jatuh ke tab **"out" (Stok habis)**.
+
+Risiko: admin bisa salah asumsi barang habis padahal cuma belum di-mapping →
+restock/restock-quantity keliru, dan listing yang butuh tindakan mapping jadi
+tersembunyi di tab yang salah. Produk unmapped seharusnya beda kategori dari
+"attention" (perlu tindakan mapping), bukan "out".
+
+Status: ditunda — logic `tabOf()` sengaja TIDAK diubah saat null-variant
+refactor (Batch 1, commit `a2e02d7`) supaya perubahan perilaku tidak
+menyelinap di commit mekanis.
+
+Keputusan desain yang harus dibuat dulu sebelum implementasi:
+1. Tambah kategori tab baru khusus unmapped (butuh update filter + counts di
+   `listTikTokProducts` + tab bar di UI), atau
+2. Ubah logic `tabOf()`: `variant = NULL` → paksa kategori tertentu tanpa
+   kategori baru (lebih murah, tapi "unmapped" jadi kecampur makna dengan
+   "attention").
+
+Scope teknis kalau dikerjakan: `tabOf()` + `counts` di
+`lib/services/marketplace-tiktok.service.ts` (baris 524-537, 683-692) dan tab
+bar di `app/(dashboard)/products/marketplace/tiktok/page.tsx`.
+
 ## Ingest Refund/Return TikTok — Prioritas: Rendah
 
 MAXIUS belum punya cara mendeteksi refund yang terjadi setelah order dikirim
