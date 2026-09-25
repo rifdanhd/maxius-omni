@@ -168,7 +168,7 @@ export type ShopeeListingRow = {
   key: string;
   accountId: string;
   accountLabel: string;
-  variantId: string;
+  variantId: string | null;
   platformProductId: string | null;
   platformTitle: string | null;
   status: string | null;
@@ -214,7 +214,7 @@ export async function listShopeeProducts(opts: {
     platformTitle: m.platformTitle,
     status: m.platformStatus,
     channelSku: m.channelSku,
-    stockTotal: m.platformStock ?? m.variant.stock,
+    stockTotal: m.platformStock ?? m.variant?.stock ?? 0,
     lastSyncedAt: m.lastSyncedAt,
   }));
   return { rows, total, page, pageSize };

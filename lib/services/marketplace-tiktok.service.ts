@@ -98,7 +98,7 @@ export interface ListTikTokParams {
 
 export interface TikTokVariantRow {
   mappingId: string;
-  variantId: string;
+  variantId: string | null;
   sku: string;
   channelSku: string;
   status: string | null;
@@ -137,6 +137,7 @@ export interface TikTokListingRow {
 interface ListedMapping {
   id: string;
   channelSku: string;
+  variantId: string | null;
   platformProductId: string | null;
   platformStatus: string | null;
   platformStatusRaw: string | null;
@@ -151,7 +152,7 @@ interface ListedMapping {
     stock: number;
     price: number | null;
     masterProduct: { id: string; name: string; category: string | null; imageUrl: string | null } | null;
-  };
+  } | null;
 }
 
 /* ------------------------------ Sync engine ------------------------------ */
@@ -594,7 +595,7 @@ export async function listTikTokProducts(
       const tab = tabOf({
         status: m.platformStatus,
         platformStock: m.platformStock,
-        variantStock: m.variant.stock,
+        variantStock: m.variant?.stock ?? 0,
         lastSyncedAt: m.lastSyncedAt,
       });
       row = {
@@ -604,10 +605,10 @@ export async function listTikTokProducts(
         platformProductId: m.platformProductId,
         platformTitle: m.platformTitle,
         master: {
-          id: m.variant.masterProduct?.id ?? null,
-          name: m.variant.masterProduct?.name ?? null,
-          imageUrl: m.variant.masterProduct?.imageUrl ?? null,
-          category: m.variant.masterProduct?.category ?? null,
+          id: m.variant?.masterProduct?.id ?? null,
+          name: m.variant?.masterProduct?.name ?? null,
+          imageUrl: m.variant?.masterProduct?.imageUrl ?? null,
+          category: m.variant?.masterProduct?.category ?? null,
         },
         status: m.platformStatus,
         tab,
@@ -622,18 +623,18 @@ export async function listTikTokProducts(
       listingMap.set(key, row);
     }
 
-    const effPrice = m.price ?? m.variant.price;
-    const stock = m.platformStock ?? m.variant.stock;
+    const effPrice = m.price ?? m.variant?.price ?? null;
+    const stock = m.platformStock ?? m.variant?.stock ?? 0;
     const variantRow: TikTokVariantRow = {
       mappingId: m.id,
-      variantId: m.variant.id,
-      sku: m.variant.sku,
+      variantId: m.variantId,
+      sku: m.variant?.sku ?? m.channelSku,
       channelSku: m.channelSku,
       status: m.platformStatus,
       tab: tabOf({
         status: m.platformStatus,
         platformStock: m.platformStock,
-        variantStock: m.variant.stock,
+        variantStock: m.variant?.stock ?? 0,
         lastSyncedAt: m.lastSyncedAt,
       }),
       price: effPrice,
