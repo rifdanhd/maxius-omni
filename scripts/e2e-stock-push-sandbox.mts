@@ -153,7 +153,7 @@ try {
   const account = await prisma.platformAccount.findFirst({ where: { label: { contains: "7680596707423979285" } } });
   if (!account?.accessToken || !account.shopCipher) throw new Error("Akun sandbox ...9285 tidak ditemukan / tanpa token+cipher");
   const mapping = await prisma.productMapping.findFirst({ where: { accountId: account.id }, include: { variant: true } });
-  if (!mapping?.variant) throw new Error("Tidak ada mapping ter-sync di akun sandbox");
+  if (!mapping?.variant || !mapping.variantId) throw new Error("Tidak ada mapping ter-sync di akun sandbox");
   const productId = mapping.platformProductId ?? "";
   if (!productId) throw new Error("Mapping tidak punya platformProductId");
 
