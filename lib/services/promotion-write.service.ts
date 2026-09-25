@@ -148,16 +148,16 @@ export async function previewPromotion(req: PreviewRequest): Promise<PreviewResu
       items.push({
         mappingId,
         input: {
-          price: mapping.price ?? mapping.variant.price ?? null,
-          priceSource: mapping.price != null ? "MAPPING_OVERRIDE" : mapping.variant.price != null ? "VARIANT_DEFAULT" : null,
-          displayName: mapping.platformTitle ?? mapping.variant.masterProduct.name,
+          price: mapping.price ?? mapping.variant?.price ?? null,
+          priceSource: mapping.price != null ? "MAPPING_OVERRIDE" : mapping.variant?.price != null ? "VARIANT_DEFAULT" : null,
+          displayName: mapping.platformTitle ?? mapping.variant?.masterProduct?.name ?? null,
           channelSku: mapping.channelSku,
           platformProductId: mapping.platformProductId,
         },
         finalPrice: null,
         error: "Diskon belum diisi untuk produk ini.",
-        masterProductName: mapping.variant.masterProduct.name,
-        variantName: mapping.variant.name,
+        masterProductName: mapping.variant?.masterProduct?.name ?? null,
+        variantName: mapping.variant?.name ?? null,
         activeOverlaps: [],
         pastOverlaps: [],
       });
@@ -165,17 +165,17 @@ export async function previewPromotion(req: PreviewRequest): Promise<PreviewResu
     }
 
     const price =
-      mapping.price != null ? mapping.price : mapping.variant.price != null ? mapping.variant.price : null;
+      mapping.price != null ? mapping.price : (mapping.variant?.price ?? null);
     const row = computePriceRow(
       {
         price,
         priceSource:
           mapping.price != null
             ? "MAPPING_OVERRIDE"
-            : mapping.variant.price != null
+            : mapping.variant?.price != null
               ? "VARIANT_DEFAULT"
               : null,
-        displayName: mapping.platformTitle ?? mapping.variant.masterProduct.name,
+        displayName: mapping.platformTitle ?? mapping.variant?.masterProduct?.name ?? null,
         channelSku: mapping.channelSku,
         platformProductId: mapping.platformProductId,
       },
@@ -201,8 +201,8 @@ export async function previewPromotion(req: PreviewRequest): Promise<PreviewResu
       input: row.input,
       finalPrice: row.finalPrice,
       error: row.error,
-      masterProductName: mapping.variant.masterProduct.name,
-      variantName: mapping.variant.name,
+      masterProductName: mapping.variant?.masterProduct?.name ?? null,
+      variantName: mapping.variant?.name ?? null,
       activeOverlaps,
       pastOverlaps,
     });

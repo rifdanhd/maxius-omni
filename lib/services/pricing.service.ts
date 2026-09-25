@@ -227,11 +227,16 @@ export async function updateMappingPrice(
       },
     },
   });
-  if (
-    !mapping ||
-    mapping.account.businessId !== businessId ||
-    mapping.variant.masterProduct.businessId !== businessId
-  ) {
+  if (!mapping || mapping.account.businessId !== businessId) {
+    return { ok: false, reason: "Mapping toko tidak ditemukan." };
+  }
+  if (!mapping.variant) {
+    return {
+      ok: false,
+      reason: "Mapping belum terhubung ke varian — hubungkan varian dulu sebelum set/hapus harga override.",
+    };
+  }
+  if (mapping.variant.masterProduct.businessId !== businessId) {
     return { ok: false, reason: "Mapping toko tidak ditemukan." };
   }
 

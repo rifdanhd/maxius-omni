@@ -227,6 +227,13 @@ export async function revalidateForCreate(req: CreatePromotionRequest): Promise<
       itemErrors.push({ mappingId, error: "Diskon belum diisi / bukan bilangan bulat." });
       continue;
     }
+    // G1: harga sumber wajib ADA sebelum G2 — kalau tidak, pesan konfirmasi
+    // diskon ekstrem akan menghitung harga akhir dari 0 ("Rp 0 / GRATIS") yang menyesatkan.
+    const basePrice = mapping.price != null ? mapping.price : (mapping.variant?.price ?? null);
+    if (basePrice === null) {
+      itemErrors.push({ mappingId, error: "Produk belum punya harga sumber (mapping & varian)." });
+      continue;
+    }
     // G2 ketat di /create: EXTREME hanya lolos bila req.confirmExtreme=true
     // (preview hanya memunculkan warning; keputusan final di sini).
     const discountIssue = validateDiscount(discount, req.confirmExtreme === true);
@@ -235,9 +242,9 @@ export async function revalidateForCreate(req: CreatePromotionRequest): Promise<
         itemErrors.push({
           mappingId,
           error: `Diskon ${discount}% butuh konfirmasi dampak eksplisit: ${extremeDiscountConfirmMessage(
-            mapping.platformTitle ?? mapping.variant.masterProduct.name,
+            mapping.platformTitle ?? mapping.variant?.masterProduct?.name ?? mapping.channelSku,
             discount,
-            Math.round(((mapping.price ?? mapping.variant.price ?? 0) * (100 - discount)) / 100)
+            Math.round((basePrice * (100 - discount)) / 100)
           )}`,
         });
       } else {
@@ -245,17 +252,12 @@ export async function revalidateForCreate(req: CreatePromotionRequest): Promise<
       }
       continue;
     }
-    const price = mapping.price != null ? mapping.price : mapping.variant.price != null ? mapping.variant.price : null;
+    const price = basePrice;
     const row = computePriceRow(
       {
         price,
-        priceSource:
-          mapping.price != null
-            ? "MAPPING_OVERRIDE"
-            : mapping.variant.price != null
-              ? "VARIANT_DEFAULT"
-              : null,
-        displayName: mapping.platformTitle ?? mapping.variant.masterProduct.name,
+        priceSource: mapping.price != null ? "MAPPING_OVERRIDE" : "VARIANT_DEFAULT",
+        displayName: mapping.platformTitle ?? mapping.variant?.masterProduct?.name ?? null,
         channelSku: mapping.channelSku,
         platformProductId: mapping.platformProductId,
       },

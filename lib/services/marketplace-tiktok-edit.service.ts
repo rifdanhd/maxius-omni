@@ -203,6 +203,9 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
   if (m.account.platform !== "TIKTOK_SHOP") throw new Error("Mapping bukan milik akun Tokopedia.");
   if (!m.account.accessToken) throw new Error("Akun belum punya access token.");
   if (!m.platformProductId) throw new Error("Listing belum pernah di-sync — refresh status baris dulu.");
+  if (!m.variant) {
+    throw new Error("Listing belum terhubung ke varian lokal — lakukan mapping dulu sebelum edit.");
+  }
 
   const token = m.account.accessToken;
   const cipher = m.account.shopCipher ?? undefined;
@@ -248,10 +251,11 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
   }
 
   // Susun varian dari TikTok skus + cocokkan ke varian local master.
-  const master = m.variant.masterProduct;
+  const variant = m.variant;
+  const master = variant.masterProduct;
   const masterVariants = master.productVariant ?? [];
   const skus = (detail.skus as Array<Record<string, unknown>> | undefined) ?? [];
-  const singleMappingVariantId = skus.length <= 1 ? m.variantId : undefined;
+  const singleMappingVariantId = skus.length <= 1 ? (m.variantId ?? undefined) : undefined;
 
   const variants: EditVariantRow[] = skus.map((sku, i) => {
     const sales = (sku.sales_attributes as Array<Record<string, unknown>> | undefined) ?? [];
@@ -281,20 +285,20 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
       salesAttributes: salesAttrs,
       tiktokSkuId: sku.id as string | undefined,
       sellerSku: sellerSku || (masterVariants[i]?.sku ?? `SKU-${i + 1}`),
-      price: price ?? m.variant.price ?? m.price,
-      stock: typeof stock === "number" && Number.isFinite(stock) ? stock : m.variant.stock,
+      price: price ?? variant.price ?? m.price,
+      stock: typeof stock === "number" && Number.isFinite(stock) ? stock : variant.stock,
       localVariantId,
     };
   });
 
   if (variants.length === 0) {
     // Produk tanpa SKU di TikTok — seed dari varian master.
-    const v = masterVariants[0] ?? m.variant;
+    const v = masterVariants[0] ?? variant;
     variants.push({
       key: "master-0",
-      name: m.variant.sku || "Varian",
+      name: variant.sku || "Varian",
       salesAttributes: [],
-      sellerSku: m.variant.sku,
+      sellerSku: variant.sku,
       price: m.price ?? v.price,
       stock: v.stock,
       localVariantId: v.id,
@@ -349,7 +353,7 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
 
   return {
     mappingId,
-    masterName: master.name ?? m.variant.masterProduct.name ?? "",
+    masterName: master.name ?? "",
     channelSku: m.channelSku,
     platformProductId: m.platformProductId,
     accountLabel: m.account.label,
@@ -391,6 +395,9 @@ export async function submitTikTokEdit(
   if (!m) return { ok: false, error: "Mapping tidak ditemukan." };
   if (!m.account.accessToken) return { ok: false, error: "Akun belum punya access token." };
   if (!m.platformProductId) return { ok: false, error: "Listing belum pernah di-sync." };
+  if (!m.variantId) {
+    return { ok: false, error: "Listing belum terhubung ke varian lokal — lakukan mapping dulu sebelum publish." };
+  }
 
   const token = m.account.accessToken;
   const cipher = m.account.shopCipher ?? undefined;
