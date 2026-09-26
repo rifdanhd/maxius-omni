@@ -174,7 +174,7 @@ export async function getAccessTokenByCode(
       data.request_id ?? "-"
     );
   }
-  const r = (data.response ?? {}) as Record<string, unknown>;
+  const r = (data.response ?? (data as Record<string, unknown>)) as Record<string, unknown>;
   const accessToken = r.access_token as string | undefined;
   const refreshToken = r.refresh_token as string | undefined;
   if (!accessToken || !refreshToken) {
@@ -229,7 +229,7 @@ export async function refreshAccessToken(
       data.request_id ?? "-"
     );
   }
-  const r = (data.response ?? {}) as Record<string, unknown>;
+  const r = (data.response ?? (data as Record<string, unknown>)) as Record<string, unknown>;
   const accessToken = r.access_token as string | undefined;
   const newRefresh = r.refresh_token as string | undefined;
   if (!accessToken || !newRefresh) throw new Error("[Shopee] Refresh token Shopee tak lengkap.");
