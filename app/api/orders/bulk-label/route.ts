@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { mergeShippingDocuments } from "@/lib/services/label-merge.service";
+import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
 
 /**
  * Cetak label gabungan (batch) untuk beberapa order sekaligus.
@@ -30,7 +31,7 @@ export const POST = withAuth(async (req) => {
     select: {
       id: true,
       orderNo: true,
-      account: { select: { accessToken: true, shopCipher: true } },
+      account: { select: { accessToken: true, shopCipher: true, platform: true } },
       shipments: { select: { externalId: true } },
     },
   });
@@ -40,10 +41,17 @@ export const POST = withAuth(async (req) => {
     packageId: string | null;
     accessToken: string | null;
     shopCipher: string | null;
+    platform: string;
   }[] = [];
   const failed: Array<{ orderNo: string; reason: string }> = [];
 
   for (const order of orders) {
+    // Guard platform: order Shopee dilewati per-item — token Shopee tidak
+    // pernah dipakai ke TikTok API (label yang berhasil tetap digabung).
+    if (order.account.platform !== "TIKTOK_SHOP") {
+      failed.push({ orderNo: order.orderNo, reason: NON_TIKTOK_LABEL_REASON });
+      continue;
+    }
     const packageId = order.shipments.find((s) => s.externalId)?.externalId ?? null;
     if (!packageId) {
       failed.push({ orderNo: order.orderNo, reason: "belum ada paket pengiriman" });
@@ -58,6 +66,7 @@ export const POST = withAuth(async (req) => {
       packageId,
       accessToken: order.account.accessToken,
       shopCipher: order.account.shopCipher,
+      platform: order.account.platform,
     });
   }
 
@@ -71,6 +80,7 @@ export const POST = withAuth(async (req) => {
       packageId: it.packageId as string,
       accessToken: it.accessToken as string,
       shopCipher: it.shopCipher,
+      platform: it.platform,
     }))
   );
 

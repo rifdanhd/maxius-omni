@@ -35,14 +35,16 @@ export type ReconcileResult = {
  * celah tersebut. Dipanggil manual via endpoint reconcile ATAU otomatis di
  * akhir syncOrdersTikTok.
  *
- * @param accountId opsional — bila diberikan hanya shipment akun tsb di-scan.
+ * @param accountId WAJIB — hanya shipment akun tsb yang di-scan, dan akun wajib
+ *                  TikTok (guard: order/token Shopee tidak boleh menyentuh API TikTok).
  */
 export async function reconcileShipmentTracking(
-  accountId?: string
+  accountId: string
 ): Promise<ReconcileResult> {
   const shipments = await prisma.shipment.findMany({
     where: {
-      ...(accountId ? { accountId } : { account: { platform: "TIKTOK_SHOP" } }),
+      accountId,
+      account: { platform: "TIKTOK_SHOP" },
       externalId: { not: null },
       OR: [{ trackingNo: null }, { trackingNo: "" }],
       order: { status: { in: NON_FINAL_ORDER_STATUSES } },

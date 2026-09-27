@@ -13,15 +13,19 @@ import { authFetch } from "@/lib/utils/api-client";
  */
 export default function PrintMethodModal({
   orderIds,
+  platform = "TIKTOK_SHOP",
   title = "Cetak Label Pengiriman",
   onClose,
   onDone,
 }: {
   orderIds: string[];
+  /** Platform order yang dicetak — non-TikTok tidak ditawarkan label resmi TikTok. */
+  platform?: string;
   title?: string;
   onClose: () => void;
   onDone: () => void;
 }) {
+  const isTikTok = platform === "TIKTOK_SHOP";
   const [method, setMethod] = useState<"label">("label");
   const [includePickingList, setIncludePickingList] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -105,8 +109,9 @@ export default function PrintMethodModal({
                   <p className="text-sm font-semibold text-gray-900">1 Label (Ukuran A6)</p>
                 </div>
                 <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                  Label kurir resmi TikTok di bagian atas + tabel ringkasan produk
-                  (nama, varian, seller SKU, qty) yang dibuat dari data pesanan di bagian bawah.
+                  {isTikTok
+                    ? "Label kurir resmi TikTok di bagian atas + tabel ringkasan produk (nama, varian, seller SKU, qty) yang dibuat dari data pesanan di bagian bawah."
+                    : "Tabel ringkasan produk (nama, varian, seller SKU, qty) dari data pesanan. Label resmi TikTok tidak berlaku untuk order ini — cetak label via Seller Center."}
                 </p>
               </div>
             </label>

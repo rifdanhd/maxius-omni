@@ -9,6 +9,7 @@ export const POST = withAuth(async (req) => {
     select: {
       id: true,
       label: true,
+      platform: true,
       accessToken: true,
       shopCipher: true,
     },
@@ -20,6 +21,12 @@ export const POST = withAuth(async (req) => {
   const errors = [];
 
   for (const acc of accounts) {
+    // Guard platform: ingest TikTok tidak boleh menyentuh akun non-TikTok
+    // (defense-in-depth — query di atas sudah filter TIKTOK_SHOP).
+    if (acc.platform !== "TIKTOK_SHOP") {
+      results.push({ accountId: acc.id, label: acc.label, error: "Ingest order hanya untuk akun TikTok Shop." });
+      continue;
+    }
     if (!acc.accessToken || !acc.shopCipher) {
       results.push({ accountId: acc.id, label: acc.label, error: "Belum punya access token / shop_cipher." });
       continue;

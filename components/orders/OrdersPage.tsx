@@ -629,8 +629,13 @@ export default function OrdersPage() {
 
   /** handlePickup — buka modal "Atur Pengiriman" untuk pesanan terpilih. */
   const handlePickup = () => {
-    const targets = orders
-      .filter((o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT")
+    const readySelected = orders.filter(
+      (o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT"
+    );
+    // Guard platform: modal pickup bentuknya TikTok (slot handover/resi TikTok) —
+    // order Shopee tidak dibuka di sini; kirim via Seller Center Shopee.
+    const targets = readySelected
+      .filter((o) => o.account?.platform === "TIKTOK_SHOP")
       .map((o) => ({
         id: o.id,
         orderNo: o.orderNo,
@@ -643,7 +648,12 @@ export default function OrdersPage() {
         courier: o.shipments?.[0]?.carrier ?? "-",
         paymentMethod: o.currency ?? "IDR",
       }));
-    if (targets.length === 0) return;
+    if (targets.length === 0) {
+      if (readySelected.length > 0) {
+        alert("Atur Pengiriman hanya untuk order TikTok Shop. Order Shopee dikirim via Seller Center Shopee.");
+      }
+      return;
+    }
     setPickupTargets(targets);
   };
 
@@ -916,9 +926,21 @@ export default function OrdersPage() {
                   placement="bottom-left"
                   onSelect={(type) => printSelectedBulk(type)}
                   items={[
-                    { id: "Label", label: "Cetak Label", description: "Label resmi TikTok gabungan (PDF)" },
-                    { id: "Invoice", label: "Cetak Invoice", description: "Faktur pesanan terpilih" },
-                    { id: "PackingList", label: "Cetak Packing List", description: "Daftar packing pesanan terpilih" },
+                    // Guard platform: "Label resmi TikTok" hanya ditawarkan bila
+                    // ada order TikTok yang terpilih (order Shopee dilewati server).
+                    ...(orders.some(
+                      (o) => selected.has(o.id) && o.account?.platform === "TIKTOK_SHOP"
+                    )
+                      ? [
+                          {
+                            id: "Label" as PrintType,
+                            label: "Cetak Label",
+                            description: "Label resmi TikTok gabungan (PDF)",
+                          },
+                        ]
+                      : []),
+                    { id: "Invoice" as PrintType, label: "Cetak Invoice", description: "Faktur pesanan terpilih" },
+                    { id: "PackingList" as PrintType, label: "Cetak Packing List", description: "Daftar packing pesanan terpilih" },
                   ]}
                 />
               </>
@@ -971,6 +993,11 @@ export default function OrdersPage() {
                 onPickup={() => {
                   // Single-order pickup dari kartu — buka modal dengan order ini saja.
                   const o = order;
+                  // Guard platform: modal pickup hanya untuk TikTok (lihat handlePickup).
+                  if (o.account?.platform !== "TIKTOK_SHOP") {
+                    alert("Atur Pengiriman hanya untuk order TikTok Shop. Order Shopee dikirim via Seller Center Shopee.");
+                    return;
+                  }
                   setPickupTargets([{
                     id: o.id,
                     orderNo: o.orderNo,

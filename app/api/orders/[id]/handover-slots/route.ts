@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
+import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getPackageHandoverTimeSlots } from "@/lib/integrations/tiktokShop";
 
 /**
@@ -20,7 +21,7 @@ export const GET = withAuth(
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
-        account: { select: { accessToken: true, shopCipher: true, businessId: true } },
+        account: { select: { accessToken: true, shopCipher: true, businessId: true, platform: true } },
         shipments: { select: { externalId: true } },
       },
     });
@@ -32,6 +33,9 @@ export const GET = withAuth(
       assertSameBrand(order.account.businessId, req.businessId);
     } catch {
       return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+    }
+    if (order.account.platform !== "TIKTOK_SHOP") {
+      return unsupportedPlatform(order.account.platform);
     }
     if (!order.account.accessToken) {
       return NextResponse.json({ error: "Akun belum punya access token." }, { status: 400 });

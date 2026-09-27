@@ -1,0 +1,191 @@
+import { test, expect } from '@playwright/test';
+import { login, apiToken, sql } from './helpers';
+
+/**
+ * M8a — guard platform: order Shopee TIDAK BOLEH menyentuh API TikTok.
+ *
+ * Semua endpoint fulfillment/label wajib menjawab guard eksplisit
+ * (code: "unsupported_platform" / failed per-item) sebelum panggilan TikTok
+ * API apa pun — bukan error TikTok / sukses senyap.
+ */
+
+const BIZ = 'business-default';
+const ACCT_S = 'e2e-m8a-shopee';
+const ACCT_T = 'e2e-m8a-tiktok';
+const ORD_S = 'e2e-m8a-order-shopee';
+const ORD_T = 'e2e-m8a-order-tiktok';
+/** orderNo yang tampil di kartu (bukan id). */
+const NO_S = 'E2E-M8A-SHP-1';
+const NO_T = 'E2E-M8A-TT-1';
+
+test.beforeAll(() => {
+  sql(
+    `INSERT INTO "PlatformAccount" (id, platform, label, "businessId", "createdAt", "updatedAt") ` +
+      `VALUES ('${ACCT_S}','SHOPEE','E2E M8a Shopee','${BIZ}',NOW(),NOW()) ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "PlatformAccount" (id, platform, label, "accessToken", "businessId", "createdAt", "updatedAt") ` +
+      `VALUES ('${ACCT_T}','TIKTOK_SHOP','E2E M8a TikTok','e2e-m8a-fake-token','${BIZ}',NOW(),NOW()) ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "Order" (id, "orderNo", status, "createTime", "updatedAt", "accountId") ` +
+      `VALUES ('${ORD_S}','E2E-M8A-SHP-1','AWAITING_SHIPMENT',NOW(),NOW(),'${ACCT_S}') ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "OrderItem" (id, qty, "channelSku", "orderId") ` +
+      `VALUES ('${ORD_S}-item',1,'SKU-M8A-1','${ORD_S}') ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "Shipment" (id, "externalId", status, "orderId", "accountId") ` +
+      `VALUES ('${ORD_S}-shp','778899','READY_TO_SHIP','${ORD_S}','${ACCT_S}') ON CONFLICT DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "Order" (id, "orderNo", status, "createTime", "updatedAt", "accountId") ` +
+      `VALUES ('${ORD_T}','E2E-M8A-TT-1','AWAITING_SHIPMENT',NOW(),NOW(),'${ACCT_T}') ON CONFLICT (id) DO NOTHING;`
+  );
+});
+
+test.afterAll(() => {
+  sql(`DELETE FROM "Order" WHERE id IN ('${ORD_S}','${ORD_T}');`);
+  sql(`DELETE FROM "PlatformAccount" WHERE id IN ('${ACCT_S}','${ACCT_T}');`);
+});
+
+test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan TikTok', async ({ page }) => {
+  await login(page);
+  const token = await apiToken(page);
+  const auth = { Authorization: `Bearer ${token}` };
+
+  // Detail order — 200 + platform SHOPEE (kategori TikTok tidak dipanggil utk Shopee).
+  const detail = await page.request.get(`/api/orders/${ORD_S}`, { headers: auth });
+  expect(detail.status()).toBe(200);
+  expect((await detail.json()).platform).toBe('SHOPEE');
+
+  // Ship — guard eksplisit 400, bukan panggilan TikTok.
+  const ship = await page.request.post(`/api/orders/${ORD_S}/ship`, {
+    headers: auth,
+    data: {},
+  });
+  expect(ship.status()).toBe(400);
+  expect((await ship.json()).code).toBe('unsupported_platform');
+
+  // Handover slots.
+  const slots = await page.request.get(`/api/orders/${ORD_S}/handover-slots`, { headers: auth });
+  expect(slots.status()).toBe(400);
+  expect((await slots.json()).code).toBe('unsupported_platform');
+
+  // Label resmi — 400 unsupported_platform (frontend fallback cetak lokal).
+  const label = await page.request.get(`/api/orders/${ORD_S}/label`, { headers: auth });
+  expect(label.status()).toBe(400);
+  expect((await label.json()).code).toBe('unsupported_platform');
+
+  // Pickup bulk — per-order gagal dengan pesan Seller Center (bukan error TikTok).
+  const pickup = await page.request.post('/api/orders/fulfillment/pickup', {
+    headers: auth,
+    data: { orderIds: [ORD_S], handover_method: 'DROP_OFF' },
+  });
+  expect(pickup.status()).toBe(200);
+  const pickupBody = await pickup.json();
+  expect(pickupBody.results[0].ok).toBe(false);
+  expect(pickupBody.results[0].error).toContain('Seller Center');
+
+  // Cetak label batch (3 rute) — Shopee dilewati per-item, bukan dipanggil ke TikTok.
+  for (const path of [
+    '/api/orders/fulfillment/shipping-label',
+    '/api/orders/label-pack',
+    '/api/orders/bulk-label',
+  ]) {
+    const res = await page.request.post(path, {
+      headers: auth,
+      data: { orderIds: [ORD_S] },
+    });
+    expect(res.status(), path).toBe(200);
+    const body = await res.json();
+    expect(body.count, path).toBe(0);
+    expect(body.failed[0].reason, path).toContain('TikTok tidak berlaku');
+  }
+
+  // Tracking sync dengan accountId Shopee — 400 eksplisit, bukan sukses senyap.
+  const tSync = await page.request.post('/api/orders/fulfillment/tracking-sync', {
+    headers: auth,
+    data: { accountId: ACCT_S },
+  });
+  expect(tSync.status()).toBe(400);
+  expect((await tSync.json()).code).toBe('unsupported_platform');
+
+  // Reconcile resi dengan accountId Shopee — 400 eksplisit.
+  const rec = await page.request.post('/api/orders/fulfillment/reconcile', {
+    headers: auth,
+    data: { accountId: ACCT_S },
+  });
+  expect(rec.status()).toBe(400);
+  expect((await rec.json()).code).toBe('unsupported_platform');
+
+  // Sync order — akun Shopee tidak pernah masuk loop ingest TikTok.
+  const sync = await page.request.post('/api/orders/sync', { headers: auth });
+  expect(sync.status()).toBe(200);
+  const syncBody = await sync.json();
+  const resultIds = (syncBody.results as Array<{ accountId: string }>).map((r) => r.accountId);
+  expect(resultIds).not.toContain(ACCT_S);
+  expect(resultIds).toContain(ACCT_T);
+
+  // Regresi jalur TikTok (semua berhenti lokal — tanpa panggilan jaringan):
+  const ttDetail = await page.request.get(`/api/orders/${ORD_T}`, { headers: auth });
+  expect(ttDetail.status()).toBe(200);
+  expect((await ttDetail.json()).platform).toBe('TIKTOK_SHOP');
+
+  const ttShip = await page.request.post(`/api/orders/${ORD_T}/ship`, {
+    headers: auth,
+    data: {},
+  });
+  expect(ttShip.status()).toBe(400);
+  expect((await ttShip.json()).code).toBeUndefined(); // "Belum ada paket", bukan guard
+
+  const ttLabel = await page.request.get(`/api/orders/${ORD_T}/label`, { headers: auth });
+  expect(ttLabel.status()).toBe(404); // "Belum ada paket", bukan guard
+
+  const ttPickup = await page.request.post('/api/orders/fulfillment/pickup', {
+    headers: auth,
+    data: { orderIds: [ORD_T], handover_method: 'DROP_OFF' },
+  });
+  expect(ttPickup.status()).toBe(200);
+  const ttPickupBody = await ttPickup.json();
+  expect(ttPickupBody.results[0].ok).toBe(false);
+  expect(ttPickupBody.results[0].error).toContain('Belum ada paket');
+});
+
+test('M8a UI: modal pickup tidak dibuka & menu Label disembunyikan utk order Shopee', async ({ page }) => {
+  await login(page);
+  await page.goto('/orders');
+
+  // Kartu OrderCard = ancestor terdekat ber-class bg-white.rounded-xl dari link orderNo.
+  const cardOf = (orderNo: string) =>
+    page
+      .getByRole('link', { name: orderNo, exact: true })
+      .locator('xpath=ancestor::div[contains(@class,"bg-white") and contains(@class,"rounded-xl")][1]');
+
+  const card = cardOf(NO_S);
+  await expect(card).toBeVisible({ timeout: 30_000 });
+
+  // Klik "Atur Pengiriman" di kartu Shopee → alert, modal TIDAK terbuka.
+  let dialogMsg = '';
+  page.once('dialog', async (d) => {
+    dialogMsg = d.message();
+    await d.accept();
+  });
+  await card.getByRole('button', { name: 'Atur Pengiriman', exact: true }).click();
+  expect(dialogMsg).toContain('Seller Center');
+  await expect(page.locator('h2', { hasText: 'Atur Pengiriman' })).toHaveCount(0);
+
+  // Pilih hanya order Shopee → menu Cetak tanpa opsi "Label resmi TikTok".
+  await card.locator('input[type="checkbox"]').check();
+  await page.getByRole('button', { name: 'Cetak (1)' }).click();
+  await expect(page.getByText('Cetak Invoice')).toBeVisible();
+  await expect(page.getByText('Label resmi TikTok gabungan (PDF)')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Tambahkan order TikTok terpilih → opsi Label resmi TikTok kembali ditawarkan.
+  const ttCard = cardOf(NO_T);
+  await ttCard.locator('input[type="checkbox"]').check();
+  await page.getByRole('button', { name: 'Cetak (2)' }).click();
+  await expect(page.getByText('Label resmi TikTok gabungan (PDF)')).toBeVisible();
+});

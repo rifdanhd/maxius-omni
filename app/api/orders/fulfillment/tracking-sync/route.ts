@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { ingestTrackingForAccount } from "@/lib/services/shipment-tracking.service";
+import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 
 /**
  * Tracking Sync — ingest timeline tracking TikTok ke ShipmentTrackingEvent.
@@ -17,6 +18,18 @@ import { ingestTrackingForAccount } from "@/lib/services/shipment-tracking.servi
 export const POST = withAuth(async (req) => {
   const body = await req.json().catch(() => null);
   const accountId = typeof body?.accountId === "string" ? body.accountId : undefined;
+
+  // Guard platform: accountId Shopee harus ditolak eksplisit (400), bukan
+  // sukses senyap dengan hasil kosong.
+  if (accountId) {
+    const acc = await prisma.platformAccount.findUnique({
+      where: { id: accountId },
+      select: { platform: true },
+    });
+    if (acc && acc.platform !== "TIKTOK_SHOP") {
+      return unsupportedPlatform(acc.platform);
+    }
+  }
 
   const accounts = await prisma.platformAccount.findMany({
     where: {

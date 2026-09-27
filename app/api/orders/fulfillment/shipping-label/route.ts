@@ -5,6 +5,7 @@ import {
   mergeShippingDocuments,
   type LabelMergeItem,
 } from "@/lib/services/label-merge.service";
+import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
 
 /**
  * Cetak label gabungan + ringkasan produk lokal (Metode Cetak dari modal sukses).
@@ -37,7 +38,7 @@ export const POST = withAuth(async (req) => {
       id: true,
       orderNo: true,
       sellerNote: true,
-      account: { select: { accessToken: true, shopCipher: true } },
+      account: { select: { accessToken: true, shopCipher: true, platform: true } },
       shipments: { select: { externalId: true } },
       items: {
         select: {
@@ -60,6 +61,12 @@ export const POST = withAuth(async (req) => {
   const items: LabelMergeItem[] = [];
 
   for (const order of orders) {
+    // Guard platform: order Shopee dilewati per-item — token Shopee tidak
+    // pernah dipakai ke TikTok API (label yang berhasil tetap digabung).
+    if (order.account.platform !== "TIKTOK_SHOP") {
+      failed.push({ orderNo: order.orderNo, reason: NON_TIKTOK_LABEL_REASON });
+      continue;
+    }
     const packageId = order.shipments.find((s) => s.externalId)?.externalId ?? null;
     if (!packageId) {
       failed.push({ orderNo: order.orderNo, reason: "belum ada paket pengiriman" });
@@ -74,6 +81,7 @@ export const POST = withAuth(async (req) => {
       packageId,
       accessToken: order.account.accessToken,
       shopCipher: order.account.shopCipher,
+      platform: order.account.platform,
       includePickingList,
       rows: order.items.map((it) => ({
         productName: it.variant?.masterProduct?.name ?? it.productName ?? it.channelSku,

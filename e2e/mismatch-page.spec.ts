@@ -14,10 +14,12 @@ test('M5b: kartu KPI Stok Mismatch di dashboard membuka halaman mismatch', async
 test('F0: verifikasi runtime halaman Stok Mismatch + tombol Retry', async ({ page }) => {
   await login(page);
 
-  // Dipetakan ke <aside> sidebar: link global 'Stok Mismatch' juga cocok dengan
-  // kartu KPI dashboard (M5b), jadi tanpa scope ini cabang ekspansi di bawah
-  // tidak pernah terjalankan.
-  const navLink = page.locator('aside').getByRole('link', { name: 'Stok Mismatch' });
+  // Dipetakan ke container sidebar (shadcn: div[data-slot=sidebar], BUKAN aside):
+  // link global 'Stok Mismatch' juga cocok dengan kartu KPI dashboard (M5b),
+  // jadi tanpa scope ini cabang ekspansi di bawah tidak pernah terjalankan.
+  const navLink = page
+    .locator('[data-slot="sidebar"]')
+    .getByRole('link', { name: 'Stok Mismatch' });
   if (!(await navLink.isVisible().catch(() => false))) {
     await page.getByRole('button', { name: 'Inventori', exact: true }).click();
   }

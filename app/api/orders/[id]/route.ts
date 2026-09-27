@@ -53,11 +53,16 @@ export const GET = withAuth(
 
   // Kategori produk: order API TikTok tidak menyediakannya, jadi resolve
   // best-effort via product API (per SKU unik). Gagal → null, tidak memblokir.
+  // Guard platform: HANYA order TikTok — order Shopee tidak boleh memicu
+  // panggilan TikTok API (token Shopee tidak pernah dipakai ke TikTok).
   const categoriesBySku = new Map<string, string | null>();
-  const accountOnly = await prisma.platformAccount.findUnique({
-    where: { id: order.accountId },
-    select: { accessToken: true, shopCipher: true },
-  });
+  const accountOnly =
+    order.account.platform === "TIKTOK_SHOP"
+      ? await prisma.platformAccount.findUnique({
+          where: { id: order.accountId },
+          select: { accessToken: true, shopCipher: true },
+        })
+      : null;
   if (accountOnly?.accessToken) {
     const uniqueSkus = [...new Set(order.items.map((it) => it.channelSku).filter(Boolean))];
     for (const sku of uniqueSkus) {

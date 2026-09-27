@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
+import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 
 /**
@@ -20,7 +21,7 @@ export const GET = withAuth(
       where: { id },
       include: {
         account: {
-          select: { accessToken: true, shopCipher: true, businessId: true },
+          select: { accessToken: true, shopCipher: true, businessId: true, platform: true },
         },
         shipments: {
           select: { externalId: true, trackingNo: true, status: true },
@@ -35,6 +36,12 @@ export const GET = withAuth(
       assertSameBrand(order.account.businessId, req.businessId);
     } catch {
       return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+    }
+
+    // Guard platform: label resmi hanya TikTok — response 400 (bukan 404) agar
+    // frontend membedakan "belum siap" vs "tidak berlaku", lalu fallback cetak lokal.
+    if (order.account.platform !== "TIKTOK_SHOP") {
+      return unsupportedPlatform(order.account.platform);
     }
 
     if (!order.account.accessToken) {

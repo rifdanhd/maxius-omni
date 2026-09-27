@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { reconcileShipmentTracking } from "@/lib/services/shipment-reconcile.service";
+import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 
 /**
  * Reconcile Resi — backfill nomor resi & kurir untuk shipment yang masih kosong.
@@ -18,6 +19,18 @@ import { reconcileShipmentTracking } from "@/lib/services/shipment-reconcile.ser
 export const POST = withAuth(async (req) => {
   const body = await req.json().catch(() => null);
   const accountId = typeof body?.accountId === "string" ? body.accountId : undefined;
+
+  // Guard platform: accountId Shopee harus ditolak eksplisit (400), bukan
+  // sukses senyap dengan hasil kosong.
+  if (accountId) {
+    const acc = await prisma.platformAccount.findUnique({
+      where: { id: accountId },
+      select: { platform: true },
+    });
+    if (acc && acc.platform !== "TIKTOK_SHOP") {
+      return unsupportedPlatform(acc.platform);
+    }
+  }
 
   const where = {
     platform: "TIKTOK_SHOP" as const,

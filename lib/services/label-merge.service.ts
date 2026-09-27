@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
+import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
 
 /**
  * Penggabungan label pengiriman TikTok untuk cetak batch.
@@ -36,6 +37,8 @@ export type LabelMergeItem = {
   packageId: string;
   accessToken: string;
   shopCipher?: string | null;
+  /** Platform akun order — non-TikTok tidak boleh menyentuh API TikTok. */
+  platform?: string;
   rows?: LabelMergeProductRow[];
   includePickingList?: boolean;
 };
@@ -192,8 +195,18 @@ export async function mergeShippingDocuments(
   let count = 0;
   const failed: LabelMergeResult["failed"] = [];
 
+  // Guard platform: item non-TikTok TIDAK PERNAH memanggil getShippingDocument
+  // (TikTok API) — dicatat ke `failed` agar UI bisa melaporkan.
+  const allowed = items.filter((item) => {
+    if (item.platform && item.platform !== "TIKTOK_SHOP") {
+      failed.push({ orderNo: item.orderNo, reason: NON_TIKTOK_LABEL_REASON });
+      return false;
+    }
+    return true;
+  });
+
   const results = await Promise.allSettled(
-    items.map(async (item) => {
+    allowed.map(async (item) => {
       // Dipaksa PDF (document_format=PDF) supaya label konsisten utk digabung;
       // docUrl tetap bisa PNG bila TikTok mengabaikannya → ditangani di bawah.
       const { docUrl } = await getShippingDocument(
@@ -211,7 +224,7 @@ export async function mergeShippingDocuments(
 
   for (let i = 0; i < results.length; i += 1) {
     const r = results[i];
-    const item = items[i];
+    const item = allowed[i];
     if (r.status === "rejected") {
       failed.push({
         orderNo: item.orderNo,

@@ -64,7 +64,7 @@ export const POST = withAuth(async (req) => {
       account: { businessId: req.businessId },
     },
     include: {
-      account: { select: { id: true, accessToken: true, shopCipher: true } },
+      account: { select: { id: true, accessToken: true, shopCipher: true, platform: true } },
       shipments: { select: { id: true, externalId: true } },
     },
   });
@@ -90,6 +90,17 @@ export const POST = withAuth(async (req) => {
 
   // Proses serial — hindari burst ke TikTok API.
   for (const order of orders) {
+    // Guard platform: order Shopee tidak boleh masuk alur ship TikTok
+    // (token Shopee tidak pernah dipakai ke TikTok API).
+    if (order.account.platform !== "TIKTOK_SHOP") {
+      results.push({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        ok: false,
+        error: "Atur Pengiriman TikTok tidak berlaku untuk order non-TikTok — kirim via Seller Center.",
+      });
+      continue;
+    }
     const packageId = order.shipments.find((s) => s.externalId)?.externalId ?? null;
 
     if (!packageId) {
