@@ -57,3 +57,28 @@ export async function login(
 export function verifyToken(token: string): jwt.JwtPayload {
   return jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
 }
+
+/**
+ * Cookie sesi httpOnly (JWT yg sama dgn token Bearer). Dipakai utk proteksi
+ * endpoint OAuth (authorize/callback) yg dijangkau navigasi browser sehingga
+ * tidak bisa membawa header Authorization.
+ */
+export const SESSION_COOKIE = "maxius_session";
+export const SESSION_MAX_AGE_S = 8 * 60 * 60; // = expiresIn JWT
+
+/**
+ * verifySessionCookie(req)
+ * Baca & verifikasi cookie sesi → payload JWT, atau null bila tidak ada/tidak
+ * valid. Tidak melempar — pemanggil memutus sendiri alur error-nya.
+ */
+export function verifySessionCookie(req: {
+  cookies: { get(name: string): { value?: string } | undefined };
+}): jwt.JwtPayload | null {
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    return verifyToken(token);
+  } catch {
+    return null;
+  }
+}

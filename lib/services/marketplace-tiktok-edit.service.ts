@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { assertSameBrand } from "@/lib/services/business-scope.service";
 import {
   getProductDetail,
   getCategoryAttributes,
@@ -191,7 +192,7 @@ async function fetchRemoteBuffer(url: string): Promise<Buffer> {
 
 /* ------------------------------ Load ------------------------------ */
 
-export async function loadTikTokEditData(mappingId: string): Promise<EditLoadData> {
+export async function loadTikTokEditData(mappingId: string, businessId: string): Promise<EditLoadData> {
   const m = await prisma.productMapping.findUnique({
     where: { id: mappingId },
     include: {
@@ -200,6 +201,7 @@ export async function loadTikTokEditData(mappingId: string): Promise<EditLoadDat
     },
   });
   if (!m) throw new Error("Mapping tidak ditemukan.");
+  assertSameBrand(m.account.businessId, businessId);
   if (m.account.platform !== "TIKTOK_SHOP") throw new Error("Mapping bukan milik akun Tokopedia.");
   if (!m.account.accessToken) throw new Error("Akun belum punya access token.");
   if (!m.platformProductId) throw new Error("Listing belum pernah di-sync — refresh status baris dulu.");

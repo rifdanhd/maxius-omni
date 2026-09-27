@@ -330,7 +330,7 @@ await ok("create call melempar (network error) → UNVERIFIED dengan tiktokCode 
 
 console.log("=== Alert: UNVERIFIED & PENDING menggantung TERLIHAT (bukan cuma di DB) ===");
 await ok("getPromotionAlerts: UNVERIFIED muncul di alert", async () => {
-  const alerts = await getPromotionAlerts();
+  const alerts = await getPromotionAlerts(business.id);
   const unv = alerts.filter((a) => a.kind === "UNVERIFIED");
   assert.ok(unv.length >= 3, "minimal 3 UNVERIFIED dari test sebelumnya");
   assert.ok(unv.every((a) => a.username.length > 0));
@@ -339,13 +339,13 @@ await ok("getPromotionAlerts: PENDING segar TIDAK alert; PENDING >30 menit → S
   const fresh = await prisma.promotionAuditLog.create({
     data: { id: crypto.randomUUID(), accountId: account.id, userId: "u", username: "tester", action: "CREATE_ACTIVITY", resultStatus: "PENDING", updatedAt: new Date() },
   });
-  let alerts = await getPromotionAlerts();
+  let alerts = await getPromotionAlerts(business.id);
   assert.ok(!alerts.some((a) => a.auditLogId === fresh.id), "PENDING segar = sedang jalan, bukan alert");
   await prisma.promotionAuditLog.update({
     where: { id: fresh.id },
     data: { createdAt: new Date(Date.now() - STALE_PENDING_MS - 60000) },
   });
-  alerts = await getPromotionAlerts();
+  alerts = await getPromotionAlerts(business.id);
   const stale = alerts.find((a) => a.auditLogId === fresh.id);
   assert.ok(stale && stale.kind === "STALE_PENDING");
 });

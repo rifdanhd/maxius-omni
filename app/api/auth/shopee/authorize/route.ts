@@ -6,6 +6,8 @@ import {
   isShopeeAuthorizeEnabled,
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
+import { verifySessionCookie } from "@/lib/services/auth.service";
+import { getUserBusinessIds } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
 
 export const SHOPEE_OAUTH_CRED_COOKIE = "shopee_oauth_cred";
@@ -18,6 +20,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL("/settings/accounts?error=shopee_authorize_disabled", appOrigin(req))
     );
+  }
+  // Sesi login wajib: brand yg diikatkan ke akun baru harus milik user yang
+  // login (cookie brand bisa dipalsukan sendiri → wajib divalidasi keanggotaan).
+  const session = verifySessionCookie(req);
+  if (!session) {
+    return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
   }
   try {
     const { searchParams } = new URL(req.url);
@@ -47,9 +55,16 @@ export async function GET(req: NextRequest) {
         maxAge: 1800,
       });
     }
-    // Bawa brand aktif ke callback (akun baru dibuat di brand ini).
+    // Bawa brand aktif ke callback (akun baru dibuat di brand ini) — hanya
+    // brand yang dimiliki user login yang boleh diikat.
     const businessId = searchParams.get("businessId")?.trim();
     if (businessId) {
+      const owned = await getUserBusinessIds(String(session.sub));
+      if (!owned.includes(businessId)) {
+        return NextResponse.redirect(
+          new URL("/settings/accounts?error=brand_forbidden", appOrigin(req))
+        );
+      }
       res.cookies.set(OAUTH_BRAND_COOKIE, businessId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { login } from "@/lib/services/auth.service";
+import { login, SESSION_COOKIE, SESSION_MAX_AGE_S } from "@/lib/services/auth.service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +14,17 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await login(username, password);
-    return NextResponse.json(result);
+    const res = NextResponse.json(result);
+    // Cookie sesi httpOnly — dipakai proteksi OAuth authorize/callback yang
+    // dijangkau lewat navigasi browser (tidak bisa bawa header Bearer).
+    res.cookies.set(SESSION_COOKIE, result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_MAX_AGE_S,
+    });
+    return res;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Login gagal.";
     return NextResponse.json({ error: message }, { status: 401 });

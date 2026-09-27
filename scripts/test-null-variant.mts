@@ -207,7 +207,7 @@ try {
   console.log("=== Batch 2: TikTok edit load/submit ===");
   let loadErr = "";
   try {
-    await loadTikTokEditData("b2-tt-noprice");
+    await loadTikTokEditData("b2-tt-noprice", BIZ2);
   } catch (e) {
     loadErr = e instanceof Error ? e.message : String(e);
   }

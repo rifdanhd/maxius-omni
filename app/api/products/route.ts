@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { businessWhere } from "@/lib/services/business-scope.service";
 
 export const GET = withAuth(async (req) => {
   // Default HANYA produk aktif (isActive) supaya halaman yang tidak peduli
@@ -9,7 +10,10 @@ export const GET = withAuth(async (req) => {
   const url = new URL(req.url);
   const includeInactive = url.searchParams.get("includeInactive") === "true";
   const products = await prisma.masterProduct.findMany({
-    where: includeInactive ? undefined : { isActive: true },
+    where: {
+      ...businessWhere.product(req.businessId),
+      ...(includeInactive ? {} : { isActive: true }),
+    },
     include: {
       productVariant: {
         include: {

@@ -6,6 +6,11 @@ import {
   resolveTiktokCreds,
 } from "@/lib/services/app-credential.service";
 import { TIKTOK_OAUTH_CRED_COOKIE } from "../authorize/route";
+import { verifySessionCookie } from "@/lib/services/auth.service";
+import {
+  DEFAULT_BUSINESS_ID,
+  getUserBusinessIds,
+} from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
 
 const TIKTOK_TOKEN_URL = "https://auth.tiktok-shops.com/api/v2/token/get";
@@ -57,14 +62,31 @@ export async function GET(req: NextRequest) {
   }
   const appKey = creds.appKey;
 
+  // Sesi login wajib + brand harus milik user yang login (cookie brand bisa
+  // dipalsukan sendiri → cek keanggotaan, bukan sekadar keberadaan id).
+  const session = verifySessionCookie(req);
+  if (!session) {
+    return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
+  }
+  const ownedBusinessIds = await getUserBusinessIds(String(session.sub));
   const cookieBrand = req.cookies.get("maxius_oauth_brand")?.value?.trim();
-  let businessId = "business-default";
+  let businessId: string | null = null;
   if (cookieBrand) {
-    const exists = await prisma.business.findUnique({
-      where: { id: cookieBrand },
-      select: { id: true },
-    });
-    if (exists) businessId = exists.id;
+    if (!ownedBusinessIds.includes(cookieBrand)) {
+      return NextResponse.redirect(
+        new URL("/settings/accounts?error=brand_forbidden", appOrigin(req)),
+      );
+    }
+    businessId = cookieBrand;
+  } else {
+    businessId = ownedBusinessIds.includes(DEFAULT_BUSINESS_ID)
+      ? DEFAULT_BUSINESS_ID
+      : (ownedBusinessIds[0] ?? null);
+  }
+  if (!businessId) {
+    return NextResponse.redirect(
+      new URL("/settings/accounts?error=no_business", appOrigin(req)),
+    );
   }
 
   const tokenUrl = new URL(TIKTOK_TOKEN_URL);

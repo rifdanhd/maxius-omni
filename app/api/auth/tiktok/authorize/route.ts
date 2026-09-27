@@ -4,6 +4,8 @@ import {
   getAuthorizeCredential,
   resolveTiktokCreds,
 } from "@/lib/services/app-credential.service";
+import { verifySessionCookie } from "@/lib/services/auth.service";
+import { getUserBusinessIds } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
 
 // Format resmi seller OAuth (ROW/ID): service_id — lihat
@@ -14,6 +16,12 @@ const TIKTOK_AUTHORIZE_URL = "https://services.tiktokshop.com/open/authorize";
 export const TIKTOK_OAUTH_CRED_COOKIE = "tiktok_oauth_cred";
 
 export async function GET(req: NextRequest) {
+  // Sesi login wajib: brand yg diikatkan ke akun baru harus milik user yang
+  // login (cookie brand bisa dipalsukan sendiri → wajib divalidasi keanggotaan).
+  const session = verifySessionCookie(req);
+  if (!session) {
+    return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
+  }
   const { searchParams } = new URL(req.url);
   let credential = null;
   try {
@@ -75,6 +83,12 @@ export async function GET(req: NextRequest) {
   }
   const businessId = searchParams.get("businessId")?.trim();
   if (businessId) {
+    const owned = await getUserBusinessIds(String(session.sub));
+    if (!owned.includes(businessId)) {
+      return NextResponse.redirect(
+        new URL("/settings/accounts?error=brand_forbidden", appOrigin(req)),
+      );
+    }
     res.cookies.set("maxius_oauth_brand", businessId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -25,10 +25,14 @@ export type PromotionAlert = {
   reason: string;
 };
 
-export async function getPromotionAlerts(): Promise<PromotionAlert[]> {
+export async function getPromotionAlerts(businessId: string): Promise<PromotionAlert[]> {
   const staleCutoff = new Date(Date.now() - STALE_PENDING_MS);
   const rows = await prisma.promotionAuditLog.findMany({
-    where: { resultStatus: { in: ["UNVERIFIED", "PENDING"] } },
+    where: {
+      resultStatus: { in: ["UNVERIFIED", "PENDING"] },
+      // Scoping: audit log berasal dari akun — hanya brand aktif yg boleh lihat.
+      account: { businessId },
+    },
     orderBy: { createdAt: "desc" },
     take: 50,
   });

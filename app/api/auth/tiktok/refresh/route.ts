@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { refreshAccessToken } from "@/lib/integrations/tiktokShop";
@@ -7,7 +7,7 @@ import {
   resolveTiktokCreds,
 } from "@/lib/services/app-credential.service";
 
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req) => {
   const body = (await req.json().catch(() => ({}))) as { accountId?: string };
   if (!body.accountId) {
     return NextResponse.json({ error: "accountId wajib diisi." }, { status: 400 });
@@ -16,7 +16,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     where: { id: body.accountId },
     include: { appCredential: true },
   });
-  if (!account || account.platform !== "TIKTOK_SHOP") {
+  if (!account || account.platform !== "TIKTOK_SHOP" || account.businessId !== req.businessId) {
     return NextResponse.json({ error: "Akun TikTok Shop tidak ditemukan." }, { status: 404 });
   }
   try {

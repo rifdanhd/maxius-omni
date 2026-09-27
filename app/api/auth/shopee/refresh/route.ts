@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { refreshAccessToken } from "@/lib/integrations/shopee";
@@ -7,7 +7,7 @@ import {
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
 
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req) => {
   const body = (await req.json().catch(() => ({}))) as { accountId?: string };
   if (!body.accountId) {
     return NextResponse.json({ error: "accountId wajib diisi." }, { status: 400 });
@@ -16,7 +16,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     where: { id: body.accountId },
     include: { appCredential: true },
   });
-  if (!account || account.platform !== "SHOPEE") {
+  if (!account || account.platform !== "SHOPEE" || account.businessId !== req.businessId) {
     return NextResponse.json({ error: "Akun Shopee tidak ditemukan." }, { status: 404 });
   }
   try {
