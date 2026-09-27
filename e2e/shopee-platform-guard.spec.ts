@@ -156,7 +156,7 @@ test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan
   expect(ttPickupBody.results[0].error).toContain('Belum ada paket');
 });
 
-test('M8a UI: modal pickup tidak dibuka & menu Label disembunyikan utk order Shopee', async ({ page }) => {
+test('M8a/M8c UI: pickup diblokir utk Shopee; Cetak Label = label lokal (Shopee) / label resmi (TikTok)', async ({ page }) => {
   await login(page);
   await page.goto('/orders');
 
@@ -179,16 +179,40 @@ test('M8a UI: modal pickup tidak dibuka & menu Label disembunyikan utk order Sho
   expect(dialogMsg).toContain('Seller Center');
   await expect(page.locator('h2', { hasText: 'Atur Pengiriman' })).toHaveCount(0);
 
-  // Pilih hanya order Shopee → menu Cetak tanpa opsi "Label resmi TikTok".
+  // Pilih hanya order Shopee → menu Cetak menawarkan "Label" LOKAL (M8c),
+  // tanpa opsi label resmi TikTok.
   await card.locator('input[type="checkbox"]').check();
   await page.getByRole('button', { name: 'Cetak (1)' }).click();
   await expect(page.getByText('Cetak Invoice')).toBeVisible();
+  await expect(page.getByText('Label pengiriman lokal')).toBeVisible();
   await expect(page.getByText('Label resmi TikTok gabungan (PDF)')).toHaveCount(0);
+
+  // Klik "Cetak Label" (Shopee-only) → label lokal lewat detail order (DB):
+  // detail terpanggil & NOL panggilan endpoint label TikTok.
+  const labelApiCalls: string[] = [];
+  let detailCalled = false;
+  page.on('request', (req) => {
+    const url = req.url();
+    if (/\/api\/orders\/[^/?]+\/label(\?|$)|label-pack|bulk-label/.test(url)) {
+      labelApiCalls.push(url);
+    }
+    if (url.includes(`/api/orders/${ORD_S}`) && !/\/label(\?|$)/.test(url)) {
+      detailCalled = true;
+    }
+  });
+  page.on('dialog', (d) => {
+    d.accept().catch(() => {});
+  });
+  const popupP = page.waitForEvent('popup', { timeout: 5_000 }).catch(() => null);
+  await page.getByRole('menuitem', { name: /^Cetak Label/ }).click();
+  await popupP;
+  await expect.poll(() => detailCalled, { timeout: 10_000 }).toBe(true);
+  expect(labelApiCalls).toEqual([]);
   await page.keyboard.press('Escape');
 
-  // Tambahkan order TikTok terpilih → opsi Label resmi TikTok kembali ditawarkan.
+  // Tambahkan order TikTok terpilih → campuran menawarkan label resmi TikTok.
   const ttCard = cardOf(NO_T);
   await ttCard.locator('input[type="checkbox"]').check();
   await page.getByRole('button', { name: 'Cetak (2)' }).click();
-  await expect(page.getByText('Label resmi TikTok gabungan (PDF)')).toBeVisible();
+  await expect(page.getByText('Label resmi TikTok')).toBeVisible();
 });

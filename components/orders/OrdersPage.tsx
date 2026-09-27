@@ -117,6 +117,20 @@ const PLATFORM: Record<string, string> = {
   TOKOPEDIA: "Tokopedia",
 };
 
+/**
+ * labelMenuDescription — deskripsi menu "Cetak Label" (bulk) mengikuti seleksi:
+ * campuran → label resmi TikTok + label lokal; murni TikTok → label resmi;
+ * murni non-TikTok → label lokal (M8c, tanpa panggilan TikTok API).
+ */
+function labelMenuDescription(orders: Order[], selected: Set<string>): string {
+  const sel = orders.filter((o) => selected.has(o.id));
+  const hasTikTok = sel.some((o) => o.account?.platform === "TIKTOK_SHOP");
+  const hasLocal = sel.some((o) => o.account?.platform !== "TIKTOK_SHOP");
+  if (hasTikTok && hasLocal) return "Label resmi TikTok (PDF) + label lokal utk non-TikTok";
+  if (hasTikTok) return "Label resmi TikTok gabungan (PDF)";
+  return "Label pengiriman lokal (alamat & resi)";
+}
+
 function formatPrice(value: number | null | undefined, fallback = "-") {
   return value == null ? fallback : `Rp ${value.toLocaleString("id-ID")}`;
 }
@@ -583,14 +597,35 @@ export default function OrdersPage() {
     }
   };
 
+  /** M8c — label lokal (browser print) utk order non-TikTok: data penerima
+   *  diambil dari detail order (DB, tanpa panggilan API label TikTok). */
+  const printLocalLabels = async (targets: Order[]) => {
+    if (targets.length === 0) return;
+    const details = await Promise.all(targets.map((o) => fetchOrderDetail(o.id)));
+    const printable = details
+      .filter((d): d is OrderDetail => d !== null)
+      .map(toPrintableFromDetail);
+    if (printable.length === 0) {
+      alert("Gagal memuat data penerima untuk label.");
+      return;
+    }
+    printOrders(printable, "Label");
+    if (printable.length < targets.length) {
+      alert(`${targets.length - printable.length} pesanan dilewati (gagal memuat data pesanan).`);
+    }
+  };
+
   const printSelectedBulk = async (type: PrintType) => {
     const targets = orders.filter((o) => selected.has(o.id));
     if (targets.length === 0) return;
     if (type === "Label") {
       // Label resmi digabung jadi 1 PDF multi-halaman di server (TikTok tidak
-      // punya endpoint batch utk shipping document). Order yang belum punya
-      // label resmi (belum di-ship / tidak punya paket) dilewati & dilaporkan.
-      await printSelectedBulkLabel(targets);
+      // punya endpoint batch utk shipping document). Order non-TikTok dicetak
+      // label LOKAL dari data pesanan (M8c) — seleksi campuran keduanya jalan.
+      const tt = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
+      const local = targets.filter((o) => o.account?.platform !== "TIKTOK_SHOP");
+      if (tt.length > 0) await printSelectedBulkLabel(tt);
+      if (local.length > 0) await printLocalLabels(local);
       return;
     }
     printOrders(targets.map(toPrintable), type);
@@ -598,11 +633,15 @@ export default function OrdersPage() {
 
   const printOrder = async (order: Order, type: PrintType) => {
     if (type === "Label") {
-      // Utamakan label resmi TikTok (identik dengan Seller Center).
-      const official = await fetchOfficialLabel(order.id);
-      if (official?.docUrl) {
-        printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
-        return;
+      // Utamakan label resmi TikTok (identik dengan Seller Center) — hanya
+      // untuk order TikTok; order non-TikTok langsung label lokal (M8c),
+      // tanpa memanggil endpoint label TikTok.
+      if (order.account?.platform === "TIKTOK_SHOP") {
+        const official = await fetchOfficialLabel(order.id);
+        if (official?.docUrl) {
+          printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
+          return;
+        }
       }
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {
@@ -926,19 +965,13 @@ export default function OrdersPage() {
                   placement="bottom-left"
                   onSelect={(type) => printSelectedBulk(type)}
                   items={[
-                    // Guard platform: "Label resmi TikTok" hanya ditawarkan bila
-                    // ada order TikTok yang terpilih (order Shopee dilewati server).
-                    ...(orders.some(
-                      (o) => selected.has(o.id) && o.account?.platform === "TIKTOK_SHOP"
-                    )
-                      ? [
-                          {
-                            id: "Label" as PrintType,
-                            label: "Cetak Label",
-                            description: "Label resmi TikTok gabungan (PDF)",
-                          },
-                        ]
-                      : []),
+                    // M8c — "Label" selalu ditawarkan: order TikTok → label resmi
+                    // TikTok (PDF gabungan), order non-TikTok → label lokal.
+                    {
+                      id: "Label" as PrintType,
+                      label: "Cetak Label",
+                      description: labelMenuDescription(orders, selected),
+                    },
                     { id: "Invoice" as PrintType, label: "Cetak Invoice", description: "Faktur pesanan terpilih" },
                     { id: "PackingList" as PrintType, label: "Cetak Packing List", description: "Daftar packing pesanan terpilih" },
                   ]}

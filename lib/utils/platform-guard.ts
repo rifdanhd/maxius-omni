@@ -4,7 +4,7 @@ export const UNSUPPORTED_PLATFORM_CODE = "unsupported_platform";
 
 /** Alasan per-item utk daftar `failed` cetak label batch. */
 export const NON_TIKTOK_LABEL_REASON =
-  "order non-TikTok — label resmi TikTok tidak berlaku (cetak via Seller Center)";
+  "order non-TikTok — label resmi TikTok tidak berlaku (cetak label lokal dari menu Cetak)";
 
 /**
  * Guard endpoint fulfillment/label milik TikTok: order Shopee (atau platform
