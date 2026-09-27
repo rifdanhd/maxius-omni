@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- script seed CJS, dijalankan via `node prisma/seed.js` */
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const prisma = new PrismaClient();
 
@@ -13,6 +14,10 @@ async function main() {
     where: { username: "admin" },
     update: {},
     create: {
+      // User.id tidak punya default di schema (dan tidak ada DEFAULT di
+      // migration) → Prisma menolak insert tanpa id ("Argument id is missing").
+      // Samakan dengan scripts/seed-production.mts: UUID eksplisit.
+      id: crypto.randomUUID(),
       username: "admin",
       passwordHash,
     },
@@ -135,13 +140,17 @@ async function main() {
       data: {
         name: mp.name,
         threshold: mp.threshold,
-        variants: {
+        // Nama relasi di schema: productVariant / productMapping (varian lama
+        // `variants`/`mappings` dihapus saat rename relasi camelCase).
+        productVariant: {
           create: [
             {
               sku: mp.sku,
               stock: mp.stock,
-              mappings: {
-                create: mp.mappings,
+              productMapping: {
+                // ProductMapping.updatedAt TIDAK punya @updatedAt (lihat
+                // schema) → wajib diisi manual, sama seperti app/api/inventory/mappings.
+                create: mp.mappings.map((m) => ({ ...m, updatedAt: new Date() })),
               },
             },
           ],
