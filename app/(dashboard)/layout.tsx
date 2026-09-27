@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
@@ -8,6 +8,10 @@ import { Header } from "@/components/layout/header";
 import { useAuthStore } from "@/stores/auth-store";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { Search } from "@/components/search";
+
+// Tidak ada sumber data eksternal yang berubah — subscribe hanya untuk
+// memenuhi kontrak useSyncExternalStore.
+const subscribeNoop = () => () => {};
 
 export default function DashboardLayout({
   children,
@@ -17,6 +21,12 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const accessToken = useAuthStore((state) => state.auth.accessToken);
+  // Token berasal dari localStorage: server & render pertama client SAMA-SAMA
+  // kosong. Tanpa gate ini cabangnya beda saat hydration → React gagal
+  // (Recoverable Error) dan dev overlay menutupi halaman (E2E tidak bisa klik).
+  // useSyncExternalStore: snapshot server = false, client = true, tanpa
+  // setState di dalam effect (larangan react-hooks/set-state-in-effect).
+  const hydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
 
   useEffect(() => {
     if (!accessToken) {
@@ -24,7 +34,7 @@ export default function DashboardLayout({
     }
   }, [accessToken, router]);
 
-  if (!accessToken) {
+  if (!hydrated || !accessToken) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500 text-sm">
         Memeriksa sesi...

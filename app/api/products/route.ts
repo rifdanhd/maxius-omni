@@ -38,5 +38,16 @@ export const GET = withAuth(async (req) => {
     },
     orderBy: { name: "asc" },
   });
-  return NextResponse.json({ products });
+  // Nama relasi di DB adalah productVariant/productMapping/bundleItem, tapi
+  // kontrak API lama memakai variants/mappings/bundleItems. Kembalikan nama
+  // lama supaya konsumen (halaman Produk, modal mapping TikTok) tidak patah.
+  const payload = products.map(({ productVariant, bundleItem, ...product }) => ({
+    ...product,
+    variants: productVariant.map(({ productMapping, ...variant }) => ({
+      ...variant,
+      mappings: productMapping,
+    })),
+    bundleItems: bundleItem,
+  }));
+  return NextResponse.json({ products: payload });
 });
