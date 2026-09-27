@@ -18,17 +18,10 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
 import jwt from "jsonwebtoken";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-settings-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-settings");
 
 const { prisma } = await import("@/lib/db/prisma");
 const {
@@ -73,7 +66,16 @@ const acc = await prisma.platformAccount.create({
 const accShopee = await prisma.platformAccount.create({
   data: { platform: "SHOPEE", label: "Toko Shopee Settings", businessId: business.id },
 });
-const user = await prisma.user.create({ data: { id: crypto.randomUUID(), username: "admin-settings", passwordHash: "x" } });
+// Keanggotaan brand WAJIB — tanpa baris UserBusiness, withAuth → 403
+// ("User tidak punya akses ke brand mana pun") sebelum handler jalan.
+const user = await prisma.user.create({
+  data: {
+    id: crypto.randomUUID(),
+    username: "admin-settings",
+    passwordHash: "x",
+    userBusiness: { create: [{ businessId: business.id }] },
+  },
+});
 const jwtSecret = process.env.JWT_SECRET;
 assert.ok(jwtSecret, "JWT_SECRET harus ada di .env utk test handler");
 const token = jwt.sign({ sub: user.id, username: user.username }, jwtSecret, { expiresIn: "10m" });
@@ -210,7 +212,7 @@ await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk ant
   _resetStockPushQueueForTests();
 });
 
-await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum ada integrasi'", async () => {
+await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum terhubung OAuth'", async () => {
   await updateInventorySettings({ syncPushShopee: false });
   await syncStockToMarketplaces([{ accountId: accShopee.id, channelSku: "SET-GATE-S1" }], 10);
   const gate = await prisma.syncLog.findFirst({
@@ -219,13 +221,15 @@ await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum ada integ
   });
   assert.ok(gate, "harus ada log gate shopee");
 
+  // Jalur lama ("belum punya integrasi push stok") diganti adapter Shopee
+  // (PHASE B.4): akun tanpa token → skipped + pesan OAuth, tetap tidak silent.
   await updateInventorySettings({ syncPushShopee: true });
   await syncStockToMarketplaces([{ accountId: accShopee.id, channelSku: "SET-GATE-S2" }], 11);
   const plain = await prisma.syncLog.findFirst({
-    where: { accountId: accShopee.id, message: { contains: "belum punya integrasi push stok" } },
+    where: { accountId: accShopee.id, message: { contains: "belum terhubung OAuth Shopee" } },
     orderBy: { createdAt: "desc" },
   });
-  assert.ok(plain, "saat aktif, jalur lama (belum ada integrasi) tetap jalan");
+  assert.ok(plain, "saat aktif, akun tanpa token tetap meninggalkan jejak jelas");
 });
 
 /* ─────────────────────── 4 — Notification gate ─────────────────────── */
@@ -249,5 +253,5 @@ await ok("bell dimatikan → handler mengembalikan alerts kosong", async () => {
 /* ─────────────────────────── Selesai ─────────────────────────── */
 console.log(`\n${passed}/${passed} PASS`);
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 process.exit(0);

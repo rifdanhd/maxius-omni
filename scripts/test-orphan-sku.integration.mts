@@ -6,15 +6,9 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-orphan-sku-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-orphan-sku");
 
 const { prisma } = await import("@/lib/db/prisma");
 const {
@@ -184,5 +178,5 @@ ok("marker orphan_sku: idempotent unhandled, SKU lain terpisah, handled → bole
 
 console.log(`\nPASS: ${passed} test group (orphan-sku). DB fixture dihapus.`);
 await prisma.$disconnect();
-execSync(`rm -f ${dbPath}`);
+db.cleanup();
 process.exit(0);

@@ -1,6 +1,6 @@
 import { test, expect, request as baseRequest } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { execFileSync } from 'child_process';
+import { sql, baseUrl } from './helpers';
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/stock-${n}.png`;
@@ -8,14 +8,6 @@ const SEED_ID = 'e2e-seed-oversell-001';
 const ACCT_ID = 'e2e-stockpage-acct';
 const MP_ID = 'e2e-stockpage-mp';
 const VAR_ID = 'e2e-stockpage-var';
-
-function sql(q: string) {
-  return execFileSync(
-    'psql',
-    ['-h', 'localhost', '-U', 'udan', '-d', 'maxius_dev', '-v', 'ON_ERROR_STOP=1', '-tAc', q],
-    { encoding: 'utf8' }
-  ).trim();
-}
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -27,7 +19,7 @@ async function login(page: Page) {
 }
 
 async function apiToken(): Promise<string> {
-  const ctx = await baseRequest.newContext({ baseURL: 'http://localhost:3000' });
+  const ctx = await baseRequest.newContext({ baseURL: baseUrl() });
   const res = await ctx.post('/api/auth/login', {
     data: { username: 'admin', password: 'admin123' },
   });
@@ -73,7 +65,7 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
 
   // 1. Badge vs API langsung.
   const token = await apiToken();
-  const apiRes = await fetch('http://localhost:3000/api/inventory/stock?tab=all&limit=1', {
+  const apiRes = await fetch(`${baseUrl()}/api/inventory/stock?tab=all&limit=1`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const apiCounts = ((await apiRes.json()) as { counts: Record<string, number> }).counts;

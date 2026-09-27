@@ -1,7 +1,50 @@
 import { test, expect } from '@playwright/test';
+import { sql } from './helpers';
 
 const SHOT = (n: string) =>
   `/Users/udan/Downloads/maxius-project/maxius-platform/e2e/screenshots/promo-${n}.png`;
+
+// Fixture mandiri: wizard butuh minimal 1 toko TikTok dgn listing aktif.
+// Sebelumnya test ini mengandalkan sisa data dev (akun dummy seed / run test
+// lama) sehingga gagal begitu DB bersih. Token sengaja KOSONG — tahap create
+// memang diuji pada jalur gagal-aman ("Promosi TIDAK jadi dibuat.").
+const ACCT = 'e2e-promo-tiktok';
+const MP = 'e2e-promo-mp';
+const VAR = 'e2e-promo-var';
+const MAP = 'e2e-promo-map';
+
+test.beforeAll(() => {
+  sql(
+    `INSERT INTO "PlatformAccount" (id, platform, label, "businessId", "createdAt", "updatedAt") ` +
+      `VALUES ('${ACCT}','TIKTOK_SHOP','E2E Promo TikTok','business-default',NOW(),NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "MasterProduct" (id, name, "businessId") ` +
+      `VALUES ('${MP}','E2E Promo Produk','business-default') ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "ProductVariant" (id, sku, stock, "safetyStock", price, "masterProductId", "createdAt", "updatedAt") ` +
+      `VALUES ('${VAR}','E2E-PROMO-SKU',20,0,100000,'${MP}',NOW(),NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
+    `INSERT INTO "ProductMapping" (id, "channelSku", "variantId", "accountId", price, ` +
+      `"platformProductId", "platformStatus", "platformTitle", "createdAt", "updatedAt") ` +
+      `VALUES ('${MAP}','E2E-PROMO-SKU','${VAR}','${ACCT}',100000,'E2E-PROMO-P1','ACTIVE',` +
+      `'E2E Promo Listing',NOW(),NOW()) ON CONFLICT (id) DO NOTHING;`
+  );
+});
+
+test.afterAll(() => {
+  // Urutan FK-safe: audit/activity dulu (accountId tanpa cascade), lalu subtree.
+  sql(`DELETE FROM "PromotionAuditLog" WHERE "accountId" = '${ACCT}';`);
+  sql(`DELETE FROM "PromotionActivity" WHERE "accountId" = '${ACCT}';`);
+  sql(`DELETE FROM "ProductMapping" WHERE id = '${MAP}';`);
+  sql(`DELETE FROM "ProductVariant" WHERE id = '${VAR}';`);
+  sql(`DELETE FROM "MasterProduct" WHERE id = '${MP}';`);
+  sql(`DELETE FROM "PlatformAccount" WHERE id = '${ACCT}';`);
+});
 
 function parseRp(text: string): number[] {
   const m = text.match(/Rp\s?([\d.]+)/g) ?? [];
@@ -29,9 +72,9 @@ test('A: wizard campaign promosi TikTok end-to-end', async ({ page }) => {
     timeout: 30_000,
   });
   const storeSelect = page.locator('select').first();
-  await expect
-    .poll(async () => storeSelect.locator('option').count(), { timeout: 30_000 })
-    .toBeGreaterThan(1);
+  // Option placeholder "(memuat toko…)" juga bernilai 1, jadi jumlah option
+  // bukan penanda data sudah masuk — assert langsung ke toko fixture.
+  await expect(storeSelect).toHaveValue(ACCT, { timeout: 30_000 });
   // Jangan hardcode index toko: tidak semua toko seed punya listing aktif.
   // Pilih toko PERTAMA yang benar-benar menampilkan >=1 checkbox listing.
   const listingBoxes = page.locator('div.m-4 input[type="checkbox"]');

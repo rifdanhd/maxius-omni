@@ -14,16 +14,9 @@
  * Jalankan: npx tsx scripts/test-phase-b-mismatch.integration.mts
  */
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-phase-b-mismatch-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-phase-b-mismatch");
 
 const { prisma } = await import("@/lib/db/prisma");
 const { listMismatchSyncJobs } = await import("@/lib/services/sync-mismatch.service");
@@ -36,7 +29,7 @@ async function ok(name: string, fn: () => Promise<void>) {
 }
 
 /* ── Fixture ── */
-const business = await prisma.business.create({ data: { name: "Phase B.1" } });
+const business = await prisma.business.create({ data: { id: "business-default", name: "Phase B.1" } });
 const shopeeAcc = await prisma.platformAccount.create({
   data: { platform: "SHOPEE", label: "Shopee 1", businessId: business.id },
 });
@@ -131,5 +124,5 @@ await ok("read-only: jumlah SyncJob tetap 4 setelah semua query", async () => {
 });
 
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 console.log(`\nPASS: ${passed} test group (phase-b-mismatch). DB fixture dihapus.`);

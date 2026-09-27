@@ -25,16 +25,9 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-phase-a-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-phase-a");
 
 const { prisma } = await import("@/lib/db/prisma");
 const {
@@ -378,5 +371,5 @@ await ok("job sukses → SUCCESS, tidak diproses ulang", async () => {
 
 /* ─────────────────────────── Cleanup ─────────────────────────── */
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 console.log(`\nPASS: ${passed} test group (phase-a). DB fixture dihapus.`);

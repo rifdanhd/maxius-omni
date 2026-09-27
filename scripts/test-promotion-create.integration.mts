@@ -18,17 +18,10 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
 // ── DB fixture: file SQLite sementara + migrasi penuh SEBELUM import prisma ──
-const dbPath = path.join(process.cwd(), "prisma", `test-promo-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-promo");
 
 // Import dinamis agar DATABASE_URL di atas berlaku sebelum PrismaClient dibuat.
 const { prisma } = await import("@/lib/db/prisma");
@@ -365,6 +358,6 @@ await ok("activeAct berstatus ONGOING dan memuat P1", async () => {
 
 /* ─────────────────────────── Cleanup ─────────────────────────── */
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 console.log(`\nPASS: ${passed} test group (integration). DB fixture dihapus.`);
 console.log(`Audit rows tersisa di DB fixture: (file dihapus — tidak tersisa apa pun)`);

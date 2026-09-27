@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { execFileSync } from 'child_process';
+import { sql } from './helpers';
 
 /**
  * [E2E] Form "Barang Masuk" (stock-in) di halaman Mapping — Daftar Varian.
@@ -16,17 +16,6 @@ const SHOT = (n: string) => `${ROOT}/e2e/screenshots/stock-in-${n}.png`;
 const MP_ID = 'e2e-stockin-mp';
 const VAR_ID = 'e2e-stockin-var';
 const SKU = 'E2E-STOCKIN-SKU';
-
-// DB dev lokal = Postgres (POSTGRES_URL). ON_ERROR_STOP agar seed gagal
-// terdengar (bukan diam-diam lanjut dengan data kosong).
-function sql(q: string) {
-  // execFileSync + args: tanpa shell, supaya kutip SQL utuh.
-  return execFileSync(
-    'psql',
-    ['-h', 'localhost', '-U', 'udan', '-d', 'maxius_dev', '-v', 'ON_ERROR_STOP=1', '-tAc', q],
-    { encoding: 'utf8' }
-  ).trim();
-}
 
 async function login(page: Page) {
   await page.goto('/login');

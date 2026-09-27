@@ -18,17 +18,9 @@
  *
  * Jalankan: npx tsx scripts/test-stock-push-queue.integration.mts
  */
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const benchDb = path.join(process.cwd(), "prisma", `test-stock-push-${Date.now()}.db`);
-execSync(`cp prisma/dev.db "${benchDb}"`);
-execSync(`npx prisma db push --skip-generate`, {
-  env: { ...process.env, DATABASE_URL: `file:${benchDb}` },
-  stdio: "pipe",
-});
-process.env.DATABASE_URL = `file:${benchDb}`;
+const db = setupTestDb("test-stock-push");
 
 const { prisma } = await import("@/lib/db/prisma");
 
@@ -303,6 +295,5 @@ check(`DEBOUNCE_WINDOW_MS dalam rentang diminta (5–10s)`, DEBOUNCE_WINDOW_MS >
 
 await prisma.$disconnect();
 restoreTimers();
-fs.rmSync(benchDb, { force: true });
-for (const suffix of ["-wal", "-shm"]) fs.rmSync(benchDb + suffix, { force: true });
+db.cleanup();
 process.exit(fail > 0 ? 1 : 0);

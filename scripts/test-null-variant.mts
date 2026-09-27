@@ -7,6 +7,9 @@
  *
  * Jalankan: npx tsx scripts/test-null-variant.mts
  */
+import { setupTestDb } from "@/scripts/lib/test-db";
+
+const db = setupTestDb("test-null-variant");
 
 const { prisma } = await import("@/lib/db/prisma");
 const { listShopeeProducts } = await import("@/lib/services/marketplace-shopee.service");
@@ -276,3 +279,4 @@ try {
   const rest = await prisma.productMapping.count();
   console.log(`cleanup: ProductMapping sisa = ${rest}`);
 }
+db.cleanup();

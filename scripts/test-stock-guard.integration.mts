@@ -15,16 +15,9 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-stock-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-stock");
 
 const { prisma } = await import("@/lib/db/prisma");
 const now = new Date();
@@ -212,17 +205,21 @@ await ok("order 2 varian (A cukup, B kurang) → TIDAK ADA yang terpotong", asyn
 console.log("=== recordSale: jalur webhook/manual juga atomik ===");
 await ok("recordSale stok pas-pasan: satu lolos satu throw, stok tidak minus", async () => {
   const { variant } = await makeVariantWithOrders("SALE-SKU", 5, 5);
-  const [okSale, failSale] = await Promise.allSettled([
+  // Pemenang race TIDAK deterministik (dua UPDATE row-lock serentak) — assert
+  // jumlahnya, bukan urutan promise-nya.
+  const results = await Promise.allSettled([
     recordSale({ accountId: accA.id, channelSku: "SALE-SKU-A", qty: 5 }),
     recordSale({ accountId: accB.id, channelSku: "SALE-SKU-B", qty: 5 }),
   ]);
-  assert.equal(okSale.status, "fulfilled");
-  assert.equal(failSale.status, "rejected");
+  const winner = results.find((r) => r.status === "fulfilled");
+  const loser = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+  assert.ok(winner, "tepat satu sale harus lolos");
+  assert.ok(loser, "tepat satu sale harus ditolak");
   const after = await prisma.productVariant.findUniqueOrThrow({ where: { id: variant.id } });
   assert.equal(after.stock, 0);
   assert.ok(after.stock >= 0);
-  const err = (failSale as PromiseRejectedResult).reason as Error;
-  assert.ok(err.message.includes("Stok tidak cukup"));
+  const err = loser.reason as Error;
+  assert.ok(err.message.includes("Stok tidak cukup"), `pesan harus 'Stok tidak cukup', dapat: ${err.message}`);
 });
 
 console.log("=== Restore tetap idempotent (duel dua restore bersamaan) ===");
@@ -247,5 +244,5 @@ await ok("InsufficientStockError terekspos utk caller", async () => {
 
 /* ─────────────────────────── Cleanup ─────────────────────────── */
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 console.log(`\nPASS: ${passed} test group (stock-guard). DB fixture dihapus.`);

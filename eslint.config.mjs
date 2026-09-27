@@ -9,6 +9,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Artefak dev server e2e (next.config.ts → distDir ".next-e2e" saat
+    // MAXIUS_E2E=1) — sama dengan .next, jangan dilint.
+    ".next-e2e/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

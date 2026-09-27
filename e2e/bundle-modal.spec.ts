@@ -1,18 +1,10 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { execFileSync } from 'child_process';
+import { sql } from './helpers';
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/bundle-${n}.png`;
 const BUNDLE_NAME = `Paket Duo Kaos Kaki (E2E ${Date.now()})`;
-
-function sql(q: string) {
-  return execFileSync(
-    'psql',
-    ['-h', 'localhost', '-U', 'udan', '-d', 'maxius_dev', '-v', 'ON_ERROR_STOP=1', '-tAc', q],
-    { encoding: 'utf8' }
-  ).trim();
-}
 
 // Fixture komponen: 2 master single + 1 varian masing-masing (mandiri,
 // tidak tergantung data dev lain).
@@ -119,4 +111,18 @@ test('E2E: buat bundle 2 komponen → toast + tab Bundle', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Tambah Produk Bundle' })).toBeHidden({ timeout: 10_000 });
   await expect(page.getByText(BUNDLE_NAME).first()).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: SHOT('created') });
+
+  // Persistensi: reload → list dirender ulang dari server (ini juga titik crash
+  // bug #1: produk dgn varian sempat melempar TypeError di reduce) lalu bundle
+  // tetap ada di tab "Produk Bundle".
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Produk Master' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole('button', { name: /^Lihat \d+ varian produk/ }).first()).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: /^Produk Bundle/ }).click();
+  await expect(page.getByText(BUNDLE_NAME).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: SHOT('after-reload') });
 });

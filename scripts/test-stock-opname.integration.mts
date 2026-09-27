@@ -16,16 +16,9 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-opname-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-opname");
 
 const { prisma } = await import("@/lib/db/prisma");
 const {
@@ -64,7 +57,7 @@ async function rejects(name: string, fn: () => Promise<unknown>, mustContain: st
 }
 
 /* ─────────────────────────── Fixture ─────────────────────────── */
-const business = await prisma.business.create({ data: { name: "Opname Test" } });
+const business = await prisma.business.create({ data: { id: "business-default", name: "Opname Test" } });
 const acc = await prisma.platformAccount.create({
   data: { platform: "TIKTOK_SHOP", label: "Toko Opname", businessId: business.id },
 });
@@ -356,5 +349,5 @@ await ok("counts agregasi DB-level", async () => {
 /* ─────────────────────────── Selesai ─────────────────────────── */
 console.log(`\n${passed}/${passed} PASS`);
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 process.exit(0);

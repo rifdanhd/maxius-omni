@@ -16,16 +16,9 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import { execSync } from "node:child_process";
-import path from "node:path";
-import fs from "node:fs";
+import { setupTestDb } from "@/scripts/lib/test-db";
 
-const dbPath = path.join(process.cwd(), "prisma", `test-phase-c-kpi-${Date.now()}.db`);
-process.env.DATABASE_URL = `file:${dbPath}`;
-execSync("npx prisma migrate deploy", {
-  env: { ...process.env, DATABASE_URL: `file:${dbPath}` },
-  stdio: "pipe",
-});
+const db = setupTestDb("test-phase-c-kpi");
 
 const { prisma } = await import("@/lib/db/prisma");
 const { getDashboardKpi } = await import("@/lib/services/dashboard-kpi.service");
@@ -37,7 +30,7 @@ async function ok(name: string, fn: () => Promise<void>) {
   console.log(`  ✓ ${name}`);
 }
 
-const business = await prisma.business.create({ data: { name: "Phase C.1" } });
+const business = await prisma.business.create({ data: { id: "business-default", name: "Phase C.1" } });
 const tiktokAcc = await prisma.platformAccount.create({
   data: {
     platform: "TIKTOK_SHOP", label: "TikTok 1", businessId: business.id,
@@ -164,5 +157,5 @@ await ok("read-only: count semua tabel tidak berubah", async () => {
 });
 
 await prisma.$disconnect();
-fs.rmSync(dbPath, { force: true });
+db.cleanup();
 console.log(`\nPASS: ${passed} test group (phase-c-kpi). DB fixture dihapus.`);
