@@ -59,7 +59,9 @@ export default function StoreIntegration() {
     const params = new URLSearchParams(window.location.search);
     const key = params.get("success") !== null ? "success" : params.get("error");
     if (key) {
-      setNotice(OAUTH_MESSAGES[key] ?? { ok: false, text: `Otorisasi gagal: ${key}.` });
+      queueMicrotask(() =>
+        setNotice(OAUTH_MESSAGES[key] ?? { ok: false, text: `Otorisasi gagal: ${key}.` }),
+      );
       const url = new URL(window.location.href);
       url.searchParams.delete("success");
       url.searchParams.delete("error");
