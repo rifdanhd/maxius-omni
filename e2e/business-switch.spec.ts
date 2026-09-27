@@ -76,28 +76,78 @@ test('ganti brand aktif → daftar toko di Pengaturan ikut berubah', async ({ pa
   expect(stored).toBe('business-default');
 });
 
-test('GAP: komponen BrandSwitcher tidak dipasang di layout manapun', async ({ page }) => {
+test('BrandSwitcher terpasang di header & bisa ganti brand via UI', async ({ page }) => {
   await login(page);
   await page.goto('/dashboard');
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 30_000 });
-  // components/layout/BrandSwitcher.tsx sudah ada & fungsinya benar, tapi tidak
-  // pernah di-import di header/sidebar/layout → pengguna TIDAK BISA ganti brand
-  // lewat UI. Bila suatu saat dipasang, hapus assertion ini dan uji klik-nya.
-  await expect(page.getByTitle('Ganti brand')).toHaveCount(0);
-  await page.screenshot({ path: SHOT('no-switcher') });
+  const switcher = page.getByTitle('Ganti brand');
+  await expect(switcher).toBeVisible();
+  await page.screenshot({ path: SHOT('switcher-default') });
+
+  // Pilih brand Raxen dari dropdown → pilihan tersimpan + reload terjadi.
+  // exact: nama tombol "Maxius Platform" di sidebar match substring 'Maxius'.
+  await switcher.click();
+  await page.getByRole('button', { name: 'Raxen', exact: true }).click();
+  await page.waitForURL('/dashboard', { timeout: 30_000 });
+  await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
+  const stored = await page.evaluate(() => localStorage.getItem('activeBusinessId'));
+  expect(stored).toBe('business-raxen');
+  await expect(switcher).toContainText('Raxen');
+  await page.screenshot({ path: SHOT('switcher-raxen') });
+
+  // Kembali ke brand default.
+  await switcher.click();
+  await page.getByRole('button', { name: 'Maxius', exact: true }).click();
+  await page.waitForURL('/dashboard', { timeout: 30_000 });
+  await expect(switcher).toContainText('Maxius');
+  const stored2 = await page.evaluate(() => localStorage.getItem('activeBusinessId'));
+  expect(stored2).toBe('business-default');
 });
 
-// BUG (belum diperbaiki): GET /api/products mengabaikan req.businessId —
-// semua brand melihat produk brand lain (kebocoran lintas brand; saat ini tidak
-// terlihat karena hanya brand default yang punya produk).
-// Root cause: app/api/products/route.ts GET tidak memfilter
-// `where: { businessId: req.businessId }` padahal kolom MasterProduct.businessId
-// ada dan route lain (mis. /api/inventory/mappings) sudah benar.
-// Ganti `test.fixme` → `test` setelah route-nya di-filter.
-test.fixme('daftar produk ter-scoping brand aktif', async ({ page }) => {
+// Scoping GET /api/products: hanya brand aktif yang boleh terlihat.
+// Fixture: 1 produk per brand — membuktikan filter-nya bukan kebetulan
+// (daftar kosong juga lolos assertion `every`).
+const PROD_DEFAULT = 'e2e-prod-default';
+const PROD_RAXEN = 'e2e-prod-raxen';
+
+test.beforeAll(() => {
+  for (const [id, brand] of [
+    [PROD_DEFAULT, 'business-default'],
+    [PROD_RAXEN, 'business-raxen'],
+  ]) {
+    sql(
+      `INSERT INTO "MasterProduct" (id, name, "businessId", "isActive") ` +
+        `VALUES ('${id}','E2E Produk ${brand}','${brand}',true) ON CONFLICT (id) DO NOTHING;`
+    );
+  }
+});
+
+test.afterAll(() => {
+  sql(`DELETE FROM "MasterProduct" WHERE id IN ('${PROD_DEFAULT}','${PROD_RAXEN}');`);
+});
+
+test('daftar produk ter-scoping brand aktif', async ({ page }) => {
   await login(page);
-  const res = await page.request.get('/api/products?businessId=business-raxen');
-  expect(res.ok()).toBeTruthy();
-  const body = (await res.json()) as { products: { businessId: string }[] };
-  expect(body.products.every((p) => p.businessId === 'business-raxen')).toBeTruthy();
+  const token = await apiToken(page);
+
+  // Brand Raxen: produknya sendiri tampil, produk brand default tidak.
+  const raxen = await page.request.get('/api/products?businessId=business-raxen', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(raxen.ok()).toBeTruthy();
+  const raxenBody = (await raxen.json()) as { products: { id: string; businessId: string }[] };
+  expect(raxenBody.products.length).toBeGreaterThan(0);
+  expect(raxenBody.products.every((p) => p.businessId === 'business-raxen')).toBeTruthy();
+  expect(raxenBody.products.map((p) => p.id)).toContain(PROD_RAXEN);
+  expect(raxenBody.products.map((p) => p.id)).not.toContain(PROD_DEFAULT);
+
+  // Brand default: sebaliknya.
+  const def = await page.request.get('/api/products?businessId=business-default', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(def.ok()).toBeTruthy();
+  const defBody = (await def.json()) as { products: { id: string; businessId: string }[] };
+  expect(defBody.products.every((p) => p.businessId === 'business-default')).toBeTruthy();
+  expect(defBody.products.map((p) => p.id)).toContain(PROD_DEFAULT);
+  expect(defBody.products.map((p) => p.id)).not.toContain(PROD_RAXEN);
 });

@@ -59,27 +59,27 @@ export default function BrandSwitcher() {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 border border-gray-200 rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className="flex items-center gap-2 border border-border rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/50"
         title="Ganti brand"
       >
         <Building2 size={16} />
         <span className="max-w-[140px] truncate">{active?.name ?? "Brand"}</span>
-        <ChevronDown size={14} className="text-gray-400" />
+        <ChevronDown size={14} className="text-muted-foreground" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+          <div className="absolute right-0 mt-1 w-56 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-20 py-1">
             {businesses.length === 0 && (
-              <div className="px-4 py-2 text-sm text-gray-400">Memuat brand…</div>
+              <div className="px-4 py-2 text-sm text-muted-foreground">Memuat brand…</div>
             )}
             {businesses.map((b) => (
               <button
                 key={b.id}
                 onClick={() => pick(b.id)}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-accent/50"
               >
-                <span className="flex-1 truncate font-medium text-gray-700">{b.name}</span>
+                <span className="flex-1 truncate font-medium">{b.name}</span>
                 {b.id === activeId && <Check size={16} className="text-emerald-600" />}
               </button>
             ))}
