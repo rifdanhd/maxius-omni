@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import { syncStockToMarketplaces } from "@/lib/services/sync.service";
+import { syncStockToMarketplaces, type SyncPushItemResult } from "@/lib/services/sync.service";
 import { isDeduplicationFailure } from "@/lib/services/stock-guard.policy";
 import { businessWhere } from "@/lib/services/business-scope.service";
 
@@ -196,6 +196,63 @@ async function runPushAttempt(
   }
 }
 /**
+ * settleDispatchedSyncJobs — tandai job yang push-nya SUDAH dieksekusi langsung
+ * oleh jalur cepat (pushVariantStockToOthers → syncStockToMarketplaces) sebagai
+ * SUCCESS, supaya tick auto-retry tidak MENDORONG ULANG nilai yang sama.
+ *
+ * Guard `newSellable = nilai yang didorong`: coalesce enqueue boleh saja sudah
+ * menaikkan baris ke nilai lebih baru (dorongan terpisah yang akan settle
+ * sendiri) — nilai lama tidak boleh menandai baris itu SUCCESS.
+ *
+ * Hasil gagal TIDAK disettle di sini: baris tetap PENDING (retryCount 0) dan
+ * menjadi tanggung jawab processDueSyncJobs() → backoff 1m/5m/15m.
+ */
+export async function settleDispatchedSyncJobs(
+  variantId: string,
+  dispatchedSellable: number,
+  results: Pick<SyncPushItemResult, "accountId" | "channelSku" | "success">[]
+): Promise<void> {
+  const succeeded = results.filter((r) => r.success);
+  if (succeeded.length === 0) return;
+  await prisma.syncJob.updateMany({
+    where: {
+      variantId,
+      newSellable: dispatchedSellable,
+      status: SYNC_JOB_STATUSES.PENDING,
+      OR: succeeded.map((r) => ({ accountId: r.accountId, channelSku: r.channelSku })),
+    },
+    data: { status: SYNC_JOB_STATUSES.SUCCESS, lastError: null, nextRetryAt: null },
+  });
+}
+
+/**
+ * SYNC_JOB_STALE_PROCESSING_MS — batas PROCESSING dianggap putus di tengah
+ * jalan (process crash / pm2 restart / OOM): klaim menulis status tapi
+ * prosesnya mati sebelum hasil push terakhir tercatat, sehingga baris tidak
+ * pernah dipilih ulang (findMany hanya PENDING/FAILED) dan tidak bisa di-retry
+ * dari UI (retrySingleSyncJob → CONFLICT). Di-sweep jadi PENDING lagi tiap tick.
+ */
+export const SYNC_JOB_STALE_PROCESSING_MS = 5 * 60_000;
+
+async function requeueStaleProcessingJobs(now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - SYNC_JOB_STALE_PROCESSING_MS);
+  const stale = { status: SYNC_JOB_STATUSES.PROCESSING, updatedAt: { lt: cutoff } };
+  const msg = "Proses terputus saat push berjalan (restart/crash) — diantre ulang.";
+  const [retriable, exhausted] = await Promise.all([
+    prisma.syncJob.updateMany({
+      where: { ...stale, retryCount: { lt: SYNC_JOB_MAX_RETRIES } },
+      data: { status: SYNC_JOB_STATUSES.PENDING, nextRetryAt: null, lastError: msg },
+    }),
+    // Retry sudah habis → penanda mismatch permanen, tetap bisa di-retry manual.
+    prisma.syncJob.updateMany({
+      where: { ...stale, retryCount: { gte: SYNC_JOB_MAX_RETRIES } },
+      data: { status: SYNC_JOB_STATUSES.FAILED, lastError: msg },
+    }),
+  ]);
+  return retriable.count + exhausted.count;
+}
+
+/**
  * processDueSyncJobs — proses job PENDING/FAILED yang jatuh tempo
  * (nextRetryAt null = baru, atau <= now) dan retryCount < max.
  * Claim via updateMany bersyarat → dua worker bersamaan tidak memproses
@@ -207,10 +264,20 @@ export async function processDueSyncJobs(opts?: {
   limit?: number;
   /** Bila diisi, hanya job milik akun brand ini yang diproses (worker global: kosong = semua brand). */
   businessId?: string;
-}): Promise<{ processed: number; succeeded: number; pendingRetry: number; failed: number }> {
+}): Promise<{
+  processed: number;
+  succeeded: number;
+  pendingRetry: number;
+  failed: number;
+  requeued: number;
+}> {
   const now = opts?.now ?? new Date();
   const pusher = opts?.pusher ?? defaultPusher;
-  const result = { processed: 0, succeeded: 0, pendingRetry: 0, failed: 0 };
+  const result = { processed: 0, succeeded: 0, pendingRetry: 0, failed: 0, requeued: 0 };
+
+  // Sweep dulu: PROCESSING yatim (proses mati di tengah push) → bisa dipilih
+  // lagi di tick yang sama, jadi tidak pernah tersangkut selamanya.
+  result.requeued = await requeueStaleProcessingJobs(now);
 
   const due = await prisma.syncJob.findMany({
     where: {

@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { syncStockToMarketplaces } from "@/lib/services/sync.service";
-import { enqueueSyncJobs } from "@/lib/services/sync-job.service";
+import { enqueueSyncJobs, settleDispatchedSyncJobs } from "@/lib/services/sync-job.service";
 import {
   buildDeductPlan,
   insufficientStockMessage,
@@ -100,6 +100,8 @@ export function lowStockSql(variantAlias = "pv", productAlias = "mp"): Prisma.Sq
  * nilai terbaru). SyncJob = state machine yang bisa di-query ulang untuk
  * retry backoff; SyncLog tetap append-only history. Enqueue tidak pernah
  * melempar — mutasi central sudah commit dan tidak boleh gagal karenanya.
+ * Pasca-dispatch, job yang berhasil di-settle SUCCESS (settleDispatchedSyncJobs)
+ * supaya tick auto-retry tidak mendorong nilai yang sama dua kali.
  */
 export async function pushVariantStockToOthers(
   variantId: string,
@@ -122,7 +124,11 @@ export async function pushVariantStockToOthers(
 
   const newStock = effectiveStock(variant.stock, variant.safetyStock);
   await enqueueSyncJobs(variantId, targets, newStock);
-  await syncStockToMarketplaces(targets, newStock);
+  const results = await syncStockToMarketplaces(targets, newStock);
+  // Push baris ini sudah dieksekusi di atas → tutup SyncJob-nya (nilai yang
+  // sama jangan didorong ulang oleh tick auto-retry). Yang gagal tetap PENDING
+  // dan diserahkan ke processDueSyncJobs().
+  await settleDispatchedSyncJobs(variantId, newStock, results);
 }
 
 /**
