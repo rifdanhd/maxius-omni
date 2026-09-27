@@ -247,6 +247,117 @@ export async function getShopInfo(accessToken: string, shopId: string | number, 
 
 export type ShopeeItemSummary = { item_id: number; item_status?: string };
 
+// ===== A5 — guard API order: rate window + batch cap (dipakai ingest M8b) =====
+
+export class ShopeeRateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ShopeeRateLimitError";
+  }
+}
+
+function envInt(name: string, def: number): number {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : def;
+}
+
+/** Hitungan request order API per token dalam jendela geser (in-memory). */
+const orderApiHits = new Map<string, number[]>();
+
+function checkOrderRateWindow(accessToken: string): void {
+  const max = envInt("SHOPEE_ORDER_RATE_MAX", 30);
+  const windowMs = envInt("SHOPEE_ORDER_RATE_WINDOW_MS", 10_000);
+  const now = Date.now();
+  const hits = (orderApiHits.get(accessToken) ?? []).filter((t) => now - t < windowMs);
+  if (hits.length >= max) {
+    orderApiHits.set(accessToken, hits);
+    throw new ShopeeRateLimitError(
+      `rate limit order API: ${max} request / ${windowMs}ms terlampaui — jeda lalu coba lagi.`
+    );
+  }
+  hits.push(now);
+  orderApiHits.set(accessToken, hits);
+}
+
+export type ShopeeOrderSummary = {
+  order_sn: string;
+  order_status: string;
+  create_time?: number;
+  update_time?: number;
+};
+
+/**
+ * getOrderList — /api/v2/order/get_order_list (daftar order + status terkini).
+ * Guard A5: rate window per token. Pemanggil WAJIB membatasi halaman
+ * (SHOPEE_ORDER_MAX_PAGES) supaya tarikan tidak tak-berujung pada has_more
+ * yang tidak pernah habis.
+ */
+export async function getOrderList(
+  accessToken: string,
+  shopId: string | number,
+  opts: {
+    offset?: number;
+    pageSize?: number;
+    createTimeFrom?: number;
+    createTimeTo?: number;
+    orderStatus?: string[];
+  } = {},
+  creds?: ShopeeCreds
+): Promise<{
+  orders: ShopeeOrderSummary[];
+  hasMore: boolean;
+  nextOffset: number;
+  totalCount: number | null;
+}> {
+  checkOrderRateWindow(accessToken);
+  const { offset = 0, pageSize = 50, createTimeFrom, createTimeTo, orderStatus } = opts;
+  const body: Record<string, unknown> = { pagination: { offset, page_size: pageSize } };
+  if (createTimeFrom || createTimeTo) {
+    body.time_range = {
+      ...(createTimeFrom ? { create_time_from: createTimeFrom } : {}),
+      ...(createTimeTo ? { create_time_to: createTimeTo } : {}),
+    };
+  }
+  if (orderStatus && orderStatus.length > 0) body.order_status = orderStatus;
+  const r = await postShopApi("/api/v2/order/get_order_list", accessToken, shopId, body, creds);
+  const orders = (r.order_list as ShopeeOrderSummary[] | undefined) ?? [];
+  return {
+    orders,
+    hasMore: r.has_more === true,
+    nextOffset: offset + orders.length,
+    totalCount: r.total_count !== undefined && r.total_count !== null ? Number(r.total_count) : null,
+  };
+}
+
+/**
+ * getOrderDetail — /api/v2/order/get_order_detail (detail per order_sn).
+ * Guard A5: rate window per token + otomatis pecah batch
+ * (SHOPEE_ORDER_DETAIL_BATCH, default 50 order_sn per panggilan).
+ */
+export async function getOrderDetail(
+  accessToken: string,
+  shopId: string | number,
+  orderSns: string[],
+  creds?: ShopeeCreds
+): Promise<Array<Record<string, unknown>>> {
+  const sns = [...new Set(orderSns.filter(Boolean))];
+  if (sns.length === 0) return [];
+  const batchSize = envInt("SHOPEE_ORDER_DETAIL_BATCH", 50);
+  const out: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < sns.length; i += batchSize) {
+    checkOrderRateWindow(accessToken);
+    const r = await postShopApi(
+      "/api/v2/order/get_order_detail",
+      accessToken,
+      shopId,
+      { order_sn_list: sns.slice(i, i + batchSize) },
+      creds
+    );
+    out.push(...((r.order_list as Array<Record<string, unknown>> | undefined) ?? []));
+  }
+  return out;
+}
+
 export async function getItemList(
   accessToken: string,
   shopId: string | number,

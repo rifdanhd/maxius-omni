@@ -12,6 +12,7 @@ import {
   restoreStockForCanceledOrder,
 } from "@/lib/services/central-stock.service";
 import { logOrphanSku } from "@/lib/services/sync-log.util";
+import { withAccountPullLock } from "@/lib/services/account-pull-lock.service";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -76,11 +77,11 @@ function toDate(epochSec: number | undefined): Date | null {
 }
 
 /**
- * resolveVariantId — hubungkan channelSku (sku_id produk TikTok) ke varian
- * via ProductMapping akun ini. Null bila belum di-mapping (SKU boleh kosong;
- * line item tetap disimpan dengan identifier eksternal product_id/sku_id).
+ * resolveVariantId — hubungkan channelSku ke varian via ProductMapping akun
+ * ini. Null bila belum di-mapping (SKU boleh kosong; line item tetap
+ * disimpan dengan identifier eksternal). Dipakai juga oleh ingest Shopee.
  */
-async function resolveVariantId(
+export async function resolveVariantId(
   prisma: PrismaLike,
   accountId: string,
   channelSku: string
@@ -167,6 +168,14 @@ async function syncShipments(
 export async function syncOrdersTikTok(
   accountId: string,
   prisma: PrismaLike = defaultPrisma
+) {
+  // A3 — anti double-pull per akun (klik sync dobel / retry paralel).
+  return withAccountPullLock(accountId, () => syncOrdersTikTokInner(accountId, prisma));
+}
+
+async function syncOrdersTikTokInner(
+  accountId: string,
+  prisma: PrismaLike
 ) {
   const account = await prisma.platformAccount.findUnique({
     where: { id: accountId },

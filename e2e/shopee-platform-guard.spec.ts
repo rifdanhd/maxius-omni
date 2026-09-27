@@ -120,13 +120,16 @@ test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan
   expect(rec.status()).toBe(400);
   expect((await rec.json()).code).toBe('unsupported_platform');
 
-  // Sync order — akun Shopee tidak pernah masuk loop ingest TikTok.
+  // Sync order — akun Shopee masuk lewat cabang SHOPEE (M8b), bukan ingest TikTok:
+  // buktinya pesan error cabang Shopee (tanpa shop_cipher) & tanpa panggilan jaringan.
   const sync = await page.request.post('/api/orders/sync', { headers: auth });
   expect(sync.status()).toBe(200);
   const syncBody = await sync.json();
-  const resultIds = (syncBody.results as Array<{ accountId: string }>).map((r) => r.accountId);
-  expect(resultIds).not.toContain(ACCT_S);
-  expect(resultIds).toContain(ACCT_T);
+  const syncResults = syncBody.results as Array<{ accountId: string; error?: string }>;
+  expect(syncResults.map((r) => r.accountId)).toContain(ACCT_T);
+  const shopeeResult = syncResults.find((r) => r.accountId === ACCT_S);
+  expect(shopeeResult?.error).toContain('access token');
+  expect(shopeeResult?.error).not.toContain('shop_cipher');
 
   // Regresi jalur TikTok (semua berhenti lokal — tanpa panggilan jaringan):
   const ttDetail = await page.request.get(`/api/orders/${ORD_T}`, { headers: auth });
