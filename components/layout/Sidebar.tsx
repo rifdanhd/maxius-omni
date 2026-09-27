@@ -175,15 +175,30 @@ export default function Sidebar() {
     router.push("/login");
   }
 
-  const toggleGroup = useCallback((key: string) => {
-    if (collapsed) setCollapsed(false);
-    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, [collapsed]);
-
   const isItemActive = useCallback((item: MenuItem) => {
     if (isMenuLink(item)) return pathname === item.href;
     return item.children.some((c) => c.href === pathname);
   }, [pathname]);
+
+  // Grup yang berisi rute aktif dianggap terbuka (kecuali sudah diklik manual).
+  // Deep-link (mis. KPI Stok Mismatch → /inventory/mismatch) tidak terjebak
+  // submenu yang collapse.
+  const isGroupOpen = useCallback((key: string) => {
+    const item = MENU.find((i) => i.key === key);
+    if (!item || !isMenuGroup(item)) return false;
+    return isItemActive(item);
+  }, [isItemActive]);
+
+  const toggleGroup = useCallback((key: string) => {
+    // Dari sidebar collapse: klik = ekspansi, paksa grup terbuka supaya
+    // submenu rute aktif ikut tampil (default-nya sudah "open", jangan di-toggle).
+    if (collapsed) {
+      setCollapsed(false);
+      setOpenGroups((prev) => ({ ...prev, [key]: true }));
+      return;
+    }
+    setOpenGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? isGroupOpen(key)) }));
+  }, [collapsed, isGroupOpen]);
 
   const platformActive = useCallback((href: string) => {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -216,7 +231,7 @@ export default function Sidebar() {
           {MENU.map((item) => {
             const hasChildren = isMenuGroup(item);
             const active = isItemActive(item);
-            const open = (openGroups[item.key] ?? false) && !collapsed;
+            const open = (openGroups[item.key] ?? isGroupOpen(item.key)) && !collapsed;
 
             const buttonContent = (
               <span className={`flex items-center ${collapsed ? 'justify-center w-full' : 'gap-3 w-full'}`}>

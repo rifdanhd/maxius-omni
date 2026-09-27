@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ChevronDown, ChevronUp, Check, Info } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { authFetch } from "@/lib/utils/api-client";
@@ -148,7 +149,7 @@ export default function DashboardPage() {
         <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ActionCard title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
           <ActionCard title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} />
-          <ActionCard title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} />
+          <ActionCard title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} href="/inventory/mismatch" />
           <ActionCard title="Sync Error (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} />
         </div>
         {opsKpi && opsKpi.storeHealth.length > 0 && (
@@ -362,9 +363,18 @@ export default function DashboardPage() {
   );
 }
 
-function ActionCard({ title, value }: { title: string, value: string }) {
+function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
+  const cls = "border border-gray-200 rounded-lg p-4 bg-white flex flex-col justify-between h-[100px] hover:border-emerald-500 transition-colors cursor-pointer";
+  if (href) {
+    return (
+      <Link href={href} className={cls}>
+        <span className="text-sm font-semibold text-gray-800">{title}</span>
+        <span className="text-2xl font-bold text-blue-600">{value}</span>
+      </Link>
+    );
+  }
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white flex flex-col justify-between h-[100px] hover:border-emerald-500 transition-colors cursor-pointer">
+    <div className={cls}>
       <span className="text-sm font-semibold text-gray-800">{title}</span>
       <span className="text-2xl font-bold text-blue-600">{value}</span>
     </div>

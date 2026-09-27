@@ -1,10 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { login, sql, SHOT } from './helpers';
 
+test('M5b: kartu KPI Stok Mismatch di dashboard membuka halaman mismatch', async ({ page }) => {
+  await login(page);
+  await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 30_000 });
+  // KPI "Stok Mismatch" adalah Link ke /inventory/mismatch. Grup Inventori
+  // tidak aktif di /dashboard → link sidebar tidak di-DOM, hanya kartu KPI.
+  await page.getByRole('link', { name: 'Stok Mismatch' }).click();
+  await page.waitForURL('/inventory/mismatch', { timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Stok Mismatch' })).toBeVisible({ timeout: 30_000 });
+});
+
 test('F0: verifikasi runtime halaman Stok Mismatch + tombol Retry', async ({ page }) => {
   await login(page);
 
-  const navLink = page.getByRole('link', { name: 'Stok Mismatch' });
+  // Dipetakan ke <aside> sidebar: link global 'Stok Mismatch' juga cocok dengan
+  // kartu KPI dashboard (M5b), jadi tanpa scope ini cabang ekspansi di bawah
+  // tidak pernah terjalankan.
+  const navLink = page.locator('aside').getByRole('link', { name: 'Stok Mismatch' });
   if (!(await navLink.isVisible().catch(() => false))) {
     await page.getByRole('button', { name: 'Inventori', exact: true }).click();
   }
