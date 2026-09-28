@@ -1,0 +1,43 @@
+; maxius-omni.service — unit systemd utk Maxius Platform (next start).
+;
+; Instal (sekali saja, sesuaikan User/WorkingDirectory/PATH bila beda):
+;   sudo cp systemd/maxius-omni.service /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now maxius-omni
+;
+; PATH: samakan dgn `dirname $(command -v node)` di shell user aplikasi
+; (nvm: tambahkan direktori bin node, mis. /home/maxius/.nvm/versions/node/vXX/bin).
+
+[Unit]
+Description=Maxius Platform (Next.js 16, maxius.id)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=maxius
+Group=maxius
+WorkingDirectory=/home/maxius/maxius-platform
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+; Port DIPAKSA 3000 lewat -p (jangan set PORT lain di .env — unit & reverse
+; proxy memakai 3000). .env di WorkingDirectory dibaca Next saat start.
+ExecStart=/usr/bin/env node node_modules/.bin/next start -p 3000
+
+; Auto-restart: proses crash → dibuka lagi → instrumentation register() jalan
+; ulang (timer [SyncRetry] baru; globalThis guard mencegah dobel per proses).
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=maxius-omni
+
+; Opsional — kill-switch auto-retry tanpa edit kode (buka komentar):
+; Environment=SYNC_RETRY_DISABLED=true
+
+[Install]
+WantedBy=multi-user.target
