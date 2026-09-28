@@ -25,7 +25,7 @@ type PushParams = {
   newStock: number;
 };
 
-async function loadShopeeAccount(accountId: string) {
+export async function loadShopeeAccount(accountId: string) {
   return prisma.platformAccount.findUnique({
     where: { id: accountId },
     include: { appCredential: true },
@@ -36,7 +36,8 @@ function credsOf(account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccoun
   return resolveShopeeCreds(account.appCredential);
 }
 
-async function withRefreshedToken<T>(
+/** Dipakai juga oleh marketplace-shopee-import.service (pull listing → master). */
+export async function withRefreshedToken<T>(
   account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>,
   fn: (accessToken: string, shopId: string, creds: ShopeeCreds) => Promise<T>
 ): Promise<T> {

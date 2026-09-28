@@ -12,6 +12,8 @@ import {
   Loader2,
   PackageOpen,
   Filter,
+  Download,
+  X,
 } from "lucide-react";
 
 type ShopeeListingRow = {
@@ -33,6 +35,36 @@ type ListResponse = {
   page: number;
   pageSize: number;
   accounts: Array<{ id: string; label: string }>;
+};
+
+type ImportAccountResult = {
+  accountId: string;
+  label: string;
+  importedItems: number;
+  importedVariants: number;
+  existing: number;
+  orphan: number;
+  duplicate: number;
+  zeroStock: number;
+  itemsScanned: number;
+  hasMore: boolean;
+  error?: string;
+};
+
+type ImportResponse = {
+  ok: boolean;
+  error?: string;
+  accounts?: ImportAccountResult[];
+  totals?: {
+    importedItems: number;
+    importedVariants: number;
+    existing: number;
+    orphan: number;
+    duplicate: number;
+    zeroStock: number;
+    hasMore: boolean;
+    errors: number;
+  };
 };
 
 const PAGE_SIZE = 20;
@@ -79,6 +111,10 @@ export default function ShopeeMarketplacePage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [syncingAll, setSyncingAll] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importAccounts, setImportAccounts] = useState<string[]>([]);
+  const [importLimit, setImportLimit] = useState(100);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -159,6 +195,46 @@ export default function ShopeeMarketplacePage() {
     finally { setSyncingAll(false); }
   }
 
+  async function runImport() {
+    setImporting(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await authFetch("/api/marketplace/shopee/products/import", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountIds: importAccounts,
+          limit: importLimit,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as ImportResponse | null;
+      if (!res.ok || !data?.ok) throw new Error(data?.error ?? `Import gagal (${res.status}).`);
+      const totals = data.totals;
+      const detail = (data.accounts ?? [])
+        .map((a) => {
+          if (a.error) return `${a.label}: gagal — ${a.error}`;
+          return `${a.label}: +${a.importedItems} listing / ${a.importedVariants} SKU` +
+            (a.orphan > 0 ? `, ${a.orphan} orphan` : "") +
+            (a.duplicate > 0 ? `, ${a.duplicate} duplikat` : "");
+        })
+        .join(" · ");
+      const tail = totals && totals.zeroStock > 0
+        ? ` ${totals.zeroStock} SKU stok 0 — isi lewat Stok Masuk/Opname sebelum push.`
+        : "";
+      notify(
+        totals && totals.errors > 0 ? "error" : "success",
+        `Import selesai: ${totals?.importedItems ?? 0} listing, ${totals?.importedVariants ?? 0} SKU baru.${detail ? " " + detail : ""}${tail}`
+      );
+      setImportOpen(false);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      notify("error", e instanceof Error ? e.message : "Import gagal.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const pageNumbers: number[] = [];
   { const start = Math.max(1, Math.min(page - 2, totalPages - 4)); const end = Math.min(totalPages, start + 4); for (let i = start; i <= end; i++) pageNumbers.push(i); }
 
@@ -174,12 +250,106 @@ export default function ShopeeMarketplacePage() {
         </div>
       )}
 
+      {importOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Import Listing dari Shopee</h2>
+                <p className="text-xs text-gray-500">Tarik produk Shopee ke katalog Maxius</p>
+              </div>
+              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4 text-sm text-gray-600">
+              <ul className="space-y-1 rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-900">
+                <li>• 1 listing Shopee = 1 produk induk; tiap varian (model) = 1 SKU stok sendiri.</li>
+                <li>• SKU memakai <b>model_sku / item_sku</b> yang sama dengan yang terlihat di Seller Center, jadi order masuk langsung match.</li>
+                <li>• Listing yang SKU-nya sudah ter-mapping tidak disentuh (aman dijalankan berulang).</li>
+                <li>• Stok awal diambil dari Shopee bila tersedia; sisanya 0 dan dicatat di kartu stok — isi lewat <b>Stok Masuk</b>/<b>Opname</b> sebelum push.</li>
+                <li>• Gambar produk, harga, dan kategori belum ikut diimport.</li>
+              </ul>
+
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-600">Toko yang diimport</p>
+                {accounts.length === 0 ? (
+                  <p className="text-xs text-gray-400">Tidak ada akun Shopee terhubung.</p>
+                ) : (
+                  <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
+                    {accounts.map((a) => (
+                      <label key={a.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4"
+                          checked={importAccounts.includes(a.id)}
+                          onChange={(e) => setImportAccounts((prev) =>
+                            e.target.checked ? [...prev, a.id] : prev.filter((x) => x !== a.id)
+                          )}
+                        />
+                        <span className="truncate">{a.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {accounts.length > 0 && (
+                  <div className="mt-1.5 flex gap-3 text-xs">
+                    <button onClick={() => setImportAccounts(accounts.map((a) => a.id))} className="font-medium text-[#2a3a8c] hover:underline">Pilih semua</button>
+                    <button onClick={() => setImportAccounts([])} className="font-medium text-gray-500 hover:underline">Kosongkan</button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-600">Batas item per proses</p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={importLimit}
+                    onChange={(e) => setImportLimit(Number(e.target.value))}
+                    className="h-[38px] rounded-md border border-gray-300 bg-white px-3 text-sm outline-none cursor-pointer"
+                  >
+                    <option value={50}>50 listing</option>
+                    <option value={100}>100 listing</option>
+                    <option value={200}>200 listing</option>
+                    <option value={500}>500 listing</option>
+                  </select>
+                  <span className="text-xs text-gray-500">Bisa diulang sampai semua listing masuk.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-3">
+              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                Batal
+              </button>
+              <button
+                onClick={runImport}
+                disabled={importing || importAccounts.length === 0}
+                className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-50"
+              >
+                {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                {importing ? "Mengimport..." : "Mulai Import"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Produk Marketplace › Shopee</p>
           <h1 className="text-xl font-bold text-gray-900">Produk Shopee</h1>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => { setImportAccounts(accountFilter); setImportOpen(true); }}
+            disabled={accounts.length === 0 || importing}
+            title={accounts.length === 0 ? "Hubungkan akun Shopee dulu di Settings › Accounts." : "Tarik listing Shopee menjadi produk + varian + mapping di Maxius"}
+            className="flex items-center gap-2 rounded-md border border-[#2a3a8c] px-4 py-2 text-sm font-medium text-[#2a3a8c] hover:bg-blue-50 disabled:opacity-50"
+          >
+            <Download size={16} /> Import dari Shopee
+          </button>
           <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60">
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
@@ -279,7 +449,8 @@ export default function ShopeeMarketplacePage() {
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
                     <PackageOpen size={28} className="mx-auto mb-2" />
-                    Tidak ada produk Shopee ditemukan. Klik <b>&quot;Sync Semua&quot;</b> untuk menarik data dari Shopee.
+                    Tidak ada produk Shopee ditemukan. Klik <b>&quot;Import dari Shopee&quot;</b> untuk membuat produk + SKU dari listing toko
+                    (atau <b>&quot;Sync Semua&quot;</b> untuk memperbarui SKU yang sudah termapping).
                   </td>
                 </tr>
               ) : (
