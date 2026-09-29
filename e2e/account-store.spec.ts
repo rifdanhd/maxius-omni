@@ -38,7 +38,7 @@ test('daftar toko: baris tampil dengan platform, status & brand yang benar', asy
   await page.screenshot({ path: SHOT('list') });
 });
 
-test('modal Tambah Marketplace: 6 kartu, Shopee langsung authorize, Lazada "segera hadir"', async ({
+test('modal Tambah Marketplace: 2 kartu (Shopee logo resmi + TikTok Shop), sisanya dihapus', async ({
   page,
 }) => {
   await login(page);
@@ -50,12 +50,21 @@ test('modal Tambah Marketplace: 6 kartu, Shopee langsung authorize, Lazada "sege
   await page.getByRole('button', { name: 'Tambahkan Marketplace' }).click();
   await expect(page.getByRole('heading', { name: 'Pilih Marketplace' })).toBeVisible();
 
-  // 4 marketplace + 2 online store.
-  for (const name of ['Shopee', 'Lazada', 'TikTok Shop', 'Blibli', 'Shopify', 'WooCommerce']) {
+  // Lazada, Blibli, Shopify & WooCommerce sudah dihapus dari modal.
+  for (const name of ['Lazada', 'Blibli', 'Shopify', 'WooCommerce']) {
+    await expect(page.getByRole('button', { name })).toHaveCount(0);
+  }
+
+  // Hanya 2 kartu: Shopee + TikTok Shop.
+  for (const name of ['Shopee', 'TikTok Shop']) {
     // exact: false — kartu TikTok membawa <img alt="TikTok Shop"> sehingga
     // accessible name-nya jadi "TikTok Shop TikTok Shop".
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
+  // Shopee: ikon = logo brand asli (path fill #EE4D2D), bukan ikon lucide.
+  await expect(
+    page.getByRole('button', { name: 'Shopee' }).locator('svg path[fill="#EE4D2D"]')
+  ).toBeVisible();
   await page.screenshot({ path: SHOT('modal') });
 
   // Shopee: app ISV sudah approved → TANPA konfirmasi, langsung navigasi ke
@@ -72,21 +81,6 @@ test('modal Tambah Marketplace: 6 kartu, Shopee langsung authorize, Lazada "sege
   await expect(page.getByText('Yakin authorize toko Shopee?')).toHaveCount(0);
   await page.waitForURL('**/settings/accounts?success=e2e-oauth-intercepted', { timeout: 15_000 });
   expect(page.url()).not.toBe(urlSebelum);
-
-  // Kembali ke modal untuk cek Lazada.
-  await page.goto('/settings/accounts');
-  await expect(
-    page.getByRole('heading', { name: 'Tambahkan Semua Toko Marketplace kamu' })
-  ).toBeVisible({ timeout: 30_000 });
-  const urlLazada = page.url();
-  await page.getByRole('button', { name: 'Tambahkan Marketplace' }).click();
-  await expect(page.getByRole('heading', { name: 'Pilih Marketplace' })).toBeVisible();
-
-  // Lazada: integrasi belum tersedia → toast, tanpa navigasi.
-  await page.getByRole('button', { name: 'Lazada' }).click();
-  await expect(page.getByText('Integrasi Lazada segera hadir')).toBeVisible();
-  expect(page.url()).toBe(urlLazada);
-  await page.screenshot({ path: SHOT('toast-lazada') });
 });
 
 test('hapus toko lewat UI: konfirmasi → baris hilang → data terhapus dari DB', async ({ page }) => {

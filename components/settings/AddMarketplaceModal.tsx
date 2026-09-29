@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { X, ShoppingBag, Store, ShoppingCart } from "lucide-react";
 import TikTokLogo from "@/components/icons/TikTokLogo";
+import ShopeeLogo from "@/components/icons/ShopeeLogo";
+import { X } from "lucide-react";
 import { getActiveBusinessId } from "@/lib/utils/api-client";
 
 type PlatformConfig = {
@@ -12,45 +12,21 @@ type PlatformConfig = {
 };
 
 export default function AddMarketplaceModal({ onClose }: { onClose: () => void }) {
-  const [toast, setToast] = useState<string | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  const showToast = (message: string) => {
-    setToast(message);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setToast(null), 2500);
-  };
-
-  const handleConnect = (platform: string, authorizePath?: string) => {
+  const handleConnect = (authorizePath?: string) => {
     // Guard Shopee ISV sudah tidak diperlukan: app ISV telah disetujui Shopee
     // (flag server SHOPEE_AUTHORIZE_ENABLED di .env tetap sbg kill-switch admin).
-    if (authorizePath) {
-      // Bawa brand aktif: akun baru dibuat di brand ini (callback).
-      const sep = authorizePath.includes("?") ? "&" : "?";
-      window.location.assign(
-        `${authorizePath}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
-      );
-      return;
-    }
-    showToast(`Integrasi ${platform} segera hadir`);
+    if (!authorizePath) return;
+    // Bawa brand aktif: akun baru dibuat di brand ini (callback).
+    const sep = authorizePath.includes("?") ? "&" : "?";
+    window.location.assign(
+      `${authorizePath}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
+    );
   };
 
+  // Lazada, Blibli, Shopify & WooCommerce dihapus dari modal (belum didukung).
   const marketplaces: PlatformConfig[] = [
-    { name: "Shopee", icon: <ShoppingBag size={24} className="text-orange-500" />, authorizePath: "/api/auth/shopee/authorize" },
-    { name: "Lazada", icon: <ShoppingCart size={24} className="text-blue-500" /> },
+    { name: "Shopee", icon: <ShopeeLogo size={24} />, authorizePath: "/api/auth/shopee/authorize" },
     { name: "TikTok Shop", icon: <TikTokLogo size={14} />, authorizePath: "/api/auth/tiktok/authorize" },
-    { name: "Blibli", icon: <ShoppingBag size={24} className="text-blue-400" /> },
-  ];
-
-  const onlineStores: PlatformConfig[] = [
-    { name: "Shopify", icon: <Store size={24} className="text-green-600" /> },
-    { name: "WooCommerce", icon: <ShoppingCart size={24} className="text-purple-600" /> },
   ];
 
   return (
@@ -69,42 +45,21 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
 
         {/* Body */}
         <div className="p-6">
-          <div className="mb-6">
+          <div>
             <h3 className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-4">Marketplace</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {marketplaces.map((item) => (
                 <PlatformCard
                   key={item.name}
                   name={item.name}
                   icon={item.icon}
-                  onClick={() => handleConnect(item.name, item.authorizePath)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-4">Online Store</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {onlineStores.map((item) => (
-                <PlatformCard
-                  key={item.name}
-                  name={item.name}
-                  icon={item.icon}
-                  onClick={() => handleConnect(item.name, item.authorizePath)}
+                  onClick={() => handleConnect(item.authorizePath)}
                 />
               ))}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white text-sm font-medium px-5 py-3 rounded-lg shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
