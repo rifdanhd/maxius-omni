@@ -12,6 +12,11 @@ import PickupSuccessModal from "./PickupSuccessModal";
 import PrintMethodModal from "./PrintMethodModal";
 import { PackageCheck } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataCard } from "@/components/ui/data-card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 20;
 
@@ -736,49 +741,51 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="p-8 font-sans h-full flex flex-col">
+    <div className="p-6 font-sans h-full flex flex-col">
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Pesanan</h1>
-        <div className="flex items-center gap-3">
-          <button className="w-10 h-10 border border-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50 bg-white">
-            <Archive size={18} />
-          </button>
-          <button className="w-10 h-10 border border-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50 bg-white">
-            <Mail size={18} />
-          </button>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Menyinkronkan..." : "Sync Pesanan"}
-          </button>
-          <button
-            onClick={handleReconcile}
-            disabled={reconciling}
-            className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={16} className={reconciling ? "animate-spin" : ""} />
-            {reconciling ? "Menyinkronkan Resi..." : "Sync Resi"}
-          </button>
-          <button
-            onClick={handleExportVisible}
-            className="px-4 py-2 border border-gray-200 rounded-lg flex items-center gap-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 bg-white"
-          >
-            Unduh CSV <ChevronDown size={16} />
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Pesanan"
+        description="Kelola pesanan dari semua marketplace — sync, proses pengiriman, cetak label/resi."
+        action={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Arsip">
+              <Archive size={18} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Email">
+              <Mail size={18} />
+            </Button>
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              className="gap-2"
+            >
+              <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Menyinkronkan..." : "Sync Pesanan"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="gap-2 text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+            >
+              <RefreshCw size={16} className={reconciling ? "animate-spin" : ""} />
+              {reconciling ? "Menyinkronkan Resi..." : "Sync Resi"}
+            </Button>
+            <Button variant="outline" onClick={handleExportVisible} className="gap-2">
+              Unduh CSV <ChevronDown size={16} />
+            </Button>
+          </div>
+        }
+      />
 
       {/* Main Card */}
-      <div className="bg-white border border-gray-200 rounded-xl flex-1 flex flex-col overflow-hidden shadow-sm">
-
+      <DataCard
+        className="flex-1 flex flex-col overflow-hidden min-h-0"
+        contentClassName="flex-1 flex flex-col overflow-hidden p-0"
+      >
         {/* Tabs */}
-        <div className="flex items-center overflow-x-auto border-b border-gray-200 px-4">
+        <div className="flex items-center overflow-x-auto border-b border-gray-200 px-4 bg-white">
           {TABS.map((tab) => {
-            // Hitung jumlah pesanan dari counts
             const count = tab.statuses === null
               ? Object.values(counts).reduce((a, b) => a + b, 0)
               : (tab.statuses ?? []).reduce((acc, s) => acc + (counts[s] ?? 0), 0);
@@ -786,7 +793,7 @@ export default function OrdersPage() {
               <button
                 key={tab.id}
                 onClick={() => handleTab(tab.id)}
-                className={`whitespace-nowrap px-4 py-4 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
                   activeTab === tab.id
                     ? "border-indigo-600 text-indigo-600"
                     : "border-transparent text-gray-600 hover:text-gray-900"
@@ -794,11 +801,7 @@ export default function OrdersPage() {
               >
                 {tab.label}
                 {count > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    activeTab === tab.id ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600"
-                  }`}>
-                    {count}
-                  </span>
+                  <StatusBadge status={activeTab === tab.id ? "info" : "inactive"} label={String(count)} className="text-[10px] px-1.5 py-0.5" />
                 )}
               </button>
             );
@@ -807,7 +810,7 @@ export default function OrdersPage() {
 
         {/* Sub-Tabs (hanya untuk tab tertentu) */}
         {currentSubTabs && (
-          <div className="flex items-center gap-0 border-b border-gray-100 px-6 bg-gray-50/50">
+          <div className="flex items-center gap-0 border-b border-gray-100 px-4 bg-gray-50/50">
             {currentSubTabs.map((sub) => {
               const subCount = sub.id === "all"
                 ? (currentTab.statuses ?? []).reduce((acc, s) => acc + (counts[s] ?? 0), 0)
@@ -816,18 +819,14 @@ export default function OrdersPage() {
                 <button
                   key={sub.id}
                   onClick={() => handleSubTab(sub.id)}
-                  className={`whitespace-nowrap px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                  className={`whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
                     activeSubTab === sub.id
                       ? "border-indigo-600 text-indigo-700"
                       : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   {sub.label}
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    activeSubTab === sub.id ? "bg-indigo-100 text-indigo-600" : "bg-gray-200 text-gray-500"
-                  }`}>
-                    {subCount}
-                  </span>
+                  <StatusBadge status={activeSubTab === sub.id ? "info" : "inactive"} label={String(subCount)} className="text-[10px] px-1.5 py-0.5" />
                 </button>
               );
             })}
@@ -835,31 +834,30 @@ export default function OrdersPage() {
         )}
 
         {/* Filter Row */}
-        <div className="p-4 border-b border-gray-100 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-gray-100 flex items-center gap-3 flex-wrap bg-white">
           <div className="flex bg-white border border-gray-200 rounded-lg h-10 flex-1 max-w-xl relative">
             {/* Keyword type dropdown */}
             <div className="relative" ref={searchTypeRef}>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setSearchTypeOpen((v) => !v)}
                 className="h-full px-3 bg-gray-50 border-r border-gray-200 text-sm text-gray-700 font-medium flex items-center gap-1.5 hover:bg-gray-100 min-w-[130px] rounded-l-lg"
               >
                 <span>{searchType.label}</span>
                 <ChevronDown size={13} className="ml-auto text-gray-400" />
-              </button>
+              </Button>
               {searchTypeOpen && (
                 <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-1.5">
                   {SEARCH_TYPES.map((type) => (
-                    <button
+                    <Button
                       key={type.id}
+                      variant="ghost"
+                      className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 justify-start"
                       onClick={() => { setSearchType(type); setSearchTypeOpen(false); setSearchInput(""); setQ(""); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${
-                        searchType.id === type.id
-                          ? "font-bold text-indigo-600"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
                     >
                       {type.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}
@@ -926,12 +924,13 @@ export default function OrdersPage() {
           </div>
 
           {hasActiveFilters && (
-            <button
+            <Button
+              variant="outline"
               onClick={handleClearFilters}
-              className="h-10 px-4 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 bg-white flex items-center gap-2 hover:bg-gray-50"
+              className="h-10 gap-2 text-gray-600"
             >
               <Filter size={16} /> Reset
-            </button>
+            </Button>
           )}
         </div>
 
@@ -984,23 +983,25 @@ export default function OrdersPage() {
             <span>Total pesanan</span>
             {pageCount > 1 && (
               <div className="flex items-center gap-1">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="px-2 py-1 border border-gray-200 rounded-md text-xs font-semibold disabled:opacity-40 enabled:hover:bg-gray-100 bg-white"
                 >
                   Sebelumnya
-                </button>
+                </Button>
                 <span className="px-2 text-xs">
                   Hal {page} / {pageCount}
                 </span>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                   disabled={page >= pageCount}
-                  className="px-2 py-1 border border-gray-200 rounded-md text-xs font-semibold disabled:opacity-40 enabled:hover:bg-gray-100 bg-white"
                 >
                   Berikutnya
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1009,11 +1010,37 @@ export default function OrdersPage() {
         {/* Orders List */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-gray-500">Memuat pesanan...</div>
+            <div className="space-y-3" aria-busy="true">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-28 rounded-xl bg-white border border-gray-200 animate-pulse"
+                  style={{ animationDelay: `${i * 80}ms` }}
+                />
+              ))}
+            </div>
           ) : error ? (
-            <div className="flex items-center justify-center h-full text-red-600">{error}</div>
+            <EmptyState
+              icon={<RefreshCw size={40} />}
+              title="Gagal memuat pesanan"
+              description={error}
+              action={
+                <Button variant="outline" onClick={refreshList} className="gap-2">
+                  <RefreshCw size={14} /> Coba lagi
+                </Button>
+              }
+            />
           ) : orders.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500">Tidak ada pesanan.</div>
+            <EmptyState
+              icon={<PackageCheck size={40} />}
+              title="Tidak ada pesanan"
+              description="Belum ada pesanan pada filter ini. Coba ganti tab/status, ubah kata kunci, atau jalankan Sync Pesanan."
+              action={
+                <Button variant="outline" onClick={handleSync} disabled={syncing} className="gap-2">
+                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Sync Pesanan
+                </Button>
+              }
+            />
           ) : (
             orders.map((order) => (
               <OrderCard
@@ -1050,7 +1077,7 @@ export default function OrdersPage() {
             ))
           )}
         </div>
-      </div>
+      </DataCard>
 
       {/* Modal Alur Pengiriman */}
       {pickupTargets && (
