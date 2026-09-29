@@ -38,7 +38,7 @@ test('daftar toko: baris tampil dengan platform, status & brand yang benar', asy
   await page.screenshot({ path: SHOT('list') });
 });
 
-test('modal Tambah Marketplace: 6 kartu, Lazada "segera hadir", Shopee wajib konfirmasi', async ({
+test('modal Tambah Marketplace: 6 kartu, Shopee langsung authorize, Lazada "segera hadir"', async ({
   page,
 }) => {
   await login(page);
@@ -58,18 +58,34 @@ test('modal Tambah Marketplace: 6 kartu, Lazada "segera hadir", Shopee wajib kon
   }
   await page.screenshot({ path: SHOT('modal') });
 
-  // Shopee: app ISV belum live → muncul konfirmasi, BATAL tidak menavigasi.
-  await page.getByRole('button', { name: 'Shopee' }).click();
-  await expect(page.getByText('Yakin authorize toko Shopee?')).toBeVisible();
+  // Shopee: app ISV sudah approved → TANPA konfirmasi, langsung navigasi ke
+  // authorize (OAuth di-intercept agar test tidak keluar ke shopee.com).
+  await page.route('**/api/auth/shopee/authorize*', async (route) => {
+    await route.fulfill({
+      status: 302,
+      headers: { location: '/settings/accounts?success=e2e-oauth-intercepted' },
+      body: '',
+    });
+  });
   const urlSebelum = page.url();
-  await page.getByRole('button', { name: 'Batal' }).click();
+  await page.getByRole('button', { name: 'Shopee' }).click();
   await expect(page.getByText('Yakin authorize toko Shopee?')).toHaveCount(0);
-  expect(page.url()).toBe(urlSebelum);
+  await page.waitForURL('**/settings/accounts?success=e2e-oauth-intercepted', { timeout: 15_000 });
+  expect(page.url()).not.toBe(urlSebelum);
+
+  // Kembali ke modal untuk cek Lazada.
+  await page.goto('/settings/accounts');
+  await expect(
+    page.getByRole('heading', { name: 'Tambahkan Semua Toko Marketplace kamu' })
+  ).toBeVisible({ timeout: 30_000 });
+  const urlLazada = page.url();
+  await page.getByRole('button', { name: 'Tambahkan Marketplace' }).click();
+  await expect(page.getByRole('heading', { name: 'Pilih Marketplace' })).toBeVisible();
 
   // Lazada: integrasi belum tersedia → toast, tanpa navigasi.
   await page.getByRole('button', { name: 'Lazada' }).click();
   await expect(page.getByText('Integrasi Lazada segera hadir')).toBeVisible();
-  expect(page.url()).toBe(urlSebelum);
+  expect(page.url()).toBe(urlLazada);
   await page.screenshot({ path: SHOT('toast-lazada') });
 });
 

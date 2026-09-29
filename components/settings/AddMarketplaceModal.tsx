@@ -13,7 +13,6 @@ type PlatformConfig = {
 
 export default function AddMarketplaceModal({ onClose }: { onClose: () => void }) {
   const [toast, setToast] = useState<string | null>(null);
-  const [confirmShopee, setConfirmShopee] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -29,13 +28,8 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
   };
 
   const handleConnect = (platform: string, authorizePath?: string) => {
-    // Guard Shopee: app ISV masih under review — wajib konfirmasi manual
-    // sebelum authorize apa pun (server juga memblokir via flag
-    // SHOPEE_AUTHORIZE_ENABLED sampai ISV approved).
-    if (platform === "Shopee" && authorizePath && !confirmShopee) {
-      setConfirmShopee(true);
-      return;
-    }
+    // Guard Shopee ISV sudah tidak diperlukan: app ISV telah disetujui Shopee
+    // (flag server SHOPEE_AUTHORIZE_ENABLED di .env tetap sbg kill-switch admin).
     if (authorizePath) {
       // Bawa brand aktif: akun baru dibuat di brand ini (callback).
       const sep = authorizePath.includes("?") ? "&" : "?";
@@ -75,29 +69,6 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
 
         {/* Body */}
         <div className="p-6">
-          {confirmShopee && (
-            <div className="mb-6 border border-amber-300 bg-amber-50 rounded-xl p-4">
-              <h3 className="text-sm font-bold text-amber-800">Yakin authorize toko Shopee?</h3>
-              <p className="text-sm text-amber-700 mt-1">
-                App Shopee ISV kami masih dalam proses review. Jangan authorize toko apa pun
-                sebelum ISV disetujui — cukup tekan Batal bila tidak sengaja.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => setConfirmShopee(false)}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={() => handleConnect("Shopee", "/api/auth/shopee/authorize")}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#2a3a8c] text-white hover:bg-blue-900"
-                >
-                  Ya, lanjutkan authorize
-                </button>
-              </div>
-            </div>
-          )}
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-4">Marketplace</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
