@@ -14,6 +14,8 @@ type BaseNavItem = {
   title: string
   badge?: string
   icon?: React.ElementType
+  /** Sembunyikan dari navigasi (sidebar & command menu) tanpa menghapus rute. */
+  hidden?: boolean
 }
 
 type NavLink = BaseNavItem & {

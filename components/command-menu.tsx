@@ -36,7 +36,7 @@ export function CommandMenu() {
           <CommandEmpty>No results found.</CommandEmpty>
           {sidebarData.navGroups.map((group) => (
             <CommandGroup key={group.title} heading={group.title}>
-              {group.items.map((navItem, i) => {
+              {group.items.filter((navItem) => !navItem.hidden).map((navItem, i) => {
                 if (navItem.url)
                   return (
                     <CommandItem
@@ -53,7 +53,7 @@ export function CommandMenu() {
                     </CommandItem>
                   )
 
-                return navItem.items?.map((subItem, i) => (
+                return navItem.items?.filter((subItem) => !subItem.hidden)?.map((subItem, i) => (
                   <CommandItem
                     key={`${navItem.title}-${subItem.url}-${i}`}
                     value={`${navItem.title}-${subItem.url}`}

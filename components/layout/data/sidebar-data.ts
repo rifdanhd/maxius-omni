@@ -52,10 +52,18 @@ export const sidebarData: SidebarData = {
             { title: 'Kelola Harga', url: '/products/prices', icon: Tag },
             { title: 'Kelola Gambar', url: '/products/images', icon: GalleryVerticalEnd },
             { title: 'Product Copy', url: '/products/copy', icon: ClipboardList },
-            { title: 'Produk Marketplace', url: '/products/marketplace', icon: Compass },
+          ],
+        },
+        {
+          // Dropdown collapsible (pola sama dgn "Pengaturan"). Halaman
+          // /products/marketplace tidak ada (404) → tidak ada item "Semua Produk".
+          title: 'Produk Marketplace',
+          icon: Compass,
+          items: [
             { title: 'Shopee', url: '/products/marketplace/shopee', icon: ShoppingBag },
             { title: 'TikTok Shop', url: '/products/marketplace/tiktok', icon: Compass },
-            { title: 'Tokopedia', url: '/products/marketplace/tokopedia', icon: Store },
+            // Scope OUT Paket 2 — rute tetap, disembunyikan dari navigasi.
+            { title: 'Tokopedia', url: '/products/marketplace/tokopedia', icon: Store, hidden: true },
           ],
         },
       ],
@@ -75,8 +83,10 @@ export const sidebarData: SidebarData = {
           ],
         },
         {
+          // Scope di luar MVP (PRD) — disembunyikan dari navigasi; rute /wms/* tetap ada.
           title: 'WMS',
           icon: Warehouse,
+          hidden: true,
           items: [
             { title: 'Inbound', url: '/wms/inbound', icon: ArrowDownToLine },
             { title: 'Outbound', url: '/wms/outbound', icon: ArrowUpToLine },
@@ -115,8 +125,10 @@ export const sidebarData: SidebarData = {
         { title: 'Log Aktivitas', url: '/logs', icon: ClipboardList },
         { title: 'Market', url: '/market', icon: Compass },
         {
+          // Placeholder — fungsinya sudah ada di Pengaturan Toko > Integrasi.
           title: 'Aplikasi',
           icon: Grid2x2,
+          hidden: true,
           items: [
             { title: 'Koneksi API', url: '/apps/api-connections', icon: Plug },
           ],
