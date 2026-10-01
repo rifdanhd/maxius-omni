@@ -4,8 +4,9 @@ import {
   Compass, Grid2x2, BookOpen,
   ArrowDownToLine, ArrowUpToLine,
   Receipt, Clock, Store, Plug, AlertTriangle,
-  Command, GalleryVerticalEnd,
+  GalleryVerticalEnd,
 } from 'lucide-react'
+import { MaxiusMark } from '@/components/icons/MaxiusLogo'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
@@ -17,7 +18,7 @@ export const sidebarData: SidebarData = {
   teams: [
     {
       name: 'Maxius',
-      logo: Command,
+      logo: MaxiusMark,
       plan: 'Platform',
     },
   ],
