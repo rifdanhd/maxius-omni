@@ -78,3 +78,35 @@ Scope teknis kalau dikerjakan: ingest webhook/poll TikTok Return API →
 update `Order.status` atau tulis StockLedger reason `ORDER_REFUNDED` via
 `restoreStockForCanceledOrder()`. Ini task kelas PHASE A (menyentuh mutasi +
 skema status), bukan sekadar fix report.
+
+## Logging Sync/Import Listing Shopee — Prioritas: Rendah
+
+Diagnosis kegagalan sync dari halaman Produk Marketplace › Shopee tidak bisa
+memakai journal atau SyncLog karena alur ini memang tidak menulis keduanya:
+
+- `syncShopeeListings` menangkap error per-akun lalu hanya mengembalikannya di
+  `results[].error` (`lib/services/marketplace-shopee.service.ts:301-310`) —
+  tidak ada `console.error` dan tidak ada baris SyncLog.
+- Route hanya meng-log bila error TOTAL (`app/api/marketplace/shopee/products/
+  sync/route.ts:11`); error per-akun tetap membalas HTTP 200 `{ok:true}`.
+- Import juga hanya menaruh pesan di `stats.error`
+  (`lib/services/marketplace-shopee-import.service.ts:187-189`).
+- `SyncLog` pada jalur Shopee hanya ditulis oleh push stok/harga
+  (`marketplace-shopee.service.ts:86,93,105,109,115`) — bukan listing sync.
+- `SyncJob` adalah antrean push stok, tidak terkait sync listing.
+
+Akibat: penyebab kegagalan live hanya terlihat dari toast UI (yang sebelum fix
+pun menelan `error`), sementara `journalctl -u maxius-omni` dan tabel
+`SyncLog`/`SyncJob` kosong untuk kasus ini.
+
+Kenapa ditunda: perbaikan Tahap 0 sesuai izin dibatasi ke toast UI saja —
+tanpa mengubah service/route/SyncLog.
+
+Keputusan sebelum implementasi:
+1. Cukup `console.error("[Shopee] sync listing", {account, error})` ke journal
+   (gratis, tanpa migrasi) atau tulis baris `SyncLog` (butuh kind baru mis.
+   `listing_sync` + keputusan retensi & isi payload)?
+2. Apakah error per-akun juga perlu balas non-200 (atau flag `ok:false`) supaya
+   monitoring bisa menghitung kegagalan tanpa mem-parse toast?
+3. Untuk import listing: apakah cukup journal, mengingat hasilnya sudah
+   terwakili di `ProductMapping.lastSyncedAt` + `StockLedger` reason `INIT`?
