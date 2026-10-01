@@ -37,6 +37,18 @@ type ListResponse = {
   accounts: Array<{ id: string; label: string }>;
 };
 
+// Kontrak POST /api/marketplace/shopee/products/sync — baris hasil per akun
+// (sync/route.ts → syncShopeeListings). Field lama `synced`/`notFound` tidak
+// pernah ada di respons sehingga toast selalu "undefined".
+type SyncAccountResult = {
+  accountId: string;
+  label: string;
+  items: number;
+  models: number;
+  matched: number;
+  error?: string;
+};
+
 type ImportAccountResult = {
   accountId: string;
   label: string;
@@ -187,10 +199,24 @@ export default function ShopeeMarketplacePage() {
       const res = await authFetch("/api/marketplace/shopee/products/sync", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Sync gagal.");
-      const accountsMsg = ((data.accounts as Array<{ label: string; synced: number; notFound: number }> ?? [])
-        .map((a) => `${a.label}: ${a.synced} update, ${a.notFound} tidak ditemukan`).join(" · ") ?? "");
-      notify("success", `Sync selesai${accountsMsg ? ": " + accountsMsg : ""}`);
+      const results = (data?.accounts ?? []) as SyncAccountResult[];
+      if (results.length === 0) {
+        notify(
+          "error",
+          "Brand aktif tidak punya akun Shopee — hubungkan toko dulu lewat Tambahkan Marketplace."
+        );
+        return;
+      }
       setRefreshKey((k) => k + 1);
+      const failed = results.filter((a) => a.error);
+      if (failed.length > 0) {
+        notify("error", failed.map((a) => `${a.label}: ${a.error}`).join(" · "));
+        return;
+      }
+      const okMsg = results
+        .map((a) => `${a.label}: ${a.items} item, ${a.models} varian, ${a.matched} ter-cocok`)
+        .join(" · ");
+      notify("success", `Sync selesai — ${okMsg}`);
     } catch (e) { notify("error", e instanceof Error ? e.message : "Sync gagal."); }
     finally { setSyncingAll(false); }
   }
