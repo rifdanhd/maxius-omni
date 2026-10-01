@@ -30,7 +30,7 @@ import { getCachedInventorySettings } from "@/lib/services/inventory-settings.se
 import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
 
 const PAGE_SIZE = 50;
-const MAX_PAGES = 20;
+const MAX_PAGES = 200;
 export const SHOPEE_IMPORT_DEFAULT_LIMIT = 100;
 export const SHOPEE_IMPORT_MAX_LIMIT = 500;
 
@@ -166,7 +166,7 @@ export async function importShopeeListings(params: {
           stats.hasMore = true;
           break;
         }
-        const { items, hasMore } = await withRefreshedToken(account, (token, shopId, creds) =>
+        const { items, hasNextPage, nextOffset } = await withRefreshedToken(account, (token, shopId, creds) =>
           getItemList(token, shopId, { offset, pageSize: PAGE_SIZE }, creds)
         );
         if (items.length === 0) break;
@@ -181,8 +181,8 @@ export async function importShopeeListings(params: {
         }
 
         if (batch.length < items.length) stats.hasMore = true;
-        if (!hasMore) break;
-        offset += PAGE_SIZE;
+        if (!hasNextPage || nextOffset <= offset) break;
+        offset = nextOffset;
       }
     } catch (e) {
       stats.error = e instanceof Error ? e.message : String(e);

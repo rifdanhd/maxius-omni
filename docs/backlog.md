@@ -110,3 +110,23 @@ Keputusan sebelum implementasi:
    monitoring bisa menghitung kegagalan tanpa mem-parse toast?
 3. Untuk import listing: apakah cukup journal, mengingat hasilnya sudah
    terwakili di `ProductMapping.lastSyncedAt` + `StockLedger` reason `INIT`?
+
+## Sinkron Listing Shopee Hanya Status NORMAL — Prioritas: Sedang
+
+Sejak `get_item_list` dikonversi ke GET, `item_status` ikut dikirim di query
+dengan default `["NORMAL"]` (`getItemList` di `lib/integrations/shopee.ts`).
+Konsekuensi produk (bukan teknis):
+
+- Listing berstatus UNLIST, BANNED, dan REVIEWING tidak ikut tersinkron ke
+  katalog master. Sync stok/harga (`syncShopeeListings`) dan import listing
+  hanya menjangkau listing NORMAL.
+- Shopee menerima satu `item_status` per panggilan — menarik semua status butuh
+  satu request per status (NORMAL, UNLIST, BANNED, REVIEWING), masing-masing
+  dengan paginasi sendiri.
+
+Keputusan sebelum implementasi:
+1. Cukup NORMAL saja (satu-satunya status yang bisa di-push stok/harga), atau
+   katalog memang harus memuat semua status?
+2. Bila semua status: iterasi `item_status` di loop paginasi
+   `syncShopeeListings` + `marketplace-shopee-import.service`, dan hitung ulang
+   batas halaman (cap kini 200 halaman per panggilan).

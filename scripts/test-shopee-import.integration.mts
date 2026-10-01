@@ -73,57 +73,46 @@ globalThis.fetch = (async (input: unknown, init?: unknown) => {
   if (pathname === "/api/v2/product/get_item_list") {
     fixture.listCalls += 1;
     if (fixture.failList) {
-      return {
-        ok: false,
-        status: 500,
-        json: async () => ({
-          error: "error_server",
-          message: "internal error",
-          request_id: "req-import-test",
-        }),
-      };
+      const raw = JSON.stringify({
+        error: "error_server",
+        message: "internal error",
+        request_id: "req-import-test",
+      });
+      return { ok: false, status: 500, text: async () => raw, json: async () => JSON.parse(raw) };
     }
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        response: {
-          item: fixture.items,
-          total_count: fixture.items.length,
-          has_more: fixture.hasMore,
-        },
-      }),
-    };
+    const raw = JSON.stringify({
+      response: {
+        item: fixture.items,
+        total_count: fixture.items.length,
+        has_more: fixture.hasMore,
+      },
+    });
+    return { ok: true, status: 200, text: async () => raw, json: async () => JSON.parse(raw) };
   }
   if (pathname === "/api/v2/product/get_item_base_info") {
-    const raw = (init as { body?: string } | undefined)?.body ?? "{}";
-    const body = JSON.parse(raw) as { item_id_list?: number[] };
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        response: {
-          item_list: (body.item_id_list ?? [])
-            .map((id) => fixture.info[id])
-            .filter(Boolean),
-        },
-      }),
-    };
+    const itemIds = (new URL(url).searchParams.get("item_id_list") ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map(Number);
+    const raw = JSON.stringify({
+      response: {
+        item_list: itemIds.map((id) => fixture.info[id]).filter(Boolean),
+      },
+    });
+    return { ok: true, status: 200, text: async () => raw, json: async () => JSON.parse(raw) };
   }
   if (pathname === "/api/v2/product/get_model_list") {
-    const raw = (init as { body?: string } | undefined)?.body ?? "{}";
-    const body = JSON.parse(raw) as { item_id?: number };
-    const m = fixture.models[Number(body.item_id)] ?? { model: [] };
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({ response: m }),
-    };
+    const itemId = new URL(url).searchParams.get("item_id");
+    const m = fixture.models[Number(itemId)] ?? { model: [] };
+    const raw = JSON.stringify({ response: m });
+    return { ok: true, status: 200, text: async () => raw, json: async () => JSON.parse(raw) };
   }
+  const notFound = JSON.stringify({ error: "error_path", message: pathname });
   return {
     ok: false,
     status: 404,
-    json: async () => ({ error: "error_path", message: pathname }),
+    text: async () => notFound,
+    json: async () => JSON.parse(notFound),
   };
 }) as typeof fetch;
 

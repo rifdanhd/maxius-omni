@@ -59,6 +59,47 @@ type ShopeeEnvelope = {
   response?: Record<string, unknown>;
 };
 
+function snippet(raw: string): string {
+  const t = raw.trim();
+  return t.length > 300 ? `${t.slice(0, 300)}…` : t;
+}
+
+export function parseShopeeEnvelope(
+  status: number,
+  raw: string,
+  apiPath: string
+): ShopeeEnvelope {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new ShopeeApiError(
+      `http_${status}`,
+      `HTTP ${status} dari ${apiPath} — body bukan JSON: ${snippet(raw)}`,
+      "-"
+    );
+  }
+  const env = (Array.isArray(parsed) ? parsed[0] : parsed) as ShopeeEnvelope | null | undefined;
+  if (!env || typeof env !== "object") {
+    throw new ShopeeApiError(
+      `http_${status}`,
+      `HTTP ${status} dari ${apiPath} — bentuk respons tak dikenal: ${snippet(raw)}`,
+      "-"
+    );
+  }
+  if (status < 200 || status >= 300) {
+    throw new ShopeeApiError(
+      env.error ?? `http_${status}`,
+      `${env.message ?? `HTTP ${status} dari ${apiPath}`} — body: ${snippet(raw)}`,
+      env.request_id ?? "-"
+    );
+  }
+  if (env.error) {
+    throw new ShopeeApiError(env.error, env.message ?? "-", env.request_id ?? "-");
+  }
+  return env;
+}
+
 async function postShopApi(
   apiPath: string,
   accessToken: string,
@@ -81,17 +122,8 @@ async function postShopApi(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = (await res.json().catch(() => ({}))) as ShopeeEnvelope;
-  if (!res.ok) {
-    throw new ShopeeApiError(
-      data.error ?? `http_${res.status}`,
-      data.message ?? `HTTP ${res.status} dari ${apiPath}`,
-      data.request_id ?? "-"
-    );
-  }
-  if (data.error) {
-    throw new ShopeeApiError(data.error, data.message ?? "-", data.request_id ?? "-");
-  }
+  const raw = await res.text();
+  const data = parseShopeeEnvelope(res.status, raw, apiPath);
   return (data.response ?? {}) as Record<string, unknown>;
 }
 
@@ -99,7 +131,8 @@ async function getShopApi(
   apiPath: string,
   accessToken: string,
   shopId: string | number,
-  creds?: ShopeeCreds
+  creds?: ShopeeCreds,
+  query?: Record<string, string | number | string[] | number[]>
 ): Promise<Record<string, unknown>> {
   const c = creds ?? envShopeeCreds();
   const timestamp = Math.floor(Date.now() / 1000);
@@ -111,15 +144,17 @@ async function getShopApi(
     shop_id: String(shopId),
     sign,
   });
-  const res = await fetch(`${SHOPEE_API_BASE}${apiPath}?${qs}`);
-  const data = (await res.json().catch(() => ({}))) as ShopeeEnvelope;
-  if (!res.ok || data.error) {
-    throw new ShopeeApiError(
-      data.error ?? `http_${res.status}`,
-      data.message ?? `HTTP ${res.status} dari ${apiPath}`,
-      data.request_id ?? "-"
-    );
+  for (const [k, v] of Object.entries(query ?? {})) {
+    if (Array.isArray(v)) {
+      // Dokumen Shopee: daftar dipisah koma (mis. item_id_list=1,2,3).
+      if (v.length > 0) qs.set(k, v.map(String).join(","));
+    } else {
+      qs.set(k, String(v));
+    }
   }
+  const res = await fetch(`${SHOPEE_API_BASE}${apiPath}?${qs}`);
+  const raw = await res.text();
+  const data = parseShopeeEnvelope(res.status, raw, apiPath);
   return (data.response ?? {}) as Record<string, unknown>;
 }
 
@@ -363,16 +398,39 @@ export async function getItemList(
   shopId: string | number,
   opts: { offset?: number; pageSize?: number; itemStatus?: string[] } = {},
   creds?: ShopeeCreds
-): Promise<{ items: ShopeeItemSummary[]; totalCount: number; hasMore: boolean }> {
+): Promise<{
+  items: ShopeeItemSummary[];
+  totalCount: number;
+  hasMore: boolean;
+  hasNextPage: boolean;
+  nextOffset: number;
+}> {
   const { offset = 0, pageSize = 50, itemStatus } = opts;
-  const body: Record<string, unknown> = { offset, page_size: pageSize };
-  if (itemStatus && itemStatus.length > 0) body.item_status = itemStatus;
-  const r = await postShopApi("/api/v2/product/get_item_list", accessToken, shopId, body, creds);
+  // Default NORMAL: hanya listing aktif ditarik (UNLIST/BANNED/REVIEWING
+  // tidak ikut — lihat backlog "item_status NORMAL"). Shopee butuh satu
+  // panggilan per status bila ingin semua status.
+  const status = itemStatus && itemStatus.length > 0 ? itemStatus : ["NORMAL"];
+  const r = await getShopApi(
+    "/api/v2/product/get_item_list",
+    accessToken,
+    shopId,
+    creds,
+    { offset, page_size: pageSize, item_status: status }
+  );
   const items = (r.item as ShopeeItemSummary[] | undefined) ?? [];
+  const hasNextPage =
+    typeof r.has_next_page === "boolean"
+      ? r.has_next_page
+      : typeof r.has_more === "boolean"
+        ? r.has_more
+        : items.length >= pageSize;
+  const nextOffset = typeof r.next_offset === "number" ? r.next_offset : offset + items.length;
   return {
     items,
     totalCount: Number(r.total_count ?? items.length),
-    hasMore: Boolean(r.has_more),
+    hasMore: hasNextPage,
+    hasNextPage,
+    nextOffset,
   };
 }
 
@@ -383,9 +441,13 @@ export async function getItemBaseInfo(
   creds?: ShopeeCreds
 ): Promise<Array<Record<string, unknown>>> {
   if (itemIds.length === 0) return [];
-  const r = await postShopApi("/api/v2/product/get_item_base_info", accessToken, shopId, {
-    item_id_list: itemIds,
-  }, creds);
+  const r = await getShopApi(
+    "/api/v2/product/get_item_base_info",
+    accessToken,
+    shopId,
+    creds,
+    { item_id_list: itemIds }
+  );
   return (r.item_list as Array<Record<string, unknown>> | undefined) ?? [];
 }
 
@@ -401,9 +463,13 @@ export async function getModelList(
   itemId: number,
   creds?: ShopeeCreds
 ): Promise<{ models: ShopeeModel[]; itemSku?: string }> {
-  const r = await postShopApi("/api/v2/product/get_model_list", accessToken, shopId, {
-    item_id: itemId,
-  }, creds);
+  const r = await getShopApi(
+    "/api/v2/product/get_model_list",
+    accessToken,
+    shopId,
+    creds,
+    { item_id: itemId }
+  );
   const models = (r.model as ShopeeModel[] | undefined) ?? [];
   return { models, itemSku: r.item_sku as string | undefined };
 }
@@ -427,8 +493,8 @@ export async function resolveModel(
   const wanted = channelSku.trim();
   let offset = 0;
   const pageSize = 50;
-  for (let page = 0; page < 20; page++) {
-    const { items, hasMore } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
+  for (let page = 0; page < 200; page++) {
+    const { items, hasNextPage, nextOffset } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
     if (items.length === 0) break;
     const baseInfos = await getItemBaseInfo(
       accessToken,
@@ -447,8 +513,8 @@ export async function resolveModel(
       const hit = models.find((m) => m.model_sku === wanted);
       if (hit) return { itemId: item.item_id, modelId: hit.model_id };
     }
-    if (!hasMore) break;
-    offset += pageSize;
+    if (!hasNextPage || nextOffset <= offset) break;
+    offset = nextOffset;
   }
   throw new Error(
     `[Shopee] SKU "${channelSku}" tidak ditemukan di shop ${shopId}. ` +
@@ -477,8 +543,8 @@ export async function resolveModelsBatch(
     const wanted = new Set(needScan);
     let offset = 0;
     const pageSize = 50;
-    for (let page = 0; page < 20 && wanted.size > 0; page++) {
-      const { items, hasMore } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
+    for (let page = 0; page < 200 && wanted.size > 0; page++) {
+      const { items, hasNextPage, nextOffset } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
       if (items.length === 0) break;
       const baseInfos = await getItemBaseInfo(
         accessToken,
@@ -503,8 +569,8 @@ export async function resolveModelsBatch(
           }
         }
       }
-      if (!hasMore) break;
-      offset += pageSize;
+      if (!hasNextPage || nextOffset <= offset) break;
+      offset = nextOffset;
     }
     for (const sku of wanted) missing.push(sku);
   }

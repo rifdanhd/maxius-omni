@@ -71,17 +71,14 @@ globalThis.fetch = (async (input: unknown, init?: unknown) => {
   const pathname = new URL(url).pathname;
   if (pathname === "/api/v2/order/get_order_list") {
     fixture.listCalls += 1;
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        response: {
-          order_list: fixture.summaries,
-          has_more: fixture.hasMore,
-          total_count: fixture.summaries.length,
-        },
-      }),
-    };
+    const raw = JSON.stringify({
+      response: {
+        order_list: fixture.summaries,
+        has_more: fixture.hasMore,
+        total_count: fixture.summaries.length,
+      },
+    });
+    return { ok: true, status: 200, text: async () => raw, json: async () => JSON.parse(raw) };
   }
   if (pathname === "/api/v2/order/get_order_detail") {
     fixture.detailCalls += 1;
@@ -91,9 +88,16 @@ globalThis.fetch = (async (input: unknown, init?: unknown) => {
     const list = (body.order_sn_list ?? [])
       .map((sn) => fixture.details[sn])
       .filter((d): d is Record<string, unknown> => Boolean(d));
-    return { ok: true, status: 200, json: async () => ({ response: { order_list: list } }) };
+    const raw = JSON.stringify({ response: { order_list: list } });
+    return { ok: true, status: 200, text: async () => raw, json: async () => JSON.parse(raw) };
   }
-  return { ok: false, status: 404, json: async () => ({ error: "unknown_path", message: pathname }) };
+  const notFound = JSON.stringify({ error: "unknown_path", message: pathname });
+  return {
+    ok: false,
+    status: 404,
+    text: async () => notFound,
+    json: async () => JSON.parse(notFound),
+  };
 }) as typeof fetch;
 
 /* ─────────────────────────── Fixture ─────────────────────────── */

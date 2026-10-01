@@ -244,8 +244,8 @@ export async function syncShopeeListings(businessId: string): Promise<
       let itemCount = 0;
       let modelCount = 0;
       let matched = 0;
-      for (let page = 0; page < 20; page++) {
-        const { items, hasMore } = await withRefreshedToken(account, (token, shopId, creds) =>
+      for (let page = 0; page < 200; page++) {
+        const { items, hasNextPage, nextOffset } = await withRefreshedToken(account, (token, shopId, creds) =>
           getItemList(token, shopId, { offset, pageSize: 50 }, creds)
         );
         if (items.length === 0) break;
@@ -294,8 +294,8 @@ export async function syncShopeeListings(businessId: string): Promise<
             }
           }
         }
-        if (!hasMore) break;
-        offset += 50;
+        if (!hasNextPage || nextOffset <= offset) break;
+        offset = nextOffset;
       }
       results.push({ accountId: account.id, label: account.label, items: itemCount, models: modelCount, matched });
     } catch (e) {
