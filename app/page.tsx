@@ -2,65 +2,92 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Boxes,
-  Zap,
-  ShieldCheck,
-  BarChart3,
-  Warehouse,
-  Link2,
+  Footprints,
+  Leaf,
+  Wind,
+  Ruler,
+  Sparkles,
+  Truck,
   ArrowRight,
   Check,
-  Menu,
-  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export const metadata: Metadata = {
-  title: "Maxius.id — Sinkronisasi Stok Omnichannel",
+  title: "KausKaki.id — Kaos Kaki Nyaman Sehari-hari",
   description:
-    "Platform omnichannel stock sync Indonesia: cegah oversell, sinkronisasi stok real-time via webhook untuk Shopee, Tokopedia, dan TikTok Shop.",
+    "Jual kaos kaki premium: katun lembut, anti-bau, tersedia segala ukuran. Pengiriman cepat ke seluruh Indonesia.",
 };
+
+const PRODUCTS = [
+  {
+    name: "Everyday Cotton",
+    price: "Rp29.000",
+    tag: "Best seller",
+    colors: ["bg-gray-900", "bg-gray-400", "bg-white border"],
+    desc: "Katun combed 24s, adem dipakai seharian.",
+  },
+  {
+    name: "Sport Ankle",
+    price: "Rp39.000",
+    tag: "Olahraga",
+    colors: ["bg-blue-600", "bg-emerald-500", "bg-black"],
+    desc: "Rib kaki stabil, kering cepat saat lari.",
+  },
+  {
+    name: "Knee High Stripe",
+    price: "Rp45.000",
+    tag: "Pilihan baru",
+    colors: ["bg-rose-500", "bg-amber-400", "bg-indigo-600"],
+    desc: "Setinggi lutut, motif stripe klasik.",
+  },
+  {
+    name: "Wool Warm",
+    price: "Rp59.000",
+    tag: "Musim dingin",
+    colors: ["bg-stone-700", "bg-orange-700", "bg-slate-800"],
+    desc: "Wool blend tebal, hangat tanpa gerah.",
+  },
+];
 
 const FEATURES = [
   {
-    icon: Boxes,
-    title: "Stok Central per Varian",
-    desc: "Satu angka stok pusat per varian (warna/ukuran), bukan per produk induk. Akurat hingga puluhan ribu SKU.",
+    icon: Leaf,
+    title: "Katun Premium",
+    desc: "Benang combed lembut, tidak mudah kusut dan tidak melar setelah dicuci berkali-kali.",
   },
   {
-    icon: Link2,
-    title: "Mapping SKU per Marketplace",
-    desc: "Setiap varian dipetakan ke SKU/ID berbeda di tiap marketplace via PlatformSkuMapping. Tidak ada lagi asumsi ID sama.",
+    icon: Wind,
+    title: "Anti Bau & Adem",
+    desc: "Teknologi serat berlubang menjaga kaki tetap kering dan bebas bau seharian.",
   },
   {
-    icon: Zap,
-    title: "Webhook Real-time",
-    desc: "Update stok terpicu webhook saat ada order, bukan polling. Mencegah oversell di detik yang sama.",
+    icon: Ruler,
+    title: "Ukuran Lengkap",
+    desc: "Dari 35–45, tersedia reguler, besar, hingga versi khusus pria dan wanita.",
   },
   {
-    icon: ShieldCheck,
-    title: "Safety Stock Buffer",
-    desc: "Cadangan pengaman per varian agar tampilan marketplace tidak pernah menjual stok yang tidak ada.",
+    icon: Footprints,
+    title: "Pas di Kaki",
+    desc: "Toe seam halus dan tumit Y-heel membuat kaos kaki tidak bergeser.",
   },
   {
-    icon: BarChart3,
-    title: "Batching Anti Rate-limit",
-    desc: "Update ke API marketplace di-batch via antrean agar aman dari rate limit saat order membludak.",
+    icon: Sparkles,
+    title: "Anti Pilling",
+    desc: "Dirajut rapat agar awet dan tetap rapi meski sudah 50+ kali cuci.",
   },
   {
-    icon: Warehouse,
-    title: "WMS + Laporan",
-    desc: "Inbound/outbound gudang, stok opname, riwayat inventori, dan analitik penjualan per toko.",
+    icon: Truck,
+    title: "Kirim Se-Indonesia",
+    desc: "Packing rapi, kirim hari ini juga untuk pesanan sebelum pukul 15.00.",
   },
 ];
 
 const STEPS = [
-  { n: "1", title: "Hubungkan toko", desc: "Koneksikan akun Shopee, Tokopedia, dan TikTok Shop via halaman Pengaturan Toko." },
-  { n: "2", title: "Mapping SKU", desc: "Petakan tiap varian master ke SKU marketplace masing-masing satu kali." },
-  { n: "3", title: "Jualan tanpa oversell", desc: "Setiap order masuk via webhook langsung mengurangi stok central dan menyebar ke semua channel." },
+  { n: "1", title: "Pilih gaya", desc: "Pilih warna, panjang, dan bahan sesuai aktivitas kamu." },
+  { n: "2", title: "Tentukan ukuran", desc: "Gunakan panduan ukuran kami supaya pas sejak pasangan pertama." },
+  { n: "3", title: "Terima di rumah", desc: "Dikirim cepat, bisa tukar ukuran gratis bila belum cocok." },
 ];
 
 export default function LandingPage() {
@@ -70,19 +97,19 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <span className="relative h-10 w-10 block">
-              <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id" fill className="object-contain" priority />
+              <Image src="/Logo/Logo_backroundNO.png" alt="KausKaki.id" fill className="object-contain" priority />
             </span>
-            <span className="font-bold text-lg">Maxius.id</span>
+            <span className="font-bold text-lg">KausKaki.id</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
-            <a href="#fitur" className="hover:text-gray-900">Fitur</a>
-            <a href="#cara-kerja" className="hover:text-gray-900">Cara Kerja</a>
-            <a href="#marketplace" className="hover:text-gray-900">Marketplace</a>
+            <a href="#koleksi" className="hover:text-gray-900">Koleksi</a>
+            <a href="#keunggulan" className="hover:text-gray-900">Keunggulan</a>
+            <a href="#cara-beli" className="hover:text-gray-900">Cara Beli</a>
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className="text-sm font-medium px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100">Masuk</Link>
             <Link href="/dashboard" className="text-sm font-semibold px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black flex items-center gap-1">
-              Buka Dashboard <ArrowRight size={16} />
+              Belanja <ArrowRight size={16} />
             </Link>
           </div>
         </div>
@@ -92,48 +119,75 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-6 pt-16 pb-12 text-center">
           <div className="flex justify-center mb-4">
             <span className="relative h-16 w-16 block">
-              <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id" fill className="object-contain" priority />
+              <Image src="/Logo/Logo_backroundNO.png" alt="KausKaki.id" fill className="object-contain" priority />
             </span>
           </div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1 mb-5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live — maxius.id sudah online
+            Gratis ongkir untuk belanja di atas Rp150.000
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-            Sinkronisasi stok omnichannel,
-            <br className="hidden md:block" /> tanpa oversell.
+            Kaos kaki yang enak
+            <br className="hidden md:block" /> dipakai seharian.
           </h1>
           <p className="mt-5 text-gray-600 max-w-2xl mx-auto text-base md:text-lg">
-            Maxius Indonesia menyatukan stok Shopee, Tokopedia, dan TikTok Shop
-            ke satu stok central per varian. Order masuk via webhook, stok
-            terpotong real-time di semua channel.
+            Dibuat dari katun premium, adem, anti-bau, dan pas di kaki.
+            Tersedia segala warna dan ukuran untuk kerja, olahraga, sampai
+            santai di rumah.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
-            <Link href="/dashboard" className="px-6 py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black flex items-center gap-2">
-              Buka Dashboard <ArrowRight size={16} />
-            </Link>
-            <a href="#fitur" className="px-6 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Lihat Fitur</a>
+            <a href="#koleksi" className="px-6 py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black flex items-center gap-2">
+              Lihat Koleksi <ArrowRight size={16} />
+            </a>
+            <a href="#keunggulan" className="px-6 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Kenapa Kami</a>
           </div>
-          <div className="mt-6 flex items-center justify-center gap-5 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Webhook real-time</span>
-            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Safety stock</span>
-            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Puluhan ribu SKU</span>
+          <div className="mt-6 flex items-center justify-center gap-5 text-xs text-gray-500 flex-wrap">
+            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Katun lembut</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Anti-bau</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Ukuran 35–45</span>
           </div>
         </section>
 
-        <section id="marketplace" className="border-y border-gray-100 bg-gray-50/60">
+        <section className="border-y border-gray-100 bg-gray-50/60">
           <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-10 text-sm font-semibold text-gray-700">
-            <span className="text-xs uppercase tracking-wider text-gray-400 font-bold">Terhubung dengan</span>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">Shopee</span>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">Tokopedia</span>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">TikTok Shop</span>
+            <span className="text-xs uppercase tracking-wider text-gray-400 font-bold">Dipercaya oleh</span>
+            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">20.000+ pelanggan</span>
+            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">Rating 4.9/5</span>
+            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">Tukar ukuran gratis</span>
           </div>
         </section>
 
-        <section id="fitur" className="max-w-6xl mx-auto px-6 pb-14 pt-14">
+        <section id="koleksi" className="max-w-6xl mx-auto px-6 pb-14 pt-14">
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold">Fitur inti</h2>
-            <p className="text-sm text-muted-foreground mt-1">Dibangun untuk correctness stok, bukan sekadar pajangan.</p>
+            <h2 className="text-2xl font-bold">Koleksi unggulan</h2>
+            <p className="text-sm text-muted-foreground mt-1">Empat model paling laris bulan ini.</p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {PRODUCTS.map((p) => (
+              <Card key={p.name} className="hover:border-gray-900 transition-colors">
+                <CardContent className="p-5 pt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    {p.colors.map((c, i) => (
+                      <span key={i} className={`w-6 h-6 rounded-full ${c}`} />
+                    ))}
+                  </div>
+                  <Badge variant="secondary" className="mb-2">{p.tag}</Badge>
+                  <h3 className="font-semibold">{p.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{p.desc}</p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="font-bold">{p.price}</span>
+                    <Link href="#cara-beli" className="text-xs font-semibold text-gray-600 hover:text-gray-900">Lihat →</Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section id="keunggulan" className="max-w-6xl mx-auto px-6 pb-14">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold">Keunggulan</h2>
+            <p className="text-sm text-muted-foreground mt-1">Detail kecil yang bikin beda di kaki kamu.</p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((f) => (
@@ -148,11 +202,11 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="cara-kerja" className="bg-gray-900 text-white">
+        <section id="cara-beli" className="bg-gray-900 text-white">
           <div className="max-w-6xl mx-auto px-6 py-14">
             <div className="text-center mb-10">
-              <h2 className="text-2xl font-bold">Cara kerja</h2>
-              <p className="text-sm text-gray-400 mt-1">Tiga langkah, sekali setting.</p>
+              <h2 className="text-2xl font-bold">Cara beli</h2>
+              <p className="text-sm text-gray-400 mt-1">Tiga langkah, langsung sampai rumah.</p>
             </div>
             <div className="grid md:grid-cols-3 gap-4">
               {STEPS.map((s) => (
@@ -164,10 +218,10 @@ export default function LandingPage() {
               ))}
             </div>
             <div className="mt-8 flex flex-wrap gap-3 justify-center">
-              <Link href="/login" className="px-6 py-3 rounded-xl bg-white text-gray-900 text-sm font-semibold hover:bg-gray-100 flex items-center gap-2">
-                Masuk untuk mulai <ArrowRight size={16} />
-              </Link>
-              <Link href="/dashboard" className="px-6 py-3 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/10">Buka Dashboard</Link>
+              <a href="#koleksi" className="px-6 py-3 rounded-xl bg-white text-gray-900 text-sm font-semibold hover:bg-gray-100 flex items-center gap-2">
+                Mulai belanja <ArrowRight size={16} />
+              </a>
+              <Link href="/login" className="px-6 py-3 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/10">Masuk</Link>
             </div>
           </div>
         </section>
@@ -175,24 +229,24 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-6 py-14">
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 grid md:grid-cols-2 gap-8 items-center">
             <div>
-              <h2 className="text-2xl font-bold mb-3">Tanpa sinkron yang benar…</h2>
+              <h2 className="text-2xl font-bold mb-3">Pernah merasakan ini?</h2>
               <ul className="text-sm text-gray-700 space-y-2 list-disc pl-5">
-                <li>Oversell → refund, penalti marketplace, rating turun.</li>
-                <li>Stok tampil rendah padahal ada → kehilangan penjualan.</li>
-                <li>Update manual / polling lambat → selisih stok antar channel.</li>
+                <li>Kaos kaki melar, melorot, dan harus ditarik terus.</li>
+                <li>Kaki cepat bau karena bahan yang tidak menyerap keringat.</li>
+                <li>Beli online, ternyata ukuran kekecilan dan ribet tukar.</li>
               </ul>
             </div>
             <div>
-              <h2 className="text-2xl font-bold mb-3">Dengan Maxius…</h2>
+              <h2 className="text-2xl font-bold mb-3">Dengan KausKaki.id…</h2>
               <ul className="text-sm text-gray-700 space-y-2 list-disc pl-5">
-                <li>Satu stok central per varian, satu kebenaran untuk semua channel.</li>
-                <li>Webhook real-time + antrean batching yang tahan rate limit.</li>
-                <li>Safety-stock buffer + deteksi mismatch & sync error 7 hari.</li>
+                <li>Pas di kaki sejak pasangan pertama, tidak melar.</li>
+                <li>Katun premium yang adem dan anti-bau seharian.</li>
+                <li>Tukar ukuran gratis dalam 7 hari, tanpa ribet.</li>
               </ul>
               <div className="mt-4 flex gap-2">
-                <Badge variant="default">Webhook</Badge>
-                <Badge variant="secondary">Safety Stock</Badge>
-                <Badge variant="outline">10k+ SKU</Badge>
+                <Badge variant="default">Katun Premium</Badge>
+                <Badge variant="secondary">Anti Bau</Badge>
+                <Badge variant="outline">Tukar Gratis</Badge>
               </div>
             </div>
           </div>
@@ -201,10 +255,10 @@ export default function LandingPage() {
 
       <footer className="border-t border-gray-100">
         <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} Maxius.id — Maxius Indonesia</span>
+          <span>© {new Date().getFullYear()} KausKaki.id — semua hak cipta dilindungi</span>
           <div className="flex items-center gap-4">
+            <a href="#koleksi" className="hover:text-gray-900">Koleksi</a>
             <Link href="/login" className="hover:text-gray-900">Masuk</Link>
-            <Link href="/dashboard" className="hover:text-gray-900">Dashboard</Link>
           </div>
         </div>
       </footer>
