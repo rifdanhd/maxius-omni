@@ -134,6 +134,9 @@ export async function GET(req: NextRequest) {
             ...(credential ? { appCredentialId: credential.id } : {}),
           },
           update: {
+            // Reconnect dari brand lain → pindahkan akun ke brand tsb (unik
+            // per platform+shop, jadi toko hanya bisa bernaung di satu brand).
+            businessId,
             label,
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
