@@ -180,6 +180,7 @@ if [ "${SKIP_BACKUP:-0}" != "1" ]; then
   command -v pg_dump >/dev/null 2>&1 ||
     die "pg_dump tidak ada — install client dulu:  sudo dnf install -y postgresql  (atau apt install postgresql-client)"
   db_url="$(grep -E '^(POSTGRES_URL|DATABASE_URL)=' .env | tail -1 | cut -d= -f2- | tr -d '"'\'' ')"
+  db_url="${db_url%%\?*}"   # buang query string (?sslmode=…) — pg_dump terima URI polos
   [ -n "$db_url" ] || die "POSTGRES_URL/DATABASE_URL kosong — backup dibatalkan"
   mkdir -p backups
   backup="backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"
