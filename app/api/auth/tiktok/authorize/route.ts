@@ -8,10 +8,12 @@ import { verifySessionCookie } from "@/lib/services/auth.service";
 import { getUserBusinessIds } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
 
-// Format resmi seller OAuth (ROW/ID): service_id — lihat
-// partner.tiktokshop.com > Seller authorization guide.
-// Format lama app_key+redirect_uri sudah tidak terdokumentasi untuk seller.
-const TIKTOK_AUTHORIZE_URL = "https://services.tiktokshop.com/open/authorize";
+// Region ID (pasca-merger TikTok Shop–Tokopedia) memakai domain seller
+// Tokopedia — isi TIKTOK_AUTHORIZE_URL dengan "Copy authorization link"
+// dari Partner Center (path-nya memuat id khusus, BUKAN Service ID).
+// Default: format resmi service_id (services.tiktokshop.com/open/authorize).
+// Fallback lama app_key+redirect_uri sudah tidak terdokumentasi → tidak dipakai.
+const TIKTOK_AUTHORIZE_DEFAULT = "https://services.tiktokshop.com/open/authorize";
 
 export const TIKTOK_OAUTH_CRED_COOKIE = "tiktok_oauth_cred";
 
@@ -42,23 +44,29 @@ export async function GET(req: NextRequest) {
       new URL("/settings/accounts?error=missing_env", appOrigin(req)),
     );
   }
-  const redirectUri =
-    process.env.TIKTOK_REDIRECT_URI ?? process.env.TIKTOK_REDIRECT_URL;
-
-  if (!redirectUri || (!creds.serviceId && !creds.appKey)) {
+  const authorizeUrl = process.env.TIKTOK_AUTHORIZE_URL?.trim();
+  if (!authorizeUrl && !creds.serviceId) {
+    console.error(
+      "[TikTok OAuth] TIKTOK_AUTHORIZE_URL / TIKTOK_SERVICE_ID kosong — " +
+        "isi dari Partner Center (Copy authorization link) di .env lalu restart."
+    );
     return NextResponse.redirect(
-      new URL("/settings/accounts?error=missing_env", appOrigin(req)),
+      new URL("/settings/accounts?error=missing_auth_url", appOrigin(req)),
     );
   }
 
-  const url = new URL(TIKTOK_AUTHORIZE_URL);
-  if (creds.serviceId) {
-    url.searchParams.set("service_id", creds.serviceId);
-  } else {
-    // Fallback legacy (tidak terdokumentasi) — isi TIKTOK_SERVICE_ID dari
-    // Partner Center > App & Service > Basic Information > Service ID.
-    url.searchParams.set("app_key", creds.appKey);
-    url.searchParams.set("redirect_uri", redirectUri);
+  let url: URL;
+  try {
+    url = authorizeUrl
+      ? new URL(authorizeUrl)
+      : new URL(
+          `${TIKTOK_AUTHORIZE_DEFAULT}?service_id=${encodeURIComponent(creds.serviceId ?? "")}`
+        );
+  } catch {
+    console.error("[TikTok OAuth] TIKTOK_AUTHORIZE_URL bukan URL valid.");
+    return NextResponse.redirect(
+      new URL("/settings/accounts?error=missing_auth_url", appOrigin(req)),
+    );
   }
 
   // Anti-CSRF: state acak disimpan di cookie httpOnly, diverifikasi di callback.

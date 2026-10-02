@@ -71,7 +71,7 @@ fi
 
 warn_missing=()
 for v in SHOPEE_PARTNER_ID SHOPEE_PARTNER_KEY SHOPEE_REDIRECT_URI \
-         TIKTOK_APP_KEY TIKTOK_APP_SECRET TIKTOK_REDIRECT_URI WEBHOOK_BASE_URL; do
+         TIKTOK_APP_KEY TIKTOK_APP_SECRET TIKTOK_REDIRECT_URI TIKTOK_SERVICE_ID TIKTOK_AUTHORIZE_URL WEBHOOK_BASE_URL; do
   grep -qE "^${v}=.+" .env || warn_missing+=("$v")
 done
 [ "${#warn_missing[@]}" -gt 0 ] && log "PERINGATAN non-fatal — env belum diisi: ${warn_missing[*]}"

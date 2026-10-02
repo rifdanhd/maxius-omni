@@ -32,12 +32,14 @@ export function resolveTiktokCreds(cred?: CredentialRef): {
   appSecret: string;
   serviceId?: string;
 } {
-  const appKey = cred?.clientId ?? process.env.TIKTOK_APP_KEY ?? "";
-  const appSecret = cred?.clientSecret ?? process.env.TIKTOK_APP_SECRET ?? "";
+  // `||` bukan `??`: string kosong ("") di AppCredential harus jatuh ke env,
+  // bukan menimpa env (jebakan `??` yang pernah bikin authorize gagal).
+  const appKey = cred?.clientId || process.env.TIKTOK_APP_KEY || "";
+  const appSecret = cred?.clientSecret || process.env.TIKTOK_APP_SECRET || "";
   if (!appKey || !appSecret) {
     throw new Error("[TikTok] TIKTOK_APP_KEY/SECRET belum diisi.");
   }
-  const serviceId = cred?.serviceId ?? process.env.TIKTOK_SERVICE_ID ?? undefined;
+  const serviceId = cred?.serviceId || process.env.TIKTOK_SERVICE_ID || undefined;
   return { appKey, appSecret, serviceId };
 }
 

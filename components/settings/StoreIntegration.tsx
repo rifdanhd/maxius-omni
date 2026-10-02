@@ -30,6 +30,7 @@ const OAUTH_MESSAGES: Record<string, { ok: boolean; text: string }> = {
   token_missing: { ok: false, text: "Token tidak lengkap dari marketplace — coba lagi." },
   save_failed: { ok: false, text: "Token diterima tapi gagal disimpan — hubungi admin." },
   missing_env: { ok: false, text: "Kredensial aplikasi belum dikonfigurasi di server." },
+  missing_auth_url: { ok: false, text: "URL otorisasi TikTok belum dikonfigurasi di server (isi TIKTOK_AUTHORIZE_URL / TIKTOK_SERVICE_ID di .env) — hubungi admin." },
   shopee_missing_env: { ok: false, text: "Partner ID/Key Shopee belum dikonfigurasi di server." },
   shopee_token_exchange_failed: { ok: false, text: "Gagal menukar kode Shopee — coba hubungkan ulang." },
   shopee_authorize_disabled: { ok: false, text: "Authorize Shopee dinonaktifkan server (SHOPEE_AUTHORIZE_ENABLED=false) — hubungi admin untuk mengaktifkan." },
