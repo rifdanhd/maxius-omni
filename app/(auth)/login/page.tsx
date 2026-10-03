@@ -74,7 +74,9 @@ function LoginForm() {
     url.searchParams.delete("google_handoff");
     const clean = () => window.history.replaceState(null, "", url.toString());
     if (authErr) {
-      setError(AUTH_ERRORS[authErr] ?? `Login gagal: ${authErr}.`);
+      // queueMicrotask: setError tidak boleh sinkron di dalam effect
+      // (react-hooks/set-state-in-effect) — tetap tampil sebelum paint.
+      queueMicrotask(() => setError(AUTH_ERRORS[authErr] ?? `Login gagal: ${authErr}.`));
       clean();
     }
     if (handoff === "1") {
