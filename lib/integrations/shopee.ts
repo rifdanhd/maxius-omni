@@ -761,6 +761,38 @@ export async function updatePrice(
 // Format base string sesuai dokumen Push Mechanism resmi.
 // creds opsional: webhook multi-credential mencoba tiap secret via
 // listActiveShopeeSecrets() di route (satu per satu ke fungsi ini).
+export type ShopeeDiscount = {
+  discount_id: number;
+  discount_name?: string;
+  status?: string; // upcoming | ongoing | expired
+  start_time?: number;
+  end_time?: number;
+  source?: number;
+};
+
+/**
+ * getDiscountList — daftar campaign diskon toko
+ * (GET /api/v2/discount/get_discount_list, module v2.discount).
+ * Params: discount_status (upcoming|ongoing|expired|all), page_no mulai 1,
+ * page_size ≤ 100. Read-only — dipakai ingest promo ke halaman Promosi.
+ */
+export async function getDiscountList(
+  accessToken: string,
+  shopId: string | number,
+  opts: { status: "upcoming" | "ongoing" | "expired" | "all"; pageNo?: number; pageSize?: number },
+  creds?: ShopeeCreds
+): Promise<{ discounts: ShopeeDiscount[]; more: boolean }> {
+  const r = await getShopApi("/api/v2/discount/get_discount_list", accessToken, shopId, creds, {
+    discount_status: opts.status,
+    page_no: opts.pageNo ?? 1,
+    page_size: Math.min(100, opts.pageSize ?? 100),
+  });
+  return {
+    discounts: (r.discount_list as ShopeeDiscount[] | undefined) ?? [],
+    more: Boolean(r.more),
+  };
+}
+
 /**
  * getReturnList — daftar pengajuan retur/refund (module v2.returns).
  * Shopee TIDAK menyediakan push/webhook retur → sumber data = polling API ini.

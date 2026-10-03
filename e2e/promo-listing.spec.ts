@@ -73,7 +73,7 @@ test('listing promosi: activity tampil, bisa dicari/difilter, bertahan setelah r
 }) => {
   await login(page);
   await page.goto('/promotions');
-  await expect(page.getByRole('heading', { name: 'Promosi TikTok Shop' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Promosi Marketplace' })).toBeVisible({
     timeout: 30_000,
   });
 
@@ -111,7 +111,7 @@ test('listing promosi: activity tampil, bisa dicari/difilter, bertahan setelah r
 
   // 5. Reload → data dibaca ulang dari DB, bukan state sementara.
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Promosi TikTok Shop' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Promosi Marketplace' })).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByText(TITLE)).toBeVisible({ timeout: 30_000 });
@@ -131,7 +131,7 @@ test('audit UNVERIFIED → banner peringatan + badge "Perlu cek manual" di listi
 
   await login(page);
   await page.goto('/promotions');
-  await expect(page.getByRole('heading', { name: 'Promosi TikTok Shop' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Promosi Marketplace' })).toBeVisible({
     timeout: 30_000,
   });
 
@@ -164,7 +164,7 @@ test('audit UNVERIFIED → banner peringatan + badge "Perlu cek manual" di listi
 test.fixme('promo hasil create muncul sendiri di listing promosi', async ({ page }) => {
   await login(page);
   await page.goto('/promotions');
-  await expect(page.getByRole('heading', { name: 'Promosi TikTok Shop' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Promosi Marketplace' })).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByText('Promosi Hasil Wizard E2E')).toBeVisible({ timeout: 30_000 });

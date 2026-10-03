@@ -365,10 +365,10 @@ export default function PromotionsPage() {
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl font-bold text-gray-900">Promosi TikTok Shop</h1>
+            <h1 className="text-xl font-bold text-gray-900">Promosi Marketplace</h1>
             <span
               className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-bold text-gray-900"
-              title="Halaman ini hanya menampilkan data dari TikTok Shop — tidak ada aksi kelola"
+              title="Halaman ini menampilkan data dari TikTok Shop & Shopee — tidak ada aksi kelola"
             >
               <Info size={12} />
               Mode monitoring (baca-saja)
@@ -535,15 +535,15 @@ export default function PromotionsPage() {
               <PackageOpen size={32} className="mx-auto text-gray-400" />
             </div>
             <h2 className="mb-1.5 text-base font-bold text-gray-900">
-              Belum ada promo aktif dari TikTok Shop
+              Belum ada promo aktif dari marketplace
             </h2>
             <p className="max-w-md text-sm text-gray-500">
-              Data promosi akan muncul di sini setelah activity dari toko berhasil ditarik
-              (ingest). Jalankan{" "}
+              Data promosi muncul otomatis — ingest berjalan tiap 30 menit (TikTok &
+amp; Shopee). Untuk tarik sekarang, jalankan{" "}
               <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-700">
                 scripts/run-promotion-ingest.mts
-              </code>{" "}
-              untuk menarik activity yang sudah ada di toko.
+              </code>
+              .
             </p>
           </div>
         ) : rows.length === 0 ? (
@@ -729,8 +729,8 @@ export default function PromotionsPage() {
               <Info size={14} className="mt-0.5 shrink-0 text-gray-400" />
               <span>
                 Halaman ini <b>mode monitoring (baca-saja)</b>: data ditampilkan apa adanya dari
-                TikTok Shop tanpa aksi buat/ubah/nonaktifkan promo. Data diperbarui lewat ingest
-                terjadwal/manual.
+                TikTok Shop &amp; Shopee tanpa aksi buat/ubah/nonaktifkan promo. Data diperbarui
+                lewat ingest terjadwal/otomatis (tiap 30 menit).
               </span>
             </div>
           </>

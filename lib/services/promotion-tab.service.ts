@@ -29,6 +29,13 @@ function classifyByStatus(status: string): PromotionTabId | null {
       return "aktif";
     case "NOT_START":
       return "upcoming";
+    // Status mentah Shopee (ingest get_discount_list).
+    case "ongoing":
+      return "aktif";
+    case "upcoming":
+      return "upcoming";
+    case "expired":
+      return "ended";
     case "DEACTIVATED":
     case "ENDED":
     // NOT_EFFECTIVE = dihentikan platform → paling masuk akal di "berakhir".

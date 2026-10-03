@@ -15,12 +15,14 @@
 const TICK_MS = 30_000;
 const AUTO_ORDERS_MS = 5 * 60_000;
 const AUTO_LISTINGS_MS = 30 * 60_000;
+const AUTO_PROMOS_MS = 30 * 60_000;
 const RUN_SWEEP_MS = 15_000;
 
 type TimerGlobal = {
   __maxiusSyncRetryTimer?: ReturnType<typeof setInterval>;
   __maxiusAutoOrdersTimer?: ReturnType<typeof setInterval>;
   __maxiusAutoListingsTimer?: ReturnType<typeof setInterval>;
+  __maxiusAutoPromosTimer?: ReturnType<typeof setInterval>;
   __maxiusRunSweepTimer?: ReturnType<typeof setInterval>;
 };
 
@@ -82,7 +84,7 @@ export async function register() {
     process.env.AUTO_SYNC_DISABLED !== "true" &&
     (process.env.NODE_ENV === "production" || process.env.AUTO_SYNC_DEV === "true");
   if (autoAllowed) {
-    const { autoSyncOrdersOnce, autoSyncListingsOnce } = await import(
+    const { autoSyncOrdersOnce, autoSyncListingsOnce, autoSyncPromotionsOnce } = await import(
       "./lib/services/auto-sync.service"
     );
 
@@ -116,6 +118,23 @@ export async function register() {
         }, AUTO_LISTINGS_MS)
       );
       console.log(`[AutoSync] listing+gambar otomatis aktif (tiap ${AUTO_LISTINGS_MS / 60000} menit)`);
+    }
+
+    if (!g.__maxiusAutoPromosTimer) {
+      g.__maxiusAutoPromosTimer = unref(
+        setInterval(() => {
+          void autoSyncPromotionsOnce()
+            .then((r) => {
+              if (r.activities > 0 || r.errors > 0) {
+                console.log(
+                  `[AutoSync] promo: ${r.accounts} akun, ${r.activities} activity, ${r.errors} galat`
+                );
+              }
+            })
+            .catch((e) => console.error("[AutoSync] promo tick gagal:", e instanceof Error ? e.message : e));
+        }, AUTO_PROMOS_MS)
+      );
+      console.log(`[AutoSync] promo marketplace otomatis aktif (tiap ${AUTO_PROMOS_MS / 60000} menit)`);
     }
   }
 }

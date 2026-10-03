@@ -13,7 +13,9 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
     where: {
       ...(accountId ? { accountId } : {}),
       ...(status ? { status } : {}),
-      account: { platform: "TIKTOK_SHOP", businessId: req.businessId },
+      // Lintas marketplace: TikTok (searchPromotionActivities) + Shopee
+      // (get_discount_list) — keduanya menyimpan ke PromotionActivity.
+      account: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, businessId: req.businessId },
     },
     orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
     take,

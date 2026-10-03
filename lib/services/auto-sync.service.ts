@@ -23,11 +23,19 @@ import { syncOrdersShopee } from "@/lib/services/shopee-order-sync.service";
 import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
 import { importShopeeListings } from "@/lib/services/marketplace-shopee-import.service";
 import { syncTikTokListings } from "@/lib/services/marketplace-tiktok.service";
+import { ingestPromotionActivitiesForAccount } from "@/lib/services/promotion-activity.service";
+import { ingestShopeePromotionsForAccount } from "@/lib/services/shopee-promotion.service";
 
 export type OrdersAutoSummary = {
   accounts: number;
   created: number;
   skipped: number;
+  errors: number;
+};
+
+export type PromosAutoSummary = {
+  accounts: number;
+  activities: number;
   errors: number;
 };
 
@@ -41,6 +49,7 @@ export type ListingsAutoSummary = {
 
 let ordersInFlight = false;
 let listingsInFlight = false;
+let promosInFlight = false;
 
 export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
   if (ordersInFlight) {
@@ -180,5 +189,53 @@ export async function autoSyncListingsOnce(): Promise<ListingsAutoSummary> {
     return out;
   } finally {
     listingsInFlight = false;
+  }
+}
+
+/**
+ * autoSyncPromotionsOnce — tarik promo/campaign TERBARU lintas marketplace:
+ * TikTok (searchPromotionActivities → PromotionActivity) + Shopee
+ * (get_discount_list → PromotionActivity). Read-only, idempoten (upsert),
+ * tanpa guard SyncRun (tidak menyentuh stok/order).
+ */
+export async function autoSyncPromotionsOnce(): Promise<PromosAutoSummary> {
+  if (promosInFlight) {
+    return { accounts: 0, activities: 0, errors: 0 };
+  }
+  promosInFlight = true;
+  try {
+    const accounts = await prisma.platformAccount.findMany({
+      where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, accessToken: { not: null } },
+      select: { id: true, platform: true, label: true },
+    });
+    const out: PromosAutoSummary = { accounts: accounts.length, activities: 0, errors: 0 };
+    for (const acc of accounts) {
+      try {
+        if (acc.platform === "TIKTOK_SHOP") {
+          const r = await ingestPromotionActivitiesForAccount(acc.id);
+          out.activities += r.itemsStored;
+          out.errors += r.errors.length;
+          if (r.errors.length > 0) {
+            console.warn(`[AutoSync] promo TikTok "${acc.label}":`, r.errors.slice(0, 2).join(" | "));
+          }
+        } else {
+          const r = await ingestShopeePromotionsForAccount(acc.id);
+          out.activities += r.upserted;
+          if (r.error) {
+            out.errors += 1;
+            console.warn(`[AutoSync] promo Shopee "${acc.label}":`, r.error);
+          }
+        }
+      } catch (e) {
+        out.errors += 1;
+        console.warn(
+          `[AutoSync] promo akun ${acc.id} gagal:`,
+          e instanceof Error ? e.message : String(e)
+        );
+      }
+    }
+    return out;
+  } finally {
+    promosInFlight = false;
   }
 }
