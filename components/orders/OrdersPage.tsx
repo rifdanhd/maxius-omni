@@ -602,14 +602,24 @@ export default function OrdersPage() {
     }
   };
 
-  /** M8c — label lokal (browser print) utk order non-TikTok: data penerima
-   *  diambil dari detail order (DB, tanpa panggilan API label TikTok). */
+  /** Label pengiriman thermal (browser print) dengan rincian produk & varian lengkap. */
   const printLocalLabels = async (targets: Order[]) => {
     if (targets.length === 0) return;
     const details = await Promise.all(targets.map((o) => fetchOrderDetail(o.id)));
     const printable = details
       .filter((d): d is OrderDetail => d !== null)
-      .map(toPrintableFromDetail);
+      .map((d, index) => {
+        const p = toPrintableFromDetail(d);
+        const orig = targets[index];
+        const origShip = orig?.shipments?.[0];
+        if (!p.trackingNumber && origShip?.trackingNo) {
+          p.trackingNumber = origShip.trackingNo;
+        }
+        if (!p.courier && origShip?.carrier) {
+          p.courier = origShip.carrier;
+        }
+        return p;
+      });
     if (printable.length === 0) {
       alert("Gagal memuat data penerima untuk label.");
       return;
@@ -624,13 +634,8 @@ export default function OrdersPage() {
     const targets = orders.filter((o) => selected.has(o.id));
     if (targets.length === 0) return;
     if (type === "Label") {
-      // Label resmi digabung jadi 1 PDF multi-halaman di server (TikTok tidak
-      // punya endpoint batch utk shipping document). Order non-TikTok dicetak
-      // label LOKAL dari data pesanan (M8c) — seleksi campuran keduanya jalan.
-      const tt = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
-      const local = targets.filter((o) => o.account?.platform !== "TIKTOK_SHOP");
-      if (tt.length > 0) await printSelectedBulkLabel(tt);
-      if (local.length > 0) await printLocalLabels(local);
+      // Gunakan template thermal lengkap dengan varian untuk seluruh order yang dipilih
+      await printLocalLabels(targets);
       return;
     }
     printOrders(targets.map(toPrintable), type);
@@ -638,22 +643,21 @@ export default function OrdersPage() {
 
   const printOrder = async (order: Order, type: PrintType) => {
     if (type === "Label") {
-      // Utamakan label resmi TikTok (identik dengan Seller Center) — hanya
-      // untuk order TikTok; order non-TikTok langsung label lokal (M8c),
-      // tanpa memanggil endpoint label TikTok.
-      if (order.account?.platform === "TIKTOK_SHOP") {
-        const official = await fetchOfficialLabel(order.id);
-        if (official?.docUrl) {
-          printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
-          return;
-        }
-      }
+      // Selalu gunakan template label pengiriman lengkap dengan rincian barang & varian
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {
         alert("Gagal memuat data penerima untuk label.");
         return;
       }
-      printOrders([toPrintableFromDetail(detail)], "Label");
+      const printable = toPrintableFromDetail(detail);
+      const ship = order.shipments?.[0];
+      if (!printable.trackingNumber && ship?.trackingNo) {
+        printable.trackingNumber = ship.trackingNo;
+      }
+      if (!printable.courier && ship?.carrier) {
+        printable.courier = ship.carrier;
+      }
+      printOrders([printable], "Label");
       return;
     }
     printOrders([toPrintable(order)], type);

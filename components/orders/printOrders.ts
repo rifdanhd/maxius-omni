@@ -42,26 +42,206 @@ const PRINT_STYLES = `
   .footer { margin-top: 32px; font-size: 11px; color: #666; }
 `;
 
-// Label pengiriman gaya resi TikTok: kertas 100mm x 150mm (4x6"/10x15cm).
+// Label pengiriman gaya resi thermal: kertas 100mm x 150mm (4x6"/10x15cm).
 const LABEL_STYLE = `
   @page { size: 100mm 150mm; margin: 0; }
-  .sheet { padding: 6mm 7mm; }
-  .label-sheet { font-size: 10px; }
-  .l-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5mm; }
-  .l-brand { display: flex; align-items: center; gap: 2mm; font-size: 15px; font-weight: 800; }
-  .l-brand .tmark { width: 7mm; height: 7mm; border-radius: 50%; background: #111; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; }
-  .l-title { font-size: 10px; font-weight: 800; border: 1.2px solid #111; border-radius: 3mm; padding: 1.5mm 3.5mm; letter-spacing: .04em; }
-  .l-barcode svg { width: 100%; height: auto; display: block; }
-  .l-resi-no { text-align: center; font-size: 12px; font-weight: 800; font-family: ui-monospace, monospace; letter-spacing: .06em; margin-top: 1mm; }
-  .l-sep { border-top: 1.5px dashed #999; margin: 4mm 0; }
-  .l-k { font-size: 8.5px; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 1mm; }
-  .l-v { font-size: 12px; font-weight: 700; line-height: 1.45; }
-  .l-addr { font-size: 10.5px; font-weight: 600; line-height: 1.5; color: #222; }
-  .l-items li { list-style: none; font-size: 10.5px; line-height: 1.5; }
-  .l-items .qty { font-weight: 800; }
-  .l-foot { display: flex; justify-content: space-between; gap: 3mm; margin-top: 5mm; border-top: 1.5px solid #111; padding-top: 3mm; }
-  .l-foot .box { flex: 1; }
-  .l-pickup { margin-top: 3mm; font-size: 9px; color: #444; }
+  @media print {
+    html, body { width: 100mm; margin: 0; padding: 0; background: #fff; }
+    .sheet { page-break-after: always; break-after: page; }
+    .sheet:last-child { page-break-after: auto; break-after: auto; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .label-sheet {
+    width: 100mm;
+    box-sizing: border-box;
+    padding: 3.5mm 4.5mm;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #111;
+    background: #fff;
+    font-size: 9.5px;
+  }
+  .l-box {
+    border: 1.5px solid #000;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .l-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    border-bottom: 1.5px solid #000;
+    background: #fafafa;
+  }
+  .l-brand {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .l-courier {
+    text-align: right;
+  }
+  .l-courier-name {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    display: block;
+  }
+  .l-badge {
+    display: inline-block;
+    background: #000;
+    color: #fff;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 2px;
+    letter-spacing: .04em;
+  }
+  .l-barcode-area {
+    padding: 6px 8px 5px;
+    text-align: center;
+    border-bottom: 1.5px solid #000;
+  }
+  .l-barcode-area svg {
+    width: 96%;
+    max-height: 46px;
+    display: block;
+    margin: 0 auto;
+  }
+  .l-resi-no {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 900;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    letter-spacing: .08em;
+    margin-top: 2px;
+  }
+  .l-order-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5px;
+    color: #444;
+    margin-top: 3px;
+    padding: 0 4px;
+  }
+  .l-addresses {
+    display: flex;
+    border-bottom: 1.5px solid #000;
+  }
+  .l-recipient {
+    flex: 1.4;
+    padding: 5px 7px;
+    border-right: 1.5px solid #000;
+  }
+  .l-sender {
+    flex: 1;
+    padding: 5px 7px;
+    background: #fbfbfb;
+  }
+  .l-k {
+    font-size: 8px;
+    font-weight: 800;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 2px;
+  }
+  .l-name {
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+  .l-phone {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 2px;
+  }
+  .l-addr {
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: #222;
+    word-break: break-word;
+  }
+  .l-items-box {
+    padding: 5px 7px;
+    border-bottom: 1.5px solid #000;
+  }
+  .l-items-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 3px;
+    padding-bottom: 2px;
+    border-bottom: 1px dashed #bbb;
+  }
+  .l-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+  }
+  .l-table th {
+    text-align: left;
+    font-size: 8px;
+    text-transform: uppercase;
+    color: #555;
+    padding: 2px 3px;
+    border-bottom: 1px solid #eee;
+  }
+  .l-table td {
+    padding: 3px 3px;
+    vertical-align: top;
+    border-bottom: 1px dashed #eee;
+  }
+  .l-table tr:last-child td {
+    border-bottom: none;
+  }
+  .l-prod-name {
+    font-weight: 700;
+    color: #111;
+    line-height: 1.25;
+  }
+  .l-prod-var {
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #000;
+    background: #f0f0f0;
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-top: 2px;
+  }
+  .l-qty {
+    text-align: center;
+    font-weight: 800;
+    font-size: 10px;
+  }
+  .l-note {
+    margin-top: 3px;
+    padding: 3px 5px;
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-radius: 2px;
+    font-size: 8px;
+    line-height: 1.3;
+  }
+  .l-foot {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 7px;
+    font-size: 8px;
+    background: #fafafa;
+  }
+  .l-foot-item strong {
+    font-weight: 800;
+  }
 `;
 
 function renderBarcode(value: string): string {
@@ -83,60 +263,100 @@ function renderBarcode(value: string): string {
 
 function buildLabel(o: PrintableOrder) {
   // Barcode & "No. Resi" wajib mengikuti nomor resi/tracking resmi, bukan ID
-  // order. Order ID panjang alfanumerik tidak bisa di-scan kurir, dan beda
-  // dengan label TikTok (barcode = resi). Fallback ke orderNo hanya saat
-  // order belum punya resi (belum di-ship).
+  // order. Order ID panjang alfanumerik tidak bisa di-scan kurir.
+  // Fallback ke orderNo hanya saat order belum punya resi (belum di-ship).
   const barcodeValue = (o.trackingNumber && o.trackingNumber !== "-" ? o.trackingNumber : o.orderNo) || o.orderNo;
-  const items = o.items
-    .map(
-      (i) =>
-        `<li><span class="qty">${i.qty}x</span> ${escapeHtml(i.name)} ${
-          i.category
-            ? `— ${escapeHtml(i.category)}`
-            : i.variant
-            ? `— ${escapeHtml(i.variant)}`
-            : ""
-        }</li>`
-    )
+  const courier = o.courier && o.courier !== "-" ? escapeHtml(o.courier) : "J&T Express";
+  const note = o.sellerNote ? `<div class="l-note"><strong>Catatan:</strong> ${escapeHtml(o.sellerNote)}</div>` : "";
+
+  let totalQty = 0;
+  const rows = o.items
+    .map((i, idx) => {
+      totalQty += i.qty;
+      const variantText =
+        i.variant && i.variant !== "-"
+          ? escapeHtml(i.variant)
+          : i.category && i.category !== "-"
+          ? escapeHtml(i.category)
+          : "";
+      return `
+        <tr>
+          <td style="width: 18px; color: #666; font-size: 8px; text-align: center;">${idx + 1}</td>
+          <td>
+            <div class="l-prod-name">${escapeHtml(i.name)}</div>
+            ${variantText ? `<div class="l-prod-var">Varian: ${variantText}</div>` : ""}
+          </td>
+          <td class="l-qty">${i.qty}</td>
+        </tr>`;
+    })
     .join("");
-  const courier = o.courier && o.courier !== "-" ? escapeHtml(o.courier) : "-";
-  const tracking = o.trackingNumber && o.trackingNumber !== "-" ? escapeHtml(o.trackingNumber) : "-";
-  const note = o.sellerNote ? `<div class="l-pickup">Catatan: ${escapeHtml(o.sellerNote)}</div>` : "";
 
   const TIKTOK_LABEL_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;margin-right:2px;"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`;
 
-  // M8c — brand header mengikuti platform order: TikTok tetap logo TikTok;
-  // order Shopee/dll memakai nama platform (label lokal bukan label TikTok).
-  const isTikTok = o.platform === "TikTok Shop";
+  const isTikTok = o.platform === "TikTok Shop" || o.platform === "TIKTOK_SHOP";
   const brand = isTikTok
     ? `${TIKTOK_LABEL_ICON} TikTok Shop`
-    : `<span class="tmark">${escapeHtml((o.platform || "-").charAt(0).toUpperCase())}</span> ${escapeHtml(o.platform)}`;
+    : `<span style="font-weight:900;text-transform:uppercase;">${escapeHtml(o.platform || "-")}</span>`;
 
   return `
     <div class="sheet label-sheet">
-      <div class="l-head">
-        <div class="l-brand">${brand}</div>
-        <div class="l-title">Label Pengiriman</div>
-      </div>
-      <div class="l-barcode">${renderBarcode(barcodeValue)}</div>
-      <div class="l-resi-no">${escapeHtml(barcodeValue)}</div>
-      <div class="l-sep"></div>
-      <div>
-        <div class="l-k">Penerima</div>
-        <div class="l-v">${escapeHtml(o.buyerName)}</div>
-        <div class="l-v">${escapeHtml(o.buyerPhone)}</div>
-        <div class="l-addr">${escapeHtml(o.address)}</div>
-        ${note}
-      </div>
-      <div class="l-sep"></div>
-      <div>
-        <div class="l-k">Isi Paket</div>
-        <ul class="l-items">${items || "<li>-</li>"}</ul>
-      </div>
-      <div class="l-foot">
-        <div class="box"><div class="l-k">Toko</div><div class="l-v">${escapeHtml(o.storeName)}</div></div>
-        <div class="box"><div class="l-k">Kurir</div><div class="l-v">${courier}</div></div>
-        <div class="box"><div class="l-k">No. Resi</div><div class="l-v">${tracking}</div></div>
+      <div class="l-box">
+        <div class="l-head">
+          <div class="l-brand">${brand}</div>
+          <div class="l-courier">
+            <span class="l-courier-name">${courier}</span>
+            <span class="l-badge">CASHLESS</span>
+          </div>
+        </div>
+
+        <div class="l-barcode-area">
+          <div class="l-barcode">${renderBarcode(barcodeValue)}</div>
+          <div class="l-resi-no">${escapeHtml(barcodeValue)}</div>
+          <div class="l-order-meta">
+            <span>No. Pesanan: <strong>${escapeHtml(o.orderNo)}</strong></span>
+            <span>${escapeHtml(o.orderDate || "")}</span>
+          </div>
+        </div>
+
+        <div class="l-addresses">
+          <div class="l-recipient">
+            <div class="l-k">Penerima:</div>
+            <div class="l-name">${escapeHtml(o.buyerName)}</div>
+            <div class="l-phone">${escapeHtml(o.buyerPhone || "-")}</div>
+            <div class="l-addr">${escapeHtml(o.address || "-")}</div>
+          </div>
+          <div class="l-sender">
+            <div class="l-k">Pengirim:</div>
+            <div class="l-name">${escapeHtml(o.storeName)}</div>
+            ${o.pickupLocation ? `<div class="l-addr" style="margin-top:2px;">${escapeHtml(o.pickupLocation)}</div>` : ""}
+          </div>
+        </div>
+
+        <div class="l-items-box">
+          <div class="l-items-title">
+            <span>Daftar Barang & Varian</span>
+            <span>Total: ${totalQty} Pcs</span>
+          </div>
+          <table class="l-table">
+            <thead>
+              <tr>
+                <th style="width: 18px; text-align: center;">No</th>
+                <th>Nama Produk & Varian</th>
+                <th style="width: 32px; text-align: center;">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || `<tr><td colspan="3" style="text-align:center;color:#666;">-</td></tr>`}
+            </tbody>
+          </table>
+          ${note}
+        </div>
+
+        <div class="l-foot">
+          <div class="l-foot-item">Platform: <strong>${escapeHtml(o.platform || "TikTok Shop")}</strong></div>
+          <div class="l-foot-item">Metode: <strong>${escapeHtml(o.paymentMethod || "COD/Non-COD")}</strong></div>
+          <div class="l-foot-item">Kurir: <strong>${courier}</strong></div>
+        </div>
       </div>
     </div>`;
 }
