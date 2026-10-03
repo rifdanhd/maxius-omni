@@ -266,6 +266,9 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.redirect(
-    new URL("/settings/accounts?success=true", appOrigin(req)),
+    new URL(
+      `/settings/accounts?success=true&brand=${encodeURIComponent(businessId)}`,
+      appOrigin(req),
+    ),
   );
 }

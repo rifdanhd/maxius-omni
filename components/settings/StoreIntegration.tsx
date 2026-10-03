@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { MonitorPlay, RefreshCw, Trash2, ShoppingBag } from "lucide-react";
 import AddMarketplaceModal from "./AddMarketplaceModal";
-import { authFetch, getActiveBusinessId } from "@/lib/utils/api-client";
+import { authFetch, getActiveBusinessId, setActiveBusinessId } from "@/lib/utils/api-client";
 
 type StoreItem = {
   id: string;
@@ -58,6 +58,13 @@ export default function StoreIntegration() {
     // Banner hasil OAuth dibaca dari query string redirect callback
     // (?success / ?error=...), lalu dibersihkan dari URL.
     const params = new URLSearchParams(window.location.search);
+    // Callback OAuth membawa brand tujuan (?brand=) — bila beda dgn brand
+    // aktif, pindahkan dulu SEBELUM fetch daftar toko (localStorage dipakai
+    // authFetch), supaya toko baru langsung terlihat tanpa reload/loop.
+    const brandParam = params.get("brand");
+    if (brandParam && brandParam !== getActiveBusinessId()) {
+      setActiveBusinessId(brandParam);
+    }
     const key = params.get("success") !== null ? "success" : params.get("error");
     if (key) {
       queueMicrotask(() =>
@@ -66,6 +73,11 @@ export default function StoreIntegration() {
       const url = new URL(window.location.href);
       url.searchParams.delete("success");
       url.searchParams.delete("error");
+      url.searchParams.delete("brand");
+      window.history.replaceState(null, "", url.toString());
+    } else if (brandParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("brand");
       window.history.replaceState(null, "", url.toString());
     }
     let cancelled = false;

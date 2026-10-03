@@ -163,5 +163,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/settings/accounts?error=save_failed", appOrigin(req)));
   }
 
-  return NextResponse.redirect(new URL("/settings/accounts?success=true", appOrigin(req)));
+  return NextResponse.redirect(
+    new URL(
+      `/settings/accounts?success=true&brand=${encodeURIComponent(businessId)}`,
+      appOrigin(req),
+    ),
+  );
 }
