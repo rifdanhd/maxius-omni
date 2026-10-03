@@ -56,6 +56,7 @@ type SyncRunRow = {
   id: string;
   accountId: string;
   startedAt: Date;
+  rangeField: string;
   windowFrom: Date | null;
   cursor: string | null;
   fetched: number;
@@ -75,11 +76,28 @@ export type EnqueueAccountResult = {
 /**
  * enqueueOrderRuns — buat (atau resume) SyncRun order per akun brand ini,
  * lalu jalankan detached. TIDAK menunggu selesai (PRD: background).
+ *
+ * Mode run (disimpan di SyncRun.rangeField, dipertahankan saat resume):
+ *  - delta (default): update_time ≥ lastPulledAt − 10 mnt → HANYA order baru /
+ *    berubah sejak tarikan terakhir (bukan ulang 30 hari tiap klik);
+ *  - full (bootstrap tanpa watermark, atau opts.full): create_time mundur
+ *    SHOPEE_ORDER_SYNC_DAYS hari — utk backfill histori.
  */
-export async function enqueueOrderRuns(businessId: string): Promise<EnqueueAccountResult[]> {
+export async function enqueueOrderRuns(
+  businessId: string,
+  opts?: { full?: boolean }
+): Promise<EnqueueAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, businessId },
-    select: { id: true, label: true, platform: true, accessToken: true, shopCipher: true, externalShopId: true },
+    select: {
+      id: true,
+      label: true,
+      platform: true,
+      accessToken: true,
+      shopCipher: true,
+      externalShopId: true,
+      lastPulledAt: true,
+    },
   });
 
   const out: EnqueueAccountResult[] = [];
@@ -105,11 +123,14 @@ export async function enqueueOrderRuns(businessId: string): Promise<EnqueueAccou
 
     // Resume: run FAILED yang masih punya posisi (cursor/jendela) → lanjut,
     // bukan mulai dari nol (hemat untuk histori 10.000+ yang terputus restart).
-    const resumable = await prisma.syncRun.findFirst({
-      where: { accountId: acc.id, kind: KIND, status: "FAILED", cursor: { not: null } },
-      orderBy: { startedAt: "desc" },
-      select: { id: true },
-    });
+    // opts.full (backfill eksplisit) TIDAK resume — mulai run penuh baru.
+    const resumable = opts?.full
+      ? null
+      : await prisma.syncRun.findFirst({
+          where: { accountId: acc.id, kind: KIND, status: "FAILED", cursor: { not: null } },
+          orderBy: { startedAt: "desc" },
+          select: { id: true },
+        });
     let runId: string;
     if (resumable) {
       await prisma.syncRun.update({
@@ -118,8 +139,25 @@ export async function enqueueOrderRuns(businessId: string): Promise<EnqueueAccou
       });
       runId = resumable.id;
     } else {
+      const now = new Date();
+      const since = opts?.full ? null : acc.lastPulledAt;
+      const useDelta = since !== null;
+      const rangeField = useDelta ? "update_time" : "create_time";
+      const windowFrom = useDelta
+        ? new Date(since.getTime() - 600_000) // overlap 10 mnt (clock skew / run kecil sebelumnya)
+        : new Date(now.getTime() - envInt("SHOPEE_ORDER_SYNC_DAYS", 30) * 86_400_000);
       const run = await prisma.syncRun.create({
-        data: { businessId, accountId: acc.id, kind: KIND, status: "QUEUED", phase: "pulling", message: "antrian" },
+        data: {
+          businessId,
+          accountId: acc.id,
+          kind: KIND,
+          status: "QUEUED",
+          phase: "pulling",
+          message: useDelta ? "antrian — delta dari watermark" : "antrian — jendela penuh",
+          startedAt: now,
+          rangeField,
+          windowFrom,
+        },
       });
       runId = run.id;
     }
@@ -208,6 +246,18 @@ async function finishRun(runId: string, message: string): Promise<void> {
 }
 
 /**
+ * Majukan watermark akun HANYA setelah run sukses tanpa error. Range end =
+ * startedAt (bukan waktu selesai) — order yang berubah selama run berjalan
+ * tetap ke-cover delta berikutnya; overlap 10 menit menutup clock skew.
+ * Gagal update watermark tidak boleh menggagalkan run.
+ */
+async function advanceWatermark(run: SyncRunRow): Promise<void> {
+  await prisma.platformAccount
+    .update({ where: { id: run.accountId }, data: { lastPulledAt: run.startedAt } })
+    .catch(() => {});
+}
+
+/**
  * sweepStaleOrderRuns — run RUNNING yang tidak berdenyut >2 menit (proses
  * mati / restart server) → FAILED resumable. Dipanggil tick instrumentation.
  */
@@ -268,7 +318,9 @@ async function runShopee(
   };
   const seen = new Set<string>();
 
-  // Jendela: run baru = rangeEnd mundur N hari; resume = windowFrom tersimpan.
+  // Mode: delta = update_time (dari watermark, disimpan enqueue); penuh =
+  // create_time mundur N hari. windowFrom SELALU diisi enqueue/resume.
+  const timeRangeField = run.rangeField === "update_time" ? "update_time" : "create_time";
   let windowFrom =
     run.windowFrom !== null
       ? Math.floor(run.windowFrom.getTime() / 1000)
@@ -290,6 +342,7 @@ async function runShopee(
             createTimeTo: winTo,
             cursor,
             pageSize,
+            timeRangeField,
           });
         } catch (e) {
           if (e instanceof ShopeeRateLimitError) {
@@ -374,6 +427,7 @@ async function runShopee(
   } catch {
     /* log gagal tidak menggagalkan run */
   }
+  if (result.errors.length === 0) await advanceWatermark(run);
   await finishRun(run.id, `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada`);
 }
 
@@ -395,13 +449,19 @@ async function runTikTok(
   };
   let pageToken: string | undefined = run.cursor || undefined;
   let pages = 0;
+  // Delta: update_time_ge dari watermark (windowFrom = since − 10 mnt);
+  // mode penuh tanpa filter (ambil semua, urut terbaru).
+  const updateTimeGe =
+    run.rangeField === "update_time" && run.windowFrom
+      ? Math.floor(run.windowFrom.getTime() / 1000)
+      : undefined;
 
   for (;;) {
     let res: Awaited<ReturnType<typeof getOrders>> | null = null;
     let attempts = 0;
     while (res === null) {
       try {
-        res = await getOrders(accessToken, shopCipher, { pageToken });
+        res = await getOrders(accessToken, shopCipher, { pageToken, updateTimeGe });
       } catch (e) {
         attempts += 1;
         if (attempts >= MAX_PAGE_ATTEMPTS) {
@@ -449,6 +509,7 @@ async function runTikTok(
   // Pasca-ingest sekali di akhir: reconcile resi + tracking + SyncLog.
   await postTikTokOrderSync(prisma, run.accountId, result);
   const reconcileNote = result.reconciled > 0 ? `, ${result.reconciled} resi dilengkapi` : "";
+  if (result.errors.length === 0) await advanceWatermark(run);
   await finishRun(
     run.id,
     `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada${reconcileNote}`

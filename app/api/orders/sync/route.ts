@@ -10,7 +10,10 @@ import { enqueueOrderRuns } from "@/lib/services/order-run.service";
  */
 export const POST = withAuth(async (req) => {
   try {
-    const results = await enqueueOrderRuns(req.businessId);
+    // {"full": true} = backfill jendela penuh (abaikan watermark) — default
+    // tetap delta: hanya order baru/berubah sejak tarikan terakhir.
+    const body = (await req.json().catch(() => ({}))) as { full?: unknown };
+    const results = await enqueueOrderRuns(req.businessId, { full: Boolean(body.full) });
     const errors = results.filter((r) => r.error).map((r) => `${r.label}: ${r.error}`);
     const started = results.filter((r) => r.runId && !r.skipped).length;
     const stillRunning = results.filter((r) => r.skipped).length;

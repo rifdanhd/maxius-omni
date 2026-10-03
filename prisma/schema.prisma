@@ -561,6 +561,8 @@ model SyncRun {
   message    String?
   /// Resume token: TikTok page_token / Shopee get_order_list cursor
   cursor     String?
+  /// Mode tarikan run ini: create_time (jendela penuh/bootstrap) | update_time (delta watermark)
+  rangeField String    @default("create_time")
   /// Jendela waktu Shopee (maks 15 hari) yang sedang/sudah ditarik
   windowFrom DateTime?
   windowTo   DateTime?
