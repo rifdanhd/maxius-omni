@@ -86,7 +86,7 @@ export async function syncStockToMarketplaces(
       // DISENGAJA user → success=true (tidak ada aksi retry yang berguna).
       const gateKey = PLATFORM_SYNC_GATE[account.platform as keyof typeof PLATFORM_SYNC_GATE];
       if (gateKey) {
-        const settings = await getCachedInventorySettings();
+        const settings = await getCachedInventorySettings(account.businessId);
         if (!settings[gateKey]) {
           await logStockPush(account.id, mapping.channelSku, newStock, "skipped",
             `Auto-push stok ke ${account.platform} dimatikan di Pengaturan Inventori.`);

@@ -186,7 +186,7 @@ export async function mapOrphanToNewMaster(params: {
   const stock = Math.max(0, Math.floor(params.stock ?? 0));
   const safetyStock = Math.max(0, Math.floor(params.safetyStock ?? 0));
   const sku = params.sku?.trim() || params.channelSku;
-  const settings = await getCachedInventorySettings();
+  const settings = await getCachedInventorySettings(params.businessId);
 
   const existingForSku = await prisma.productMapping.findUnique({
     where: { accountId_channelSku: { accountId: params.accountId, channelSku: params.channelSku } },

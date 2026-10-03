@@ -37,12 +37,12 @@ export const GET = withAuth(async (req) => {
   // Gate notifikasi stok menipis (Pengaturan Inventori). Channel EMAIL belum
   // ada di sistem (tidak ada provider) — bell in-app ini satu-satunya channel;
   // kalau dimatikan, endpoint tetap ada tapi tidak mengeluarkan alert.
-  const settings = await getCachedInventorySettings();
+  const businessId = req.businessId;
+  const settings = await getCachedInventorySettings(businessId);
   if (!settings.notifyLowStock) {
     return NextResponse.json({ count: 0, alerts: [] });
   }
 
-  const businessId = req.businessId;
   const data = await cached(`stock-alerts:${businessId}`, CACHE_TTL_MS, async () => {
     const rows = await prisma.$queryRaw<StockAlertRow[]>`
       SELECT

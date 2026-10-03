@@ -3,7 +3,7 @@
  *
  * DB fixture ASLI (SQLite temp + migrate deploy) — tanpa mock prisma.
  * Cakupan:
- *  1. Settings semantics: singleton auto-create, patch parsial, persistensi,
+ *  1. Settings semantics: auto-create per brand, patch parsial, persistensi,
  *     validasi ketat (threshold non-bulat/negatif, boolean salah tipe,
  *     frekuensi tak dikenal, body bukan objek).
  *  2. lowStockDefaultThreshold → ambang awal produk BARU, diuji lewat HANDLER
@@ -28,7 +28,6 @@ const {
   getInventorySettings,
   updateInventorySettings,
   validateInventorySettingsUpdate,
-  SETTING_ID,
 } = await import("@/lib/services/inventory-settings.service");
 const { saveProductCopyAsDraft } = await import("@/lib/services/product-copy.service");
 const { syncStockToMarketplaces } = await import("@/lib/services/sync.service");
@@ -96,7 +95,14 @@ await ok("get pertama kali → auto-create baris default", async () => {
   assert.equal(s.opnameReminderFrequency, "monthly");
   const rows = await prisma.inventorySetting.findMany();
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].id, SETTING_ID);
+  assert.equal(rows[0].businessId, "business-default");
+});
+
+await ok("brand lain: auto-create menyalin baris default (perilaku identik)", async () => {
+  const s = await getInventorySettings(business.id);
+  assert.equal(s.lowStockDefaultThreshold, 20, "salinan harus sama dgn baris default saat dibuat");
+  const row = await prisma.inventorySetting.findUnique({ where: { businessId: business.id } });
+  assert.ok(row, "baris brand lain harus tersimpan terpisah");
 });
 
 await ok("validate: field tak dikenal diabaikan, field valid lolos", async () => {
@@ -133,7 +139,7 @@ rejectsVal(
 rejectsVal("validate: body null ditolak", validateInventorySettingsUpdate(null), "Body harus objek");
 
 await ok("updateInventorySettings: patch parsial + persistensi", async () => {
-  const s1 = await updateInventorySettings({
+  const s1 = await updateInventorySettings("business-default", {
     lowStockDefaultThreshold: 5,
     notifyLowStock: false,
     syncPushTiktok: false,
@@ -150,8 +156,8 @@ await ok("updateInventorySettings: patch parsial + persistensi", async () => {
 /* ─────────────────────── 2 — Threshold wiring ─────────────────────── */
 console.log("=== 2 — lowStockDefaultThreshold → produk baru ===");
 
-await ok("product-copy: draft baru memakai ambang global (bukan 20)", async () => {
-  await updateInventorySettings({ lowStockDefaultThreshold: 7 });
+await ok("product-copy: draft baru memakai ambang setting brand (bukan 20)", async () => {
+  await updateInventorySettings("business-default", { lowStockDefaultThreshold: 7 });
   const { id } = await saveProductCopyAsDraft({
     businessId: "business-default",
     name: "[TEST] Produk Copy Threshold",
@@ -162,8 +168,8 @@ await ok("product-copy: draft baru memakai ambang global (bukan 20)", async () =
   await prisma.masterProduct.delete({ where: { id } });
 });
 
-await ok("HANDLER /api/inventory/mappings: produk baru ber-threshold global", async () => {
-  await updateInventorySettings({ lowStockDefaultThreshold: 9 });
+await ok("HANDLER /api/inventory/mappings: produk baru ber-threshold setting brand", async () => {
+  await updateInventorySettings(business.id, { lowStockDefaultThreshold: 9 });
   const req = new Request("http://localhost/api/inventory/mappings", {
     method: "POST",
     headers: authHeaders,
@@ -189,7 +195,7 @@ console.log("=== 3 — syncPush* gate di sync.service ===");
 
 await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk antrean", async () => {
   _resetStockPushQueueForTests();
-  await updateInventorySettings({ syncPushTiktok: false });
+  await updateInventorySettings(business.id, { syncPushTiktok: false });
   await syncStockToMarketplaces([{ accountId: acc.id, channelSku: "SET-GATE-1" }], 42);
   const gateLogs = await prisma.syncLog.findMany({
     where: {
@@ -203,7 +209,7 @@ await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk ant
   // Nilai yang ditahan tercatat di payload — cek jejak tidak silent.
   assert.ok(gateLogs[0].message?.includes("TikTok Shop") || gateLogs[0].message?.includes("TIKTOK_SHOP"));
   // Aktifkan lagi → tidak ada log gate baru untuk push berikutnya.
-  await updateInventorySettings({ syncPushTiktok: true });
+  await updateInventorySettings(business.id, { syncPushTiktok: true });
   await syncStockToMarketplaces([{ accountId: acc.id, channelSku: "SET-GATE-2" }], 43);
   const gateLogs2 = await prisma.syncLog.findMany({
     where: { accountId: acc.id, message: { contains: "dimatikan" } },
@@ -213,7 +219,7 @@ await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk ant
 });
 
 await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum terhubung OAuth'", async () => {
-  await updateInventorySettings({ syncPushShopee: false });
+  await updateInventorySettings(business.id, { syncPushShopee: false });
   await syncStockToMarketplaces([{ accountId: accShopee.id, channelSku: "SET-GATE-S1" }], 10);
   const gate = await prisma.syncLog.findFirst({
     where: { accountId: accShopee.id, message: { contains: "dimatikan" } },
@@ -223,7 +229,7 @@ await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum terhubung
 
   // Jalur lama ("belum punya integrasi push stok") diganti adapter Shopee
   // (PHASE B.4): akun tanpa token → skipped + pesan OAuth, tetap tidak silent.
-  await updateInventorySettings({ syncPushShopee: true });
+  await updateInventorySettings(business.id, { syncPushShopee: true });
   await syncStockToMarketplaces([{ accountId: accShopee.id, channelSku: "SET-GATE-S2" }], 11);
   const plain = await prisma.syncLog.findFirst({
     where: { accountId: accShopee.id, message: { contains: "belum terhubung OAuth Shopee" } },
@@ -236,7 +242,7 @@ await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum terhubung
 console.log("=== 4 — notifyLowStock gate di /api/stock-alerts ===");
 
 await ok("bell dimatikan → handler mengembalikan alerts kosong", async () => {
-  await updateInventorySettings({ notifyLowStock: false });
+  await updateInventorySettings(business.id, { notifyLowStock: false });
   const req = new Request("http://localhost/api/stock-alerts", { headers: authHeaders });
   const res = await (stockAlertsRoute.GET as (r: unknown) => Promise<Response>)(req);
   assert.ok(res.ok);
@@ -244,7 +250,7 @@ await ok("bell dimatikan → handler mengembalikan alerts kosong", async () => {
   assert.deepEqual(data.alerts, []);
   assert.equal(data.count, 0);
 
-  await updateInventorySettings({ notifyLowStock: true });
+  await updateInventorySettings(business.id, { notifyLowStock: true });
   const res2 = await (stockAlertsRoute.GET as (r: unknown) => Promise<Response>)(req);
   const data2 = (await res2.json()) as { count: number; alerts: unknown[] };
   assert.ok(Array.isArray(data2.alerts), "saat aktif, bentuk respons tetap normal");

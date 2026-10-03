@@ -6,10 +6,10 @@ import {
   validateInventorySettingsUpdate,
 } from "@/lib/services/inventory-settings.service";
 
-// GET /api/inventory/settings — baca singleton (baris default auto-dibuat
-// saat pertama dibaca — tanpa seed terpisah).
-export const GET = withAuth(async () => {
-  const settings = await getInventorySettings();
+// GET /api/inventory/settings — baca baris brand aktif (auto-create bila
+// pertama — tanpa seed terpisah).
+export const GET = withAuth(async (req) => {
+  const settings = await getInventorySettings(req.businessId);
   return NextResponse.json({ settings });
 });
 
@@ -21,6 +21,6 @@ export const PUT = withAuth(async (req) => {
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.reason }, { status: 400 });
   }
-  const settings = await updateInventorySettings(parsed.data);
+  const settings = await updateInventorySettings(req.businessId, parsed.data);
   return NextResponse.json({ settings });
 });

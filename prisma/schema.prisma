@@ -49,6 +49,7 @@ model Business {
 
 model InventorySetting {
   id                       String   @id @default("inventory-default")
+  businessId               String   @unique @default("business-default")
   lowStockDefaultThreshold Int      @default(20)
   notifyLowStock           Boolean  @default(true)
   notifyLowStockEmail      Boolean  @default(false)

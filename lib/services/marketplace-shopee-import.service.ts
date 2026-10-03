@@ -113,7 +113,7 @@ export async function importShopeeListings(params: {
   limit?: number;
 }): Promise<ShopeeImportAccountResult[]> {
   const limit = normalizeShopeeImportLimit(params.limit);
-  const settings = await getCachedInventorySettings();
+  const settings = await getCachedInventorySettings(params.businessId);
 
   const accounts = await prisma.platformAccount.findMany({
     where: {

@@ -131,9 +131,9 @@ export const POST = withAuth(async (req) => {
     });
   } else {
     // Buat produk + varian baru sekaligus, lalu mapping di bawah.
-    // Ambang awal produk baru = setting global Pengaturan Inventori
+    // Ambang awal produk baru = setting Pengaturan Inventori brand aktif
     // (produk existing tetap pakai threshold per-produk masing-masing).
-    const settings = await getCachedInventorySettings();
+    const settings = await getCachedInventorySettings(req.businessId);
     const created = await prisma.$transaction(async (tx) => {
       const product = await tx.masterProduct.create({
         data: {

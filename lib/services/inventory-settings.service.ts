@@ -1,16 +1,19 @@
 import { prisma } from "@/lib/db/prisma";
+import { DEFAULT_BUSINESS_ID } from "@/lib/services/business-scope.service";
 
 /**
  * Pengaturan Inventori (FITUR Pengaturan Inventori).
  *
- * Singleton row id "inventory-default" — auto-dibuat saat pertama dibaca
- * (pola get-or-create; tanpa seed terpisah). Kolom eksplisit di schema agar
- * type-safe. Nilai per setting & pemakaiannya:
+ * Satu baris PER BRAND (unique businessId; legacy id "inventory-default"
+ * = baris brand default era singleton). Auto-dibuat saat pertama dibaca —
+ * baris brand baru menyalin nilai baris default (pola get-or-create; tanpa
+ * seed terpisah). Kolom eksplisit di schema agar type-safe. Nilai per
+ * setting & pemakaiannya:
  *
  * - lowStockDefaultThreshold → ambang AWAL MasterProduct.threshold utk produk
  *   BARU (dua lokasi create: /api/inventory/mappings & product-copy.service).
  *   Produk existing tetap pakai threshold per-produk (dapat diubah di halaman
- *   Produk Master) — global TIDAK menimpa nilai per-produk.
+ *   Produk Master) — setting brand TIDAK menimpa nilai per-produk.
  * - notifyLowStock → gate in-app NotificationBell via /api/stock-alerts.
  *   notifyLowStockEmail disimpan tapi BELUM aktif: repo tidak punya provider
  *   email (tidak ada nodemailer/resend/smtp) — tidak bikin sistem baru.
@@ -63,12 +66,43 @@ function toSettings(row: SettingsRow): InventorySettings {
   };
 }
 
-/** getInventorySettings — baca singleton; auto-create baris default bila kosong. */
-export async function getInventorySettings(): Promise<InventorySettings> {
-  const row = await prisma.inventorySetting.findUnique({ where: { id: SETTING_ID } });
-  if (row) return toSettings(row);
-  const created = await prisma.inventorySetting.create({ data: { id: SETTING_ID } });
-  return toSettings(created);
+/** getInventorySettings — baca baris PER BRAND; auto-create bila kosong.
+ *  Baris baru disalin dari baris default brand (periode singleton global)
+ *  supaya perilaku tiap brand identik dengan sebelum pemisahan. */
+export async function getInventorySettings(
+  businessId: string = DEFAULT_BUSINESS_ID
+): Promise<InventorySettings> {
+  const existing = await prisma.inventorySetting.findUnique({ where: { businessId } });
+  if (existing) return toSettings(existing);
+  const template = await prisma.inventorySetting.findUnique({
+    where: { businessId: DEFAULT_BUSINESS_ID },
+  });
+  try {
+    const created = await prisma.inventorySetting.create({
+      data: {
+        // PK per brand; baris legacy tetap memakai id "inventory-default".
+        id: businessId,
+        businessId,
+        ...(template
+          ? {
+              lowStockDefaultThreshold: template.lowStockDefaultThreshold,
+              notifyLowStock: template.notifyLowStock,
+              notifyLowStockEmail: template.notifyLowStockEmail,
+              syncPushTokopedia: template.syncPushTokopedia,
+              syncPushShopee: template.syncPushShopee,
+              syncPushTiktok: template.syncPushTiktok,
+              opnameReminderFrequency: template.opnameReminderFrequency,
+            }
+          : {}),
+      },
+    });
+    return toSettings(created);
+  } catch (e) {
+    // Balapan pembacaan paralel → unique(businessId) menang; baca ulang.
+    const again = await prisma.inventorySetting.findUnique({ where: { businessId } });
+    if (again) return toSettings(again);
+    throw e;
+  }
 }
 
 /**
@@ -79,8 +113,10 @@ export async function getInventorySettings(): Promise<InventorySettings> {
  * dimatikan masih diabaikan sampai TTL habis (push bisa jalan setelah
  * dimatikan). Kejujuran perilaku > penghematan mikro.
  */
-export async function getCachedInventorySettings(): Promise<InventorySettings> {
-  return getInventorySettings();
+export async function getCachedInventorySettings(
+  businessId: string = DEFAULT_BUSINESS_ID
+): Promise<InventorySettings> {
+  return getInventorySettings(businessId);
 }
 
 /**
@@ -138,11 +174,12 @@ export function validateInventorySettingsUpdate(
   return { ok: true, data: out };
 }
 
-/** updateInventorySettings — patch parsial; pastikan baris ada dulu. */
+/** updateInventorySettings — patch parsial per brand; pastikan baris ada dulu. */
 export async function updateInventorySettings(
+  businessId: string,
   patch: Partial<InventorySettings>
 ): Promise<InventorySettings> {
-  await getInventorySettings();
-  const row = await prisma.inventorySetting.update({ where: { id: SETTING_ID }, data: patch });
+  await getInventorySettings(businessId);
+  const row = await prisma.inventorySetting.update({ where: { businessId }, data: patch });
   return toSettings(row);
 }

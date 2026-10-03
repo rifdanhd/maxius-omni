@@ -847,8 +847,8 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
         ];
 
   return await prisma.$transaction(async (tx) => {
-    // Ambang awal produk baru = setting global Pengaturan Inventori.
-    const settings = await getCachedInventorySettings();
+    // Ambang awal produk baru = setting Pengaturan Inventori brand produk.
+    const settings = await getCachedInventorySettings(input.businessId);
     const product = await tx.masterProduct.create({
       data: {
         name,
