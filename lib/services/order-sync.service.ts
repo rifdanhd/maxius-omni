@@ -184,7 +184,18 @@ async function syncOrdersTikTokInner(
   if (!account.accessToken) throw new Error("Akun belum punya access token.");
   if (!account.shopCipher) throw new Error("Akun belum punya shop_cipher.");
 
-  const { orders } = await getOrders(account.accessToken, account.shopCipher);
+  // Tarik SEMUA halaman orders/search. Default API hanya 20 order/panggilan dan
+  // tanpa loop, order baru di halaman berikutnya tidak pernah ketarik
+  // (insiden: "0 baru, 20 sudah ada" padahal webhook menerima order baru).
+  const orders: OrderRaw[] = [];
+  const MAX_ORDER_PAGES = 50;
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_ORDER_PAGES; page++) {
+    const res = await getOrders(account.accessToken, account.shopCipher, { pageToken });
+    orders.push(...(res.orders as OrderRaw[]));
+    if (res.orders.length === 0 || !res.nextPageToken) break;
+    pageToken = res.nextPageToken;
+  }
 
   const result = { fetched: orders.length, created: 0, skipped: 0, errors: [] as string[], reconciled: 0, reconcileScan: 0, trackingEvents: 0 };
 
@@ -414,6 +425,27 @@ async function syncOrdersTikTokInner(
     result.errors.push(...tracking.errors.map((e) => `tracking: ${e}`));
   } catch (e) {
     result.errors.push(`tracking: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // Riwayat sync TikTok (sebelumnya tidak ada log sama sekali — hanya Shopee).
+  try {
+    await prisma.syncLog.create({
+      data: {
+        direction: "in",
+        kind: "order_sync",
+        status: result.errors.length > 0 ? "error" : "success",
+        message: `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada`,
+        payload: JSON.stringify({
+          fetched: result.fetched,
+          created: result.created,
+          skipped: result.skipped,
+          errors: result.errors,
+        }),
+        accountId,
+      },
+    });
+  } catch (e) {
+    console.warn("[OrderSync] gagal menulis SyncLog order_sync:", e instanceof Error ? e.message : String(e));
   }
 
   return result;

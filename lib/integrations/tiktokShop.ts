@@ -390,9 +390,9 @@ export async function searchReturns(
 export async function getOrders(
   accessToken: string,
   shopCipher?: string,
-  opts: { pageSize?: number; orderStatus?: string } = {}
+  opts: { pageSize?: number; orderStatus?: string; pageToken?: string } = {}
 ) {
-  const { pageSize = 20, orderStatus } = opts;
+  const { pageSize = 20, orderStatus, pageToken } = opts;
   // Catatan penting (106001/sign invalid): bila body kosong `{}`, generateSign melewati
   // body TAPI fetch mengirim `"{}"` -> signature mismatch -> HTTP 401.
   // Karena itu kirim body null (tanpa body) saat tidak ada filter, dan hanya sertakan
@@ -402,7 +402,7 @@ export async function getOrders(
     "POST",
     "/order/202309/orders/search",
     accessToken,
-    { page_size: pageSize },
+    { page_size: pageSize, ...(pageToken ? { page_token: pageToken } : {}) },
     body,
     shopCipher
   );
