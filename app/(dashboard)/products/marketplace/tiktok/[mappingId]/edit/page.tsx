@@ -647,6 +647,7 @@ export default function TikTokEditPage() {
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       showToast("error", "Periksa kembali field yang wajib diisi.");
+      setTimeout(() => focusFirstInvalidField(errors), 0);
       return;
     }
 
@@ -783,7 +784,7 @@ export default function TikTokEditPage() {
 
       {/* A. Informasi Produk */}
       <Section title="A. Informasi Produk" icon={Layers} index={1}>
-        <Field label="Nama Produk" required error={fieldErrors.title}>
+        <Field label="Nama Produk" required error={fieldErrors.title} fieldKey="title">
           <input
             type="text"
             value={title}
@@ -800,7 +801,7 @@ export default function TikTokEditPage() {
           <span className="text-[11px] text-gray-400">{title.length}/255 karakter</span>
         </Field>
 
-        <Field label="Kategori" required error={fieldErrors.category}>
+        <Field label="Kategori" required error={fieldErrors.category} fieldKey="category">
           <div className="relative">
             <button
               type="button"
@@ -865,7 +866,7 @@ export default function TikTokEditPage() {
           </div>
         </Field>
 
-        <Field label="Deskripsi Produk" required error={fieldErrors.description} hint="Bullet list, numbered list, dan insert gambar didukung.">
+        <Field label="Deskripsi Produk" required error={fieldErrors.description} hint="Bullet list, numbered list, dan insert gambar didukung." fieldKey="description">
           <div
             className={`border rounded-md overflow-hidden ${fieldErrors.description ? "border-gray-400" : "border-gray-300"}`}
           >
@@ -910,7 +911,7 @@ export default function TikTokEditPage() {
       </Section>
 
       {/* B. Spesifikasi */}
-      <Section title="B. Spesifikasi" icon={Info} index={2} hint="Atribut dinamis dari kategori TikTok Shop yang dipilih.">
+      <Section title="B. Spesifikasi" icon={Info} index={2} hint="Atribut dinamis dari kategori TikTok Shop yang dipilih." fieldKey="attrs">
         {requiredAttrs.map((a) => (
           <AttributeField
             key={a.id}
@@ -1058,7 +1059,7 @@ export default function TikTokEditPage() {
               {rows.map((r) => {
                 const err = fieldErrors[`variant-${r.key}`];
                 return (
-                  <tr key={r.key} className="border-b border-gray-100 last:border-0">
+                  <tr key={r.key} className="border-b border-gray-100 last:border-0" data-field-key={`variant-${r.key}`}>
                     <td className="px-4 py-2 text-gray-700 font-semibold">{r.name || "Varian"}</td>
                     <td className="px-4 py-2">
                       <input
@@ -1106,7 +1107,7 @@ export default function TikTokEditPage() {
       </Section>
 
       {/* D. Foto Produk */}
-      <Section title="D. Unggah Foto Produk" icon={ImagePlus} index={4} error={fieldErrors.images}>
+      <Section title="D. Unggah Foto Produk" icon={ImagePlus} index={4} error={fieldErrors.images} fieldKey="images">
         <div className="grid grid-cols-1 md:grid-cols-3 sm:grid-cols-5 gap-3">
           {images.map((img) => (
             <div key={img.uid} className="relative group aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-50">
@@ -1201,7 +1202,7 @@ export default function TikTokEditPage() {
       {/* F. Pengiriman & Garansi */}
       <Section title="F. Pengiriman & Garansi" icon={Check} index={6}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <Field label="Berat Produk" required error={fieldErrors.weight}>
+          <Field label="Berat Produk" required error={fieldErrors.weight} fieldKey="weight">
             <div className="flex gap-2">
               <input
                 type="number"
@@ -1238,6 +1239,7 @@ export default function TikTokEditPage() {
                   min={1}
                   max={1000}
                   value={pkg[k]}
+                  data-field-key={k}
                   onChange={(e) => {
                     setPkg((p) => ({ ...p, [k]: e.target.value }));
                     setFieldErrors((f) => ({ ...f, [k]: "" }));
@@ -1266,7 +1268,7 @@ export default function TikTokEditPage() {
       </Section>
 
       {/* G. Publish Platform */}
-      <Section title="G. Publish Platform" icon={Check} index={7} error={fieldErrors.platforms} hint="Akun ini terintegrasi TikTok Shop — satu produk bisa tayang di beberapa storefront.">
+      <Section title="G. Publish Platform" icon={Check} index={7} error={fieldErrors.platforms} fieldKey="platforms" hint="Akun ini terintegrasi TikTok Shop — satu produk bisa tayang di beberapa storefront.">
         <div className="space-y-2">
           {data.platforms.map((p) => (
             <label
@@ -1324,12 +1326,28 @@ export default function TikTokEditPage() {
 
 /* ------------------------------ Sub-components ------------------------------ */
 
+/** Scroll + fokus ke field pertama yang error (urutan DOM = urutan form). */
+function focusFirstInvalidField(errors: Record<string, string>) {
+  const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-field-key]"));
+  for (const el of nodes) {
+    const key = el.dataset.fieldKey ?? "";
+    if (!errors[key]) continue;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const target = el.matches("input, select, textarea, button")
+      ? el
+      : el.querySelector<HTMLElement>("input:not([type='hidden']), select, textarea, button");
+    target?.focus({ preventScroll: true });
+    break;
+  }
+}
+
 function Section({
   title,
   icon: Icon,
   index,
   hint,
   error,
+  fieldKey,
   children,
 }: {
   title: string;
@@ -1337,10 +1355,11 @@ function Section({
   index?: number;
   hint?: string;
   error?: string;
+  fieldKey?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-8">
+    <section className="mb-8" data-field-key={fieldKey}>
       <div className="flex items-center gap-2 mb-3">
         {index && (
           <span className="w-6 h-6 rounded-full bg-[#111827] text-white text-xs font-bold flex items-center justify-center">
@@ -1362,16 +1381,18 @@ function Field({
   required,
   error,
   hint,
+  fieldKey,
   children,
 }: {
   label: string;
   required?: boolean;
   error?: string;
   hint?: string;
+  fieldKey?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 last:mb-0">
+    <div className="mb-4 last:mb-0" data-field-key={fieldKey}>
       <label className="font-semibold text-gray-700 text-sm flex items-center gap-1 mb-1.5">
         {label}
         {required && <span className="text-gray-500">*</span>}

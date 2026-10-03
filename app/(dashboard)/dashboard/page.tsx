@@ -88,6 +88,23 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('potensi'); // potensi, terjual, penjualan, pesanan
   const [panduanAwalOpen, setPanduanAwalOpen] = useState(true);
+  const [greet, setGreet] = useState<{ name: string | null; salam: string; date: string } | null>(null);
+  useEffect(() => {
+    queueMicrotask(() => {
+      const h = new Date().getHours();
+      setGreet({
+        name: localStorage.getItem("username"),
+        salam: h < 11 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam",
+        date: new Intl.DateTimeFormat("id-ID", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "Asia/Jakarta",
+        }).format(new Date()),
+      });
+    });
+  }, []);
 
   useEffect(() => {
     async function loadAll() {
@@ -148,6 +165,15 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 md:p-8">
+      <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm px-4 md:px-6 py-5">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+          {greet ? `${greet.salam}, ${greet.name ?? "Seller"}` : "Selamat datang"} 👋
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {greet ? `${greet.date} · ` : ""}Berikut ringkasan toko Anda hari ini.
+        </p>
+      </div>
+
       <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-4 md:px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-800">Yang Perlu Dilakukan</h2>

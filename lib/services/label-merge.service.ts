@@ -174,6 +174,192 @@ function formatDate(): string {
   return new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function safeText(str: string): string {
+  return String(str ?? "")
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * stampProductVariantOnLabel — menempelkan tabel rincian produk & varian
+ * langsung pada area putih bagian bawah label resmi TikTok (halaman 1),
+ * sehingga label tetap 100% ASLI (barcode, logo TikTok & J&T, alamat kurir)
+ * dan sekaligus memuat varian untuk staf packing gudang.
+ */
+export async function stampProductVariantOnLabel(
+  pdfBytes: Uint8Array,
+  rows: LabelMergeProductRow[],
+  orderNo?: string
+): Promise<Uint8Array> {
+  if (!rows || rows.length === 0) return pdfBytes;
+
+  const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const pages = pdfDoc.getPages();
+  if (pages.length === 0) return pdfBytes;
+
+  const page = pages[0];
+  const { width, height } = page.getSize();
+  const font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedStandardFont(StandardFonts.HelveticaBold);
+
+  // Label resmi A6 (tinggi ~420pt). Area kurir berakhir di sekitar y ≈ 145pt.
+  // Area bawah yang kosong ada di rentang y = 10pt s.d. y = 142pt.
+  const margin = 12;
+  const boxWidth = width - margin * 2;
+  const boxTop = Math.min(142, height * 0.36);
+  const boxBottom = 10;
+  const boxHeight = boxTop - boxBottom;
+
+  if (boxHeight < 50) {
+    // Ruang di bawah tidak cukup, kembalikan dokumen asli
+    return pdfBytes;
+  }
+
+  // 1. Kotak bingkai pembatas
+  page.drawRectangle({
+    x: margin,
+    y: boxBottom,
+    width: boxWidth,
+    height: boxHeight,
+    borderWidth: 1,
+    borderColor: DARK,
+    color: WHITE,
+  });
+
+  // 2. Baris Header Gelap
+  const headerHeight = 13;
+  const headerY = boxTop - headerHeight;
+  page.drawRectangle({
+    x: margin,
+    y: headerY,
+    width: boxWidth,
+    height: headerHeight,
+    color: NAVY,
+  });
+
+  page.drawText("RINCIAN PRODUK & VARIAN", {
+    x: margin + 6,
+    y: headerY + 3.5,
+    size: 7,
+    font: bold,
+    color: WHITE,
+  });
+
+  const totalQty = rows.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
+  page.drawText(`Total: ${totalQty} pcs`, {
+    x: margin + boxWidth - 55,
+    y: headerY + 3.5,
+    size: 6.5,
+    font: bold,
+    color: WHITE,
+  });
+
+  // 3. Kolom Tabel
+  const cols = [
+    { label: "No", w: 18 },
+    { label: "Nama Produk", w: Math.floor(boxWidth * 0.44) },
+    { label: "Varian / SKU", w: Math.floor(boxWidth * 0.40) },
+    { label: "Qty", w: boxWidth - 18 - Math.floor(boxWidth * 0.44) - Math.floor(boxWidth * 0.40) },
+  ];
+
+  const colHeaderY = headerY - 11;
+  let cx = margin;
+  for (const c of cols) {
+    page.drawText(c.label, {
+      x: cx + 3,
+      y: colHeaderY + 2.5,
+      size: 6.5,
+      font: bold,
+      color: DARK,
+    });
+    cx += c.w;
+  }
+  page.drawLine({
+    start: { x: margin, y: colHeaderY },
+    end: { x: margin + boxWidth, y: colHeaderY },
+    thickness: 0.5,
+    color: LIGHT,
+  });
+
+  // 4. Data Baris Produk & Varian
+  const rowHeight = 12.5;
+  let currentY = colHeaderY - rowHeight;
+  const maxRows = Math.floor((colHeaderY - boxBottom - 4) / rowHeight);
+  const displayRows = rows.slice(0, maxRows);
+
+  for (let i = 0; i < displayRows.length; i++) {
+    const r = displayRows[i];
+    cx = margin;
+
+    // No
+    page.drawText(String(i + 1), {
+      x: cx + 4,
+      y: currentY + 3,
+      size: 6.5,
+      font,
+      color: DARK,
+    });
+    cx += cols[0].w;
+
+    // Nama Produk
+    const safeProd = safeText(r.productName);
+    page.drawText(clip(safeProd, 28), {
+      x: cx + 3,
+      y: currentY + 3,
+      size: 6.5,
+      font: bold,
+      color: DARK,
+      maxWidth: cols[1].w - 6,
+    });
+    cx += cols[1].w;
+
+    // Varian
+    const variantStr = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
+    page.drawText(clip(variantStr, 24), {
+      x: cx + 3,
+      y: currentY + 3,
+      size: 6.5,
+      font: bold,
+      color: DARK,
+      maxWidth: cols[2].w - 6,
+    });
+    cx += cols[2].w;
+
+    // Qty
+    page.drawText(String(r.qty), {
+      x: cx + 6,
+      y: currentY + 3,
+      size: 7,
+      font: bold,
+      color: DARK,
+    });
+
+    // Divider
+    page.drawLine({
+      start: { x: margin, y: currentY },
+      end: { x: margin + boxWidth, y: currentY },
+      thickness: 0.4,
+      color: LIGHT,
+    });
+
+    currentY -= rowHeight;
+  }
+
+  // Jika produk melebihi kapasitas baris
+  if (rows.length > maxRows) {
+    page.drawText(`+ ${rows.length - maxRows} produk lainnya`, {
+      x: margin + 6,
+      y: boxBottom + 2.5,
+      size: 6,
+      font: bold,
+      color: GRAY,
+    });
+  }
+
+  return await pdfDoc.save();
+}
+
 async function fetchDocumentBytes(docUrl: string): Promise<Uint8Array> {
   const res = await fetch(docUrl, { headers: { "User-Agent": "maxius-platform/1.0.0" } });
   if (!res.ok) throw new Error(`unduh label gagal (HTTP ${res.status})`);
@@ -238,15 +424,20 @@ export async function mergeShippingDocuments(
     try {
       const { bytes } = r.value;
       if (isPdf(bytes)) {
-        await mergePdfs(merged, bytes);
+        // Tempelkan varian langsung pada label resmi halaman 1
+        if (item.rows && item.rows.length > 0) {
+          const stamped = await stampProductVariantOnLabel(bytes, item.rows, item.orderNo);
+          await mergePdfs(merged, stamped);
+        } else {
+          await mergePdfs(merged, bytes);
+        }
       } else if (isPng(bytes) || isJpeg(bytes)) {
         await embedLabelImage(merged, bytes);
+        if (item.rows && item.rows.length > 0) {
+          addProductSummaryPage(merged, item.orderNo, item.rows, "PRODUK");
+        }
       } else {
         throw new Error("format dokumen tidak didukung");
-      }
-      // Bagian bawah: tabel ringkasan produk dari OrderItem/ProductVariant lokal.
-      if (item.rows && item.rows.length > 0) {
-        addProductSummaryPage(merged, item.orderNo, item.rows, "PRODUK");
       }
       // Opsional: halaman Picking List untuk gudang.
       if (item.includePickingList) {

@@ -4,6 +4,10 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
+import {
+  stampProductVariantOnLabel,
+  type LabelMergeProductRow,
+} from "@/lib/services/label-merge.service";
 
 /**
  * Label pengiriman RESMI dari TikTok (GetPackageShippingDocument).
@@ -11,7 +15,8 @@ import { getShippingDocument } from "@/lib/integrations/tiktokShop";
  *   - order belum di-ship → 404 (frontend harus fallback ke render lokal)
  *   - order dikirim oleh seller (ship order AWB mandiri) → tidak tersedia
  *
- * Mengembalikan doc_url (PDF/PNG, valid 24 jam) + tracking_number paket.
+ * Mengembalikan doc_url (PDF asli) + pdfBase64 (PDF resmi TikTok yang sudah
+ * ditambahkan rincian varian produk di area bawah) + tracking_number paket.
  */
 export const GET = withAuth(
   async (req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
@@ -25,6 +30,20 @@ export const GET = withAuth(
         },
         shipments: {
           select: { externalId: true, trackingNo: true, status: true },
+        },
+        items: {
+          select: {
+            productName: true,
+            skuName: true,
+            channelSku: true,
+            qty: true,
+            variant: {
+              select: {
+                sku: true,
+                masterProduct: { select: { name: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -59,7 +78,9 @@ export const GET = withAuth(
     const { docUrl, trackingNumber } = await getShippingDocument(
       order.account.accessToken,
       order.account.shopCipher ?? undefined,
-      packageId
+      packageId,
+      "SHIPPING_LABEL",
+      "PDF"
     );
 
     if (!docUrl) {
@@ -69,8 +90,27 @@ export const GET = withAuth(
       );
     }
 
+    let pdfBase64: string | null = null;
+    try {
+      const res = await fetch(docUrl, { headers: { "User-Agent": "maxius-platform/1.0.0" } });
+      if (res.ok) {
+        const rawBytes = new Uint8Array(await res.arrayBuffer());
+        const rows: LabelMergeProductRow[] = order.items.map((it) => ({
+          productName: it.variant?.masterProduct?.name ?? it.productName ?? it.channelSku,
+          variant: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,
+          sellerSku: it.variant?.sku ?? it.channelSku,
+          qty: it.qty,
+        }));
+        const stamped = await stampProductVariantOnLabel(rawBytes, rows, order.orderNo);
+        pdfBase64 = Buffer.from(stamped).toString("base64");
+      }
+    } catch (e) {
+      console.error("[Label] Gagal menempelkan varian ke label resmi:", e);
+    }
+
     return NextResponse.json({
       docUrl,
+      pdfBase64,
       trackingNumber,
       packageId,
       status: order.shipments[0]?.status ?? null,

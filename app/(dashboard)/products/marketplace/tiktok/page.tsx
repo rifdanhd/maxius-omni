@@ -52,6 +52,7 @@ type ListingRow = {
   accountLabel: string;
   platformProductId: string | null;
   platformTitle: string | null;
+  titleUnsynced?: boolean;
   master: {
     id: string | null;
     name: string | null;
@@ -1207,6 +1208,14 @@ function FragmentRow({
             <div className="max-w-[240px]">
               <div className="text-gray-900 font-bold leading-tight flex items-start gap-1.5">
                 <span className="min-w-0 truncate" title={name}>{name}</span>
+                {row.titleUnsynced && (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    title="Judul asli di TikTok belum pernah tersinkron — menampilkan nama produk master. Klik Sinkron untuk menarik judul asli."
+                  >
+                    Judul belum sync
+                  </span>
+                )}
                 {deleted && (
                   <span className="shrink-0 inline-flex items-center gap-1 bg-gray-100 text-gray-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     Del

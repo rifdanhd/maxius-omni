@@ -25,6 +25,7 @@ type ShopeeListingRow = {
   platformTitle: string | null;
   status: string | null;
   channelSku: string | null;
+  variantCount: number;
   stockTotal: number;
   lastSyncedAt: string | null;
 };
@@ -491,9 +492,14 @@ export default function ShopeeMarketplacePage() {
                           <div className="max-w-[240px]">
                             <div className="text-gray-900 font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
                             <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
+                            {row.variantCount > 1 && (
+                              <span className="inline-flex items-center gap-1 mt-1.5 ml-1 text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" title="Satu produk Shopee dengan banyak model/SKU — stok diakumulasi dari semua varian.">
+                                {row.variantCount} varian
+                              </span>
+                            )}
                           </div>
                         </td>
-                        <td className="px-5 py-4"><span className="text-sm text-gray-700 font-mono font-semibold">{row.channelSku ?? "-"}</span></td>
+                        <td className="px-5 py-4"><span className="text-sm text-gray-700 font-mono font-semibold">{row.variantCount > 1 ? `${row.variantCount} SKU` : (row.channelSku ?? "-")}</span></td>
                         <td className="px-5 py-4 text-gray-700 font-semibold">{fmtNumber(row.stockTotal)}</td>
                         <td className="px-5 py-4">
                           {isMapped ? (
@@ -511,9 +517,9 @@ export default function ShopeeMarketplacePage() {
                             <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Detail Produk</div>
                             <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
                               <div>Platform Product ID: <span className="font-mono">{row.platformProductId ?? "-"}</span></div>
-                              <div>Channel SKU: <span className="font-mono">{row.channelSku ?? "-"}</span></div>
+                              <div>Jumlah SKU: <span className="font-mono">{row.variantCount}</span></div>
+                              <div>Channel SKU: <span className="font-mono">{row.channelSku ?? (row.variantCount > 1 ? "per varian" : "-")}</span></div>
                               <div>Status Platform: <span>{statusLabel(row.status)}</span></div>
-                              <div>Mapping ID: <span className="font-mono">{row.key}</span></div>
                             </div>
                           </td>
                         </tr>

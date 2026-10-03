@@ -31,6 +31,10 @@ const FAQ = [
     a: "Buka Inventori → Stok Mismatch untuk melihat daftarnya. Biasanya karena perubahan belum selesai dikirim atau ada pesanan baru. Jalankan sinkron ulang dari Produk Marketplace; bila masih berbeda, stok varian di aplikasi adalah acuan — perbaiki dari sana, bukan dari marketplace.",
   },
   {
+    q: "Kenapa judul produk di halaman TikTok bisa sama dengan Shopee?",
+    a: "Judul asli tiap toko baru tampil setelah tombol Sinkron dijalankan. Sebelum sinkron, aplikasi menampilkan nama produk master sebagai pengganti dan memberi label \"Judul belum sync\". Jalankan Sinkron di Produk Marketplace untuk menarik judul asli dari TikTok — judul boleh berbeda antar toko, ubah lewat Seller Center masing-masing lalu sinkron ulang.",
+  },
+  {
     q: "Kenapa SKU di Shopee dan TikTok berbeda?",
     a: "Wajar — tiap marketplace punya kode sendiri. Cukup sekali mapping di Mapping Stok Terpusat, stok terpusat akan terkirim ke semua toko yang sudah di-mapping.",
   },

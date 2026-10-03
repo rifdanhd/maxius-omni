@@ -174,6 +174,7 @@ export type ShopeeListingRow = {
   platformTitle: string | null;
   status: string | null;
   channelSku: string | null;
+  variantCount: number;
   stockTotal: number;
   lastSyncedAt: Date | null;
 };
@@ -196,29 +197,80 @@ export async function listShopeeProducts(opts: {
       ? { OR: [{ channelSku: { contains: search } }, { platformTitle: { contains: search } }] }
       : {}),
   };
-  const [total, mappings] = await Promise.all([
-    prisma.productMapping.count({ where: where as never }),
-    prisma.productMapping.findMany({
-      where: where as never,
-      include: { account: { select: { id: true, label: true } }, variant: { select: { stock: true } } },
-      orderBy: { updatedAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-  ]);
-  const rows: ShopeeListingRow[] = mappings.map((m) => ({
-    key: m.id,
-    accountId: m.account.id,
-    accountLabel: m.account.label,
-    variantId: m.variantId,
-    platformProductId: m.platformProductId,
-    platformTitle: m.platformTitle,
-    status: m.platformStatus,
-    channelSku: m.channelSku,
-    stockTotal: m.platformStock ?? m.variant?.stock ?? 0,
-    lastSyncedAt: m.lastSyncedAt,
-  }));
-  return { rows, total, page, pageSize };
+  const mappings = await prisma.productMapping.findMany({
+    where: where as never,
+    include: {
+      account: { select: { id: true, label: true } },
+      variant: { select: { id: true, stock: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  // Kelompokkan per (akun, item) — 1 produk Shopee bisa punya banyak
+  // model/SKU; tampilkan 1 baris per produk (konsisten dengan Seller Center
+  // & halaman TikTok), stok = akumulasi semua varian.
+  type Group = {
+    key: string;
+    accountId: string;
+    accountLabel: string;
+    variantId: string | null;
+    allMapped: boolean;
+    platformProductId: string | null;
+    platformTitle: string | null;
+    status: string | null;
+    channelSkus: string[];
+    stockTotal: number;
+    lastSyncedAt: Date | null;
+  };
+  const groups = new Map<string, Group>();
+  for (const m of mappings) {
+    const gk = `${m.account.id}|${m.platformProductId ?? m.channelSku}`;
+    const stock = m.platformStock ?? m.variant?.stock ?? 0;
+    const g = groups.get(gk);
+    if (!g) {
+      groups.set(gk, {
+        key: gk,
+        accountId: m.account.id,
+        accountLabel: m.account.label,
+        variantId: m.variantId,
+        allMapped: m.variantId != null,
+        platformProductId: m.platformProductId,
+        platformTitle: m.platformTitle,
+        status: m.platformStatus,
+        channelSkus: [m.channelSku],
+        stockTotal: stock,
+        lastSyncedAt: m.lastSyncedAt,
+      });
+      continue;
+    }
+    if (!g.platformTitle && m.platformTitle) g.platformTitle = m.platformTitle;
+    if (!g.status && m.platformStatus) g.status = m.platformStatus;
+    if (m.variantId == null) g.allMapped = false;
+    else if (!g.variantId) g.variantId = m.variantId;
+    if (!g.channelSkus.includes(m.channelSku)) g.channelSkus.push(m.channelSku);
+    g.stockTotal += stock;
+    if (m.lastSyncedAt && (!g.lastSyncedAt || m.lastSyncedAt > g.lastSyncedAt)) {
+      g.lastSyncedAt = m.lastSyncedAt;
+    }
+  }
+
+  const all = [...groups.values()];
+  const rows: ShopeeListingRow[] = all
+    .slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize)
+    .map((g) => ({
+      key: g.key,
+      accountId: g.accountId,
+      accountLabel: g.accountLabel,
+      variantId: g.allMapped ? g.variantId : null,
+      platformProductId: g.platformProductId,
+      platformTitle: g.platformTitle,
+      status: g.status,
+      channelSku: g.channelSkus.length === 1 ? g.channelSkus[0] : null,
+      variantCount: g.channelSkus.length,
+      stockTotal: g.stockTotal,
+      lastSyncedAt: g.lastSyncedAt,
+    }));
+  return { rows, total: all.length, page, pageSize };
 }
 
 export async function syncShopeeListings(businessId: string): Promise<

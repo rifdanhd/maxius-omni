@@ -33,6 +33,20 @@ export const POST = withAuth(async (req) => {
       orderNo: true,
       account: { select: { accessToken: true, shopCipher: true, platform: true } },
       shipments: { select: { externalId: true } },
+      items: {
+        select: {
+          productName: true,
+          skuName: true,
+          channelSku: true,
+          qty: true,
+          variant: {
+            select: {
+              sku: true,
+              masterProduct: { select: { name: true } },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -42,6 +56,7 @@ export const POST = withAuth(async (req) => {
     accessToken: string | null;
     shopCipher: string | null;
     platform: string;
+    rows: { productName: string; variant: string; sellerSku: string; qty: number }[];
   }[] = [];
   const failed: Array<{ orderNo: string; reason: string }> = [];
 
@@ -67,6 +82,12 @@ export const POST = withAuth(async (req) => {
       accessToken: order.account.accessToken,
       shopCipher: order.account.shopCipher,
       platform: order.account.platform,
+      rows: order.items.map((it) => ({
+        productName: it.variant?.masterProduct?.name ?? it.productName ?? it.channelSku,
+        variant: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,
+        sellerSku: it.variant?.sku ?? it.channelSku,
+        qty: it.qty,
+      })),
     });
   }
 
@@ -81,6 +102,7 @@ export const POST = withAuth(async (req) => {
       accessToken: it.accessToken as string,
       shopCipher: it.shopCipher,
       platform: it.platform,
+      rows: it.rows,
     }))
   );
 

@@ -119,6 +119,8 @@ export interface TikTokListingRow {
   accountLabel: string;
   platformProductId: string | null;
   platformTitle: string | null;
+  /** true bila judul asli di TikTok belum pernah tersinkron (platformTitle null). */
+  titleUnsynced?: boolean;
   master: {
     id: string | null;
     name: string | null;
@@ -683,6 +685,7 @@ export async function listTikTokProducts(
       channelSku: row.variantCount === 1 ? row.variants[0].channelSku : null,
       priceMin: min,
       priceMax: max,
+      titleUnsynced: row.platformTitle == null,
       platformTitle: row.platformTitle ?? row.master?.name ?? null,
     };
   });

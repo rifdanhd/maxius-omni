@@ -230,7 +230,7 @@ async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
  */
 async function fetchOfficialLabel(
   id: string
-): Promise<{ docUrl: string; trackingNumber: string | null } | null> {
+): Promise<{ docUrl: string; pdfBase64?: string; trackingNumber: string | null } | null> {
   try {
     const token = localStorage.getItem("token");
     const res = await authFetch(`/api/orders/${id}/label`, {
@@ -238,7 +238,13 @@ async function fetchOfficialLabel(
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.docUrl ? { docUrl: data.docUrl, trackingNumber: data.trackingNumber ?? null } : null;
+    return data?.docUrl
+      ? {
+          docUrl: data.docUrl,
+          pdfBase64: data.pdfBase64 ?? undefined,
+          trackingNumber: data.trackingNumber ?? null,
+        }
+      : null;
   } catch (e) {
     console.error(e);
     return null;
@@ -634,8 +640,12 @@ export default function OrdersPage() {
     const targets = orders.filter((o) => selected.has(o.id));
     if (targets.length === 0) return;
     if (type === "Label") {
-      // Gunakan template thermal lengkap dengan varian untuk seluruh order yang dipilih
-      await printLocalLabels(targets);
+      // Label resmi digabung jadi 1 PDF multi-halaman di server (sudah bertempel varian produk).
+      // Order non-TikTok dicetak label lokal dari data pesanan.
+      const tt = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
+      const local = targets.filter((o) => o.account?.platform !== "TIKTOK_SHOP");
+      if (tt.length > 0) await printSelectedBulkLabel(tt);
+      if (local.length > 0) await printLocalLabels(local);
       return;
     }
     printOrders(targets.map(toPrintable), type);
@@ -643,7 +653,21 @@ export default function OrdersPage() {
 
   const printOrder = async (order: Order, type: PrintType) => {
     if (type === "Label") {
-      // Selalu gunakan template label pengiriman lengkap dengan rincian barang & varian
+      // Utamakan label RESMI TikTok ASLI (sudah ditambahkan tabel varian langsung di PDF resmi)
+      if (order.account?.platform === "TIKTOK_SHOP") {
+        const official = await fetchOfficialLabel(order.id);
+        if (official?.pdfBase64) {
+          printPdfWindow(
+            URL.createObjectURL(pdfBlobFromBase64(official.pdfBase64)),
+            `Label ${order.orderNo}`
+          );
+          return;
+        }
+        if (official?.docUrl) {
+          printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
+          return;
+        }
+      }
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {
         alert("Gagal memuat data penerima untuk label.");
