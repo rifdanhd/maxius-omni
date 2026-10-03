@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { logStockPush } from "@/lib/services/sync-log.util";
+import { applyMarketplaceCover } from "@/lib/services/gallery.service";
 import type { SyncPushItemResult } from "@/lib/services/sync.service";
 import {
   assertAccountActive,
@@ -280,26 +281,23 @@ export async function listShopeeProducts(opts: {
 }
 
 /**
- * backfillMasterImages — tulis gambar listing ke MasterProduct.imageUrl
- * HANYA untuk produk yang masih kosong (tidak menimpa pilihan manual di
- * Kelola Gambar). Dipakai import & sync listing Shopee.
+ * backfillMasterImages — tulis gambar listing ke MasterProduct.imageUrl +
+ * baris ProductImage (cover) HANYA untuk produk yang masih kosong
+ * (tidak menimpa pilihan manual di Kelola Gambar). Dipakai import & sync
+ * listing Shopee.
  */
 export async function backfillMasterImages(imageByVariant: Map<string, string>): Promise<void> {
   if (imageByVariant.size === 0) return;
   const variants = await prisma.productVariant.findMany({
     where: { id: { in: [...imageByVariant.keys()] } },
-    select: { id: true, masterProductId: true, masterProduct: { select: { imageUrl: true } } },
+    select: { id: true, masterProductId: true },
   });
   const done = new Set<string>();
   for (const v of variants) {
-    if (v.masterProduct.imageUrl || done.has(v.masterProductId)) continue;
     const image = imageByVariant.get(v.id);
-    if (!image) continue;
+    if (!image || done.has(v.masterProductId)) continue;
     done.add(v.masterProductId);
-    await prisma.masterProduct.update({
-      where: { id: v.masterProductId },
-      data: { imageUrl: image },
-    });
+    await applyMarketplaceCover(v.masterProductId, image);
   }
 }
 

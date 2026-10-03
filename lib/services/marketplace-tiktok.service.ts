@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { applyMarketplaceCover } from "@/lib/services/gallery.service";
 import {
   searchProducts,
   getProduct,
@@ -284,6 +285,15 @@ function toUnmappedProduct(product: Record<string, unknown>): TikTokUnmappedProd
 }
 
 /**
+ * Status yang disembunyikan dari panel "Belum Terhubung": produk terhapus /
+ * diarsipkan di Seller Center tidak lagi layak ditawarkan untuk mapping.
+ */
+const UNMAPPED_HIDDEN_STATUSES = new Set(["DELETED", "ARCHIVED"]);
+function isUnmappedVisible(p: Record<string, unknown>): boolean {
+  return !UNMAPPED_HIDDEN_STATUSES.has(String(p.status ?? "").toUpperCase());
+}
+
+/**
  * findUnmappedProducts — produk TikTok yang tidak match mapping lokal mana pun.
  * Produk dianggap termapping bila MINIMAL satu kunci (sku.id / seller_sku /
  * product.id) cocok dengan channelSku sebuah mapping. Murni discovery (tanpa
@@ -300,7 +310,7 @@ function findUnmappedProducts(
     if (product) matchedProductIds.add(String(product.id ?? ""));
   }
   return [...products.values()]
-    .filter((p) => !matchedProductIds.has(String(p.id ?? "")))
+    .filter((p) => !matchedProductIds.has(String(p.id ?? "")) && isUnmappedVisible(p))
     .map(toUnmappedProduct);
 }
 
@@ -319,20 +329,13 @@ type SyncAccountResult = {
  * seluruh ProductMapping milik akun itu. Idempoten terhadap totalCount.
  */
 /**
- * backfillMasterImageUrl — tulis gambar utama listing ke MasterProduct.imageUrl
- * HANYA jika masih kosong (tidak menimpa pilihan manual di Kelola Gambar).
+ * backfillMasterImageUrl — terapkan gambar utama listing ke produk:
+ * MasterProduct.imageUrl (jika kosong) + baris ProductImage cover (jika
+ * galeri kosong). Tidak pernah menimpa pilihan manual di Kelola Gambar.
  */
 async function backfillMasterImageUrl(masterProductId: string | null, image: string | null): Promise<void> {
   if (!masterProductId || !image) return;
-  const p = await prisma.masterProduct.findUnique({
-    where: { id: masterProductId },
-    select: { imageUrl: true },
-  });
-  if (!p || p.imageUrl) return;
-  await prisma.masterProduct.update({
-    where: { id: masterProductId },
-    data: { imageUrl: image },
-  });
+  await applyMarketplaceCover(masterProductId, image);
 }
 
 export async function syncTikTokListings(businessId: string): Promise<SyncAccountResult[]> {
@@ -400,7 +403,7 @@ include: {
       },
     });
     const unmapped = [...products.values()]
-      .filter((p) => !matchedProductIds.has(String(p.id ?? "")))
+      .filter((p) => !matchedProductIds.has(String(p.id ?? "")) && isUnmappedVisible(p))
       .map(toUnmappedProduct);
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
   }

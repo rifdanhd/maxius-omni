@@ -56,6 +56,28 @@ export interface ImageRow {
 /** Target minimal gambar agar produk dianggap lengkap = sejumlah variannya. */
 const requiredImages = (variantCount: number) => Math.max(1, variantCount);
 
+/**
+ * applyMarketplaceCover — terapkan gambar listing marketplace ke produk:
+ * - isi MasterProduct.imageUrl hanya jika masih kosong;
+ * - buat baris ProductImage (cover) hanya jika galeri masih kosong.
+ * Tidak pernah menimpa pilihan gambar manual di Kelola Gambar.
+ */
+export async function applyMarketplaceCover(masterProductId: string, url: string): Promise<void> {
+  const p = await prisma.masterProduct.findUnique({
+    where: { id: masterProductId },
+    select: { imageUrl: true, _count: { select: { productImage: true } } },
+  });
+  if (!p) return;
+  if (!p.imageUrl) {
+    await prisma.masterProduct.update({ where: { id: masterProductId }, data: { imageUrl: url } });
+  }
+  if (p._count.productImage === 0) {
+    await prisma.productImage.create({
+      data: { id: crypto.randomUUID(), masterProductId, url, isCover: true, order: 0 },
+    });
+  }
+}
+
 export async function listGallery(
   params: GalleryParams
 ): Promise<{ rows: GalleryRow[]; total: number; page: number; pageSize: number }> {

@@ -258,7 +258,14 @@ async function importOneItem(params: {
           businessId,
           importedFrom: `SHOPEE:${account.externalShopId ?? ""}`,
           threshold,
-          imageUrl: itemBaseImage(info),
+          imageUrl: image,
+          ...(image
+            ? {
+                productImage: {
+                  create: [{ id: crypto.randomUUID(), url: image, isCover: true, order: 0 }],
+                },
+              }
+            : {}),
           productVariant: {
             create: pending.map((d) => ({
               sku: d.channelSku,
