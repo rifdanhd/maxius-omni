@@ -451,12 +451,24 @@ export async function getItemBaseInfo(
   return (r.item_list as Array<Record<string, unknown>> | undefined) ?? [];
 }
 
-/** Gambar utama item dari respons get_item_base_info (string[] atau string). */
+/** Gambar utama item dari respons get_item_base_info (string[] / string / objek resmi Shopee). */
 export function itemBaseImage(info: Record<string, unknown>): string | null {
   const img = info.image;
   if (typeof img === "string" && img.trim()) return img.trim();
   if (Array.isArray(img)) {
     for (const v of img) if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  if (img && typeof img === "object") {
+    // Respons resmi get_item_base_info:
+    //   image: { image_url_list: string[], image_id_list: string[] }
+    // image_id_list = ID internal (bukan URL) → jangan dikembalikan.
+    const urlList = (img as { image_url_list?: unknown }).image_url_list;
+    if (Array.isArray(urlList)) {
+      for (const v of urlList) {
+        // Placeholder docs Shopee memakai "-" — bukan URL.
+        if (typeof v === "string" && v.trim() && v.trim() !== "-") return v.trim();
+      }
+    }
   }
   const images = info.images;
   if (Array.isArray(images)) {
