@@ -101,8 +101,9 @@ export const sidebarData: SidebarData = {
       title: 'Bisnis',
       items: [
         { title: 'Promosi', url: '/promotions', icon: Tag },
-        { title: 'Chat', url: '/chat', icon: MessageSquare },
-        { title: 'Daftar Pelanggan', url: '/customers', icon: Users },
+        // Placeholder — disembunyikan sampai fiturnya benar-benar ada.
+        { title: 'Chat', url: '/chat', icon: MessageSquare, hidden: true },
+        { title: 'Daftar Pelanggan', url: '/customers', icon: Users, hidden: true },
       ],
     },
     {
@@ -120,11 +121,13 @@ export const sidebarData: SidebarData = {
           icon: Settings,
           items: [
             { title: 'Pengaturan Toko', url: '/settings/accounts', icon: Store },
-            { title: 'Kelola Pengguna', url: '/settings/users', icon: Users },
+            // Placeholder — kelola user via seed/psql dulu.
+            { title: 'Kelola Pengguna', url: '/settings/users', icon: Users, hidden: true },
           ],
         },
-        { title: 'Log Aktivitas', url: '/logs', icon: ClipboardList },
-        { title: 'Market', url: '/market', icon: Compass },
+        // Placeholder — disembunyikan sampai fiturnya benar-benar ada.
+        { title: 'Log Aktivitas', url: '/logs', icon: ClipboardList, hidden: true },
+        { title: 'Market', url: '/market', icon: Compass, hidden: true },
         {
           // Placeholder — fungsinya sudah ada di Pengaturan Toko > Integrasi.
           title: 'Aplikasi',
@@ -134,7 +137,7 @@ export const sidebarData: SidebarData = {
             { title: 'Koneksi API', url: '/apps/api-connections', icon: Plug },
           ],
         },
-        { title: 'Pusat Edukasi', url: '/education', icon: BookOpen },
+        { title: 'Panduan', url: '/education', icon: BookOpen },
       ],
     },
   ],

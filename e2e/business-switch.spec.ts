@@ -76,13 +76,22 @@ test('ganti brand aktif → daftar toko di Pengaturan ikut berubah', async ({ pa
   expect(stored).toBe('business-default');
 });
 
-test('BrandSwitcher disembunyikan — satu dashboard tanpa dropdown brand', async ({ page }) => {
+test('UI bersih: tanpa dropdown brand, menu placeholder tersembunyi, lonceng notifikasi ada', async ({ page }) => {
   await login(page);
   await page.goto('/dashboard');
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 30_000 });
   // Dropdown brand (Maxius/Raxen/dll) sengaja dihapus dari header — semua toko
   // tampil dalam satu dashboard; brand aktif tetap bisa di-set via localStorage.
   await expect(page.getByTitle('Ganti brand')).toHaveCount(0);
+
+  // Sidebar: panduan tampil, menu placeholder (Chat/Pelanggan/Market/Log) tersembunyi.
+  await expect(page.getByRole('link', { name: 'Panduan', exact: true })).toBeVisible();
+  for (const hidden of ['Chat', 'Daftar Pelanggan', 'Market', 'Log Aktivitas', 'Kelola Pengguna']) {
+    await expect(page.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
+  }
+
+  // Lonceng notifikasi (stok menipis/habis) terpasang di header.
+  await expect(page.getByRole('button', { name: 'Notifikasi' })).toBeVisible();
   await page.screenshot({ path: SHOT('no-switcher') });
 });
 

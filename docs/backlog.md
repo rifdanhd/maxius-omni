@@ -130,3 +130,39 @@ Keputusan sebelum implementasi:
 2. Bila semua status: iterasi `item_status` di loop paginasi
    `syncShopeeListings` + `marketplace-shopee-import.service`, dan hitung ulang
    batas halaman (cap kini 200 halaman per panggilan).
+
+## Sisa P2 PRD §29 (Chat, Customer Analytics, Advanced Reports, Automation) — Prioritas: Rendah
+
+Status Fase D (2026-10-03): semua P1 sudah beres; P2 yang **sudah jadi**: Campaign
+(promotions + wizard, ada e2e). Empat P2 berikut sengaja TIDAK dikerjakan tanpa
+keputusan produk (jangan diputuskan sepihak implementer):
+
+1. **Unified Chat (§23)** — butuh akses API percakapan terpisah per marketplace
+   (Shopee/TikTok), approval + scope berbeda dari API selling. Opsi:
+   (a) unified in-app bila API tersedia, (b) cukup deep-link ke aplikasi seller
+   masing-masing (murah, tidak unified), (c) tunda sampai ada permintaan dari
+   operasional.
+2. **Customer Analytics (§22)** — PRD: total customer, repeat, distribution;
+   dilarang mengarang data umur/gender. Data lokal dari `Order` (buyer) cukup
+   untuk total + repeat rate tanpa API; demografi hanya kalau marketplace API
+   menyediakan. Keputusan: cukup versi lokal di dashboard, atau tunda?
+3. **Advanced Reports (§20)** — Laporan Penjualan (omset+winning) dan Stok sudah
+   ada. "Advanced" (drill-down, ekspor CSV, segmentasi per varian/platform,
+   rentang kustom) belum didefinisikan — perlu daftar laporan konkret dulu.
+4. **Automation (§29 P2)** — rule otomatis (mis. auto-reprice, auto-restock,
+   auto-bump promosi) = high-risk tanpa aturan bisnis yang disepakati.
+
+## Notifikasi Kanal Telegram (§25) — Prioritas: Sedang (setelah demo)
+
+Kanal Dashboard sudah jalan (lonceng notifikasi di header, sumber
+`/api/stock-alerts`). Kanal **Telegram** dari PRD belum ada: butuh bot token +
+chat id dari pemilik bisnis (aset dari user, bukan kode) dan keputusan event
+mana yang dikirim (low stock, sync failed, token expired, store health warning).
+
+## Store Health: Rating/Cancellation Marketplace (§21) — Prioritas: Rendah
+
+Store Health di dashboard kini berbasis fakta DB (status akun/API, token,
+sync error) sesuai aturan PRD "jangan mengasumsikan data tersedia". Metrik
+rating/cancellation dari marketplace butuh endpoint performa toko per platform
+(ketersediaan & izin berbeda tiap platform — perlu dicek per API sebelum
+berjanji menampilkannya).

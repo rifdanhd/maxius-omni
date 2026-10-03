@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/header";
 import { useAuthStore } from "@/stores/auth-store";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { Search } from "@/components/search";
+import NotificationBell from "@/components/layout/NotificationBell";
 
 // Tidak ada sumber data eksternal yang berubah — subscribe hanya untuk
 // memenuhi kontrak useSyncExternalStore.
@@ -47,6 +48,7 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <Header>
           <div className="flex items-center gap-2 md:gap-4">
+            <NotificationBell />
             <Search />
             <ThemeSwitch />
           </div>

@@ -50,6 +50,7 @@ export default function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label="Notifikasi"
         className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 border border-gray-200 relative"
       >
         <Bell size={16} />
