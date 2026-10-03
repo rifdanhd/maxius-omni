@@ -60,12 +60,54 @@ type OpsKpi = {
 
 type RecentOrder = {
   id: string;
+  orderNo: string;
   customer: string;
   product: string;
   status: string;
   amount: number;
   date: string;
 };
+
+// Bentuk ringan dari GET /api/orders (orders[] sudah masked/Pii).
+type ApiOrder = {
+  id: string;
+  orderNo: string;
+  buyerName: string | null;
+  amount: number | null;
+  createTime: string;
+  status: string;
+  items: { productName: string | null }[];
+};
+
+function toRecentOrder(o: ApiOrder): RecentOrder {
+  const items = o.items ?? [];
+  const first = items[0]?.productName ?? "—";
+  const product = items.length > 1 ? `${first} +${items.length - 1} lainnya` : first;
+  const d = new Date(o.createTime);
+  return {
+    id: o.id,
+    orderNo: o.orderNo || o.id,
+    customer: o.buyerName || "—",
+    product,
+    status: o.status,
+    amount: o.amount ?? 0,
+    date: isNaN(d.getTime())
+      ? "—"
+      : d.toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+  };
+}
+
+function statusBadge(status: string): "default" | "secondary" | "destructive" | "outline" {
+  const s = status.toUpperCase();
+  if (s === "COMPLETED" || s === "DELIVERED") return "default";
+  if (s === "CANCELLED") return "destructive";
+  if (s === "UNPAID" || s === "ON_HOLD") return "outline";
+  return "secondary";
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -94,12 +136,15 @@ export default function DashboardPage() {
           authFetch("/api/summary", { headers }),
           authFetch("/api/analytics", { headers }),
           authFetch("/api/dashboard/kpi", { headers }),
-          authFetch("/api/orders/recent", { headers }),
+          authFetch("/api/orders?pageSize=10&sort=createTime&dir=desc", { headers }),
         ]);
         if (summaryRes.ok) setSummary(await summaryRes.json());
         if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
         if (kpiRes.ok) setOpsKpi(await kpiRes.json());
-        if (ordersRes.ok) setRecentOrders(await ordersRes.json());
+        if (ordersRes.ok) {
+          const body = (await ordersRes.json()) as { orders?: ApiOrder[] };
+          setRecentOrders((body.orders ?? []).map(toRecentOrder));
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -208,6 +253,41 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {(analytics?.topStores?.length ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Penjualan per Toko</CardTitle>
+            <CardDescription>Performa seluruh toko marketplace dalam brand ini</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Toko</TableHead>
+                  <TableHead>Platform</TableHead>
+                  <TableHead className="text-right">Unit</TableHead>
+                  <TableHead className="text-right">Nilai</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {analytics!.topStores.map((store) => (
+                  <TableRow key={store.id}>
+                    <TableCell className="font-medium">{store.label}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {store.platform === "SHOPEE" ? "Shopee" : store.platform === "TIKTOK_SHOP" ? "TikTok Shop" : store.platform}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{store.units.toLocaleString("id-ID")}</TableCell>
+                    <TableCell className="text-right">{formatRp(store.value)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
@@ -228,13 +308,11 @@ export default function DashboardPage() {
             <TableBody>
               {recentOrders.slice(0, 10).map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id}</TableCell>
+                  <TableCell className="font-medium">{order.orderNo}</TableCell>
                   <TableCell>{order.customer}</TableCell>
                   <TableCell>{order.product}</TableCell>
                   <TableCell>
-                    <Badge variant={order.status === "completed" ? "default" : order.status === "processing" ? "secondary" : "outline"}>
-                      {order.status}
-                    </Badge>
+                    <Badge variant={statusBadge(order.status)}>{statusLabel(order.status)}</Badge>
                   </TableCell>
                   <TableCell>{formatRp(order.amount)}</TableCell>
                   <TableCell className="text-muted-foreground">{order.date}</TableCell>
