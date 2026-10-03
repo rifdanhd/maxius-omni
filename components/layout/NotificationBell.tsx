@@ -1,26 +1,48 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, AlertTriangle, PackageX, ChevronRight } from "lucide-react";
-import type { StockAlert } from "@/app/api/stock-alerts/route";
+import { Bell, AlertTriangle, PackageX, ChevronRight, ClipboardList } from "lucide-react";
+import type { StockAlert, StockAlertsResponse } from "@/app/api/stock-alerts/route";
+import type { OpnameReminder } from "@/lib/services/opname-reminder.service";
 import { authFetch } from "@/lib/utils/api-client";
 
 export default function NotificationBell() {
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
+  const [reminder, setReminder] = useState<OpnameReminder | null>(null);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Polling 60 dtk + saat tab kembali fokus — badge merah selalu segar
+  // (fetch sekali saat mount membuat angka basi setelah stok berubah).
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    authFetch("/api/stock-alerts", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => (res.ok ? res.json() : Promise.resolve(null)))
-      .then((data) => setAlerts(data?.alerts ?? []))
-      .catch((e) => {
-        console.error(e);
-        setAlerts([]);
-      });
+    let cancelled = false;
+    const load = () => {
+      const token = localStorage.getItem("token");
+      authFetch("/api/stock-alerts", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.json() : Promise.resolve(null)))
+        .then((data: StockAlertsResponse | null) => {
+          if (cancelled) {
+            return;
+          }
+          setAlerts(data?.alerts ?? []);
+          setReminder(data?.reminder ?? null);
+        })
+        .catch((e) => {
+          console.error(e);
+          if (!cancelled) setAlerts([]);
+        });
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -42,7 +64,9 @@ export default function NotificationBell() {
   }, [open]);
 
   const outCount = alerts.filter((a) => a.severity === "out").length;
-  const hasAlert = alerts.length > 0;
+  const reminderDue = Boolean(reminder?.due);
+  const badgeCount = alerts.length + (reminderDue ? 1 : 0);
+  const hasAlert = badgeCount > 0;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -55,8 +79,8 @@ export default function NotificationBell() {
       >
         <Bell size={16} />
         {hasAlert && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-gray-500 text-white text-[9px] font-bold flex items-center justify-center">
-            {alerts.length > 9 ? "9+" : alerts.length}
+          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 ring-2 ring-white text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+            {badgeCount > 9 ? "9+" : badgeCount}
           </span>
         )}
       </button>
@@ -65,10 +89,27 @@ export default function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-bold text-gray-900">Stok Menipis</p>
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-900">
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 text-red-700">
               {alerts.length} varian
             </span>
           </div>
+
+          {/* Pengingat opname otomatis (frekuensi di Pengaturan Inventori) */}
+          {reminderDue && reminder && (
+            <a
+              href="/inventory/opname"
+              className="flex items-start gap-2 px-4 py-2.5 border-b border-amber-200 bg-amber-50 text-amber-900 text-xs font-semibold hover:bg-amber-100"
+            >
+              <ClipboardList size={14} className="shrink-0 mt-0.5" />
+              <span>
+                Pengingat opname stok ({reminder.frequency === "daily" ? "harian" : reminder.frequency === "weekly" ? "mingguan" : "bulanan"})
+                {reminder.lastOpnameAt
+                  ? ` — terakhir ${new Date(reminder.lastOpnameAt).toLocaleDateString("id-ID")}`
+                  : " — belum pernah opname"}
+                . Jalankan sekarang →
+              </span>
+            </a>
+          )}
 
           <div className="max-h-80 overflow-y-auto">
             {alerts.length === 0 ? (
@@ -84,7 +125,7 @@ export default function NotificationBell() {
                 >
                   <span
                     className={`mt-0.5 shrink-0 ${
-                      a.severity === "out" ? "text-gray-500" : "text-gray-500"
+                      a.severity === "out" ? "text-red-500" : "text-amber-500"
                     }`}
                   >
                     {a.severity === "out" ? <PackageX size={16} /> : <AlertTriangle size={16} />}

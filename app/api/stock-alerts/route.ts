@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/utils/api";
 import { cached } from "@/lib/utils/ttl-cache";
 import { effectiveStock, lowStockSql, resolveMinStock } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { getOpnameReminder, type OpnameReminder } from "@/lib/services/opname-reminder.service";
 
 const CACHE_TTL_MS = 60_000;
 
@@ -24,6 +25,13 @@ export type StockAlert = StockAlertRow & {
   severity: "low" | "out";
 };
 
+export type StockAlertsResponse = {
+  count: number;
+  alerts: StockAlert[];
+  /** Pengingat opname otomatis (null bila frekuensi = off). */
+  reminder: OpnameReminder | null;
+};
+
 /**
  * GET /api/stock-alerts — daftar varian dengan stok "mepet".
  *
@@ -39,8 +47,10 @@ export const GET = withAuth(async (req) => {
   // kalau dimatikan, endpoint tetap ada tapi tidak mengeluarkan alert.
   const businessId = req.businessId;
   const settings = await getCachedInventorySettings(businessId);
+  // Pengingat opname dihitung terpisah dari gate (bukan "stok menipis").
+  const reminder = await getOpnameReminder(businessId);
   if (!settings.notifyLowStock) {
-    return NextResponse.json({ count: 0, alerts: [] });
+    return NextResponse.json({ count: 0, alerts: [], reminder } satisfies StockAlertsResponse);
   }
 
   const data = await cached(`stock-alerts:${businessId}`, CACHE_TTL_MS, async () => {
@@ -72,5 +82,5 @@ export const GET = withAuth(async (req) => {
     return { count: alerts.length, alerts };
   });
 
-  return NextResponse.json(data);
+  return NextResponse.json({ ...data, reminder } satisfies StockAlertsResponse);
 });
