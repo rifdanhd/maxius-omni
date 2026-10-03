@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Check, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight, Check, Info } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -127,6 +127,25 @@ export default function DashboardPage() {
   const avgDailyUnits = m ? m.units.current / 7 : 0;
   const avgDailyCompletedOrders = m ? m.completedOrders.current / 7 : 0;
 
+  // Panduan Awal: progres dihitung dari data asli (summary + KPI), bukan hardcoded.
+  const onboardingSteps = [
+    { label: "Sambungkan toko marketplace (Shopee / TikTok)", href: "/settings/accounts", done: summary.accountsConnected > 0 },
+    { label: "Buat produk master & varian", href: "/products", done: summary.activeSku > 0 },
+    {
+      label: "Mapping varian ke SKU tiap toko",
+      href: "/products/mapping",
+      done: summary.activeSku > 0 && (opsKpi?.storeHealth.length ?? 0) > 0 && (opsKpi?.storeHealth.every((s) => s.orphanSkus === 0) ?? false),
+    },
+    { label: "Isi stok siap jual di Inventori", href: "/inventory", done: (opsKpi?.centralStock.totalSellable ?? 0) > 0 },
+    { label: "Pesanan pertama masuk", href: "/orders", done: summary.newOrders + summary.completedOrders > 0 },
+    {
+      label: "Sinkronisasi berjalan tanpa error (7 hari)",
+      href: "/settings/accounts",
+      done: summary.accountsConnected > 0 && (opsKpi?.syncErrors.count7d ?? 1) === 0,
+    },
+  ];
+  const onboardingDone = onboardingSteps.filter((s) => s.done).length;
+
   return (
     <div className="p-4 md:p-8">
       <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -211,47 +230,35 @@ export default function DashboardPage() {
         </div>
         {panduanAwalOpen && (
           <div className="p-4 md:p-6 border-t border-gray-100">
-            <div className="bg-gray-50 text-gray-900 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">1/6 Selesai</div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full bg-gray-500 flex items-center justify-center text-white"><Check size={12} /></div>
-                  <span className="text-sm text-gray-700">Buat Produk Master</span>
-                </div>
-                <ChevronDown size={16} className="text-gray-400" />
-              </div>
-              <div className="py-2 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-4">
+            <div className="bg-gray-50 text-gray-900 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">
+              {onboardingDone}/{onboardingSteps.length} Selesai
+            </div>
+            <div className="space-y-1">
+              {onboardingSteps.map((s) => (
+                <Link
+                  key={s.label}
+                  href={s.href}
+                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-gray-50 group"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full border-2 border-gray-200 border-dashed"></div>
-                    <span className="text-sm font-semibold text-gray-800">Tambah Produk ke Marketplace</span>
+                    {s.done ? (
+                      <div className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center text-white">
+                        <Check size={12} />
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border-2 border-gray-300 border-dashed" />
+                    )}
+                    <span className={`text-sm ${s.done ? "text-gray-500" : "font-semibold text-gray-800"}`}>{s.label}</span>
                   </div>
-                  <ChevronUp size={16} className="text-gray-400" />
-                </div>
-                <div className="ml-8 bg-gray-50 rounded-lg p-4 md:p-5 flex border border-gray-100 flex-col md:flex-row">
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-gray-900 mb-2">Tambah produk kamu ke marketplace</h3>
-                    <p className="text-sm text-gray-600 mb-6">Tambah produk master ke semua marketplace kamu. <a href="#" className="text-gray-900 hover:underline">Lebih Lanjut</a></p>
-                    <div className="flex items-center gap-4">
-                      <button className="bg-[#111827] text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-900 transition-colors">Tambah Sekarang</button>
-                      <a href="#" className="text-sm font-semibold text-[#111827] hover:underline">Kaitkan Produk Marketplace ke Master</a>
-                    </div>
-                  </div>
-                  <div className="w-full md:w-64 shrink-0 rounded-lg overflow-hidden relative shadow-sm border border-gray-200 bg-white flex items-center justify-center mt-4 md:mt-0">
-                    <div className="absolute inset-0 bg-[#111827] opacity-90 p-4">
-                      <div className="text-white text-xs font-bold mb-2 flex items-center gap-2"><span className="bg-gray-400 text-gray-900 px-1 py-0.5 rounded text-[10px]">Step 2</span></div>
-                      <div className="text-white font-bold text-sm leading-tight">How to publish product to Marketplace</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full border-2 border-gray-200 border-dashed"></div>
-                  <span className="text-sm text-gray-600">Kelola Inventori</span>
-                </div>
-                <ChevronDown size={16} className="text-gray-400" />
-              </div>
+                  <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-700" />
+                </Link>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
+              Butuh bantuan langkah demi langkah?{" "}
+              <Link href="/education" className="font-semibold text-gray-900 hover:underline">
+                Buka Panduan lengkap →
+              </Link>
             </div>
           </div>
         )}
