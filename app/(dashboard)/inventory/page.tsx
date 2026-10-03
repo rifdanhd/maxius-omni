@@ -46,7 +46,7 @@ export default function InventoryStockPage() {
 
   const [editing, setEditing] = useState<{
     variantId: string;
-    field: "safetyStock" | "minStock";
+    field: "safetyStock" | "minStock" | "stock";
     value: string;
   } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -99,6 +99,14 @@ export default function InventoryStockPage() {
     };
   }, [tab, q, reloadKey]);
 
+  // Debounce search 300ms (paritas halaman marketplace) — Enter tetap instan.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQ((prev) => (prev === qInput.trim() ? prev : qInput.trim()));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
   // Paginasi = event handler (boleh setState langsung).
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -121,14 +129,51 @@ export default function InventoryStockPage() {
 
   async function handleSaveEdit() {
     if (!editing) return;
+    if (editing.field === "stock" && editing.value.trim() === "") {
+      setError("Stok wajib diisi (angka bulat >= 0).");
+      return;
+    }
     const parsed =
       editing.field === "minStock" && editing.value.trim() === ""
         ? null
         : Number(editing.value);
     if (parsed !== null && (!Number.isInteger(parsed) || parsed < 0)) {
-      setError("Nilai harus bilangan bulat >= 0 (kosongkan Batas Min utk ikut produk induk).");
+      setError(
+        editing.field === "stock"
+          ? "Stok harus bilangan bulat >= 0."
+          : "Nilai harus bilangan bulat >= 0 (kosongkan Batas Min utk ikut produk induk)."
+      );
       return;
     }
+
+    // Atur stok fisik langsung dari halaman ini (pola Shopee Seller Centre):
+    // angka mutlak → StockLedger MANUAL_ADJUSTMENT + push otomatis ke
+    // semua listing ter-mapping (lewati kalau auto-push dimatikan di settings).
+    if (editing.field === "stock" && parsed !== null) {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await api<{ ok: boolean; stockAfter: number }>(
+          `/api/inventory/variants/${editing.variantId}/adjust`,
+          { method: "POST", body: JSON.stringify({ newStock: parsed, note: "Diatur langsung dari halaman Stok Varian." }) }
+        );
+        setRows((prev) =>
+          prev.map((r) =>
+            r.variantId === editing.variantId
+              ? { ...r, stock: res.stockAfter, available: Math.max(0, res.stockAfter - r.safetyStock) }
+              : r
+          )
+        );
+        setEditing(null);
+        setReloadKey((k) => k + 1);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Gagal menyimpan stok.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -288,7 +333,7 @@ export default function InventoryStockPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") setQ(qInput.trim());
                 }}
-                placeholder="Cari SKU / nama varian / produk… (Enter)"
+                placeholder="Cari SKU / nama varian / produk…"
                 className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-900"
               />
             </div>
@@ -304,7 +349,7 @@ export default function InventoryStockPage() {
                 <thead>
                   <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
                     <th className="px-4 py-3 font-semibold">Produk / Varian</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="ProductVariant.stock — stok mentah di database">Fisik</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="ProductVariant.stock — stok mentah di database. Klik pensil untuk atur langsung (tersimpan + di-push ke marketplace)">Fisik</th>
                     <th className="px-4 py-3 font-semibold text-right" title="safetyStock — buffer yang tidak dijual. Stok tayang di marketplace = Fisik − Cadangan (min. 0). Klik ikon riwayat untuk melihat siapa mengubahnya.">Cadangan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Info saja: jumlah activity promosi AKTIF yang mencakup varian. Tidak mengurangi Tersedia (tidak ada konsep reserve di skema).">Promosi</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok (belum AWAITING_SHIPMENT) — demand yang akan datang">Pesanan</th>
@@ -335,7 +380,50 @@ export default function InventoryStockPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium">{fmt(r.stock)}</td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {editing?.variantId === r.variantId && editing.field === "stock" ? (
+                          <span className="inline-flex flex-col items-end gap-1">
+                            <span className="inline-flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                value={editing.value}
+                                onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveEdit();
+                                  if (e.key === "Escape") setEditing(null);
+                                }}
+                                disabled={saving}
+                                autoFocus
+                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-gray-900"
+                              />
+                              <button
+                                onClick={handleSaveEdit}
+                                disabled={saving}
+                                className="text-xs font-bold text-gray-900 hover:underline disabled:opacity-50"
+                              >
+                                Simpan
+                              </button>
+                            </span>
+                            <span className="text-[11px] text-gray-500">
+                              Tersimpan &amp; di-push ke marketplace
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-end gap-1">
+                            {fmt(r.stock)}
+                            <button
+                              title="Atur stok fisik langsung"
+                              onClick={() =>
+                                setEditing({ variantId: r.variantId, field: "stock", value: String(r.stock) })
+                              }
+                              className="text-gray-400 hover:text-gray-700"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         {editing?.variantId === r.variantId && editing.field === "safetyStock" ? (
                           <span className="inline-flex flex-col items-end gap-1">

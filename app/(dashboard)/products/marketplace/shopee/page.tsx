@@ -36,6 +36,7 @@ type ListResponse = {
   total: number;
   page: number;
   pageSize: number;
+  counts?: Record<string, number>;
   accounts: Array<{ id: string; label: string }>;
 };
 
@@ -83,6 +84,13 @@ type ImportResponse = {
 
 const PAGE_SIZE = 20;
 const PLATFORM_LABEL = "Shopee";
+const TABS: Array<{ id: string; label: string }> = [
+  { id: "all", label: "Semua" },
+  { id: "active", label: "Aktif" },
+  { id: "out", label: "Habis" },
+  { id: "unlisted", label: "Nonaktif" },
+  { id: "deleted", label: "Dihapus" },
+];
 
 function fmtNumber(n: number | null | undefined): string {
   if (n === null || n === undefined) return "-";
@@ -99,7 +107,8 @@ function fmtDate(iso: string | null | undefined): string {
 function statusLabel(status: string | null | undefined): string {
   if (!status) return "Belum di-sync";
   const s = status.toUpperCase();
-  if (s === "ACTIVE" || s === "ACTIVATE") return "Aktif di Shopee";
+  if (s === "NORMAL" || s === "ACTIVE" || s === "ACTIVATE") return "Aktif di Shopee";
+  if (s === "UNLISTED") return "Tanpa dijual (unlisted)";
   if (s === "SELLER_DEACTIVATED") return "Nonaktif (seller)";
   if (s === "PLATFORM_DEACTIVATED") return "Nonaktif (platform)";
   if (s === "FREEZE") return "Dibekukan";
@@ -119,6 +128,8 @@ export default function ShopeeMarketplacePage() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState("name_asc");
+  const [tab, setTab] = useState("all");
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [refreshKey, setRefreshKey] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string[]>([]);
@@ -146,6 +157,7 @@ export default function ShopeeMarketplacePage() {
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) sp.set("search", q);
     sp.set("sort", sort);
+    sp.set("tab", tab);
     if (accountFilter.length > 0) sp.set("accountIds", accountFilter.join(","));
     let cancelled = false;
     async function run() {
@@ -159,6 +171,7 @@ export default function ShopeeMarketplacePage() {
         const data: ListResponse = await res.json();
         setRows(data.rows ?? []);
         setTotal(data.total ?? 0);
+        setCounts(data.counts ?? {});
         setAccounts(data.accounts ?? []);
         setError(null);
       } catch (e) {
@@ -169,7 +182,7 @@ export default function ShopeeMarketplacePage() {
     }
     run();
     return () => { cancelled = true; };
-  }, [page, q, sort, accountFilter, refreshKey]);
+  }, [page, q, sort, tab, accountFilter, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => { setQ(searchInput); setPage(1); }, 300);
@@ -394,6 +407,35 @@ export default function ShopeeMarketplacePage() {
       )}
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+        {/* Tab status — paritas dgn halaman TikTok (badge count dari server) */}
+        <div className="flex items-center overflow-x-auto border-b border-gray-200 px-4 bg-white">
+          {TABS.map((t) => {
+            const count = counts[t.id] ?? 0;
+            return (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setTab(t.id);
+                  setPage(1);
+                }}
+                className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                  tab === t.id ? "border-gray-900 text-gray-900" : "border-transparent text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {t.label}
+                {count > 0 && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                      tab === t.id ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         <div className="p-4 border-b border-gray-200 flex items-center gap-3 flex-wrap">
           <div className="relative w-80">
             <input ref={searchRef} type="text" value={searchInput}

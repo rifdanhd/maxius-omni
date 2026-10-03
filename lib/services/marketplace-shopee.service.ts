@@ -189,8 +189,16 @@ export async function listShopeeProducts(opts: {
   accountIds?: string[];
   page?: number;
   pageSize?: number;
-}): Promise<{ rows: ShopeeListingRow[]; total: number; page: number; pageSize: number }> {
-  const { businessId, search, accountIds, page = 1, pageSize = 20 } = opts;
+  sort?: string;
+  tab?: string;
+}): Promise<{
+  rows: ShopeeListingRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<string, number>;
+}> {
+  const { businessId, search, accountIds, page = 1, pageSize = 20, sort, tab = "all" } = opts;
   const where: Record<string, unknown> = {
     account: {
       platform: "SHOPEE",
@@ -261,7 +269,54 @@ export async function listShopeeProducts(opts: {
     }
   }
 
-  const all = [...groups.values()];
+  let all = [...groups.values()];
+
+  // Tab status (paritas dgn halaman TikTok) — counts dari basis sebelum tab
+  // dipilih supaya badge tidak saling menghilangkan.
+  const st = (g: { status: string | null }) => (g.status ?? "").toUpperCase();
+  const counts: Record<string, number> = {
+    all: all.length,
+    active: all.filter((g) => st(g) === "NORMAL").length,
+    out: all.filter((g) => g.stockTotal === 0).length,
+    unlisted: all.filter((g) => st(g) === "UNLISTED").length,
+    deleted: all.filter((g) => st(g) === "DELETED").length,
+  };
+  if (tab === "active") all = all.filter((g) => st(g) === "NORMAL");
+  else if (tab === "out") all = all.filter((g) => g.stockTotal === 0);
+  else if (tab === "unlisted") all = all.filter((g) => st(g) === "UNLISTED");
+  else if (tab === "deleted") all = all.filter((g) => st(g) === "DELETED");
+
+  // Sort — sebelumnya UI mengirim `sort` tapi backend selalu updatedAt desc.
+  const cmpStr = (a: string, b: string) => a.localeCompare(b, "id", { sensitivity: "base" });
+  const byTitle = (g: (typeof all)[number]) => g.platformTitle ?? g.channelSkus[0] ?? "";
+  const bySku = (g: (typeof all)[number]) => g.channelSkus[0] ?? "";
+  const byUpdated = (g: (typeof all)[number]) => g.lastSyncedAt?.getTime() ?? 0;
+  switch (sort) {
+    case "name_asc":
+      all.sort((a, b) => cmpStr(byTitle(a), byTitle(b)));
+      break;
+    case "name_desc":
+      all.sort((a, b) => cmpStr(byTitle(b), byTitle(a)));
+      break;
+    case "sku_asc":
+      all.sort((a, b) => cmpStr(bySku(a), bySku(b)));
+      break;
+    case "sku_desc":
+      all.sort((a, b) => cmpStr(bySku(b), bySku(a)));
+      break;
+    case "stock_asc":
+      all.sort((a, b) => a.stockTotal - b.stockTotal);
+      break;
+    case "stock_desc":
+      all.sort((a, b) => b.stockTotal - a.stockTotal);
+      break;
+    case "updated_desc":
+      all.sort((a, b) => byUpdated(b) - byUpdated(a));
+      break;
+    default:
+      break; // default = updatedAt desc dari query
+  }
+
   const rows: ShopeeListingRow[] = all
     .slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize)
     .map((g) => ({
@@ -278,7 +333,7 @@ export async function listShopeeProducts(opts: {
       imageUrl: g.imageUrl,
       lastSyncedAt: g.lastSyncedAt,
     }));
-  return { rows, total: all.length, page, pageSize };
+  return { rows, total: all.length, page, pageSize, counts };
 }
 
 /**

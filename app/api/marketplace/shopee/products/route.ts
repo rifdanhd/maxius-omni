@@ -20,6 +20,8 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
       accountIds,
       page: Number(sp.get("page") ?? 1),
       pageSize: Number(sp.get("pageSize") ?? 20),
+      sort: sp.get("sort") ?? undefined,
+      tab: sp.get("tab") ?? undefined,
     }),
     getShopeeAccounts(req.businessId),
   ]);
