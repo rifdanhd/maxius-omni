@@ -318,6 +318,23 @@ type SyncAccountResult = {
  * syncTikTokListing — tarik semua produk TikTok (per akun) & update status
  * seluruh ProductMapping milik akun itu. Idempoten terhadap totalCount.
  */
+/**
+ * backfillMasterImageUrl — tulis gambar utama listing ke MasterProduct.imageUrl
+ * HANYA jika masih kosong (tidak menimpa pilihan manual di Kelola Gambar).
+ */
+async function backfillMasterImageUrl(masterProductId: string | null, image: string | null): Promise<void> {
+  if (!masterProductId || !image) return;
+  const p = await prisma.masterProduct.findUnique({
+    where: { id: masterProductId },
+    select: { imageUrl: true },
+  });
+  if (!p || p.imageUrl) return;
+  await prisma.masterProduct.update({
+    where: { id: masterProductId },
+    data: { imageUrl: image },
+  });
+}
+
 export async function syncTikTokListings(businessId: string): Promise<SyncAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: "TIKTOK_SHOP", businessId },
@@ -368,6 +385,7 @@ include: {
       const upd = applyProduct({ channelSku: m.channelSku }, product);
       if (String(product.status ?? "").toUpperCase() === "DELETED") deleted += 1;
       await prisma.productMapping.update({ where: { id: m.id }, data: upd });
+      await backfillMasterImageUrl(m.variant?.masterProductId ?? null, productMainImage(product));
       synced += 1;
     }
 
@@ -430,7 +448,7 @@ export async function syncTikTokMapping(
 ): Promise<{ ok: boolean; reason?: string }> {
   const m = await prisma.productMapping.findUnique({
     where: { id: mappingId },
-    include: { account: true },
+    include: { account: true, variant: { select: { masterProductId: true } } },
   });
   if (!m) return { ok: false, reason: "Mapping tidak ditemukan." };
   if (m.account.businessId !== businessId) {
@@ -450,6 +468,7 @@ export async function syncTikTokMapping(
     where: { id: mappingId },
     data: applyProduct({ channelSku: m.channelSku }, product),
   });
+  await backfillMasterImageUrl(m.variant?.masterProductId ?? null, productMainImage(product));
   return { ok: true };
 }
 

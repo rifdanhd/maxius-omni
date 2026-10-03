@@ -24,10 +24,14 @@
  */
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
-import { getItemBaseInfo, getItemList, getModelList } from "@/lib/integrations/shopee";
+import { getItemBaseInfo, getItemList, getModelList, itemBaseImage } from "@/lib/integrations/shopee";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
-import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
+import {
+  backfillMasterImages,
+  loadShopeeAccount,
+  withRefreshedToken,
+} from "@/lib/services/marketplace-shopee.service";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 200;
@@ -222,6 +226,16 @@ async function importOneItem(params: {
     knownRefs.push(hit);
   }
 
+  // Backfill gambar ke master yang sudah ada (hanya jika imageUrl masih kosong).
+  const image = itemBaseImage(info);
+  if (image) {
+    const imageByVariant = new Map<string, string>();
+    for (const ref of knownRefs) {
+      if (ref.variantId) imageByVariant.set(ref.variantId, image);
+    }
+    await backfillMasterImages(imageByVariant);
+  }
+
   const pending = descriptors.filter((d) => !byChannelSku.has(d.channelSku));
   const statusRaw = JSON.stringify(info).slice(0, 8000);
   const now = new Date();
@@ -244,6 +258,7 @@ async function importOneItem(params: {
           businessId,
           importedFrom: `SHOPEE:${account.externalShopId ?? ""}`,
           threshold,
+          imageUrl: itemBaseImage(info),
           productVariant: {
             create: pending.map((d) => ({
               sku: d.channelSku,

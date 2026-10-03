@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History, Pencil, RefreshCw, Search, X } from "lucide-react";
+import { History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import type { StockRow, StockTab } from "@/app/api/inventory/stock/route";
 import type { OversellEntry } from "@/app/api/inventory/oversells/route";
@@ -318,10 +318,22 @@ export default function InventoryStockPage() {
                   {rows.map((r) => (
                     <tr key={r.variantId} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-gray-800 leading-tight">{r.productName}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {r.variantName ?? r.sku} · <span className="font-mono">{r.sku}</span>
-                        </p>
+                        <div className="flex items-start gap-3">
+                          {r.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.imageUrl} alt="" className="w-10 h-10 rounded object-cover bg-gray-100 shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+                              <PackageOpen size={16} />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-gray-800 leading-tight">{r.productName}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {r.variantName ?? r.sku} · <span className="font-mono">{r.sku}</span>
+                            </p>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(r.stock)}</td>
                       <td className="px-4 py-3 text-right">

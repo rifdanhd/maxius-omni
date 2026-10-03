@@ -451,6 +451,20 @@ export async function getItemBaseInfo(
   return (r.item_list as Array<Record<string, unknown>> | undefined) ?? [];
 }
 
+/** Gambar utama item dari respons get_item_base_info (string[] atau string). */
+export function itemBaseImage(info: Record<string, unknown>): string | null {
+  const img = info.image;
+  if (typeof img === "string" && img.trim()) return img.trim();
+  if (Array.isArray(img)) {
+    for (const v of img) if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  const images = info.images;
+  if (Array.isArray(images)) {
+    for (const v of images) if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
 export type ShopeeModel = {
   model_id: number;
   model_sku?: string;

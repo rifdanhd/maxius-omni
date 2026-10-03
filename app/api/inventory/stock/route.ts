@@ -12,6 +12,7 @@ export type StockRow = {
   variantName: string | null;
   productId: string;
   productName: string;
+  imageUrl: string | null;
   stock: number;
   safetyStock: number;
   promoActive: number;
@@ -29,6 +30,7 @@ type RawRow = {
   variantName: string | null;
   productId: string;
   productName: string;
+  imageUrl: string | null;
   stock: number;
   safetyStock: number;
   promoActive: number;
@@ -141,6 +143,7 @@ export const GET = withAuth(async (req) => {
       pv.name          AS "variantName",
       mp.id            AS "productId",
       mp.name          AS "productName",
+      mp."imageUrl"    AS "imageUrl",
       pv.stock         AS stock,
       pv."safetyStock" AS "safetyStock",
       COALESCE(pr."promoActive", 0) AS "promoActive",
@@ -208,6 +211,7 @@ export const GET = withAuth(async (req) => {
     variantName: r.variantName,
     productId: r.productId,
     productName: r.productName,
+    imageUrl: r.imageUrl ?? null,
     stock: Number(r.stock),
     safetyStock: Number(r.safetyStock),
     promoActive: Number(r.promoActive),

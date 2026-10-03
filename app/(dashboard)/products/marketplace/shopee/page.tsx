@@ -27,6 +27,7 @@ type ShopeeListingRow = {
   channelSku: string | null;
   variantCount: number;
   stockTotal: number;
+  imageUrl: string | null;
   lastSyncedAt: string | null;
 };
 
@@ -489,14 +490,24 @@ export default function ShopeeMarketplacePage() {
                       <tr className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
                         <td className="px-5 py-4 pt-5"><input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={selected.has(row.key)} onChange={() => toggleRow(row.key)} /></td>
                         <td className="px-5 py-4">
-                          <div className="max-w-[240px]">
-                            <div className="text-gray-900 font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
-                            <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
-                            {row.variantCount > 1 && (
-                              <span className="inline-flex items-center gap-1 mt-1.5 ml-1 text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" title="Satu produk Shopee dengan banyak model/SKU — stok diakumulasi dari semua varian.">
-                                {row.variantCount} varian
-                              </span>
+                          <div className="flex items-start gap-3">
+                            {row.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={row.imageUrl} alt="" className="w-12 h-12 rounded object-cover bg-gray-100 shrink-0" />
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+                                <PackageOpen size={18} />
+                              </div>
                             )}
+                            <div className="max-w-[240px]">
+                              <div className="text-gray-900 font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
+                              <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
+                              {row.variantCount > 1 && (
+                                <span className="inline-flex items-center gap-1 mt-1.5 ml-1 text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" title="Satu produk Shopee dengan banyak model/SKU — stok diakumulasi dari semua varian.">
+                                  {row.variantCount} varian
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-5 py-4"><span className="text-sm text-gray-700 font-mono font-semibold">{row.variantCount > 1 ? `${row.variantCount} SKU` : (row.channelSku ?? "-")}</span></td>

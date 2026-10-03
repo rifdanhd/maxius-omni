@@ -10,6 +10,7 @@ import {
   getItemBaseInfo,
   getItemList,
   getModelList,
+  itemBaseImage,
   refreshAccessToken,
   updatePrice as apiUpdatePrice,
   updateStockBatch as apiUpdateStockBatch,
@@ -176,6 +177,7 @@ export type ShopeeListingRow = {
   channelSku: string | null;
   variantCount: number;
   stockTotal: number;
+  imageUrl: string | null;
   lastSyncedAt: Date | null;
 };
 
@@ -201,7 +203,7 @@ export async function listShopeeProducts(opts: {
     where: where as never,
     include: {
       account: { select: { id: true, label: true } },
-      variant: { select: { id: true, stock: true } },
+      variant: { select: { id: true, stock: true, masterProduct: { select: { imageUrl: true } } } },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -220,6 +222,7 @@ export async function listShopeeProducts(opts: {
     status: string | null;
     channelSkus: string[];
     stockTotal: number;
+    imageUrl: string | null;
     lastSyncedAt: Date | null;
   };
   const groups = new Map<string, Group>();
@@ -239,10 +242,12 @@ export async function listShopeeProducts(opts: {
         status: m.platformStatus,
         channelSkus: [m.channelSku],
         stockTotal: stock,
+        imageUrl: m.variant?.masterProduct?.imageUrl ?? null,
         lastSyncedAt: m.lastSyncedAt,
       });
       continue;
     }
+    if (!g.imageUrl && m.variant?.masterProduct?.imageUrl) g.imageUrl = m.variant.masterProduct.imageUrl;
     if (!g.platformTitle && m.platformTitle) g.platformTitle = m.platformTitle;
     if (!g.status && m.platformStatus) g.status = m.platformStatus;
     if (m.variantId == null) g.allMapped = false;
@@ -268,9 +273,34 @@ export async function listShopeeProducts(opts: {
       channelSku: g.channelSkus.length === 1 ? g.channelSkus[0] : null,
       variantCount: g.channelSkus.length,
       stockTotal: g.stockTotal,
+      imageUrl: g.imageUrl,
       lastSyncedAt: g.lastSyncedAt,
     }));
   return { rows, total: all.length, page, pageSize };
+}
+
+/**
+ * backfillMasterImages — tulis gambar listing ke MasterProduct.imageUrl
+ * HANYA untuk produk yang masih kosong (tidak menimpa pilihan manual di
+ * Kelola Gambar). Dipakai import & sync listing Shopee.
+ */
+export async function backfillMasterImages(imageByVariant: Map<string, string>): Promise<void> {
+  if (imageByVariant.size === 0) return;
+  const variants = await prisma.productVariant.findMany({
+    where: { id: { in: [...imageByVariant.keys()] } },
+    select: { id: true, masterProductId: true, masterProduct: { select: { imageUrl: true } } },
+  });
+  const done = new Set<string>();
+  for (const v of variants) {
+    if (v.masterProduct.imageUrl || done.has(v.masterProductId)) continue;
+    const image = imageByVariant.get(v.id);
+    if (!image) continue;
+    done.add(v.masterProductId);
+    await prisma.masterProduct.update({
+      where: { id: v.masterProductId },
+      data: { imageUrl: image },
+    });
+  }
 }
 
 export async function syncShopeeListings(businessId: string): Promise<
@@ -289,9 +319,13 @@ export async function syncShopeeListings(businessId: string): Promise<
     try {
       const existing = await prisma.productMapping.findMany({
         where: { accountId: account.id },
-        select: { id: true, channelSku: true },
+        select: { id: true, channelSku: true, variantId: true },
       });
       const byChannelSku = new Map(existing.map((m) => [m.channelSku, m.id]));
+      const variantByChannelSku = new Map(
+        existing.filter((m) => m.variantId != null).map((m) => [m.channelSku, m.variantId as string])
+      );
+      const imageByVariant = new Map<string, string>();
       let offset = 0;
       let itemCount = 0;
       let modelCount = 0;
@@ -314,6 +348,18 @@ export async function syncShopeeListings(businessId: string): Promise<
             getModelList(token, shopId, itemId, creds)
           );
           modelCount += models.length;
+          const image = itemBaseImage(info);
+          if (image) {
+            const imageCandidates =
+              models.length === 0
+                ? [`${itemId}:0`, itemSku]
+                : models.flatMap((mm) => [`${itemId}:${mm.model_id}`, mm.model_sku]);
+            for (const c of imageCandidates) {
+              if (!c) continue;
+              const vid = variantByChannelSku.get(c) ?? variantByChannelSku.get(`${itemId}:${c}`);
+              if (vid && !imageByVariant.has(vid)) imageByVariant.set(vid, image);
+            }
+          }
           const touch = async (candidates: Array<string | undefined>, extraTitle: string | null, extraStatus: string | null) => {
             for (const c of candidates) {
               if (!c) continue;
@@ -349,6 +395,7 @@ export async function syncShopeeListings(businessId: string): Promise<
         if (!hasNextPage || nextOffset <= offset) break;
         offset = nextOffset;
       }
+      await backfillMasterImages(imageByVariant);
       results.push({ accountId: account.id, label: account.label, items: itemCount, models: modelCount, matched });
     } catch (e) {
       results.push({
