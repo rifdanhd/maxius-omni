@@ -546,6 +546,8 @@ model SyncLog {
 model User {
   id             String         @id
   username       String         @unique
+  // Email undangan utk Google login (invite-only) — null = belum bisa Google.
+  email          String?        @unique
   passwordHash   String
   canViewFullPii Boolean        @default(true)
   stockLedger    StockLedger[]
