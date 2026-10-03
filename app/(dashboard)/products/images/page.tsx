@@ -76,8 +76,8 @@ const fmtDate = (iso: string | null | undefined) => {
 function statusBadge(row: GalleryRow) {
   if (row.totalImages === 0)
     return { label: "Tidak Ada Gambar", cls: "bg-gray-100 text-gray-600" };
-  if (row.complete) return { label: "Lengkap", cls: "bg-emerald-100 text-emerald-700" };
-  return { label: "Belum Lengkap", cls: "bg-amber-100 text-amber-700" };
+  if (row.complete) return { label: "Lengkap", cls: "bg-gray-100 text-gray-900" };
+  return { label: "Belum Lengkap", cls: "bg-gray-100 text-gray-900" };
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -264,7 +264,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900"
+                className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
               >
                 <Upload size={15} /> Pilih File
               </button>
@@ -293,7 +293,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                     {f.name}
                     <button
                       onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
-                      className="text-gray-400 hover:text-red-600"
+                      className="text-gray-400 hover:text-gray-900"
                     >
                       <X size={12} />
                     </button>
@@ -302,7 +302,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                 <button
                   onClick={upload}
                   disabled={busy}
-                  className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   Unggah
@@ -312,7 +312,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl border border-red-100">
+            <div className="bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl border border-gray-100">
               {error}
             </div>
           )}
@@ -332,7 +332,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt={`Gambar ${i + 1}`} className="w-full aspect-square object-cover" />
                   {img.isCover && (
-                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 bg-amber-400 text-amber-950 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 bg-gray-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       <Star size={11} /> Cover
                     </span>
                   )}
@@ -341,7 +341,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                       <button
                         onClick={() => setCover(img)}
                         title="Jadikan cover"
-                        className="bg-white/90 hover:bg-white shadow rounded-md p-1.5 text-amber-600"
+                        className="bg-white/90 hover:bg-white shadow rounded-md p-1.5 text-gray-900"
                       >
                         <Star size={14} />
                       </button>
@@ -349,7 +349,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                     <button
                       onClick={() => removeImage(img)}
                       title="Hapus"
-                      className="bg-white/90 hover:bg-white shadow rounded-md p-1.5 text-red-600"
+                      className="bg-white/90 hover:bg-white shadow rounded-md p-1.5 text-gray-900"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -359,7 +359,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                       onClick={() => move(-1, img)}
                       disabled={i === 0}
                       title="Geser ke kiri"
-                      className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ArrowLeft size={14} />
                     </button>
@@ -368,7 +368,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                       onClick={() => move(1, img)}
                       disabled={i === images.length - 1}
                       title="Geser ke kanan"
-                      className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ArrowRight size={14} />
                     </button>
@@ -419,7 +419,7 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="p-6 overflow-y-auto">
-          {error && <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+          {error && <div className="bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl">{error}</div>}
           {loading ? (
             <p className="text-sm text-gray-400">Memuat riwayat...</p>
           ) : rows.length === 0 ? (
@@ -437,7 +437,7 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                   {r.isCover && (
-                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       <Star size={11} /> Cover
                     </span>
                   )}
@@ -604,7 +604,7 @@ export default function KelolaGambarPage() {
             </button>
             <button
               disabled
-              className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white opacity-60 cursor-not-allowed"
+              className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white opacity-60 cursor-not-allowed"
             >
               <Upload size={16} /> Unggah Massal
             </button>
@@ -634,13 +634,13 @@ export default function KelolaGambarPage() {
               }}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] min-w-[120px] justify-between ${
                 filterOpen || filterActive
-                  ? "border-indigo-500 bg-indigo-50/70 text-indigo-700"
+                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
                   : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
               <span>Filter</span>
               {filterActive && (
-                <span className="px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
                   {(statusFilter !== "all" ? 1 : 0) + (categoryFilter ? 1 : 0)}
                 </span>
               )}
@@ -690,7 +690,7 @@ export default function KelolaGambarPage() {
                   <button onClick={resetFilter} className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md">
                     Reset
                   </button>
-                  <button onClick={applyFilter} className="px-4 py-2 text-sm font-medium bg-[#2a3a8c] text-white rounded-md hover:bg-blue-900">
+                  <button onClick={applyFilter} className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-md hover:bg-gray-900">
                     Terapkan
                   </button>
                 </div>
@@ -699,9 +699,9 @@ export default function KelolaGambarPage() {
           </div>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} produk dipilih
-              <button onClick={() => setSelected(new Set())} className="text-indigo-500 hover:text-indigo-800 underline">
+              <button onClick={() => setSelected(new Set())} className="text-gray-500 hover:text-gray-900 underline">
                 Batal
               </button>
             </div>
@@ -731,7 +731,7 @@ export default function KelolaGambarPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-red-600">{error}</td>
+                  <td colSpan={7} className="px-5 py-12 text-center text-gray-900">{error}</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
@@ -844,7 +844,7 @@ export default function KelolaGambarPage() {
                 }}
                 className={`w-9 h-9 text-sm rounded-md ${
                   n === page
-                    ? "bg-[#2a3a8c] text-white font-semibold"
+                    ? "bg-[#111827] text-white font-semibold"
                     : "border border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >

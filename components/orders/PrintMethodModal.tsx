@@ -75,7 +75,7 @@ export default function PrintMethodModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gray-50 text-gray-900 flex items-center justify-center">
               <Printer size={18} />
             </div>
             <div>
@@ -96,7 +96,7 @@ export default function PrintMethodModal({
           {/* Opsi ukuran/kondisi print */}
           <div>
             <p className="text-xs font-bold text-gray-900 mb-2">Ukuran Label Pengiriman</p>
-            <label className={`flex items-start gap-3 border rounded-xl p-4 cursor-pointer transition-colors ${method === "label" ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/15" : "border-gray-200 hover:bg-gray-50"}`}>
+            <label className={`flex items-start gap-3 border rounded-xl p-4 cursor-pointer transition-colors ${method === "label" ? "border-gray-900 bg-gray-50/50 ring-2 ring-gray-500/15" : "border-gray-200 hover:bg-gray-50"}`}>
               <input
                 type="radio"
                 checked={method === "label"}
@@ -105,7 +105,7 @@ export default function PrintMethodModal({
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <FileText size={15} className="text-indigo-600" />
+                  <FileText size={15} className="text-gray-900" />
                   <p className="text-sm font-semibold text-gray-900">1 Label (Ukuran A6)</p>
                 </div>
                 <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
@@ -137,7 +137,7 @@ export default function PrintMethodModal({
           </label>
 
           {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700 flex items-start gap-2">
+            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-900 flex items-start gap-2">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               {error}
             </div>
@@ -156,7 +156,7 @@ export default function PrintMethodModal({
           <button
             onClick={handlePrint}
             disabled={printing}
-            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
+            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
           >
             {printing ? (
               <>

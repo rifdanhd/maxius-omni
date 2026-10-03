@@ -69,9 +69,9 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ];
 
 const TAB_BADGE: Record<TabId, string> = {
-  PENDING: "bg-amber-100 text-amber-700 border-amber-200",
-  IN_PROGRESS: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  COMPLETED: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  PENDING: "bg-gray-100 text-gray-900 border-gray-200",
+  IN_PROGRESS: "bg-gray-100 text-gray-900 border-gray-200",
+  COMPLETED: "bg-gray-100 text-gray-900 border-gray-200",
   CANCELLED: "bg-gray-100 text-gray-500 border-gray-200",
 };
 
@@ -168,7 +168,7 @@ export default function StockOpnamePage() {
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900"
           >
             <Plus className="h-4 w-4" />
             Buat Stok Opname
@@ -184,7 +184,7 @@ export default function StockOpnamePage() {
             onClick={() => setActiveTab(t.id)}
             className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${
               activeTab === t.id
-                ? "border-blue-300 bg-blue-50 text-blue-700"
+                ? "border-gray-300 bg-gray-50 text-gray-900"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
@@ -199,7 +199,7 @@ export default function StockOpnamePage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
           {error}
         </div>
       )}
@@ -242,7 +242,7 @@ export default function StockOpnamePage() {
                   </td>
                   <td className="px-4 py-3">
                     {r.diffItems > 0 ? (
-                      <span className="font-medium text-amber-600">{fmt(r.diffItems)} produk</span>
+                      <span className="font-medium text-gray-900">{fmt(r.diffItems)} produk</span>
                     ) : (
                       <span className="text-gray-400">—</span>
                     )}
@@ -267,7 +267,7 @@ export default function StockOpnamePage() {
                     ) : (
                       <button
                         onClick={() => setDetailId(r.id)}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-900"
                       >
                         Input Hitung
                       </button>
@@ -373,7 +373,7 @@ function CreateModal({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Cari produk / SKU…"
-            className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
           {loading ? (
             <div className="flex items-center justify-center p-6 text-gray-500">
@@ -418,12 +418,12 @@ function CreateModal({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Mis. hitung fisik gudang utama"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </label>
 
           {error && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900">
               {error}
             </div>
           )}
@@ -441,7 +441,7 @@ function CreateModal({
             <button
               onClick={submit}
               disabled={submitting || selected.size === 0}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Buat Opname
@@ -595,8 +595,8 @@ function CountModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {result && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" />
               <div>
                 <div className="font-semibold">Opname selesai.</div>
                 <div>
@@ -609,8 +609,8 @@ function CountModal({
           )}
 
           {error && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" />
               <div>{error}</div>
             </div>
           )}
@@ -655,7 +655,7 @@ function CountModal({
                             value={raw}
                             onChange={(e) => setCount(i.variantId, e.target.value)}
                             placeholder="—"
-                            className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm focus:border-blue-500 focus:outline-none"
+                            className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm focus:border-gray-500 focus:outline-none"
                           />
                         )}
                       </td>
@@ -663,11 +663,11 @@ function CountModal({
                         {diff === null ? (
                           <span className="text-gray-400">—</span>
                         ) : diff === 0 ? (
-                          <span className="text-emerald-600">Cocok</span>
+                          <span className="text-gray-900">Cocok</span>
                         ) : diff > 0 ? (
-                          <span className="font-medium text-emerald-600">+{fmt(diff)}</span>
+                          <span className="font-medium text-gray-900">+{fmt(diff)}</span>
                         ) : (
-                          <span className="font-medium text-red-600">−{fmt(-diff)}</span>
+                          <span className="font-medium text-gray-900">−{fmt(-diff)}</span>
                         )}
                       </td>
                     </tr>
@@ -684,13 +684,13 @@ function CountModal({
               <span>
                 Terhitung {fmt(stats.counted)}/{fmt(stats.total)} produk
                 {stats.diff > 0 && (
-                  <span className="ml-2 font-medium text-amber-600">
+                  <span className="ml-2 font-medium text-gray-900">
                     · {fmt(stats.diff)} selisih
                   </span>
                 )}
               </span>
               {!allCounted && (
-                <span className="text-xs text-amber-600">
+                <span className="text-xs text-gray-900">
                   Semua produk harus terhitung sebelum bisa difinalisasi.
                 </span>
               )}
@@ -699,7 +699,7 @@ function CountModal({
               <button
                 onClick={cancel}
                 disabled={cancelling || saving || finalizing}
-                className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50"
               >
                 {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                 Batalkan Opname
@@ -717,7 +717,7 @@ function CountModal({
                   onClick={finalize}
                   disabled={finalizing || saving || !allCounted}
                   title={allCounted ? "" : "Lengkapi semua hasil hitung dulu"}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
                 >
                   {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
                   Finalisasi & Koreksi Stok

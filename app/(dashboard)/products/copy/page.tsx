@@ -65,7 +65,7 @@ function PriceInput({
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ""))}
         placeholder="contoh: 25000"
-        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
       />
     </div>
   );
@@ -275,7 +275,7 @@ export default function ProductCopyPage() {
         <h1 className="text-xl font-bold text-gray-900">Copy Produk dari URL</h1>
       </div>
 
-      <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
+      <div className="mb-6 flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-900">
         <ShieldCheck size={16} className="mt-0.5 shrink-0" />
         <p>
           Fitur untuk membantu Anda meng-input ulang produk milik Anda sendiri (misal produk lama
@@ -287,7 +287,7 @@ export default function ProductCopyPage() {
       {toast && (
         <div
           className={`mb-4 px-4 py-3 rounded-md text-sm font-medium flex items-center gap-2 ${
-            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+            toast.type === "success" ? "bg-gray-900 text-white" : "bg-gray-900 text-white"
           }`}
         >
           {toast.type === "success" ? <Check size={16} /> : <AlertTriangle size={16} />}
@@ -296,14 +296,14 @@ export default function ProductCopyPage() {
       )}
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 border border-red-200 bg-red-50 rounded-lg px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-start gap-2 border border-gray-200 bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-900">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <div className="flex-1">
             <p>{error}</p>
             {mode === "input" && (
               <button
                 onClick={startManual}
-                className="mt-1 text-red-600 underline font-medium hover:text-red-800"
+                className="mt-1 text-gray-900 underline font-medium hover:text-gray-900"
               >
                 Isi manual saja
               </button>
@@ -328,12 +328,12 @@ export default function ProductCopyPage() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && runParse()}
                 placeholder="https://www.tokopedia.com/…"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
               />
               <button
                 onClick={runParse}
                 disabled={busy}
-                className="inline-flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
               >
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 {busy ? "Mengambil data..." : "Ambil Data"}
@@ -363,11 +363,11 @@ export default function ProductCopyPage() {
               {mode === "preview" && parsed && (
                 <div className="mb-6 flex items-start justify-between gap-3 flex-wrap border-b border-gray-100 pb-5">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-semibold">
+                    <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-900 text-[11px] font-semibold">
                       {parsed.sourcePlatform}
                     </span>
                     {parsed.price !== null && (
-                      <span className="text-xs text-emerald-600 font-semibold">
+                      <span className="text-xs text-gray-900 font-semibold">
                         {fmtRupiah(parsed.price)}
                       </span>
                     )}
@@ -397,13 +397,13 @@ export default function ProductCopyPage() {
                             type="button"
                             onClick={() => toggleImage(src)}
                             className={`relative aspect-square rounded-md border overflow-hidden bg-gray-50 ${
-                              on ? "border-indigo-500 ring-2 ring-indigo-200" : "border-gray-200"
+                              on ? "border-gray-500 ring-2 ring-gray-200" : "border-gray-200"
                             }`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={src} alt="produk" className="w-full h-full object-cover" />
                             {on && (
-                              <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                              <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center">
                                 <Check size={12} />
                               </span>
                             )}
@@ -422,13 +422,13 @@ export default function ProductCopyPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="font-semibold text-gray-700 text-sm block mb-1.5">
-                      Nama Produk <span className="text-red-500">*</span>
+                      Nama Produk <span className="text-gray-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -449,7 +449,7 @@ export default function ProductCopyPage() {
                         value={form.category}
                         onChange={(e) => setForm({ ...form, category: e.target.value })}
                         placeholder="contoh: Makanan Ringan"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
                       />
                     </div>
                   </div>
@@ -462,7 +462,7 @@ export default function ProductCopyPage() {
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                       placeholder="Deskripsi produk…"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-y"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 resize-y"
                     />
                   </div>
                 </div>
@@ -471,7 +471,7 @@ export default function ProductCopyPage() {
               {hasVariantMode() && (
                 <div className="border-t border-gray-200 px-6 py-6">
                   <div className="flex items-center gap-2 mb-1">
-                    <Boxes size={16} className="text-[#2a3a8c]" />
+                    <Boxes size={16} className="text-[#111827]" />
                     <h2 className="font-semibold text-gray-900">Daftar Varian</h2>
                     <span className="text-[11px] text-gray-400 font-normal">
                       ({variantRows.length} varian — hasil deteksi otomatis bisa diubah)
@@ -500,7 +500,7 @@ export default function ProductCopyPage() {
                                 value={row.name}
                                 onChange={(e) => updateVariantRow(i, { name: e.target.value })}
                                 placeholder="mis. Hitam - M"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
                               />
                             </td>
                             <td className="px-4 py-2">
@@ -515,7 +515,7 @@ export default function ProductCopyPage() {
                                   updateVariantRow(i, { stock: e.target.value.replace(/[^\d]/g, "") })
                                 }
                                 placeholder="0"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
                               />
                             </td>
                             <td className="px-4 py-2">
@@ -524,14 +524,14 @@ export default function ProductCopyPage() {
                                 value={row.sku}
                                 onChange={(e) => updateVariantRow(i, { sku: e.target.value })}
                                 placeholder="kosongkan untuk generate otomatis"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
                               />
                             </td>
                             <td className="px-4 py-2">
                               <button
                                 type="button"
                                 onClick={() => removeVariantRow(i)}
-                                className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                className="p-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-50"
                                 title="Hapus varian"
                               >
                                 <Trash2 size={15} />
@@ -561,7 +561,7 @@ export default function ProductCopyPage() {
               <button
                 onClick={saveDraft}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-md bg-[#2a3a8c] px-5 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 {saving ? "Menyimpan…" : "Simpan sebagai Draft Produk"}

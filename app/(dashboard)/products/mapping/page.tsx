@@ -327,13 +327,13 @@ export default function ProductMappingPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">{error}</div>
       )}
 
       {/* Tambah Mapping */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
-          <Plus size={16} className="text-[#2a3a8c]" />
+          <Plus size={16} className="text-[#111827]" />
           <h2 className="font-semibold text-gray-900">Tambah Mapping</h2>
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -366,7 +366,7 @@ export default function ProductMappingPage() {
                 type="checkbox"
                 checked={!form.useNewVariant}
                 onChange={() => setForm((f) => ({ ...f, useNewVariant: !f.useNewVariant }))}
-                className="accent-[#2a3a8c]"
+                className="accent-[#111827]"
               />
               Pakai varian yang sudah ada
             </label>
@@ -439,7 +439,7 @@ export default function ProductMappingPage() {
             <button
               onClick={handleCreateMapping}
               disabled={saving}
-              className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-5 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60 transition-colors"
+              className="flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60 transition-colors"
             >
               <Link2 size={16} /> {saving ? "Menyimpan..." : "Simpan Mapping"}
             </button>
@@ -449,9 +449,9 @@ export default function ProductMappingPage() {
 
       {/* SKU Order Belum Ter-mapping (orphan) — detect & tag saja, aksi manual */}
       {orphansLoaded && orphans.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl shadow-sm" data-testid="orphan-panel">
-          <div className="px-6 py-4 border-b border-amber-200 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-amber-600" />
+        <div className="bg-gray-50 border border-gray-200 rounded-xl shadow-sm" data-testid="orphan-panel">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-gray-900" />
             <h2 className="font-semibold text-gray-900">
               SKU Order Belum Ter-mapping ({orphans.length})
             </h2>
@@ -459,7 +459,7 @@ export default function ProductMappingPage() {
               — muncul di order ({orphans.reduce((s, o) => s + o.qty, 0)} pcs) tapi belum punya varian stok pusat. Analytics belum menampilkan nama produknya.
             </span>
           </div>
-          <div className="divide-y divide-amber-100">
+          <div className="divide-y divide-gray-100">
             {orphans.map((o) => {
               const mode = mapMode[o.channelSku] ?? "existing";
               return (
@@ -468,7 +468,7 @@ export default function ProductMappingPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm text-gray-900">{o.channelSku}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">{o.qty} pcs</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-900 font-semibold">{o.qty} pcs</span>
                         <span className="text-xs text-gray-500">{o.orderCount} order</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1 truncate max-w-[480px]">
@@ -479,7 +479,7 @@ export default function ProductMappingPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setMapMode((p) => ({ ...p, [o.channelSku]: "existing" }))}
-                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "existing" ? "border-[#2a3a8c] bg-white text-[#2a3a8c]" : "border-gray-200 bg-white text-gray-600"}`}
+                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "existing" ? "border-[#111827] bg-white text-[#111827]" : "border-gray-200 bg-white text-gray-600"}`}
                       >
                         <LinkIcon size={13} /> Ke varian ada
                       </button>
@@ -488,7 +488,7 @@ export default function ProductMappingPage() {
                           setMapMode((p) => ({ ...p, [o.channelSku]: "new" }));
                           setNewName((p) => ({ ...p, [o.channelSku]: p[o.channelSku] ?? o.sampleProductName ?? "" }));
                         }}
-                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "new" ? "border-[#2a3a8c] bg-white text-[#2a3a8c]" : "border-gray-200 bg-white text-gray-600"}`}
+                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "new" ? "border-[#111827] bg-white text-[#111827]" : "border-gray-200 bg-white text-gray-600"}`}
                       >
                         <PackagePlus size={13} /> Buat master baru
                       </button>
@@ -512,7 +512,7 @@ export default function ProductMappingPage() {
                       <button
                         onClick={() => handleMapOrphan(o)}
                         disabled={mapSaving === o.channelSku || !mapTarget[o.channelSku]}
-                        className="rounded-md bg-[#2a3a8c] px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-900 disabled:opacity-50"
+                        className="rounded-md bg-[#111827] px-4 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-50"
                       >
                         {mapSaving === o.channelSku ? "Menyimpan..." : "Mapping + Backfill"}
                       </button>
@@ -529,7 +529,7 @@ export default function ProductMappingPage() {
                       <button
                         onClick={() => handleMapOrphan(o)}
                         disabled={mapSaving === o.channelSku || !newName[o.channelSku]?.trim()}
-                        className="rounded-md bg-[#2a3a8c] px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-900 disabled:opacity-50"
+                        className="rounded-md bg-[#111827] px-4 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:opacity-50"
                       >
                         {mapSaving === o.channelSku ? "Menyimpan..." : "Buat Master + Mapping"}
                       </button>
@@ -546,7 +546,7 @@ export default function ProductMappingPage() {
       {/* Daftar Mapping */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
-          <Boxes size={16} className="text-[#2a3a8c]" />
+          <Boxes size={16} className="text-[#111827]" />
           <h2 className="font-semibold text-gray-900">Daftar Mapping ({mappings.length})</h2>
         </div>
         {loading ? (
@@ -580,7 +580,7 @@ export default function ProductMappingPage() {
                           <div className="text-xs text-gray-500">varian {m.variant.sku}</div>
                         </>
                       ) : (
-                        <span className="text-xs text-amber-600">belum ter-mapping</span>
+                        <span className="text-xs text-gray-900">belum ter-mapping</span>
                       )}
                     </td>
                     <td className="px-6 py-3">
@@ -615,7 +615,7 @@ export default function ProductMappingPage() {
                           <button
                             onClick={() => handleRepoint(m.id, repoint[m.id])}
                             disabled={!repoint[m.id] || repointSaving === m.id}
-                            className="rounded-md bg-[#2a3a8c] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                            className="rounded-md bg-[#111827] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                           >
                             <Save size={14} />
                           </button>
@@ -637,7 +637,7 @@ export default function ProductMappingPage() {
                           </button>
                           <button
                             onClick={() => handleDelete(m.id, m.channelSku)}
-                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                            className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-50"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -655,11 +655,11 @@ export default function ProductMappingPage() {
       {/* Daftar Varian (sku_master) + Sesuaikan Stok */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
-          <Boxes size={16} className="text-[#2a3a8c]" />
+          <Boxes size={16} className="text-[#111827]" />
           <h2 className="font-semibold text-gray-900">Daftar Varian (sku_master)</h2>
         </div>
         {stockInVariant && (
-          <div className="p-6 border-b border-gray-200 bg-emerald-50/50">
+          <div className="p-6 border-b border-gray-200 bg-gray-50/50">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">
               Barang Masuk: {stockInVariant.masterProduct.name} / {stockInVariant.sku}
             </h3>
@@ -692,7 +692,7 @@ export default function ProductMappingPage() {
                 <button
                   onClick={handleStockIn}
                   disabled={stockInSaving}
-                  className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                  className="flex items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60 transition-colors"
                 >
                   <Save size={15} /> {stockInSaving ? "Menyimpan..." : "Catat"}
                 </button>
@@ -707,7 +707,7 @@ export default function ProductMappingPage() {
           </div>
         )}
         {adjustVariant && (
-          <div className="p-6 border-b border-gray-200 bg-indigo-50/50">
+          <div className="p-6 border-b border-gray-200 bg-gray-50/50">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">
               Sesuaikan Stok: {adjustVariant.masterProduct.name} / {adjustVariant.sku}
             </h3>
@@ -740,7 +740,7 @@ export default function ProductMappingPage() {
                 <button
                   onClick={handleAdjust}
                   disabled={adjustSaving}
-                  className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60 transition-colors"
+                  className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60 transition-colors"
                 >
                   <Save size={15} /> {adjustSaving ? "Menyimpan..." : "Simpan"}
                 </button>
@@ -783,7 +783,7 @@ export default function ProductMappingPage() {
                       <div className="inline-flex items-center gap-2">
                         <button
                           onClick={() => { setStockInVariant(v); setStockInForm({ qty: "", note: "" }); }}
-                          className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100"
                           title="Catat barang masuk (restock fisik) — +qty, bukan angka absolut"
                         >
                           <PackagePlus size={14} /> Barang Masuk
@@ -810,10 +810,10 @@ export default function ProductMappingPage() {
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <History size={16} className="text-[#2a3a8c]" />
+              <History size={16} className="text-[#111827]" />
               <h2 className="font-semibold text-gray-900">Riwayat Stok (stock_ledger)</h2>
             </div>
-            <button onClick={loadLedger} className="text-xs font-medium text-[#2a3a8c] hover:underline">
+            <button onClick={loadLedger} className="text-xs font-medium text-[#111827] hover:underline">
               Muat ulang
             </button>
           </div>
@@ -840,7 +840,7 @@ export default function ProductMappingPage() {
                       {e.variant ? `${e.variant.masterProduct.name} / ${e.variant.sku}` : "-"}
                     </td>
                     <td className="px-6 py-3 font-medium">
-                      <span className={e.changeQty < 0 ? "text-red-600" : "text-green-600"}>
+                      <span className={e.changeQty < 0 ? "text-gray-900" : "text-gray-900"}>
                         {e.changeQty > 0 ? "+" : ""}{e.changeQty}
                       </span>
                     </td>

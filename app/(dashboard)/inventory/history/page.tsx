@@ -42,12 +42,12 @@ const KIND_STYLE: Record<
   HistoryItem["eventKind"],
   { icon: typeof Package; cls: string; label: string }
 > = {
-  ORDER: { icon: Package, cls: "bg-blue-100 text-blue-700", label: "Order" },
-  ORDER_CANCEL: { icon: ArrowUpRight, cls: "bg-amber-100 text-amber-700", label: "Batal/Refund" },
-  SALE: { icon: Tag, cls: "bg-violet-100 text-violet-700", label: "Penjualan" },
+  ORDER: { icon: Package, cls: "bg-gray-100 text-gray-900", label: "Order" },
+  ORDER_CANCEL: { icon: ArrowUpRight, cls: "bg-gray-100 text-gray-900", label: "Batal/Refund" },
+  SALE: { icon: Tag, cls: "bg-gray-100 text-gray-900", label: "Penjualan" },
   MANUAL: { icon: ClipboardCheck, cls: "bg-gray-100 text-gray-600", label: "Manual" },
-  OPNAME: { icon: ClipboardCheck, cls: "bg-emerald-100 text-emerald-700", label: "Stok Opname" },
-  OVERSELL: { icon: AlertOctagon, cls: "bg-red-100 text-red-700", label: "Oversell" },
+  OPNAME: { icon: ClipboardCheck, cls: "bg-gray-100 text-gray-900", label: "Stok Opname" },
+  OVERSELL: { icon: AlertOctagon, cls: "bg-gray-100 text-gray-900", label: "Oversell" },
   OTHER: { icon: Minus, cls: "bg-gray-100 text-gray-500", label: "Lainnya" },
 };
 
@@ -191,7 +191,7 @@ export default function InventoryHistoryPage() {
             onClick={() => setSource(f.id)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
               source === f.id
-                ? "border-blue-300 bg-blue-50 text-blue-700"
+                ? "border-gray-300 bg-gray-50 text-gray-900"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
@@ -240,7 +240,7 @@ export default function InventoryHistoryPage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
           {error}
         </div>
       )}
@@ -292,7 +292,7 @@ export default function InventoryHistoryPage() {
                         {it.sku ?? "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <div className={`font-medium ${it.eventKind === "OVERSELL" ? "text-red-600" : "text-gray-800"}`}>
+                        <div className={`font-medium ${it.eventKind === "OVERSELL" ? "text-gray-900" : "text-gray-800"}`}>
                           {it.event}
                         </div>
                         {(it.accountLabel || it.username) && (
@@ -309,7 +309,7 @@ export default function InventoryHistoryPage() {
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         {it.changeQty === null ? (
                           <span
-                            className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"
+                            className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-900"
                             title="Stok tidak diubah — order perlu ditinjau manual"
                           >
                             <AlertOctagon className="h-3.5 w-3.5" />
@@ -325,11 +325,11 @@ export default function InventoryHistoryPage() {
                             <span className="text-gray-300">→</span>
                             <span className="text-gray-900">{fmt(it.stockAfter ?? 0)}</span>
                             {it.changeQty > 0 ? (
-                              <span className="ml-1 inline-flex items-center text-xs font-semibold text-emerald-600">
+                              <span className="ml-1 inline-flex items-center text-xs font-semibold text-gray-900">
                                 <ArrowUpRight className="h-3.5 w-3.5" />+{fmt(it.changeQty)}
                               </span>
                             ) : (
-                              <span className="ml-1 inline-flex items-center text-xs font-semibold text-red-600">
+                              <span className="ml-1 inline-flex items-center text-xs font-semibold text-gray-900">
                                 <ArrowDownRight className="h-3.5 w-3.5" />
                                 {fmt(it.changeQty)}
                               </span>

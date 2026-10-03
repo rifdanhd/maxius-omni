@@ -163,8 +163,8 @@ function Toast({
       <div
         className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
           toast.type === "success"
-            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-            : "bg-red-50 border-red-200 text-red-800"
+            ? "bg-gray-50 border-gray-200 text-gray-900"
+            : "bg-gray-50 border-gray-200 text-gray-900"
         }`}
       >
         <span className="flex-1">{toast.message}</span>
@@ -522,7 +522,7 @@ export default function TikTokMarketplacePage() {
           <button
             onClick={syncAll}
             disabled={syncingAll}
-            className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60"
+            className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
@@ -551,7 +551,7 @@ export default function TikTokMarketplacePage() {
               onClick={() => switchTab(key)}
               className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors ${
                 active
-                  ? "bg-[#2a3a8c] text-white border-transparent"
+                  ? "bg-[#111827] text-white border-transparent"
                   : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
               }`}
             >
@@ -570,29 +570,29 @@ export default function TikTokMarketplacePage() {
 
       {/* Produk belum ter-mapping (discovery, bukan auto-import) */}
       {unmappedChecked && unmappedTotal > 0 && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-3 flex items-center justify-between flex-wrap gap-2">
-            <p className="text-sm font-bold text-amber-800">
+            <p className="text-sm font-bold text-gray-900">
               {unmappedTotal} produk di TikTok Shop belum ter-mapping ke stok pusat
             </p>
             <button
               onClick={loadUnmapped}
               disabled={unmappedLoading}
-              className="text-xs font-semibold text-amber-700 underline hover:text-amber-900 disabled:opacity-50"
+              className="text-xs font-semibold text-gray-900 underline hover:text-gray-900 disabled:opacity-50"
             >
               {unmappedLoading ? "Memeriksa..." : "Periksa ulang"}
             </button>
           </div>
-          <div className="divide-y divide-amber-100">
+          <div className="divide-y divide-gray-100">
             {unmapped.filter((a) => a.unmapped.length > 0).map((a) => (
               <div key={a.accountId}>
                 <button
                   onClick={() => toggleUnmappedAccount(a.accountId)}
-                  className="w-full px-5 py-2.5 flex items-center justify-between text-sm hover:bg-amber-100/50"
+                  className="w-full px-5 py-2.5 flex items-center justify-between text-sm hover:bg-gray-100/50"
                 >
                   <span className="font-semibold text-gray-800">
                     {a.label}
-                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-gray-500 text-white text-[10px] font-bold">
                       {a.unmapped.length}
                     </span>
                   </span>
@@ -601,7 +601,7 @@ export default function TikTokMarketplacePage() {
                 {unmappedOpen.has(a.accountId) && (
                   <div className="px-5 pb-3 flex flex-col gap-2">
                     {a.unmapped.map((p) => (
-                      <div key={p.platformProductId} className="bg-white border border-amber-200 rounded-lg p-3">
+                      <div key={p.platformProductId} className="bg-white border border-gray-200 rounded-lg p-3">
                         <div className="flex gap-3">
                           {p.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -632,7 +632,7 @@ export default function TikTokMarketplacePage() {
                                 </span>
                                 <button
                                   onClick={() => setMapTarget({ accountId: a.accountId, accountLabel: a.label, product: p, sku: s })}
-                                  className="shrink-0 text-xs font-semibold bg-[#2a3a8c] text-white px-3 py-1 rounded-md hover:bg-blue-900"
+                                  className="shrink-0 text-xs font-semibold bg-[#111827] text-white px-3 py-1 rounded-md hover:bg-gray-900"
                                 >
                                   Mapping
                                 </button>
@@ -693,14 +693,14 @@ export default function TikTokMarketplacePage() {
               onClick={() => setFilterOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] ${
                 filterOpen || filterActive
-                  ? "border-indigo-500 bg-indigo-50/70 text-indigo-700"
+                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
                   : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
               <Filter size={14} />
               <span>Toko/Akun</span>
               {filterActive && (
-                <span className="px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
                   {accountFilter.length}
                 </span>
               )}
@@ -743,7 +743,7 @@ export default function TikTokMarketplacePage() {
                   </button>
                   <button
                     onClick={() => setFilterOpen(false)}
-                    className="text-xs font-semibold bg-[#2a3a8c] text-white px-3 py-1.5 rounded-md"
+                    className="text-xs font-semibold bg-[#111827] text-white px-3 py-1.5 rounded-md"
                   >
                     Terapkan
                   </button>
@@ -761,14 +761,14 @@ export default function TikTokMarketplacePage() {
             {unmappedLoading ? <Loader2 size={14} className="animate-spin" /> : <PackageOpen size={14} />}
             <span>Belum ter-mapping</span>
             {unmappedChecked && unmappedTotal > 0 && (
-              <span className="px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+              <span className="px-1.5 rounded-full bg-gray-500 text-white text-[10px] font-bold">
                 {unmappedTotal}
               </span>
             )}
           </button>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} listing dipilih
               <button onClick={() => setSelected(new Set())} className="underline">Batal</button>
             </div>
@@ -800,7 +800,7 @@ export default function TikTokMarketplacePage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-red-600">{error}</td>
+                  <td colSpan={9} className="px-5 py-12 text-center text-gray-900">{error}</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
@@ -865,7 +865,7 @@ export default function TikTokMarketplacePage() {
                 onClick={() => setPage(n)}
                 className={`w-9 h-9 text-sm rounded-md ${
                   n === page
-                    ? "bg-[#2a3a8c] text-white font-semibold"
+                    ? "bg-[#111827] text-white font-semibold"
                     : "border border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >
@@ -1018,7 +1018,7 @@ function MapUnmappedModal({
               onClick={() => setMode(key)}
               className={`px-3 py-1.5 rounded-md border ${
                 mode === key
-                  ? "bg-[#2a3a8c] text-white border-transparent"
+                  ? "bg-[#111827] text-white border-transparent"
                   : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
               }`}
             >
@@ -1122,7 +1122,7 @@ function MapUnmappedModal({
           )}
         </div>
 
-        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-xs text-gray-900">{error}</p>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -1134,7 +1134,7 @@ function MapUnmappedModal({
           <button
             onClick={submit}
             disabled={saving || loadingMasters}
-            className="px-4 py-2 text-sm font-semibold bg-[#2a3a8c] text-white rounded-md hover:bg-blue-900 disabled:opacity-60 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-semibold bg-[#111827] text-white rounded-md hover:bg-gray-900 disabled:opacity-60 flex items-center gap-2"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             {saving ? "Menyimpan..." : "Simpan mapping"}
@@ -1208,14 +1208,14 @@ function FragmentRow({
               <div className="text-gray-900 font-bold leading-tight flex items-start gap-1.5">
                 <span className="min-w-0 truncate" title={name}>{name}</span>
                 {deleted && (
-                  <span className="shrink-0 inline-flex items-center gap-1 bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="shrink-0 inline-flex items-center gap-1 bg-gray-100 text-gray-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     Del
                   </span>
                 )}
               </div>
               <button
                 onClick={onExpand}
-                className="text-xs text-indigo-600 hover:underline mt-1 inline-flex items-center gap-1"
+                className="text-xs text-gray-900 hover:underline mt-1 inline-flex items-center gap-1"
               >
                 {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 Lihat {row.variantCount} varian produk
@@ -1232,7 +1232,7 @@ function FragmentRow({
         <td className="px-5 py-4">
           <div className="flex flex-col gap-1">
             <span
-              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit bg-emerald-100 text-emerald-800`}
+              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit bg-gray-100 text-gray-900`}
               title={row.platformProductId ?? row.channelSku ?? undefined}
             >
               <Radio size={11} /> TikTok Shop {effectiveActive ? "●" : ""}
@@ -1265,7 +1265,7 @@ function FragmentRow({
           {row.master ? (
             <Link
               href={`/products?highlight=${encodeURIComponent(row.master.id ?? "")}`}
-              className="text-xs font-semibold text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs font-semibold text-gray-900 hover:underline inline-flex items-center gap-1"
             >
               {row.master.name ?? "-"} <ExternalLink size={11} />
             </Link>
@@ -1280,7 +1280,7 @@ function FragmentRow({
               onClick={onToggle}
               disabled={busy || !row.platformProductId || deleted}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                effectiveActive ? "bg-emerald-500" : "bg-gray-300"
+                effectiveActive ? "bg-gray-500" : "bg-gray-300"
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               role="switch"
               aria-checked={effectiveActive}
@@ -1331,7 +1331,7 @@ function FragmentRow({
                   e.stopPropagation();
                   onMenuToggle();
                 }}
-                className={`p-1.5 rounded-md border text-gray-600 hover:bg-gray-50 ${menuOpen ? "border-indigo-300 bg-indigo-50" : "border-gray-300"}`}
+                className={`p-1.5 rounded-md border text-gray-600 hover:bg-gray-50 ${menuOpen ? "border-gray-300 bg-gray-50" : "border-gray-300"}`}
                 title="Atur"
               >
                 <MoreVertical size={14} />
@@ -1343,20 +1343,20 @@ function FragmentRow({
                 >
                   <Link
                     href={`/products/marketplace/tiktok/${encodeURIComponent(row.variants[0]?.mappingId ?? "")}/edit`}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     Ubah
                     <span className="block text-[10px] text-gray-400">Edit & publish ke TikTok Shop</span>
                   </Link>
                   <button
                     onClick={onSyncRow}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     Sync ulang status
                   </button>
                   <button
                     onClick={onExpand}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     Detail varian
                   </button>

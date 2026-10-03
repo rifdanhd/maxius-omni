@@ -496,8 +496,8 @@ export default function PromotionCreatePage() {
     return (
       <div className="p-4 md:p-8 max-w-3xl mx-auto">
         {createResult.ok && createResult.resultStatus === "SUCCESS" ? (
-          <div className="bg-white border border-emerald-200 rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-emerald-700">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-gray-900">
               <CheckCircle2 size={28} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-bold text-lg">Promosi berhasil dibuat & terverifikasi.</p>
@@ -514,9 +514,9 @@ export default function PromotionCreatePage() {
         ) : createResult.ok ? (
           /* UNVERIFIED / PARTIAL — warning BESAR: activity ada di TikTok tapi
              produk belum pasti ter-attach → wajib cek manual. */
-          <div className="bg-white border-2 border-amber-400 rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-amber-800">
-              <AlertTriangle size={32} className="mt-0.5 shrink-0 text-amber-500" />
+          <div className="bg-white border-2 border-gray-400 rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-gray-900">
+              <AlertTriangle size={32} className="mt-0.5 shrink-0 text-gray-500" />
               <div>
                 <p className="font-bold text-lg">
                   {createResult.resultStatus === "PARTIAL"
@@ -531,10 +531,10 @@ export default function PromotionCreatePage() {
                   nonaktifkan di sana agar pembeli tidak terkena diskon yang tidak diinginkan.
                 </p>
                 {createResult.unverifiedReason && (
-                  <p className="text-xs text-amber-700 mt-2">Penyebab: {createResult.unverifiedReason}</p>
+                  <p className="text-xs text-gray-900 mt-2">Penyebab: {createResult.unverifiedReason}</p>
                 )}
                 {(createResult.failedBatches?.length ?? 0) > 0 && (
-                  <ul className="text-xs mt-2 space-y-1 text-amber-700">
+                  <ul className="text-xs mt-2 space-y-1 text-gray-900">
                     {createResult.failedBatches!.map((b) => (
                       <li key={b.batchIndex}>
                         Batch {b.batchIndex} gagal: {b.error}
@@ -546,8 +546,8 @@ export default function PromotionCreatePage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-red-200 rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-red-700">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-gray-900">
               <AlertCircle size={28} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-bold text-lg">Promosi TIDAK jadi dibuat.</p>
@@ -565,7 +565,7 @@ export default function PromotionCreatePage() {
           </div>
         )}
         <div className="mt-5 flex gap-2">
-          <Link href="/promotions" className="rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900">
+          <Link href="/promotions" className="rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900">
             Lihat daftar promosi
           </Link>
           <button
@@ -588,12 +588,12 @@ export default function PromotionCreatePage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <Link href="/promotions" className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#2a3a8c] mb-2">
+      <Link href="/promotions" className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#111827] mb-2">
         <ChevronLeft size={14} /> Kembali ke daftar promosi
       </Link>
       <div className="flex items-center gap-2.5 flex-wrap">
         <h1 className="text-xl font-bold text-gray-900">Buat Promosi Baru</h1>
-        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-bold text-gray-900">
           <ShieldAlert size={12} />
           Mengubah harga jual nyata
         </span>
@@ -610,9 +610,9 @@ export default function PromotionCreatePage() {
               <div
                 className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold border ${
                   active
-                    ? "bg-[#2a3a8c] text-white border-transparent"
+                    ? "bg-[#111827] text-white border-transparent"
                     : done
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      ? "bg-gray-50 text-gray-900 border-gray-200"
                       : "bg-gray-50 text-gray-400 border-gray-200"
                 }`}
               >
@@ -663,18 +663,18 @@ export default function PromotionCreatePage() {
 
             {loadingListings ? (
               <div className="flex items-center justify-center py-12 text-gray-400">
-                <Loader2 size={22} className="animate-spin mr-2 text-[#2a3a8c]" />
+                <Loader2 size={22} className="animate-spin mr-2 text-[#111827]" />
                 <span className="text-sm">Memuat produk…</span>
               </div>
             ) : (
               <>
                 {loadError && (
-                  <p className="mx-4 mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                  <p className="mx-4 mt-3 text-xs text-gray-900 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                     {loadError}
                   </p>
                 )}
                 {priceError && (
-                  <p className="mx-4 mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{priceError}</p>
+                  <p className="mx-4 mt-3 text-xs text-gray-900 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">{priceError}</p>
                 )}
                 <div className="m-4 rounded-lg border border-gray-100 divide-y divide-gray-100 max-h-[420px] overflow-y-auto">
                   {listings.length === 0 && <p className="px-4 py-8 text-center text-sm text-gray-400">Tidak ada listing aktif.</p>}
@@ -682,13 +682,13 @@ export default function PromotionCreatePage() {
                     const isSelected = listing.key in discountByListingKey;
                     const needsPrice = isSelected && listing.variants.some((v) => v.price === null);
                     return (
-                      <div key={listing.key} className={`px-4 py-3 ${isSelected ? "bg-blue-50/40" : ""}`}>
+                      <div key={listing.key} className={`px-4 py-3 ${isSelected ? "bg-gray-50/40" : ""}`}>
                         <div className="flex items-start gap-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleListing(listing)}
-                            className="mt-1 h-4 w-4 accent-[#2a3a8c] cursor-pointer"
+                            className="mt-1 h-4 w-4 accent-[#111827] cursor-pointer"
                           />
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-bold text-gray-900 truncate" title={listing.platformTitle ?? listing.master?.name ?? ""}>
@@ -711,9 +711,9 @@ export default function PromotionCreatePage() {
                                 }
                                 className={`border rounded-md px-2 py-1 text-sm w-16 text-right outline-none ${
                                   discountIssue(discountByListingKey[listing.key])
-                                    ? "border-red-400 bg-red-50"
+                                    ? "border-gray-400 bg-gray-50"
                                     : isExtreme(discountByListingKey[listing.key])
-                                      ? "border-amber-400 bg-amber-50"
+                                      ? "border-gray-400 bg-gray-50"
                                       : "border-gray-300"
                                 }`}
                               />
@@ -727,8 +727,8 @@ export default function PromotionCreatePage() {
                             .filter((v) => v.price === null)
                             .map((v) =>
                               v.variantId ? (
-                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
-                                  <p className="text-[11px] font-bold text-amber-800">
+                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-gray-300 bg-gray-50 p-2.5">
+                                  <p className="text-[11px] font-bold text-gray-900">
                                     Produk belum punya harga — isi dulu agar bisa dipromosikan (SKU: {v.sku})
                                   </p>
                                   <div className="mt-1.5 flex items-center gap-2">
@@ -744,7 +744,7 @@ export default function PromotionCreatePage() {
                                     <button
                                       onClick={() => savePrice(v)}
                                       disabled={priceSavingFor === variantIdentityKey(v)}
-                                      className="rounded-md bg-[#2a3a8c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 disabled:opacity-60 flex items-center gap-1"
+                                      className="rounded-md bg-[#111827] px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-60 flex items-center gap-1"
                                     >
                                       {priceSavingFor === variantIdentityKey(v) && <Loader2 size={12} className="animate-spin" />}
                                       Simpan harga
@@ -752,8 +752,8 @@ export default function PromotionCreatePage() {
                                   </div>
                                 </div>
                               ) : (
-                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
-                                  <p className="text-[11px] font-bold text-amber-800">
+                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-gray-300 bg-gray-50 p-2.5">
+                                  <p className="text-[11px] font-bold text-gray-900">
                                     Belum di-mapping ke varian — hubungkan varian dulu (menu Mapping) sebelum set harga. (SKU: {v.sku})
                                   </p>
                                 </div>
@@ -767,12 +767,12 @@ export default function PromotionCreatePage() {
             )}
           </div>
 
-          {step1Problem && <p className="text-xs text-red-600">{step1Problem}</p>}
+          {step1Problem && <p className="text-xs text-gray-900">{step1Problem}</p>}
           <div className="flex justify-end">
             <button
               onClick={() => setStep(2)}
               disabled={step1Problem !== null}
-              className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Lanjut ke Diskon & Jadwal <ArrowRight size={15} />
             </button>
@@ -837,7 +837,7 @@ export default function PromotionCreatePage() {
               Kebijakan: diskon 1–95% langsung boleh. 0% / ≥96% (hampir gratis) butuh konfirmasi tambahan.
               Limit pembelian mengikuti default TikTok (tanpa batas).
             </p>
-            {step2Problem && <p className="text-xs text-red-600">{step2Problem}</p>}
+            {step2Problem && <p className="text-xs text-gray-900">{step2Problem}</p>}
           </div>
 
           {/* Tabel produk + diskon + hasil preview */}
@@ -864,7 +864,7 @@ export default function PromotionCreatePage() {
                           {listing.platformTitle ?? listing.master?.name ?? "-"}
                         </p>
                         {overlapCount > 0 && preview?.ok && (
-                          <p className="text-[10px] text-amber-700 mt-0.5">⚠ sedang ikut promo aktif lain</p>
+                          <p className="text-[10px] text-gray-900 mt-0.5">⚠ sedang ikut promo aktif lain</p>
                         )}
                       </td>
                       <td className="px-4 py-2.5">
@@ -879,7 +879,7 @@ export default function PromotionCreatePage() {
                               setPreview(null);
                             }}
                             className={`border rounded-md px-2 py-1 text-sm w-16 text-right outline-none ${
-                              invalid ? "border-red-400 bg-red-50" : isExtreme(d) ? "border-amber-400 bg-amber-50" : "border-gray-300"
+                              invalid ? "border-gray-400 bg-gray-50" : isExtreme(d) ? "border-gray-400 bg-gray-50" : "border-gray-300"
                             }`}
                           />
                           <Percent size={12} className="text-gray-400" />
@@ -899,14 +899,14 @@ export default function PromotionCreatePage() {
           <button
             onClick={runPreview}
             disabled={previewing || step2Problem !== null}
-            className="w-full flex items-center justify-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 rounded-md bg-[#111827] px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
           >
             {previewing ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
             {previewing ? "Menghitung…" : "Preview Harga Akhir"}
           </button>
 
           {preview && !preview.ok && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 flex items-start gap-2">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <span>{preview.error}</span>
             </div>
@@ -916,7 +916,7 @@ export default function PromotionCreatePage() {
             <div className="space-y-3">
               {/* Blocking error (G1) */}
               {hasBlockingError && (
-                <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                <div className="rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 flex items-start gap-2">
                   <AlertCircle size={16} className="mt-0.5 shrink-0" />
                   <div>
                     <p className="font-bold">Ada produk yang tidak bisa ikut promosi:</p>
@@ -938,23 +938,23 @@ export default function PromotionCreatePage() {
 
               {/* Pesan dampak ekstrem — VERBATIM dari backend, border merah (G2) */}
               {(preview.extremeConfirmMessages?.length ?? 0) > 0 && (
-                <div className="rounded-lg border-2 border-red-400 bg-red-50 p-4">
-                  <p className="text-xs font-bold text-red-800 uppercase tracking-wider mb-2">
+                <div className="rounded-lg border-2 border-gray-400 bg-gray-50 p-4">
+                  <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
                     Peringatan — dampak sangat besar:
                   </p>
                   <ul className="space-y-2">
                     {preview.extremeConfirmMessages!.map((m) => (
-                      <li key={m.mappingId} className="text-sm font-semibold text-red-800 leading-snug">
+                      <li key={m.mappingId} className="text-sm font-semibold text-gray-900 leading-snug">
                         {m.message}
                       </li>
                     ))}
                   </ul>
-                  <label className="mt-3 flex items-start gap-2 text-sm font-bold text-red-900 cursor-pointer">
+                  <label className="mt-3 flex items-start gap-2 text-sm font-bold text-gray-900 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={confirmExtreme}
                       onChange={(e) => setConfirmExtreme(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-red-600"
+                      className="mt-0.5 h-4 w-4 accent-gray-900"
                     />
                     Saya sudah membaca peringatan di atas dan tetap ingin lanjut.
                   </label>
@@ -963,17 +963,17 @@ export default function PromotionCreatePage() {
 
               {/* Overlap aktif (G3) */}
               {hasActiveOverlap && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-                  <p className="text-sm font-bold text-amber-800">Ada produk yang sedang ikut promo lain yang masih aktif.</p>
-                  <p className="text-xs text-amber-700 mt-1">
+                <div className="rounded-lg border border-gray-300 bg-gray-50 p-4">
+                  <p className="text-sm font-bold text-gray-900">Ada produk yang sedang ikut promo lain yang masih aktif.</p>
+                  <p className="text-xs text-gray-900 mt-1">
                     TikTok bisa menolak produk yang ikut dua promo sekaligus. Penolakan resmi tetap tampil apa adanya.
                   </p>
-                  <label className="mt-2 flex items-start gap-2 text-sm font-bold text-amber-900 cursor-pointer">
+                  <label className="mt-2 flex items-start gap-2 text-sm font-bold text-gray-900 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={acknowledgeActiveOverlap}
                       onChange={(e) => setAcknowledgeActiveOverlap(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-amber-600"
+                      className="mt-0.5 h-4 w-4 accent-gray-900"
                     />
                     Tetap lanjutkan meski ada tumpang tindih.
                   </label>
@@ -990,7 +990,7 @@ export default function PromotionCreatePage() {
                 <button
                   onClick={() => setStep(3)}
                   disabled={!step2GateOk}
-                  className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Lanjut ke Konfirmasi <ArrowRight size={15} />
                 </button>
@@ -1049,16 +1049,16 @@ export default function PromotionCreatePage() {
               </div>
             </div>
             {(hasExtreme || hasActiveOverlap) && (
-              <p className="mt-3 text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+              <p className="mt-3 text-xs font-semibold text-gray-900 flex items-center gap-1.5">
                 <AlertTriangle size={13} />
                 Termasuk konfirmasi khusus yang sudah Anda centang di langkah sebelumnya.
               </p>
             )}
           </div>
 
-          <div className="bg-white border-2 border-red-200 rounded-xl shadow-sm p-5">
+          <div className="bg-white border-2 border-gray-200 rounded-xl shadow-sm p-5">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-red-50 p-2.5 text-red-600 shrink-0">
+              <div className="rounded-lg bg-gray-50 p-2.5 text-gray-900 shrink-0">
                 <ShieldAlert size={20} />
               </div>
               <div className="flex-1">
@@ -1067,7 +1067,7 @@ export default function PromotionCreatePage() {
                   Setelah langkah ini, harga jual di TikTok benar-benar berubah sesuai jadwal di atas.
                 </p>
                 <label className="block mt-4 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Ketik <span className="text-red-600">BUAT</span> (huruf besar semua) untuk melanjutkan
+                  Ketik <span className="text-gray-900">BUAT</span> (huruf besar semua) untuk melanjutkan
                 </label>
                 <input
                   type="text"
@@ -1075,7 +1075,7 @@ export default function PromotionCreatePage() {
                   onChange={(e) => setConfirmationWord(e.target.value)}
                   placeholder="BUAT"
                   autoFocus
-                  className="mt-1.5 border border-gray-300 rounded-md px-3 py-2 text-sm w-full outline-none focus:border-red-400"
+                  className="mt-1.5 border border-gray-300 rounded-md px-3 py-2 text-sm w-full outline-none focus:border-gray-400"
                 />
                 <div className="mt-4 flex gap-2 justify-end">
                   <button
@@ -1089,7 +1089,7 @@ export default function PromotionCreatePage() {
                     onClick={runCreate}
                     // Persis & case-sensitive — tanpa trim di sini (server tetap validasi ulang).
                     disabled={confirmationWord !== "BUAT" || creating}
-                    className="flex items-center gap-2 rounded-md bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-md bg-gray-900 px-5 py-2 text-sm font-bold text-white hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {creating && <Loader2 size={14} className="animate-spin" />}
                     {creating ? "Sedang membuat…" : "Ya, Buat Promosi Sekarang"}

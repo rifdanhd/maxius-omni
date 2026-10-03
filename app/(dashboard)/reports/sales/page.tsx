@@ -156,7 +156,7 @@ export default function SalesReportPage() {
             onClick={() => setPreset(t.id)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
               preset === t.id
-                ? "border-blue-300 bg-blue-50 text-blue-700"
+                ? "border-gray-300 bg-gray-50 text-gray-900"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
@@ -208,7 +208,7 @@ export default function SalesReportPage() {
       </div>
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -224,7 +224,7 @@ export default function SalesReportPage() {
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <div className="text-sm font-medium text-gray-500">Total Omset</div>
-              <div className="mt-1 text-2xl font-bold text-blue-600">
+              <div className="mt-1 text-2xl font-bold text-gray-900">
                 {omset ? fmtRp(omset.total.revenue) : "—"}
               </div>
             </div>
@@ -261,7 +261,7 @@ export default function SalesReportPage() {
                     }
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="Omset" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Omset" stroke="#111827" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -278,7 +278,7 @@ export default function SalesReportPage() {
                     onClick={() => setGroupBy(g)}
                     className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
                       groupBy === g
-                        ? "border-blue-300 bg-blue-50 text-blue-700"
+                        ? "border-gray-300 bg-gray-50 text-gray-900"
                         : "border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
@@ -358,7 +358,7 @@ function BreakdownCard({ title, rows }: { title: string; rows: Slice[] }) {
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-gray-100">
                 <div
-                  className="h-full rounded-full bg-blue-500"
+                  className="h-full rounded-full bg-gray-500"
                   style={{ width: `${Math.round((r.revenue / max) * 100)}%` }}
                 />
               </div>

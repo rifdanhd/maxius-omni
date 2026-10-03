@@ -272,7 +272,7 @@ export default function InventoryStockPage() {
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100">
+        <div className="mb-4 bg-gray-50 text-gray-900 text-sm px-4 py-3 rounded-xl border border-gray-100">
           {error}
         </div>
       )}
@@ -344,13 +344,13 @@ export default function InventoryStockPage() {
                               <button
                                 onClick={handleSaveEdit}
                                 disabled={saving}
-                                className="text-xs font-bold text-emerald-600 hover:underline disabled:opacity-50"
+                                className="text-xs font-bold text-gray-900 hover:underline disabled:opacity-50"
                               >
                                 Simpan
                               </button>
                             </span>
                             {Number(editing.value) > r.stock && (
-                              <span className="text-[11px] font-medium text-amber-600">
+                              <span className="text-[11px] font-medium text-gray-900">
                                 Cadangan melebihi stok fisik ({fmt(r.stock)}) — stok tayang akan jadi 0.
                               </span>
                             )}
@@ -379,7 +379,7 @@ export default function InventoryStockPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {r.promoActive > 0 ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900">
                             {r.promoActive} aktif
                           </span>
                         ) : (
@@ -387,7 +387,7 @@ export default function InventoryStockPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(r.orderedQty)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-blue-600">{fmt(r.available)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(r.available)}</td>
                       <td className="px-4 py-3 text-right text-gray-400">0</td>
                       <td className="px-4 py-3 text-right">
                         {editing?.variantId === r.variantId && editing.field === "minStock" ? (
@@ -409,7 +409,7 @@ export default function InventoryStockPage() {
                             <button
                               onClick={handleSaveEdit}
                               disabled={saving}
-                              className="text-xs font-bold text-emerald-600 hover:underline disabled:opacity-50"
+                              className="text-xs font-bold text-gray-900 hover:underline disabled:opacity-50"
                             >
                               Simpan
                             </button>
@@ -446,7 +446,7 @@ export default function InventoryStockPage() {
                           title={r.notifyEmail ? "Nonaktifkan notifikasi" : "Aktifkan notifikasi (toggle saja — belum ada pengiriman email)"}
                           onClick={() => handleToggleEmail(r)}
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            r.notifyEmail ? "bg-emerald-500" : "bg-gray-200"
+                            r.notifyEmail ? "bg-gray-500" : "bg-gray-200"
                           }`}
                         >
                           <span
@@ -524,14 +524,14 @@ export default function InventoryStockPage() {
                         <span className="block text-xs text-gray-500">{e.platform}</span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(e.occurredAt)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-red-600">{fmt(e.failedQty)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(e.failedQty)}</td>
                       <td className="px-4 py-3">
                         {e.handledAt ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900">
                             Sudah ditangani
                           </span>
                         ) : (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900">
                             Belum ditangani
                           </span>
                         )}

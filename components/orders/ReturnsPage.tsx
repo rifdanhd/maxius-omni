@@ -11,14 +11,14 @@ const PLATFORM: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  PENDING_SELLER: { label: "Menunggu Respons", className: "bg-amber-100 text-amber-800" },
-  APPROVED: { label: "Disetujui", className: "bg-blue-100 text-blue-800" },
-  REJECTED: { label: "Ditolak", className: "bg-red-100 text-red-800" },
-  PLATFORM_DECIDED: { label: "Diputuskan Platform", className: "bg-purple-100 text-purple-800" },
-  IN_TRANSIT: { label: "Barang Dikirim Balik", className: "bg-cyan-100 text-cyan-800" },
-  RECEIVED: { label: "Diterima Gudang", className: "bg-teal-100 text-teal-800" },
-  REFUNDED: { label: "Selesai Refund", className: "bg-green-100 text-green-800" },
-  DISPUTED: { label: "Sengketa", className: "bg-orange-100 text-orange-800" },
+  PENDING_SELLER: { label: "Menunggu Respons", className: "bg-gray-100 text-gray-900" },
+  APPROVED: { label: "Disetujui", className: "bg-gray-100 text-gray-900" },
+  REJECTED: { label: "Ditolak", className: "bg-gray-100 text-gray-900" },
+  PLATFORM_DECIDED: { label: "Diputuskan Platform", className: "bg-gray-100 text-gray-900" },
+  IN_TRANSIT: { label: "Barang Dikirim Balik", className: "bg-gray-100 text-gray-900" },
+  RECEIVED: { label: "Diterima Gudang", className: "bg-gray-100 text-gray-900" },
+  REFUNDED: { label: "Selesai Refund", className: "bg-gray-100 text-gray-900" },
+  DISPUTED: { label: "Sengketa", className: "bg-gray-100 text-gray-900" },
   CANCELLED: { label: "Dibatalkan", className: "bg-gray-100 text-gray-600" },
   UNKNOWN: { label: "Status Baru", className: "bg-gray-100 text-gray-600" },
 };
@@ -84,10 +84,10 @@ function slaBadge(slaDueDate: string | null) {
   const diffMs = new Date(slaDueDate).getTime() - Date.now();
   const hours = diffMs / 3600000;
   if (diffMs < 0) {
-    return { label: "SLA terlewat", className: "bg-red-600 text-white" };
+    return { label: "SLA terlewat", className: "bg-gray-900 text-white" };
   }
   if (hours <= 24) {
-    return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-amber-500 text-white" };
+    return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-gray-500 text-white" };
   }
   return null;
 }
@@ -217,7 +217,7 @@ export default function ReturnsPage() {
       </div>
 
       {syncMessage && (
-        <div className="mb-4 rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-800">{syncMessage}</div>
+        <div className="mb-4 rounded-lg bg-gray-50 px-4 py-2 text-sm text-gray-900">{syncMessage}</div>
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
@@ -314,7 +314,7 @@ export default function ReturnsPage() {
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
                       {r.isPlatformAutoApproved && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-600 px-2 py-0.5 text-xs font-medium text-white">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-900 px-2 py-0.5 text-xs font-medium text-white">
                           <CheckCircle2 className="h-3 w-3" /> Platform-approved
                         </span>
                       )}
@@ -324,14 +324,14 @@ export default function ReturnsPage() {
                         </span>
                       )}
                       {r.items.some((it) => !it.variantId) && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-900">
                           SKU belum ter-mapping
                         </span>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => setDetail(r)} className="text-sm font-medium text-blue-600 hover:underline">
+                    <button onClick={() => setDetail(r)} className="text-sm font-medium text-gray-900 hover:underline">
                       Detail
                     </button>
                   </td>
@@ -437,7 +437,7 @@ export default function ReturnsPage() {
                     </div>
                   </div>
                   {it.restockedAt ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-900">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Stok ditambah {formatDate(it.restockedAt)}
                     </span>
                   ) : it.variantId ? (

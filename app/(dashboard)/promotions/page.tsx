@@ -82,11 +82,11 @@ const ACTIVITY_TYPE_LABEL: Record<string, string> = {
 
 // Badge warna per status activity (nilai API TikTok).
 const STATUS_BADGE: Record<string, string> = {
-  ONGOING: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  NOT_START: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  DEACTIVATED: "bg-red-100 text-red-700 border-red-200",
+  ONGOING: "bg-gray-100 text-gray-900 border-gray-200",
+  NOT_START: "bg-gray-100 text-gray-900 border-gray-200",
+  DEACTIVATED: "bg-gray-100 text-gray-900 border-gray-200",
   ENDED: "bg-gray-100 text-gray-500 border-gray-200",
-  NOT_EFFECTIVE: "bg-red-100 text-red-700 border-red-200",
+  NOT_EFFECTIVE: "bg-gray-100 text-gray-900 border-gray-200",
 };
 
 const PRODUCT_LEVEL_LABEL: Record<string, string> = {
@@ -185,7 +185,7 @@ function ActivityItemsDetail({ activity }: { activity: PromotionActivity }) {
                 </td>
                 <td className="px-4 py-3">
                   {item.discount ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-pink-50 px-2 py-0.5 text-xs font-bold text-pink-700 border border-pink-200">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs font-bold text-gray-900 border border-gray-200">
                       <Percent size={11} />
                       {item.discount}
                     </span>
@@ -367,7 +367,7 @@ export default function PromotionsPage() {
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl font-bold text-gray-900">Promosi TikTok Shop</h1>
             <span
-              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700"
+              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-bold text-gray-900"
               title="Halaman ini hanya menampilkan data dari TikTok Shop — tidak ada aksi kelola"
             >
               <Info size={12} />
@@ -381,7 +381,7 @@ export default function PromotionsPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/promotions/create"
-            className="flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+            className="flex items-center gap-1.5 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900"
           >
             <Plus size={16} />
             Buat Promosi Baru
@@ -398,7 +398,7 @@ export default function PromotionsPage() {
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
             disabled={loading}
-            className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60"
+            className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {loading ? "Memuat..." : "Muat Ulang"}
@@ -408,7 +408,7 @@ export default function PromotionsPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -418,8 +418,8 @@ export default function PromotionsPage() {
           zombie terlewat: create sukses menurut sebagian sumber tapi tidak
           terkonfirmasi, atau intent PENDING >30 menit (proses crash). */}
       {visibleAlerts.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-          <div className="flex items-start gap-2 text-sm text-amber-800">
+        <div className="mb-4 rounded-lg border border-gray-300 bg-gray-50 px-4 py-3">
+          <div className="flex items-start gap-2 text-sm text-gray-900">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="font-bold">
@@ -434,13 +434,13 @@ export default function PromotionsPage() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-[11px] text-amber-700">
+              <p className="mt-1 text-[11px] text-gray-900">
                 Cek TikTok Seller Center — nonaktifkan activity zombie bila ada.
               </p>
             </div>
             <button
               onClick={() => setDismissedAlertIds(new Set(alerts.map((a) => a.auditLogId)))}
-              className="shrink-0 rounded px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100"
+              className="shrink-0 rounded px-2 py-1 text-[11px] font-semibold text-gray-900 hover:bg-gray-100"
             >
               Tutup
             </button>
@@ -505,7 +505,7 @@ export default function PromotionsPage() {
                   }}
                   className={`px-4 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 border border-b-0 transition-colors ${
                     active
-                      ? "bg-[#2a3a8c] text-white border-transparent"
+                      ? "bg-[#111827] text-white border-transparent"
                       : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
                   }`}
                 >
@@ -525,7 +525,7 @@ export default function PromotionsPage() {
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <Loader2 size={28} className="animate-spin mb-3 text-[#2a3a8c]" />
+            <Loader2 size={28} className="animate-spin mb-3 text-[#111827]" />
             <p className="text-sm">Memuat daftar promosi…</p>
           </div>
         ) : activities.length === 0 ? (
@@ -595,7 +595,7 @@ export default function PromotionsPage() {
                               <div
                                 className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                                   activity.status === "ONGOING"
-                                    ? "bg-pink-50 text-pink-600"
+                                    ? "bg-gray-50 text-gray-900"
                                     : "bg-gray-100 text-gray-400"
                                 }`}
                               >
@@ -616,7 +616,7 @@ export default function PromotionsPage() {
                                   </span>
                                   {unverifiedActivityIds.has(activity.externalActivityId) && (
                                     <span
-                                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-full border bg-amber-100 text-amber-800 border-amber-300"
+                                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-full border bg-gray-100 text-gray-900 border-gray-300"
                                       title="Create dari Maxius tidak terkonfirmasi — cek TikTok Seller Center"
                                     >
                                       Perlu cek manual
@@ -650,7 +650,7 @@ export default function PromotionsPage() {
                                 }`}
                               />
                               <span className="min-w-0">
-                                <span className="block text-sm font-bold text-gray-900 group-hover:text-[#2a3a8c]">
+                                <span className="block text-sm font-bold text-gray-900 group-hover:text-[#111827]">
                                   {activity.items.length} produk
                                 </span>
                                 <span className="block text-[11px] text-gray-500 truncate max-w-[220px]">

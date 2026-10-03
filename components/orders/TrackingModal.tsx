@@ -129,7 +129,7 @@ export default function TrackingModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gray-50 text-gray-900 flex items-center justify-center">
               <Truck size={18} />
             </div>
             <div>
@@ -169,19 +169,19 @@ export default function TrackingModal({
                 </p>
                 {hasTracking ? (
                   <div className="flex items-center gap-1.5 justify-end">
-                    <span className="font-mono text-sm font-bold text-indigo-600">
+                    <span className="font-mono text-sm font-bold text-gray-900">
                       {order.trackingNumber}
                     </span>
                     <button
                       onClick={handleCopy}
                       title="Salin Resi"
-                      className="p-1 hover:bg-indigo-50 rounded text-gray-500 hover:text-indigo-600 transition-colors"
+                      className="p-1 hover:bg-gray-50 rounded text-gray-500 hover:text-gray-900 transition-colors"
                     >
-                      {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                      {copied ? <Check size={14} className="text-gray-900" /> : <Copy size={14} />}
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium">
+                  <span className="text-xs text-gray-900 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded font-medium">
                     Belum Diterbitkan
                   </span>
                 )}
@@ -199,7 +199,7 @@ export default function TrackingModal({
           {/* Timeline Tracking */}
           <div>
             <p className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-1.5">
-              <Clock size={14} className="text-indigo-600" />
+              <Clock size={14} className="text-gray-900" />
               Status & Riwayat Pengiriman
             </p>
 
@@ -210,7 +210,7 @@ export default function TrackingModal({
                   const translated = label !== ev.description;
                   return (
                     <div key={`${ev.eventTime}-${idx}`} className="relative">
-                      <div className="absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 bg-emerald-500 border-white text-white shadow-xs">
+                      <div className="absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 bg-gray-500 border-white text-white shadow-xs">
                         <Check size={10} strokeWidth={3} />
                       </div>
                       <div>
@@ -235,7 +235,7 @@ export default function TrackingModal({
                     <div
                       className={`absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${
                         step.done
-                          ? "bg-emerald-500 border-white text-white shadow-xs"
+                          ? "bg-gray-500 border-white text-white shadow-xs"
                           : "bg-white border-gray-300 text-gray-400"
                       }`}
                     >
@@ -271,7 +271,7 @@ export default function TrackingModal({
               href={`https://cekresi.com/?noresi=${encodeURIComponent(order.trackingNumber)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 hover:underline"
+              className="text-xs font-semibold text-gray-900 hover:text-gray-900 flex items-center gap-1.5 hover:underline"
             >
               <span>Cek di Web Kurir</span>
               <ExternalLink size={13} />

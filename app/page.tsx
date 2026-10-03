@@ -32,21 +32,21 @@ const PRODUCTS = [
     name: "Sport Ankle",
     price: "Rp39.000",
     tag: "Olahraga",
-    colors: ["bg-blue-600", "bg-emerald-500", "bg-black"],
+    colors: ["bg-gray-900", "bg-gray-500", "bg-black"],
     desc: "Rib kaki stabil, kering cepat saat lari.",
   },
   {
     name: "Knee High Stripe",
     price: "Rp45.000",
     tag: "Pilihan baru",
-    colors: ["bg-rose-500", "bg-amber-400", "bg-indigo-600"],
+    colors: ["bg-gray-500", "bg-gray-400", "bg-gray-900"],
     desc: "Setinggi lutut, motif stripe klasik.",
   },
   {
     name: "Wool Warm",
     price: "Rp59.000",
     tag: "Musim dingin",
-    colors: ["bg-stone-700", "bg-orange-700", "bg-slate-800"],
+    colors: ["bg-gray-900", "bg-gray-900", "bg-gray-900"],
     desc: "Wool blend tebal, hangat tanpa gerah.",
   },
 ];
@@ -122,8 +122,8 @@ export default function LandingPage() {
               <Image src="/Logo/Logo_backroundNO.png" alt="KausKaki.id" fill className="object-contain" priority />
             </span>
           </div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1 mb-5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="inline-flex items-center gap-2 text-xs font-semibold bg-gray-50 text-gray-900 border border-gray-200 rounded-full px-3 py-1 mb-5">
+            <span className="w-2 h-2 rounded-full bg-gray-500 animate-pulse" />
             Gratis ongkir untuk belanja di atas Rp150.000
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
@@ -142,9 +142,9 @@ export default function LandingPage() {
             <a href="#keunggulan" className="px-6 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Kenapa Kami</a>
           </div>
           <div className="mt-6 flex items-center justify-center gap-5 text-xs text-gray-500 flex-wrap">
-            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Katun lembut</span>
-            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Anti-bau</span>
-            <span className="flex items-center gap-1"><Check size={14} className="text-emerald-600" /> Ukuran 35–45</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-gray-900" /> Katun lembut</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-gray-900" /> Anti-bau</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-gray-900" /> Ukuran 35–45</span>
           </div>
         </section>
 

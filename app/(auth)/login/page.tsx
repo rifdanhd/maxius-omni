@@ -117,7 +117,7 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {sessionExpired && !error && (
-            <div className="bg-amber-50 text-amber-700 text-xs px-4 py-3 rounded-xl border border-amber-200">
+            <div className="bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl border border-gray-200">
               Sesi Anda berakhir, silakan login kembali.
             </div>
           )}
@@ -144,7 +144,7 @@ function LoginForm() {
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl border border-red-100 flex items-center gap-2">
+            <div className="bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl border border-gray-100 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>

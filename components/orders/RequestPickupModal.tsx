@@ -174,7 +174,7 @@ export default function RequestPickupModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gray-50 text-gray-900 flex items-center justify-center">
               <PackageCheck size={18} />
             </div>
             <div>
@@ -198,7 +198,7 @@ export default function RequestPickupModal({
           {/* Tabel pesanan */}
           <div>
             <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-              <Truck size={14} className="text-indigo-600" /> Daftar Pesanan
+              <Truck size={14} className="text-gray-900" /> Daftar Pesanan
             </p>
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
@@ -233,7 +233,7 @@ export default function RequestPickupModal({
                         <td className="px-4 py-3 text-xs text-gray-600">{order.paymentMethod}</td>
                         <td className="px-4 py-3 text-xs text-gray-700 text-center font-semibold">{order.totalQty}</td>
                         <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded border border-orange-200">
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-900 text-[10px] font-bold rounded border border-gray-200">
                             {order.status}
                           </span>
                         </td>
@@ -248,7 +248,7 @@ export default function RequestPickupModal({
           {/* Kurir & mode handover */}
           <div>
             <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-              <Truck size={14} className="text-indigo-600" /> Kurir & Layanan
+              <Truck size={14} className="text-gray-900" /> Kurir & Layanan
             </p>
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <div className="px-4 py-3 bg-white flex items-center justify-between">
@@ -256,7 +256,7 @@ export default function RequestPickupModal({
                   <p className="text-sm font-semibold text-gray-900">TikTok Shipping</p>
                   <p className="text-[11px] text-gray-500">Kurir ditentukan & resi diterbitkan oleh TikTok</p>
                 </div>
-                <span className="px-2 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md border border-indigo-100">
+                <span className="px-2 py-1 bg-gray-50 text-gray-900 text-[10px] font-bold rounded-md border border-gray-100">
                   TikTok Shipping
                 </span>
               </div>
@@ -271,7 +271,7 @@ export default function RequestPickupModal({
                     onClick={() => setMode("PICKUP")}
                     className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
                       mode === "PICKUP"
-                        ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
+                        ? "border-gray-900 bg-gray-900 text-white shadow-xs"
                         : "border-gray-200 text-gray-700 hover:bg-gray-50"
                     } ${canPickup === false ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
@@ -283,7 +283,7 @@ export default function RequestPickupModal({
                     onClick={() => setMode("DROP_OFF")}
                     className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
                       mode === "DROP_OFF"
-                        ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
+                        ? "border-gray-900 bg-gray-900 text-white shadow-xs"
                         : "border-gray-200 text-gray-700 hover:bg-gray-50"
                     } ${canDropOff === false ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
@@ -303,7 +303,7 @@ export default function RequestPickupModal({
           {mode === "PICKUP" && (
             <div>
               <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                <Clock size={14} className="text-indigo-600" /> Atur Jadwal Penjemputan
+                <Clock size={14} className="text-gray-900" /> Atur Jadwal Penjemputan
               </p>
               <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <label className="flex items-start gap-2.5 px-4 py-3 bg-white cursor-pointer hover:bg-gray-50 border-b border-gray-100">
@@ -358,7 +358,7 @@ export default function RequestPickupModal({
                   </div>
                 ) : null}
                 {slotsError && (
-                  <div className="px-4 py-3 bg-amber-50 text-[11px] text-amber-700 flex items-start gap-1.5">
+                  <div className="px-4 py-3 bg-gray-50 text-[11px] text-gray-900 flex items-start gap-1.5">
                     <AlertCircle size={13} className="shrink-0 mt-0.5" />
                     {slotsError}
                   </div>
@@ -370,7 +370,7 @@ export default function RequestPickupModal({
           {/* Lokasi penjemputan */}
           <div>
             <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-              <MapPin size={14} className="text-indigo-600" /> Lokasi Penjemputan
+              <MapPin size={14} className="text-gray-900" /> Lokasi Penjemputan
             </p>
             <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white text-sm text-gray-700">
               {pickupLocation ?? "Master Warehouse"}
@@ -380,19 +380,19 @@ export default function RequestPickupModal({
           {/* Catatan penjual */}
           <div>
             <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-              <StickyNote size={14} className="text-indigo-600" /> Catatan Penjual
+              <StickyNote size={14} className="text-gray-900" /> Catatan Penjual
             </p>
             <textarea
               value={sellerNote}
               onChange={(e) => setSellerNote(e.target.value)}
               rows={2}
               placeholder="Catatan untuk kurir / gudang (opsional)"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 resize-none"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-500/30 focus:border-gray-400 resize-none"
             />
           </div>
 
           {actionError && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700 flex items-start gap-2">
+            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-900 flex items-start gap-2">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               {actionError}
             </div>
@@ -411,7 +411,7 @@ export default function RequestPickupModal({
           <button
             onClick={handleConfirm}
             disabled={busy}
-            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
+            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
           >
             {busy ? (
               <>

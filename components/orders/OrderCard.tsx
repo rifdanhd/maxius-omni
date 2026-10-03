@@ -117,11 +117,11 @@ export default function OrderCard({
       {/* Header */}
       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
         <div className="flex items-center gap-4">
-          <div className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-md border border-orange-200">
+          <div className="px-3 py-1 bg-gray-100 text-gray-900 text-xs font-bold rounded-md border border-gray-200">
             {order.status}
           </div>
           <div className="text-sm text-gray-600">
-            Nomor Pesanan: <a href="#" className="text-blue-600 font-semibold hover:underline">{order.orderId}</a>
+            Nomor Pesanan: <a href="#" className="text-gray-900 font-semibold hover:underline">{order.orderId}</a>
           </div>
           <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
             <Clock size={14} />
@@ -132,7 +132,7 @@ export default function OrderCard({
         <div className="flex items-center gap-4">
           <button 
             onClick={onSync}
-            className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-blue-600 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-gray-900 transition-colors"
           >
             <RefreshCw size={14} /> Sync dari Marketplace
           </button>
@@ -151,7 +151,7 @@ export default function OrderCard({
             type="checkbox"
             checked={checked}
             onChange={onToggleChecked}
-            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
           />
         </div>
         
@@ -198,7 +198,7 @@ export default function OrderCard({
                <p className="text-xs font-semibold text-gray-900 mb-1">Catatan Penjual</p>
                <div className="flex items-center gap-2 group cursor-pointer">
                  <p className="text-xs text-gray-600">{order.sellerNote || '-'}</p>
-                 <Pencil size={12} className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                 <Pencil size={12} className="text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                </div>
             </div>
           </div>
@@ -242,9 +242,9 @@ export default function OrderCard({
             <button
               disabled
               title="Modul Chat belum tersedia"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-emerald-200 bg-emerald-50/40 rounded-md text-xs font-semibold text-emerald-600 cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 bg-gray-50/40 rounded-md text-xs font-semibold text-gray-900 cursor-not-allowed"
             >
-               <MessageCircle size={14} className="text-emerald-500" /> Chat Pembeli
+               <MessageCircle size={14} className="text-gray-500" /> Chat Pembeli
             </button>
             <PrintDropdown
                prefixIcon={<Printer size={14} />}
@@ -269,7 +269,7 @@ export default function OrderCard({
               <button
                 onClick={onShip}
                 disabled={shipping}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 rounded-md text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 rounded-md text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
               >
                 <PackageCheck size={14} />
                 {shipping ? "Mengirim..." : "Kirim Paket"}
@@ -280,7 +280,7 @@ export default function OrderCard({
               <button
                 onClick={onPickup}
                 disabled={shipping}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 rounded-md text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 rounded-md text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
               >
                 <PackageCheck size={14} />
                 {shipping ? "Memproses..." : "Atur Pengiriman"}
@@ -290,7 +290,7 @@ export default function OrderCard({
             <button
               type="button"
               onClick={handleOpenTracking}
-              className="px-5 py-1.5 bg-[#2a3a8c] hover:bg-[#202e70] text-white rounded-md text-xs font-semibold transition-colors shadow-xs"
+              className="px-5 py-1.5 bg-[#111827] hover:bg-[#000000] text-white rounded-md text-xs font-semibold transition-colors shadow-xs"
             >
               Lacak
             </button>
@@ -299,8 +299,8 @@ export default function OrderCard({
                <div
                   className={`px-3 py-1 text-xs font-bold rounded-md ${
                      sla.tone === "urgent"
-                        ? "bg-red-600 text-white"
-                        : "bg-amber-400 text-amber-950"
+                        ? "bg-gray-900 text-white"
+                        : "bg-gray-400 text-gray-900"
                   }`}
                >
                   {sla.label}

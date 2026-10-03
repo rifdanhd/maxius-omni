@@ -319,7 +319,7 @@ export default function Sidebar() {
             {!collapsed && "Sembunyikan Menu"}
           </button>
 
-          <button onClick={handleLogout} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors`} title={collapsed ? "Keluar" : undefined}>
+          <button onClick={handleLogout} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors`} title={collapsed ? "Keluar" : undefined}>
             <LogOut size={18} /> {!collapsed && "Keluar"}
           </button>
         </div>

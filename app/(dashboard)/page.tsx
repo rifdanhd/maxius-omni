@@ -109,7 +109,7 @@ function statusLabel(status: string): string {
   return status.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+const COLORS = ["#111827", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db"];
 
 function formatRp(n: number): string {
   return "Rp" + Math.round(n).toLocaleString("id-ID");
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               </div>
               {stat.change && (
                 <div className="flex items-center gap-1 mt-2">
-                  {stat.up ? <ArrowUpRight className="h-4 w-4 text-green-600" /> : <ArrowDownRight className="h-4 w-4 text-red-600" />}
+                  {stat.up ? <ArrowUpRight className="h-4 w-4 text-gray-900" /> : <ArrowDownRight className="h-4 w-4 text-gray-900" />}
                   <Badge variant={stat.up ? "default" : "destructive"} className="text-xs">{stat.change}</Badge>
                 </div>
               )}
@@ -220,8 +220,8 @@ export default function DashboardPage() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: "#9ca3af", fontSize: 12 }} dx={-10} />
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
                   <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: "20px", fontSize: "12px" }} />
-                  <Bar dataKey="current" name="Periode Sekarang" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="previous" name="Periode Sebelumnya" fill="#93c5fd" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="current" name="Periode Sekarang" fill="#111827" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="previous" name="Periode Sebelumnya" fill="#9ca3af" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -237,7 +237,7 @@ export default function DashboardPage() {
             {opsKpi && opsKpi.lowStock.top.slice(0, 5).map((item, i) => (
               <div key={item.variantId} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                  <div className="h-2 w-2 rounded-full bg-gray-500" />
                   <div>
                     <p className="text-sm font-medium">{item.productName}</p>
                     <p className="text-xs text-muted-foreground">{item.variantName ?? item.sku}</p>

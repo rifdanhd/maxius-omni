@@ -46,7 +46,7 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
         {/* Body */}
         <div className="p-6">
           <div>
-            <h3 className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-4">Marketplace</h3>
+            <h3 className="text-sm font-semibold text-gray-900 bg-gray-50 px-3 py-1 rounded-full inline-block mb-4">Marketplace</h3>
             <div className="grid grid-cols-2 gap-4">
               {marketplaces.map((item) => (
                 <PlatformCard
@@ -68,7 +68,7 @@ function PlatformCard({ name, icon, onClick }: { name: string, icon: React.React
   return (
     <button 
       onClick={onClick}
-      className="flex flex-col items-center justify-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all group bg-white"
+      className="flex flex-col items-center justify-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-gray-500 hover:shadow-md transition-all group bg-white"
     >
       <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:scale-110 transition-transform">
         {icon}

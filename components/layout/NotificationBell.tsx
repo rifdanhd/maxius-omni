@@ -55,7 +55,7 @@ export default function NotificationBell() {
       >
         <Bell size={16} />
         {hasAlert && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-gray-500 text-white text-[9px] font-bold flex items-center justify-center">
             {alerts.length > 9 ? "9+" : alerts.length}
           </span>
         )}
@@ -65,7 +65,7 @@ export default function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-bold text-gray-900">Stok Menipis</p>
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-900">
               {alerts.length} varian
             </span>
           </div>
@@ -84,7 +84,7 @@ export default function NotificationBell() {
                 >
                   <span
                     className={`mt-0.5 shrink-0 ${
-                      a.severity === "out" ? "text-red-500" : "text-amber-500"
+                      a.severity === "out" ? "text-gray-500" : "text-gray-500"
                     }`}
                   >
                     {a.severity === "out" ? <PackageX size={16} /> : <AlertTriangle size={16} />}
@@ -106,7 +106,7 @@ export default function NotificationBell() {
 
           <a
             href="/products"
-            className="block px-4 py-2.5 text-xs font-semibold text-indigo-600 bg-gray-50 hover:bg-indigo-50 text-center border-t border-gray-100"
+            className="block px-4 py-2.5 text-xs font-semibold text-gray-900 bg-gray-50 hover:bg-gray-50 text-center border-t border-gray-100"
           >
             {outCount > 0
               ? `Lihat ${outCount} varian stok habis di Produk Master`

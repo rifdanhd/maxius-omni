@@ -67,7 +67,7 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        checked ? "bg-blue-600" : "bg-gray-300"
+        checked ? "bg-gray-900" : "bg-gray-300"
       } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
     >
       <span
@@ -93,7 +93,7 @@ function Section({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5">
       <div className="mb-4 flex items-start gap-3">
-        <span className="rounded-lg bg-blue-50 p-2 text-blue-600">
+        <span className="rounded-lg bg-gray-50 p-2 text-gray-900">
           <Icon className="h-5 w-5" />
         </span>
         <div>
@@ -179,14 +179,14 @@ export default function InventorySettingsPage() {
         </div>
         <div className="flex items-center gap-2">
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
               <CheckCircle2 className="h-4 w-4" /> Tersimpan
             </span>
           )}
           <button
             onClick={save}
             disabled={saving || !settings}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Simpan Pengaturan
@@ -195,8 +195,8 @@ export default function InventorySettingsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" />
           <div>{error}</div>
         </div>
       )}
@@ -221,7 +221,7 @@ export default function InventorySettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, lowStockDefaultThreshold: Number(e.target.value) })
                 }
-                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
               />
               <span className="text-sm text-gray-500">unit atau kurang = stok menipis</span>
             </div>
@@ -327,7 +327,7 @@ export default function InventorySettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, opnameReminderFrequency: e.target.value })
                 }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
               >
                 {FREQ_OPTIONS.map((f) => (
                   <option key={f.id} value={f.id}>

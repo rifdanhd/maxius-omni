@@ -41,10 +41,10 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
 ];
 
 const STATUS_BADGE: Record<string, string> = {
-  FAILED: "bg-red-100 text-red-700 border-red-200",
-  PENDING: "bg-amber-100 text-amber-700 border-amber-200",
-  PROCESSING: "bg-blue-100 text-blue-700 border-blue-200",
-  SUCCESS: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  FAILED: "bg-gray-100 text-gray-900 border-gray-200",
+  PENDING: "bg-gray-100 text-gray-900 border-gray-200",
+  PROCESSING: "bg-gray-100 text-gray-900 border-gray-200",
+  SUCCESS: "bg-gray-100 text-gray-900 border-gray-200",
 };
 
 const fmt = (n: number) => n.toLocaleString("id-ID");
@@ -190,7 +190,7 @@ export default function SyncMismatchPage() {
             onClick={() => setFilter(f.id)}
             className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
               filter === f.id
-                ? "border-blue-300 bg-blue-50 text-blue-700"
+                ? "border-gray-300 bg-gray-50 text-gray-900"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
@@ -203,7 +203,7 @@ export default function SyncMismatchPage() {
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}
             placeholder="Cari produk / SKU / channelSku…"
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
       </div>
@@ -212,8 +212,8 @@ export default function SyncMismatchPage() {
         <div
           className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
             notice.kind === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-red-200 bg-red-50 text-red-700"
+              ? "border-gray-200 bg-gray-50 text-gray-900"
+              : "border-gray-200 bg-gray-50 text-gray-900"
           }`}
         >
           {notice.text}
@@ -221,7 +221,7 @@ export default function SyncMismatchPage() {
       )}
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -269,7 +269,7 @@ export default function SyncMismatchPage() {
                     {fmt(r.variant.centralStock)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="font-medium text-red-600">{fmt(r.newSellable)}</span>
+                    <span className="font-medium text-gray-900">{fmt(r.newSellable)}</span>
                     {r.diffVsCentral !== 0 && (
                       <div className="text-xs text-gray-500">
                         selisih {r.diffVsCentral > 0 ? "+" : "−"}{fmt(Math.abs(r.diffVsCentral))} vs central
@@ -280,7 +280,7 @@ export default function SyncMismatchPage() {
                     {r.retryCount}/{r.maxRetries}
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
-                    <div className="truncate text-xs text-red-600" title={r.lastError ?? ""}>
+                    <div className="truncate text-xs text-gray-900" title={r.lastError ?? ""}>
                       {r.lastError ?? "—"}
                     </div>
                     {r.status === "PENDING" && r.nextRetryAt && (
@@ -302,7 +302,7 @@ export default function SyncMismatchPage() {
                       <button
                         onClick={() => retryJob(r.id)}
                         disabled={retrying.has(r.id)}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
                       >
                         {retrying.has(r.id) ? "Retrying…" : "Retry"}
                       </button>

@@ -175,17 +175,17 @@ export default function DashboardPage() {
                     return (
                       <tr key={s.accountId} className="border-b border-gray-100 last:border-0">
                         <td className="py-2 pr-3 font-medium text-gray-900">
-                          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-amber-500" : "bg-emerald-500"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
+                          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-gray-500" : "bg-gray-500"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
                           {s.label}
                         </td>
                         <td className="px-3 py-2 text-gray-600">{s.platform}</td>
                         <td className="px-3 py-2 text-center">
-                          {s.hasToken ? <span className="text-emerald-600 font-semibold">OK</span> : <span className="text-red-600 font-semibold">Hilang</span>}
+                          {s.hasToken ? <span className="text-gray-900 font-semibold">OK</span> : <span className="text-gray-900 font-semibold">Hilang</span>}
                         </td>
                         <td className="px-3 py-2 text-center text-gray-700">{s.errors7d}</td>
                         <td className="px-3 py-2 text-center text-gray-700">{s.mismatch}</td>
                         <td className="px-3 py-2 text-center">
-                          {s.orphanSkus > 0 ? <a href="/products/mapping" className="font-semibold text-amber-600 hover:underline">{s.orphanSkus}</a> : <span className="text-gray-400">0</span>}
+                          {s.orphanSkus > 0 ? <a href="/products/mapping" className="font-semibold text-gray-900 hover:underline">{s.orphanSkus}</a> : <span className="text-gray-400">0</span>}
                         </td>
                         <td className="px-3 py-2 text-gray-500 text-xs">
                           {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
@@ -211,11 +211,11 @@ export default function DashboardPage() {
         </div>
         {panduanAwalOpen && (
           <div className="p-4 md:p-6 border-t border-gray-100">
-            <div className="bg-blue-50 text-blue-600 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">1/6 Selesai</div>
+            <div className="bg-gray-50 text-gray-900 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">1/6 Selesai</div>
             <div className="space-y-2">
               <div className="flex items-center justify-between py-2 border-b border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white"><Check size={12} /></div>
+                  <div className="w-5 h-5 rounded-full bg-gray-500 flex items-center justify-center text-white"><Check size={12} /></div>
                   <span className="text-sm text-gray-700">Buat Produk Master</span>
                 </div>
                 <ChevronDown size={16} className="text-gray-400" />
@@ -231,15 +231,15 @@ export default function DashboardPage() {
                 <div className="ml-8 bg-gray-50 rounded-lg p-4 md:p-5 flex border border-gray-100 flex-col md:flex-row">
                   <div className="flex-1">
                     <h3 className="text-base font-bold text-gray-900 mb-2">Tambah produk kamu ke marketplace</h3>
-                    <p className="text-sm text-gray-600 mb-6">Tambah produk master ke semua marketplace kamu. <a href="#" className="text-blue-600 hover:underline">Lebih Lanjut</a></p>
+                    <p className="text-sm text-gray-600 mb-6">Tambah produk master ke semua marketplace kamu. <a href="#" className="text-gray-900 hover:underline">Lebih Lanjut</a></p>
                     <div className="flex items-center gap-4">
-                      <button className="bg-[#2a3a8c] text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-900 transition-colors">Tambah Sekarang</button>
-                      <a href="#" className="text-sm font-semibold text-[#2a3a8c] hover:underline">Kaitkan Produk Marketplace ke Master</a>
+                      <button className="bg-[#111827] text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-900 transition-colors">Tambah Sekarang</button>
+                      <a href="#" className="text-sm font-semibold text-[#111827] hover:underline">Kaitkan Produk Marketplace ke Master</a>
                     </div>
                   </div>
                   <div className="w-full md:w-64 shrink-0 rounded-lg overflow-hidden relative shadow-sm border border-gray-200 bg-white flex items-center justify-center mt-4 md:mt-0">
-                    <div className="absolute inset-0 bg-[#42509f] opacity-90 p-4">
-                      <div className="text-white text-xs font-bold mb-2 flex items-center gap-2"><span className="bg-yellow-400 text-gray-900 px-1 py-0.5 rounded text-[10px]">Step 2</span></div>
+                    <div className="absolute inset-0 bg-[#111827] opacity-90 p-4">
+                      <div className="text-white text-xs font-bold mb-2 flex items-center gap-2"><span className="bg-gray-400 text-gray-900 px-1 py-0.5 rounded text-[10px]">Step 2</span></div>
                       <div className="text-white font-bold text-sm leading-tight">How to publish product to Marketplace</div>
                     </div>
                   </div>
@@ -301,8 +301,8 @@ export default function DashboardPage() {
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dx={-10} />
                 <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
                 <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px', fontSize: '12px'}} />
-                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
-                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="#93c5fd" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
+                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="#111827" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
+                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="#9ca3af" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -319,7 +319,7 @@ export default function DashboardPage() {
             ) : (analytics!.topStores.map((store) => (
               <div key={store.id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3 mb-2 last:mb-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 text-green-700 rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
+                    <div className="w-8 h-8 bg-gray-100 text-gray-900 rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
                     <span className="font-semibold text-sm text-gray-800">{store.label}</span>
                   </div>
                   <div className="flex items-center gap-8">
@@ -345,7 +345,7 @@ export default function DashboardPage() {
             ) : (analytics!.topProducts.slice(0, 3).map((product) => (
               <div key={product.key} className="flex justify-between items-center border border-gray-100 rounded-lg p-3 mb-2 last:mb-0">
                   <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 bg-orange-200 rounded-md shrink-0"></div>
+                    <div className="w-12 h-12 bg-gray-200 rounded-md shrink-0"></div>
                     <div>
                       <p className="text-sm font-semibold text-gray-800 leading-tight">{product.name}</p>
                       <p className="text-xs text-gray-500 mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
@@ -364,19 +364,19 @@ export default function DashboardPage() {
 }
 
 function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
-  const cls = "border border-gray-200 rounded-lg p-4 bg-white flex flex-col justify-between h-[100px] hover:border-emerald-500 transition-colors cursor-pointer";
+  const cls = "border border-gray-200 rounded-lg p-4 bg-white flex flex-col justify-between h-[100px] hover:border-gray-500 transition-colors cursor-pointer";
   if (href) {
     return (
       <Link href={href} className={cls}>
         <span className="text-sm font-semibold text-gray-800">{title}</span>
-        <span className="text-2xl font-bold text-blue-600">{value}</span>
+        <span className="text-2xl font-bold text-gray-900">{value}</span>
       </Link>
     );
   }
   return (
     <div className={cls}>
       <span className="text-sm font-semibold text-gray-800">{title}</span>
-      <span className="text-2xl font-bold text-blue-600">{value}</span>
+      <span className="text-2xl font-bold text-gray-900">{value}</span>
     </div>
   );
 }
@@ -396,14 +396,14 @@ function MetricTab({ active, onClick, title, value, trend, trendUp, badge, subte
       className={`p-4 cursor-pointer relative ${active ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}`}
       onClick={onClick}
     >
-      {active && <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>}
+      {active && <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-900"></div>}
       <div className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-2">
         {title} <Info size={12} className="text-gray-400" />
       </div>
       <div className="flex items-end gap-2 mb-2">
-        <span className={`text-xl font-bold ${active ? 'text-blue-600' : 'text-gray-900'}`}>{value}</span>
+        <span className={`text-xl font-bold ${active ? 'text-gray-900' : 'text-gray-900'}`}>{value}</span>
         {trend && (
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${trendUp ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${trendUp ? 'bg-gray-100 text-gray-900' : 'bg-gray-100 text-gray-900'}`}>
             {trend}
           </span>
         )}

@@ -21,11 +21,11 @@ export type DropdownPlacement =
 function getDefaultIcon(type: PrintType) {
   switch (type) {
     case "Label":
-      return <Tag size={15} className="text-indigo-600" />;
+      return <Tag size={15} className="text-gray-900" />;
     case "Invoice":
-      return <Receipt size={15} className="text-emerald-600" />;
+      return <Receipt size={15} className="text-gray-900" />;
     case "PackingList":
-      return <ClipboardList size={15} className="text-amber-600" />;
+      return <ClipboardList size={15} className="text-gray-900" />;
     default:
       return <Printer size={15} className="text-gray-600" />;
   }
@@ -115,12 +115,12 @@ export default function PrintDropdown({
 
   const buttonClasses =
     variant === "filled"
-      ? `flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 transition-all ${
-          open ? "ring-2 ring-indigo-400/50 bg-indigo-700" : ""
+      ? `flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-md text-xs font-semibold hover:bg-gray-900 transition-all ${
+          open ? "ring-2 ring-gray-400/50 bg-gray-900" : ""
         }`
       : `flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-xs font-semibold transition-all ${
           open
-            ? "border-indigo-500 bg-indigo-50/70 text-indigo-700 ring-2 ring-indigo-500/15"
+            ? "border-gray-500 bg-gray-50/70 text-gray-900 ring-2 ring-gray-500/15"
             : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
         }`;
 
@@ -161,17 +161,17 @@ export default function PrintDropdown({
                   close();
                   onSelect(item.id);
                 }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left rounded-lg transition-colors hover:bg-indigo-50/80 group"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left rounded-lg transition-colors hover:bg-gray-50/80 group"
               >
-                <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0 border border-gray-100 group-hover:bg-white group-hover:border-indigo-100 transition-colors">
+                <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0 border border-gray-100 group-hover:bg-white group-hover:border-gray-100 transition-colors">
                   {item.icon ?? getDefaultIcon(item.id)}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-gray-800 group-hover:text-indigo-950 leading-snug">
+                  <span className="text-xs font-semibold text-gray-800 group-hover:text-gray-900 leading-snug">
                     {item.label}
                   </span>
                   {item.description && (
-                    <span className="text-[10px] text-gray-400 group-hover:text-indigo-600/80 leading-tight">
+                    <span className="text-[10px] text-gray-400 group-hover:text-gray-900/80 leading-tight">
                       {item.description}
                     </span>
                   )}

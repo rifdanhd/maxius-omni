@@ -65,8 +65,8 @@ const SORT_OPTIONS = [
 ];
 
 const PLATFORM_BADGE: Record<string, string> = {
-  SHOPEE: "bg-orange-100 text-orange-700",
-  TOKOPEDIA: "bg-green-100 text-green-700",
+  SHOPEE: "bg-gray-100 text-gray-900",
+  TOKOPEDIA: "bg-gray-100 text-gray-900",
   TIKTOK_SHOP: "bg-black text-white",
   DEFAULT: "bg-gray-100 text-gray-700",
 };
@@ -144,7 +144,7 @@ function InlinePrice({
             setDraft(value === null ? "" : String(Math.round(value)));
             setEditing(true);
           }}
-          className="text-gray-400 hover:text-indigo-600 opacity-0 group-hover/price:opacity-100 transition-opacity"
+          className="text-gray-400 hover:text-gray-900 opacity-0 group-hover/price:opacity-100 transition-opacity"
           title="Ubah harga"
           aria-label="Ubah harga"
         >
@@ -156,7 +156,7 @@ function InlinePrice({
 
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <div className="flex items-center gap-1 border border-indigo-300 rounded-md px-2 py-1 bg-indigo-50/50">
+      <div className="flex items-center gap-1 border border-gray-300 rounded-md px-2 py-1 bg-gray-50/50">
         <span className="text-xs text-gray-500 font-semibold">Rp</span>
         <input
           ref={inputRef}
@@ -179,7 +179,7 @@ function InlinePrice({
       <button
         onClick={commit}
         disabled={saving}
-        className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+        className="text-gray-900 hover:text-gray-900 disabled:opacity-50"
         title="Simpan"
         aria-label="Simpan"
       >
@@ -197,7 +197,7 @@ function InlinePrice({
         <X size={14} />
       </button>
       {error && (
-        <span className="text-[10px] text-red-600 whitespace-nowrap absolute right-0 top-full mt-0.5">
+        <span className="text-[10px] text-gray-900 whitespace-nowrap absolute right-0 top-full mt-0.5">
           {error}
         </span>
       )}
@@ -315,7 +315,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
         <div className="p-6">
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full border-2 border-dashed border-gray-300 rounded-xl py-8 flex flex-col items-center gap-2 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+            className="w-full border-2 border-dashed border-gray-300 rounded-xl py-8 flex flex-col items-center gap-2 text-gray-500 hover:border-gray-400 hover:text-gray-900 transition-colors"
           >
             <Upload size={24} />
             <span className="text-sm font-medium">
@@ -360,7 +360,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           )}
 
           {err && (
-            <div className="mt-4 bg-red-50 text-red-600 text-xs px-4 py-3 rounded-xl border border-red-100">
+            <div className="mt-4 bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl border border-gray-100">
               {err}
             </div>
           )}
@@ -369,8 +369,8 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
             <div
               className={`mt-4 text-xs px-4 py-3 rounded-xl border ${
                 result.ok
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                  : "bg-amber-50 text-amber-700 border-amber-100"
+                  ? "bg-gray-50 text-gray-900 border-gray-100"
+                  : "bg-gray-50 text-gray-900 border-gray-100"
               }`}
             >
               <div className="font-semibold">
@@ -393,7 +393,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
           <button
             onClick={downloadTemplate}
-            className="text-sm font-medium text-indigo-600 hover:underline inline-flex items-center gap-1.5"
+            className="text-sm font-medium text-gray-900 hover:underline inline-flex items-center gap-1.5"
           >
             <FileDown size={14} /> Unduh template
           </button>
@@ -407,7 +407,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
             <button
               onClick={submit}
               disabled={!fileName || submitting}
-              className="px-4 py-2 text-sm font-medium bg-[#2a3a8c] text-white rounded-md hover:bg-blue-900 disabled:opacity-50 inline-flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-md hover:bg-gray-900 disabled:opacity-50 inline-flex items-center gap-2"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
               Proses Unggah
@@ -699,7 +699,7 @@ export default function KelolaHargaPage() {
           <div className="relative" ref={uploadRef}>
             <button
               onClick={() => setUploadOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 transition-colors"
+              className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 transition-colors"
             >
               <Upload size={16} /> Unggah Massal <ChevronDown size={14} />
             </button>
@@ -738,7 +738,7 @@ export default function KelolaHargaPage() {
               onClick={() => setSortOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-3 text-sm font-medium h-[38px] min-w-[150px] justify-between ${
                 sortOpen
-                  ? "border-indigo-500 bg-indigo-50/70 text-indigo-700"
+                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
                   : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
@@ -757,7 +757,7 @@ export default function KelolaHargaPage() {
                     }}
                     className={`w-full text-left px-4 py-2 text-sm ${
                       sort.id === opt.id
-                        ? "font-semibold text-indigo-600 bg-indigo-50"
+                        ? "font-semibold text-gray-900 bg-gray-50"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -780,13 +780,13 @@ export default function KelolaHargaPage() {
               }}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] min-w-[120px] justify-between ${
                 filterOpen || filterActive
-                  ? "border-indigo-500 bg-indigo-50/70 text-indigo-700"
+                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
                   : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
               <span>Filter</span>
               {filterActive && (
-                <span className="px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
                   {
                     selectedStores.size +
                       (categoryFilter ? 1 : 0) +
@@ -879,7 +879,7 @@ export default function KelolaHargaPage() {
                   </button>
                   <button
                     onClick={applyFilter}
-                    className="px-4 py-2 text-sm font-medium bg-[#2a3a8c] text-white rounded-md hover:bg-blue-900"
+                    className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-md hover:bg-gray-900"
                   >
                     Terapkan
                   </button>
@@ -889,11 +889,11 @@ export default function KelolaHargaPage() {
           </div>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} baris dipilih
               <button
                 onClick={() => setSelected(new Set())}
-                className="text-indigo-500 hover:text-indigo-800 underline"
+                className="text-gray-500 hover:text-gray-900 underline"
               >
                 Batal
               </button>
@@ -939,7 +939,7 @@ export default function KelolaHargaPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-red-600">
+                  <td colSpan={7} className="px-5 py-12 text-center text-gray-900">
                     {error}
                   </td>
                 </tr>
@@ -982,7 +982,7 @@ export default function KelolaHargaPage() {
                               className="w-12 h-12 rounded object-cover shrink-0 bg-gray-100"
                             />
                           ) : (
-                            <div className="w-12 h-12 bg-orange-200 rounded object-cover shrink-0"></div>
+                            <div className="w-12 h-12 bg-gray-200 rounded object-cover shrink-0"></div>
                           )}
                           <div className="max-w-[220px]">
                             <div className="text-gray-900 font-bold leading-tight">
@@ -1067,7 +1067,7 @@ export default function KelolaHargaPage() {
                               {m.overridePrice !== null && (
                                 <button
                                   onClick={() => clearOverridePrice(row, m)}
-                                  className="text-[10px] text-indigo-500 hover:text-indigo-800 underline mt-0.5"
+                                  className="text-[10px] text-gray-500 hover:text-gray-900 underline mt-0.5"
                                   title="Hapus override → ikuti harga default"
                                 >
                                   ikuti default
@@ -1121,7 +1121,7 @@ export default function KelolaHargaPage() {
                 }}
                 className={`w-9 h-9 text-sm rounded-md ${
                   n === page
-                    ? "bg-[#2a3a8c] text-white font-semibold"
+                    ? "bg-[#111827] text-white font-semibold"
                     : "border border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >

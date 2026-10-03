@@ -151,7 +151,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
             <span
               className={`px-3 py-1 rounded-md border text-xs font-bold ${
                 detail.status === "AWAITING_SHIPMENT"
-                  ? "bg-orange-50 text-orange-700 border-orange-200"
+                  ? "bg-gray-50 text-gray-900 border-gray-200"
                   : "bg-gray-100 text-gray-700 border-gray-200"
               }`}
             >
@@ -166,10 +166,10 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
 
         {!loading && error && (
           <div className="py-24 text-center">
-            <p className="text-red-600 mb-4">{error}</p>
+            <p className="text-gray-900 mb-4">{error}</p>
             <button
               onClick={load}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700"
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gray-900 hover:bg-gray-900"
             >
               Coba Lagi
             </button>
@@ -213,8 +213,8 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
 
               {/* Catatan pembeli */}
               {detail.buyerNote && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
-                  <p className="text-xs font-semibold text-amber-700 mb-1">Catatan Pembeli</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-4">
+                  <p className="text-xs font-semibold text-gray-900 mb-1">Catatan Pembeli</p>
                   <p className="text-sm text-gray-800 italic">“{detail.buyerNote}”</p>
                 </div>
               )}
@@ -224,7 +224,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
                 title="Pembeli"
                 note={
                   detail.canViewFullPii ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-900">
                       <Eye size={12} /> Data penuh (tercatat)
                     </span>
                   ) : (

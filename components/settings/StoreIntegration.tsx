@@ -135,10 +135,10 @@ export default function StoreIntegration() {
     store.isFrozen
       ? { dot: "bg-gray-400", text: "Dibekukan" }
       : store.status === "connected"
-        ? { dot: "bg-green-500", text: "Terhubung" }
+        ? { dot: "bg-gray-500", text: "Terhubung" }
         : store.status === "expired"
-          ? { dot: "bg-amber-500", text: "Token kedaluwarsa" }
-          : { dot: "bg-red-500", text: "Terputus" };
+          ? { dot: "bg-gray-500", text: "Token kedaluwarsa" }
+          : { dot: "bg-gray-500", text: "Terputus" };
 
   const platformLabel = (platform?: string) =>
     platform === "SHOPEE" ? "Shopee" : platform === "TIKTOK_SHOP" ? "TikTok Shop" : (platform ?? "—");
@@ -148,7 +148,7 @@ export default function StoreIntegration() {
       {notice && (
         <div
           className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
-            notice.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+            notice.ok ? "bg-gray-50 text-gray-900 border border-gray-200" : "bg-gray-50 text-gray-900 border border-gray-200"
           }`}
         >
           {notice.text}
@@ -157,8 +157,8 @@ export default function StoreIntegration() {
       {/* Header Section */}
       <div className="flex items-start justify-between mb-8 p-6 bg-gray-50 border border-gray-100 rounded-xl">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-            <MonitorPlay className="text-blue-600" size={24} />
+          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+            <MonitorPlay className="text-gray-900" size={24} />
           </div>
           <div>
             <h2 className="text-lg font-bold text-gray-900">Tambahkan Semua Toko Marketplace kamu</h2>
@@ -167,7 +167,7 @@ export default function StoreIntegration() {
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-[#2a3a8c] hover:bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
+          className="bg-[#111827] hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
         >
           Tambahkan Marketplace
         </button>
@@ -192,7 +192,7 @@ export default function StoreIntegration() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-red-600">{loadError}</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-900">{loadError}</td>
                 </tr>
               ) : stores.length === 0 ? (
               <tr>
@@ -203,7 +203,7 @@ export default function StoreIntegration() {
                 <tr key={store.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                      <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center text-gray-900 shrink-0">
                         <ShoppingBag size={16} />
                       </div>
                       <span className="text-sm font-semibold text-gray-800">{store.name}</span>
@@ -243,7 +243,7 @@ export default function StoreIntegration() {
                               `${store.authorizePath!}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
                             );
                           }}
-                          className="text-xs font-semibold text-white bg-[#2a3a8c] hover:bg-blue-900 px-3 py-1.5 rounded transition-colors"
+                          className="text-xs font-semibold text-white bg-[#111827] hover:bg-gray-900 px-3 py-1.5 rounded transition-colors"
                           title="Hubungkan ulang via OAuth"
                         >
                           Hubungkan ulang
@@ -251,14 +251,14 @@ export default function StoreIntegration() {
                       )}
                       <button 
                         onClick={() => handleSync(store.id)}
-                        className="text-[#2a3a8c] hover:bg-blue-50 p-1.5 rounded transition-colors"
+                        className="text-[#111827] hover:bg-gray-50 p-1.5 rounded transition-colors"
                         title="Sync"
                       >
                         <RefreshCw size={16} />
                       </button>
                       <button 
                         onClick={() => handleDelete(store.id, store.name)}
-                        className="text-[#2a3a8c] hover:bg-red-50 hover:text-red-600 p-1.5 rounded transition-colors"
+                        className="text-[#111827] hover:bg-gray-50 hover:text-gray-900 p-1.5 rounded transition-colors"
                         title="Hapus"
                       >
                         <Trash2 size={16} />

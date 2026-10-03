@@ -72,9 +72,9 @@ const SORT_OPTIONS = [
 ];
 
 const stockMeta: Record<StockLevel, { label: string; cls: string; dot: string }> = {
-  ok: { label: "Stok Aman", cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
-  low: { label: "Stok Menipis", cls: "bg-amber-100 text-amber-700", dot: "bg-amber-500" },
-  out: { label: "Stok Habis", cls: "bg-red-100 text-red-700", dot: "bg-red-500" },
+  ok: { label: "Stok Aman", cls: "bg-gray-100 text-gray-900", dot: "bg-gray-500" },
+  low: { label: "Stok Menipis", cls: "bg-gray-100 text-gray-900", dot: "bg-gray-500" },
+  out: { label: "Stok Habis", cls: "bg-gray-100 text-gray-900", dot: "bg-gray-500" },
 };
 
 type TabId = "semua_produk" | "produk_satuan" | "produk_bundle";
@@ -358,7 +358,7 @@ export default function MasterProductsPage() {
             <div className="relative" ref={addRef}>
               <button
                 onClick={() => setAddOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 transition-colors"
+                className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 transition-colors"
               >
                 <Plus size={16} /> Tambah Produk Baru <ChevronDown size={16} />
               </button>
@@ -436,7 +436,7 @@ export default function MasterProductsPage() {
               onClick={() => switchTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? "border-blue-800 text-gray-900"
+                  ? "border-gray-900 text-gray-900"
                   : "border-transparent text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -444,8 +444,8 @@ export default function MasterProductsPage() {
               <span
                 className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                   activeTab === tab.id
-                    ? "bg-[#5e72e4] text-white"
-                    : "bg-blue-100 text-blue-600"
+                    ? "bg-[#111827] text-white"
+                    : "bg-gray-100 text-gray-900"
                 }`}
               >
                 {tab.count}
@@ -474,7 +474,7 @@ export default function MasterProductsPage() {
               onClick={() => setSortOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-3 text-sm font-medium h-[38px] min-w-[140px] justify-between ${
                 sortOpen
-                  ? "border-indigo-500 bg-indigo-50/70 text-indigo-700"
+                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
                   : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
@@ -492,7 +492,7 @@ export default function MasterProductsPage() {
                     }}
                     className={`w-full text-left px-4 py-2 text-sm ${
                       sort.id === opt.id
-                        ? "font-semibold text-indigo-600 bg-indigo-50"
+                        ? "font-semibold text-gray-900 bg-gray-50"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -509,7 +509,7 @@ export default function MasterProductsPage() {
               onClick={() => setFilterOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] min-w-[120px] justify-between ${
                 filterOpen || filterLevel !== "all"
-                  ? "border-indigo-500 bg-indigo-50/70 text-indigo-700"
+                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
                   : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
@@ -526,8 +526,8 @@ export default function MasterProductsPage() {
               <div className="absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-1.5">
                 {[
                   { id: "all" as const, label: "Semua Produk" },
-                  { id: "low" as const, label: "Stok Menipis", dot: "bg-amber-500" },
-                  { id: "out" as const, label: "Stok Habis", dot: "bg-red-500" },
+                  { id: "low" as const, label: "Stok Menipis", dot: "bg-gray-500" },
+                  { id: "out" as const, label: "Stok Habis", dot: "bg-gray-500" },
                 ].map((opt) => (
                   <button
                     key={opt.id}
@@ -537,7 +537,7 @@ export default function MasterProductsPage() {
                     }}
                     className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${
                       filterLevel === opt.id
-                        ? "font-semibold text-indigo-600 bg-indigo-50"
+                        ? "font-semibold text-gray-900 bg-gray-50"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
@@ -599,7 +599,7 @@ export default function MasterProductsPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-red-600">
+                  <td colSpan={9} className="px-5 py-10 text-center text-gray-900">
                     {error}
                   </td>
                 </tr>
@@ -649,18 +649,18 @@ export default function MasterProductsPage() {
                                 className="w-12 h-12 rounded object-cover shrink-0 bg-gray-100"
                               />
                             ) : (
-                              <div className="w-12 h-12 bg-orange-200 rounded object-cover shrink-0"></div>
+                              <div className="w-12 h-12 bg-gray-200 rounded object-cover shrink-0"></div>
                             )}
                             <div className="max-w-[220px]">
                               <div className="text-gray-900 font-bold leading-tight flex items-center gap-2 flex-wrap">
                                 {product.name}
                                 {product.status === "draft" && (
-                                  <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wide">
+                                  <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-900 text-[10px] font-bold uppercase tracking-wide">
                                     Draft
                                   </span>
                                 )}
                                 {isBundle(product) && (
-                                  <span className="px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wide">
+                                  <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-900 text-[10px] font-bold uppercase tracking-wide">
                                     Bundle
                                   </span>
                                 )}
@@ -675,7 +675,7 @@ export default function MasterProductsPage() {
                               </div>
                               <button
                                 onClick={() => toggleExpand(product.id)}
-                                className="mt-1 flex items-center gap-1 text-xs font-medium text-[#2a3a8c] hover:underline"
+                                className="mt-1 flex items-center gap-1 text-xs font-medium text-[#111827] hover:underline"
                               >
                                 {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                                 Lihat {product.variants.length} varian produk
@@ -703,7 +703,7 @@ export default function MasterProductsPage() {
                         </td>
 
                         <td className="px-5 py-4 align-top pt-5 text-gray-700">
-                          <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
+                          <span className="inline-flex items-center gap-1 text-gray-900 font-semibold">
                             <Info size={13} />
                             {totalLinks(product)}
                           </span>
@@ -713,7 +713,7 @@ export default function MasterProductsPage() {
                           <a
                             href="#"
                             onClick={(e) => e.preventDefault()}
-                            className="text-blue-600 font-semibold hover:underline"
+                            className="text-gray-900 font-semibold hover:underline"
                           >
                             {storeN} Toko
                           </a>
@@ -761,7 +761,7 @@ export default function MasterProductsPage() {
                                       setConfirmProduct(product);
                                       setAturFor(null);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-red-600 hover:bg-red-50"
+                                    className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-gray-900 hover:bg-gray-50"
                                   >
                                     <Eye size={14} /> Nonaktifkan
                                   </button>
@@ -771,7 +771,7 @@ export default function MasterProductsPage() {
                                       setAturFor(null);
                                       void setProductActive(product, true);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-emerald-600 hover:bg-emerald-50"
+                                    className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-gray-900 hover:bg-gray-50"
                                   >
                                     <Eye size={14} /> Aktifkan kembali
                                   </button>
@@ -847,7 +847,7 @@ export default function MasterProductsPage() {
                                           <a
                                             href="#"
                                             onClick={(e) => e.preventDefault()}
-                                            className="text-[#2a3a8c] font-semibold inline-flex items-center gap-1 text-xs hover:underline"
+                                            className="text-[#111827] font-semibold inline-flex items-center gap-1 text-xs hover:underline"
                                           >
                                             <Info size={12} /> {v.mappings.length} Produk
                                           </a>
@@ -875,8 +875,8 @@ export default function MasterProductsPage() {
           <div
             className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
               toast.type === "success"
-                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                : "bg-red-50 border-red-200 text-red-800"
+                ? "bg-gray-50 border-gray-200 text-gray-900"
+                : "bg-gray-50 border-gray-200 text-gray-900"
             }`}
           >
             <span className="flex-1">{toast.message}</span>
@@ -926,7 +926,7 @@ export default function MasterProductsPage() {
               <button
                 onClick={() => void setProductActive(confirmProduct, false)}
                 disabled={togglingActive}
-                className="px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-60"
+                className="px-4 py-2 text-sm font-semibold bg-gray-900 text-white rounded-md hover:bg-gray-900 disabled:opacity-60"
               >
                 {togglingActive ? "Memproses..." : "Ya, nonaktifkan"}
               </button>
@@ -1089,7 +1089,7 @@ function BundleModal({
 
         <div className="mt-3 flex flex-col gap-2.5">
           <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
-            Nama bundle <span className="text-red-500">*</span>
+            Nama bundle <span className="text-gray-500">*</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -1164,7 +1164,7 @@ function BundleModal({
                           {o.sku} · fisik {o.stock}
                         </span>
                       </span>
-                      <Plus size={14} className="shrink-0 text-indigo-600" />
+                      <Plus size={14} className="shrink-0 text-gray-900" />
                     </button>
                   ))
                 )}
@@ -1198,7 +1198,7 @@ function BundleModal({
                     <button
                       onClick={() => removeComponent(c.variantId)}
                       title="Hapus komponen"
-                      className="shrink-0 text-gray-400 hover:text-red-600"
+                      className="shrink-0 text-gray-400 hover:text-gray-900"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -1209,7 +1209,7 @@ function BundleModal({
           </div>
         </div>
 
-        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-xs text-gray-900">{error}</p>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -1221,7 +1221,7 @@ function BundleModal({
           <button
             onClick={submit}
             disabled={saving || loadingMasters}
-            className="px-4 py-2 text-sm font-semibold bg-[#2a3a8c] text-white rounded-md hover:bg-blue-900 disabled:opacity-60 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-semibold bg-[#111827] text-white rounded-md hover:bg-gray-900 disabled:opacity-60 flex items-center gap-2"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             {saving ? "Menyimpan..." : "Simpan bundle"}

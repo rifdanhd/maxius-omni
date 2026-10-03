@@ -49,12 +49,12 @@ export default function PickupSuccessModal({
           {/* Ikon centang / gagal */}
           <div className="flex flex-col items-center text-center space-y-3">
             {successCount > 0 ? (
-              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-                <CheckCircle2 size={36} className="text-emerald-600" />
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                <CheckCircle2 size={36} className="text-gray-900" />
               </div>
             ) : (
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-                <XCircle size={36} className="text-red-600" />
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                <XCircle size={36} className="text-gray-900" />
               </div>
             )}
 
@@ -65,10 +65,10 @@ export default function PickupSuccessModal({
                   <span className="font-bold text-gray-900">{successCount} pesanan</span>
                 </p>
               ) : (
-                <p className="text-sm text-red-600">Semua pesanan gagal diproses.</p>
+                <p className="text-sm text-gray-900">Semua pesanan gagal diproses.</p>
               )}
               {hasMixed && (
-                <p className="text-xs text-amber-600 mt-1">
+                <p className="text-xs text-gray-900 mt-1">
                   {failedCount} pesanan gagal — lihat detail di bawah.
                 </p>
               )}
@@ -86,13 +86,13 @@ export default function PickupSuccessModal({
                   <div
                     key={r.orderId}
                     className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
-                      r.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
+                      r.ok ? "bg-gray-50 text-gray-900" : "bg-gray-50 text-gray-900"
                     }`}
                   >
                     {r.ok ? (
-                      <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />
+                      <CheckCircle2 size={13} className="shrink-0 text-gray-500" />
                     ) : (
-                      <XCircle size={13} className="shrink-0 text-red-500" />
+                      <XCircle size={13} className="shrink-0 text-gray-500" />
                     )}
                     <span className="font-semibold">{r.orderNo}</span>
                     <span className="ml-auto text-[10px]">
@@ -110,10 +110,10 @@ export default function PickupSuccessModal({
 
           {/* Daftar gagal (expandable) */}
           {failedItems.length > 0 && (
-            <div className="rounded-xl border border-red-200 overflow-hidden">
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
               <button
                 onClick={() => setShowFailed((v) => !v)}
-                className="w-full px-4 py-3 bg-red-50 flex items-center gap-2 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
+                className="w-full px-4 py-3 bg-gray-50 flex items-center gap-2 text-xs font-semibold text-gray-900 hover:bg-gray-100 transition-colors"
               >
                 <AlertCircle size={14} />
                 <span>{failedItems.length} pesanan gagal</span>
@@ -122,11 +122,11 @@ export default function PickupSuccessModal({
                 </span>
               </button>
               {showFailed && (
-                <div className="px-4 py-3 bg-white border-t border-red-100 space-y-2">
+                <div className="px-4 py-3 bg-white border-t border-gray-100 space-y-2">
                   {failedItems.map((r) => (
                     <div key={r.orderId} className="flex items-start gap-2 text-xs">
                       <span className="font-semibold text-gray-900 shrink-0">{r.orderNo}:</span>
-                      <span className="text-red-600">{r.error ?? "Kesalahan tidak diketahui"}</span>
+                      <span className="text-gray-900">{r.error ?? "Kesalahan tidak diketahui"}</span>
                     </div>
                   ))}
                 </div>
@@ -146,7 +146,7 @@ export default function PickupSuccessModal({
           {successCount > 0 && (
             <button
               onClick={() => onPrintLabels(successfulOrderIds)}
-              className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex items-center gap-2 shadow-xs"
+              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-900 flex items-center gap-2 shadow-xs"
             >
               <Printer size={14} /> Cetak Label
             </button>

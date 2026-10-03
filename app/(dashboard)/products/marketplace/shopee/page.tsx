@@ -269,7 +269,7 @@ export default function ShopeeMarketplacePage() {
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] max-w-sm">
           <div className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
-            toast.type === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+            toast.type === "success" ? "bg-gray-50 border-gray-200 text-gray-900" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
             <span className="flex-1">{toast.message}</span>
             <button onClick={() => setToast(null)} className="underline text-xs opacity-70">Tutup</button>
           </div>
@@ -290,7 +290,7 @@ export default function ShopeeMarketplacePage() {
             </div>
 
             <div className="space-y-4 px-5 py-4 text-sm text-gray-600">
-              <ul className="space-y-1 rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-900">
+              <ul className="space-y-1 rounded-lg bg-gray-50 border border-gray-100 p-3 text-xs text-gray-900">
                 <li>• 1 listing Shopee = 1 produk induk; tiap varian (model) = 1 SKU stok sendiri.</li>
                 <li>• SKU memakai <b>model_sku / item_sku</b> yang sama dengan yang terlihat di Seller Center, jadi order masuk langsung match.</li>
                 <li>• Listing yang SKU-nya sudah ter-mapping tidak disentuh (aman dijalankan berulang).</li>
@@ -321,7 +321,7 @@ export default function ShopeeMarketplacePage() {
                 )}
                 {accounts.length > 0 && (
                   <div className="mt-1.5 flex gap-3 text-xs">
-                    <button onClick={() => setImportAccounts(accounts.map((a) => a.id))} className="font-medium text-[#2a3a8c] hover:underline">Pilih semua</button>
+                    <button onClick={() => setImportAccounts(accounts.map((a) => a.id))} className="font-medium text-[#111827] hover:underline">Pilih semua</button>
                     <button onClick={() => setImportAccounts([])} className="font-medium text-gray-500 hover:underline">Kosongkan</button>
                   </div>
                 )}
@@ -352,7 +352,7 @@ export default function ShopeeMarketplacePage() {
               <button
                 onClick={runImport}
                 disabled={importing || importAccounts.length === 0}
-                className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
               >
                 {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                 {importing ? "Mengimport..." : "Mulai Import"}
@@ -372,11 +372,11 @@ export default function ShopeeMarketplacePage() {
             onClick={() => { setImportAccounts(accountFilter); setImportOpen(true); }}
             disabled={accounts.length === 0 || importing}
             title={accounts.length === 0 ? "Hubungkan akun Shopee dulu di Settings › Accounts." : "Tarik listing Shopee menjadi produk + varian + mapping di Maxius"}
-            className="flex items-center gap-2 rounded-md border border-[#2a3a8c] px-4 py-2 text-sm font-medium text-[#2a3a8c] hover:bg-blue-50 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md border border-[#111827] px-4 py-2 text-sm font-medium text-[#111827] hover:bg-gray-50 disabled:opacity-50"
           >
             <Download size={16} /> Import dari Shopee
           </button>
-          <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-[#2a3a8c] px-4 py-2 text-sm font-medium text-white hover:bg-blue-900 disabled:opacity-60">
+          <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60">
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
           </button>
@@ -384,10 +384,10 @@ export default function ShopeeMarketplacePage() {
       </div>
 
       {!loading && accounts.length === 0 && (
-        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-          <PackageOpen size={32} className="mx-auto mb-3 text-amber-500" />
-          <p className="text-sm font-semibold text-amber-800">Belum ada akun Shopee terhubung</p>
-          <p className="text-xs text-amber-600 mt-1">Hubungkan toko Shopee melalui <Link href="/settings/accounts" className="underline font-semibold">Tambahkan Marketplace</Link> untuk mulai sync produk.</p>
+        <div className="mb-6 bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+          <PackageOpen size={32} className="mx-auto mb-3 text-gray-500" />
+          <p className="text-sm font-semibold text-gray-900">Belum ada akun Shopee terhubung</p>
+          <p className="text-xs text-gray-900 mt-1">Hubungkan toko Shopee melalui <Link href="/settings/accounts" className="underline font-semibold">Tambahkan Marketplace</Link> untuk mulai sync produk.</p>
         </div>
       )}
 
@@ -418,10 +418,10 @@ export default function ShopeeMarketplacePage() {
           <div className="relative" ref={filterRef}>
             <button onClick={() => setFilterOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] ${
-                filterOpen || filterActive ? "border-indigo-500 bg-indigo-50/70 text-indigo-700" : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"}`}>
+                filterOpen || filterActive ? "border-gray-500 bg-gray-50/70 text-gray-900" : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"}`}>
               <Filter size={14} />
               <span>Toko/Akun</span>
-              {filterActive && <span className="px-1.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">{accountFilter.length}</span>}
+              {filterActive && <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">{accountFilter.length}</span>}
               <ChevronDown size={14} />
             </button>
             {filterOpen && (
@@ -439,14 +439,14 @@ export default function ShopeeMarketplacePage() {
                 </div>
                 <div className="mt-2 flex items-center justify-between">
                   <button onClick={() => setAccountFilter([])} className="text-xs font-medium text-gray-500 hover:text-gray-800 underline">Reset</button>
-                  <button onClick={() => setFilterOpen(false)} className="text-xs font-semibold bg-[#2a3a8c] text-white px-3 py-1.5 rounded-md">Terapkan</button>
+                  <button onClick={() => setFilterOpen(false)} className="text-xs font-semibold bg-[#111827] text-white px-3 py-1.5 rounded-md">Terapkan</button>
                 </div>
               </div>
             )}
           </div>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} produk dipilih
               <button onClick={() => setSelected(new Set())} className="underline">Batal</button>
             </div>
@@ -470,7 +470,7 @@ export default function ShopeeMarketplacePage() {
               {loading ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-500">Memuat data...</td></tr>
               ) : error ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-red-600">{error}</td></tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-900">{error}</td></tr>
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
@@ -490,16 +490,16 @@ export default function ShopeeMarketplacePage() {
                         <td className="px-5 py-4">
                           <div className="max-w-[240px]">
                             <div className="text-gray-900 font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
-                            <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
+                            <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
                           </div>
                         </td>
                         <td className="px-5 py-4"><span className="text-sm text-gray-700 font-mono font-semibold">{row.channelSku ?? "-"}</span></td>
                         <td className="px-5 py-4 text-gray-700 font-semibold">{fmtNumber(row.stockTotal)}</td>
                         <td className="px-5 py-4">
                           {isMapped ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">✅ Mapped</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">✅ Mapped</span>
                           ) : (
-                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full hover:bg-amber-200">⚠️ Belum Mapped</Link>
+                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full hover:bg-gray-200">⚠️ Belum Mapped</Link>
                           )}
                         </td>
                         <td className="px-5 py-4 text-sm text-gray-600">{row.accountLabel}</td>
@@ -536,7 +536,7 @@ export default function ShopeeMarketplacePage() {
               </button>
               {pageNumbers.map((n) => (
                 <button key={n} onClick={() => setPage(n)}
-                  className={`w-9 h-9 text-sm rounded-md ${n === page ? "bg-[#2a3a8c] text-white font-semibold" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}>{n}</button>
+                  className={`w-9 h-9 text-sm rounded-md ${n === page ? "bg-[#111827] text-white font-semibold" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}>{n}</button>
               ))}
               <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
                 className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
