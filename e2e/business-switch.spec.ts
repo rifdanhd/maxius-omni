@@ -76,32 +76,14 @@ test('ganti brand aktif → daftar toko di Pengaturan ikut berubah', async ({ pa
   expect(stored).toBe('business-default');
 });
 
-test('BrandSwitcher terpasang di header & bisa ganti brand via UI', async ({ page }) => {
+test('BrandSwitcher disembunyikan — satu dashboard tanpa dropdown brand', async ({ page }) => {
   await login(page);
   await page.goto('/dashboard');
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 30_000 });
-  const switcher = page.getByTitle('Ganti brand');
-  await expect(switcher).toBeVisible();
-  await page.screenshot({ path: SHOT('switcher-default') });
-
-  // Pilih brand Raxen dari dropdown → pilihan tersimpan + reload terjadi.
-  // exact: nama tombol "Maxius Platform" di sidebar match substring 'Maxius'.
-  await switcher.click();
-  await page.getByRole('button', { name: 'Raxen', exact: true }).click();
-  await page.waitForURL('/dashboard', { timeout: 30_000 });
-  await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
-  const stored = await page.evaluate(() => localStorage.getItem('activeBusinessId'));
-  expect(stored).toBe('business-raxen');
-  await expect(switcher).toContainText('Raxen');
-  await page.screenshot({ path: SHOT('switcher-raxen') });
-
-  // Kembali ke brand default.
-  await switcher.click();
-  await page.getByRole('button', { name: 'Maxius', exact: true }).click();
-  await page.waitForURL('/dashboard', { timeout: 30_000 });
-  await expect(switcher).toContainText('Maxius');
-  const stored2 = await page.evaluate(() => localStorage.getItem('activeBusinessId'));
-  expect(stored2).toBe('business-default');
+  // Dropdown brand (Maxius/Raxen/dll) sengaja dihapus dari header — semua toko
+  // tampil dalam satu dashboard; brand aktif tetap bisa di-set via localStorage.
+  await expect(page.getByTitle('Ganti brand')).toHaveCount(0);
+  await page.screenshot({ path: SHOT('no-switcher') });
 });
 
 // Scoping GET /api/products: hanya brand aktif yang boleh terlihat.

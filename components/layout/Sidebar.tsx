@@ -6,9 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
-  Home, ShoppingBag, Package, Warehouse, Tag, MessageSquare,
-  Users, BarChart2, Settings, ChevronDown, ChevronUp, ClipboardList,
-  Compass, Grid2x2, BookOpen, Boxes, MessageCircle, Rss, ArrowLeftToLine, ArrowRightToLine, LogOut, Menu
+  Home, ShoppingBag, Package, Tag,
+  BarChart2, Settings, ChevronDown, ChevronUp,
+  BookOpen, Boxes, MessageCircle, Rss, ArrowLeftToLine, ArrowRightToLine, LogOut, Menu
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -54,20 +54,7 @@ const MENU: MenuItem[] = [
       { key: "riwayat-inventori", label: "Riwayat Inventori", href: "/inventory/history" },
     ],
   },
-  {
-    key: "wms",
-    icon: Warehouse,
-    label: "WMS",
-    children: [
-      { key: "inbound", label: "Inbound", href: "/wms/inbound" },
-      { key: "outbound", label: "Outbound", href: "/wms/outbound" },
-      { key: "gudang", label: "Gudang", href: "/wms/warehouse" },
-      { key: "kelola-rak", label: "Kelola Rak", href: "/wms/racks" },
-    ],
-  },
   { key: "promosi", icon: Tag, label: "Promosi", href: "/promotions" },
-  { key: "chat", icon: MessageSquare, label: "Chat", href: "/chat" },
-  { key: "pelanggan", icon: Users, label: "Daftar Pelanggan", href: "/customers" },
   {
     key: "laporan",
     icon: BarChart2,
@@ -83,18 +70,9 @@ const MENU: MenuItem[] = [
     label: "Pengaturan",
     children: [
       { key: "akun-toko", label: "Pengaturan Toko", href: "/settings/accounts" },
-      { key: "pengguna", label: "Kelola Pengguna", href: "/settings/users" },
     ],
   },
-  { key: "log-aktivitas", icon: ClipboardList, label: "Log Aktivitas", href: "/logs" },
-  { key: "market", icon: Compass, label: "Market", href: "/market" },
-  {
-    key: "aplikasi",
-    icon: Grid2x2,
-    label: "Aplikasi",
-    children: [{ key: "koneksi-api", label: "Koneksi API", href: "/apps/api-connections" }],
-  },
-  { key: "pusat-edukasi", icon: BookOpen, label: "Pusat Edukasi", href: "/education" },
+  { key: "pusat-edukasi", icon: BookOpen, label: "Panduan", href: "/education" },
 ];
 
 type ConnectedPlatform = { key: string; label: string; href: string };
