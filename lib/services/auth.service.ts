@@ -18,6 +18,15 @@ export interface AuthUser {
   canViewFullPii: boolean;
 }
 
+/** Terbitkan token sesi JWT (8h) — dipakai login password & Google login. */
+export function issueSessionToken(user: AuthUser): string {
+  return jwt.sign(
+    { sub: user.id, username: user.username, canViewFullPii: user.canViewFullPii },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+}
+
 /**
  * login(username, password)
  * Verifikasi kredensial user dan kembalikan signed JWT.
@@ -33,14 +42,8 @@ export async function login(
     throw new Error("Username atau password salah.");
   }
 
-  const token = jwt.sign(
-    { sub: user.id, username: user.username, canViewFullPii: user.canViewFullPii },
-    JWT_SECRET,
-    { expiresIn: "8h" }
-  );
-
   return {
-    token,
+    token: issueSessionToken(user),
     user: {
       id: user.id,
       username: user.username,

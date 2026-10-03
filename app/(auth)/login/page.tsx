@@ -1,10 +1,21 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { authFetch, setActiveBusinessId, DEFAULT_BUSINESS_ID } from "@/lib/utils/api-client";
+
+// Pesan error OAuth Google dari redirect callback (?error=...).
+const AUTH_ERRORS: Record<string, string> = {
+  google_disabled: "Login Google belum diaktifkan di server (GOOGLE_CLIENT_ID/SECRET belum diisi).",
+  google_state: "Login Google gagal: sesi tidak cocok — coba lagi.",
+  google_denied: "Login Google dibatalkan.",
+  google_token_exchange: "Login Google gagal: menukar kode dengan Google — coba lagi.",
+  google_unverified: "Login Google ditolak: email tidak terverifikasi.",
+  google_not_invited:
+    "Email ini belum terdaftar — minta admin mengundangnya dulu. Sementara, tetap bisa login pakai username/password.",
+};
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -23,6 +34,71 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Selesaikan login (password ATAU handoff Google): simpan token →
+  // init brand aktif → redirect. Dipakai handleSubmit & efek google_handoff.
+  async function finishLogin(token: string, uname: string) {
+    localStorage.setItem("token", token);
+    localStorage.setItem("username", uname);
+    useAuthStore.getState().auth.setAccessToken(token);
+
+    // Init brand aktif SEBELUM navigasi — localStorage tidak pernah kosong,
+    // sehingga connect OAuth selalu membawa brand yang benar. Pilihan =
+    // paritas dgn resolveRequestBusiness: brand default bila user anggota,
+    // selain itu brand pertama (daftar urut nama).
+    try {
+      const bizRes = await authFetch("/api/businesses");
+      if (bizRes.ok) {
+        const biz = (await bizRes.json()) as { businesses?: { id: string }[] };
+        const ids = (biz.businesses ?? []).map((b) => b.id);
+        const preferred = ids.includes(DEFAULT_BUSINESS_ID) ? DEFAULT_BUSINESS_ID : ids[0];
+        if (preferred) setActiveBusinessId(preferred);
+      }
+    } catch {
+      // Gagal → biarkan fallback business-default; BrandSwitcher mengoreksi nanti.
+    }
+
+    // Redirect hanya setelah token tersimpan
+    router.push("/dashboard");
+  }
+
+  // Callback Google: (?google_handoff=1) pindahkan token dari cookie httpOnly
+  // ke localStorage; (?error=...) tampilkan pesan. Keduanya dibersihkan dari URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authErr = params.get("error");
+    const handoff = params.get("google_handoff");
+    if (!authErr && handoff !== "1") return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("error");
+    url.searchParams.delete("google_handoff");
+    const clean = () => window.history.replaceState(null, "", url.toString());
+    if (authErr) {
+      setError(AUTH_ERRORS[authErr] ?? `Login gagal: ${authErr}.`);
+      clean();
+    }
+    if (handoff === "1") {
+      (async () => {
+        try {
+          const res = await fetch("/api/auth/google/session");
+          const d = (await res.json().catch(() => null)) as {
+            token?: string;
+            user?: { username?: string };
+            error?: string;
+          } | null;
+          if (!res.ok || !d?.token) {
+            throw new Error(d?.error ?? "Sesi Google tidak valid — coba lagi.");
+          }
+          clean();
+          await finishLogin(d.token, d.user?.username ?? "");
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Login Google gagal.");
+          clean();
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,28 +140,7 @@ function LoginForm() {
         throw new Error("Server tidak mengembalikan token.");
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("username", data.user.username);
-      useAuthStore.getState().auth.setAccessToken(data.token);
-
-      // Init brand aktif SEBELUM navigasi — localStorage tidak pernah kosong,
-      // sehingga connect OAuth selalu membawa brand yang benar. Pilihan =
-      // paritas dgn resolveRequestBusiness: brand default bila user anggota,
-      // selain itu brand pertama (daftar urut nama).
-      try {
-        const bizRes = await authFetch("/api/businesses");
-        if (bizRes.ok) {
-          const biz = (await bizRes.json()) as { businesses?: { id: string }[] };
-          const ids = (biz.businesses ?? []).map((b) => b.id);
-          const preferred = ids.includes(DEFAULT_BUSINESS_ID) ? DEFAULT_BUSINESS_ID : ids[0];
-          if (preferred) setActiveBusinessId(preferred);
-        }
-      } catch {
-        // Gagal → biarkan fallback business-default; BrandSwitcher mengoreksi nanti.
-      }
-
-      // Redirect hanya setelah token tersimpan
-      router.push("/dashboard");
+      await finishLogin(data.token, data.user.username);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
@@ -167,6 +222,31 @@ function LoginForm() {
             )}
           </button>
         </form>
+
+        <div className="mt-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400 uppercase">atau</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              // Navigasi penuh disengaja: route server membalas 302 ke Google.
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+              window.location.assign("/api/auth/google");
+            }}
+            className="w-full flex items-center justify-center gap-3 text-sm font-semibold bg-white text-gray-700 border border-gray-200 rounded-xl px-4 py-3 hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
+              <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+              <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
+              <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
+            </svg>
+            Masuk dengan Google
+          </button>
+        </div>
 
       </div>
 
