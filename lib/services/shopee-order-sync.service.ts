@@ -108,7 +108,9 @@ export async function createShopeeOrder(
   const rawStatus = s(detail.order_status) ?? "UNKNOWN";
   const status = canonicalShopeeStatus(rawStatus);
 
-  const addr = obj(detail.shipping_address);
+  // Nama field resmi v2: recipient_address / item_list / package_list / pay_time;
+  // fallback nama lama dipertahankan bila Shopee mengirim keduanya.
+  const addr = obj(detail.shipping_address ?? detail.recipient_address);
   const recipientName =
     s(addr?.name) ?? s(detail.recipient_name) ?? s(detail.buyer_username) ?? null;
   const recipientPhone = encryptPii(s(addr?.phone) ?? s(addr?.phone_number));
@@ -119,7 +121,7 @@ export async function createShopeeOrder(
       .join(", ") || null
   );
 
-  const lineItems = arr(detail.items).map((it) => {
+  const lineItems = arr(detail.items ?? detail.item_list).map((it) => {
     const itemId = n(it.item_id);
     const modelId = n(it.model_id);
     return {
@@ -152,7 +154,7 @@ export async function createShopeeOrder(
   const amount = n(detail.amount) ?? n(detail.total_amount) ?? (amountFromItems || null);
 
   const paymentMethod = s(detail.payment_method);
-  const packagesRaw = arr(detail.packages);
+  const packagesRaw = arr(detail.packages ?? detail.package_list);
 
   const order = await prisma.$transaction(async (tx) => {
     const created = await tx.order.create({
@@ -172,7 +174,7 @@ export async function createShopeeOrder(
         amount,
         currency: s(detail.currency),
         createTime: toDate(detail.create_time),
-        paidTime: toDate(detail.payment_time),
+        paidTime: toDate(detail.payment_time ?? detail.pay_time),
         shippingDueTime: toDate(detail.shipping_due_time),
         accountId,
         items: {
@@ -216,22 +218,26 @@ export type ShopeeSyncResult = {
 /**
  * syncOrdersShopee — tarik order Shopee (M8b):
  *  - A3: dikunci per akun (anti double-pull)
- *  - A5: daftar ditarik ber-halaman dengan cap SHOPEE_ORDER_MAX_PAGES;
- *    error list/detail → SyncLog kind=order_sync (tidak senyap)
+ *  - A5: jendela waktu maks 15 hari (dokumen resmi get_order_list) + cursor,
+ *    dedup lintas jendela, cap SHOPEE_ORDER_MAX_PAGES; error list/detail →
+ *    SyncLog kind=order_sync (tidak senyap)
  *  - A4: order yang SUDAH ada → refresh status saja (progress-only);
  *    efek stok hanya pada transisi status (idempoten via ledger)
  *  - order baru → get_order_detail lalu create + efek stok (A1)
+ *  - opts.since → mode watermark (time_range_field=update_time) utk auto-sync
  */
 export async function syncOrdersShopee(
   accountId: string,
-  prisma: PrismaLike = defaultPrisma
+  prisma: PrismaLike = defaultPrisma,
+  opts?: { since?: Date }
 ): Promise<ShopeeSyncResult> {
-  return withAccountPullLock(accountId, () => syncOrdersShopeeInner(accountId, prisma));
+  return withAccountPullLock(accountId, () => syncOrdersShopeeInner(accountId, prisma, opts));
 }
 
 async function syncOrdersShopeeInner(
   accountId: string,
-  prisma: PrismaLike
+  prisma: PrismaLike,
+  opts?: { since?: Date }
 ): Promise<ShopeeSyncResult> {
   const account = await prisma.platformAccount.findUnique({ where: { id: accountId } });
   if (!account) throw new Error("Akun tidak ditemukan.");
@@ -243,33 +249,76 @@ async function syncOrdersShopeeInner(
   const result: ShopeeSyncResult = { fetched: 0, created: 0, skipped: 0, errors: [] };
   const maxPages = envInt("SHOPEE_ORDER_MAX_PAGES", 10);
   const pageSize = 50;
-  const syncDays = envInt("SHOPEE_ORDER_SYNC_DAYS", 30);
-  const timeFrom = Math.floor(Date.now() / 1000) - syncDays * 86400;
+  const WINDOW_SEC = 15 * 86400;
+  const nowSec = Math.floor(Date.now() / 1000);
 
-  // A5 — tarik daftar ber-halaman (cap halaman; error → berhenti + SyncLog).
-  const summaries: ShopeeOrderSummary[] = [];
-  let offset = 0;
-  let hasMore = true;
-  for (let page = 1; page <= maxPages && hasMore; page++) {
-    try {
-      const r = await getOrderList(account.accessToken, shopId, {
-        offset,
-        pageSize,
-        createTimeFrom: timeFrom,
-      });
-      summaries.push(...r.orders);
-      hasMore = r.hasMore;
-      offset = r.nextOffset;
-      if (r.orders.length === 0) break;
-    } catch (e) {
-      const message = `get_order_list halaman ${page}: ${errMsg(e)}`;
-      result.errors.push(message);
-      await logOrderSyncError(prisma, accountId, message, { page, offset });
-      break;
+  // Rentang: watermark update_time ≥ since (overlap 10 menit utk clock skew /
+  // refresh berjalan) ATAU hari ini ke belakang SHOPEE_ORDER_SYNC_DAYS.
+  let timeRangeField: "create_time" | "update_time" = "create_time";
+  let rangeFrom: number;
+  if (opts?.since) {
+    timeRangeField = "update_time";
+    rangeFrom = Math.floor(opts.since.getTime() / 1000) - 600;
+  } else {
+    rangeFrom = nowSec - envInt("SHOPEE_ORDER_SYNC_DAYS", 30) * 86400;
+  }
+
+  // A5 — ber-halaman (cursor) per jendela 15 hari; dedup lintas jendela;
+  // error → berhenti + SyncLog.
+  const seen = new Set<string>();
+  let pages = 0;
+  let stop = false;
+  for (let winFrom = rangeFrom; winFrom < nowSec && !stop && pages < maxPages; winFrom += WINDOW_SEC) {
+    const winTo = Math.min(winFrom + WINDOW_SEC, nowSec);
+    let cursor = "";
+    let hasMore = true;
+    while (hasMore && !stop && pages < maxPages) {
+      pages += 1;
+      try {
+        const r = await getOrderList(account.accessToken, shopId, {
+          createTimeFrom: winFrom,
+          createTimeTo: winTo,
+          cursor,
+          pageSize,
+          timeRangeField,
+        });
+        const fresh = r.orders.filter((o) => {
+          const sn = s(o.order_sn);
+          if (!sn || seen.has(sn)) return false;
+          seen.add(sn);
+          return true;
+        });
+        result.fetched += fresh.length;
+        if (fresh.length > 0) {
+          await ingestShopeeOrderSummaries(prisma, accountId, account.accessToken, shopId, fresh, result);
+        }
+        hasMore = r.hasMore;
+        cursor = r.nextCursor;
+        if (r.orders.length === 0) break;
+      } catch (e) {
+        const message = `get_order_list halaman ${pages}: ${errMsg(e)}`;
+        result.errors.push(message);
+        await logOrderSyncError(prisma, accountId, message, { page: pages, cursor });
+        stop = true;
+      }
     }
   }
-  result.fetched = summaries.length;
+  return result;
+}
 
+/**
+ * ingestShopeeOrderSummaries — ingest satu batch halaman get_order_list:
+ * A4 refresh status order existing + order baru → get_order_detail → create
+ * + efek stok (A1). Dipakai syncOrdersShopee (sinkron) dan background SyncRun.
+ */
+export async function ingestShopeeOrderSummaries(
+  prisma: PrismaLike,
+  accountId: string,
+  accessToken: string,
+  shopId: string,
+  summaries: ShopeeOrderSummary[],
+  result: ShopeeSyncResult
+): Promise<void> {
   // A4 — order yang sudah ada: refresh status saja (progress-only).
   const newSns: string[] = [];
   for (const sum of summaries) {
@@ -317,7 +366,7 @@ async function syncOrdersShopeeInner(
   if (newSns.length > 0) {
     let details: Array<Record<string, unknown>> = [];
     try {
-      details = await getOrderDetail(account.accessToken, shopId, newSns);
+      details = await getOrderDetail(accessToken, shopId, newSns);
     } catch (e) {
       const message = `get_order_detail: ${errMsg(e)}`;
       result.errors.push(message);
@@ -351,8 +400,6 @@ async function syncOrdersShopeeInner(
       }
     }
   }
-
-  return result;
 }
 
 /**

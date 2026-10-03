@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, Mail, ChevronDown, Search, Filter, Calendar, RefreshCw, Printer } from "lucide-react";
+import { Archive, Mail, ChevronDown, Search, Filter, Calendar, RefreshCw, Printer, Info, X } from "lucide-react";
 import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, printPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
@@ -17,6 +17,7 @@ import { DataCard } from "@/components/ui/data-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const PAGE_SIZE = 20;
 
@@ -378,6 +379,11 @@ export default function OrdersPage() {
   const [syncing, setSyncing] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Background run (SyncRun): progres live + tombol terkunci saat aktif. */
+  const [bgActive, setBgActive] = useState(false);
+  const [bgProgress, setBgProgress] = useState<{ fetched: number; created: number; skipped: number; phase: string | null } | null>(null);
+  const [infoDismissed, setInfoDismissed] = useState(false);
+  const bgWasActive = useRef(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [printingBulk, setPrintingBulk] = useState(false);
   const [pickupTargets, setPickupTargets] = useState<RequestPickupOrder[] | null>(null);
@@ -480,6 +486,81 @@ export default function OrdersPage() {
 
   const hasActiveFilters = q.trim() !== "" || from !== "" || to !== "" || sort.id !== "newest";
 
+  const refreshList = async () => {
+    try {
+      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
+      setOrders(refreshed.orders ?? []);
+      setTotal(refreshed.total ?? total);
+      setPageCount(refreshed.pageCount ?? pageCount);
+      setCounts(refreshed.counts ?? counts);
+      setSelected(new Set());
+    } catch {
+      // Refresh gagal bukan hal fatal — info sudah tampil di modal.
+    }
+  };
+
+  /** Poll status background run (SyncRun): progres live + alert penutup. */
+  const refreshRunStatus = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await authFetch("/api/orders/sync/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        runs: Array<{
+          id: string;
+          status: string;
+          phase: string | null;
+          message: string | null;
+          fetched: number;
+          created: number;
+          skipped: number;
+          error: string | null;
+        }>;
+      };
+      const runs = data.runs ?? [];
+      const activeRuns = runs.filter((r) => r.status === "QUEUED" || r.status === "RUNNING");
+      if (activeRuns.length > 0) {
+        bgWasActive.current = true;
+        setBgActive(true);
+        setBgProgress({
+          fetched: activeRuns.reduce((a, r) => a + r.fetched, 0),
+          created: activeRuns.reduce((a, r) => a + r.created, 0),
+          skipped: activeRuns.reduce((a, r) => a + r.skipped, 0),
+          phase: activeRuns.find((r) => r.phase === "rate_wait")?.phase ?? activeRuns[0]?.phase ?? null,
+        });
+        return;
+      }
+      setBgActive(false);
+      setBgProgress(null);
+      if (bgWasActive.current) {
+        bgWasActive.current = false;
+        const last = runs[0];
+        if (last?.status === "DONE") {
+          alert(`Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
+        } else if (last?.status === "FAILED") {
+          alert(`Sync gagal: ${last.error ?? "-"}\n\nKlik "Sync Pesanan" untuk lanjut dari posisi terakhir.`);
+        }
+        void refreshList().catch((e) => console.error(e));
+      }
+    } catch (e) {
+      console.warn("status sync:", e);
+    }
+  };
+
+  // Polling tiap 4 dtk (query ringan, take 10) — progres terlihat bahkan
+  // setelah kembali dari menu lain / dibuka di tab lain.
+  const runStatusRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    runStatusRef.current = refreshRunStatus; // closure terbaru tiap render
+  });
+  useEffect(() => {
+    void runStatusRef.current();
+    const t = setInterval(() => void runStatusRef.current(), 4000);
+    return () => clearInterval(t);
+  }, [bgActive]);
+
   const handleSync = async () => {
     setSyncing(true);
     setError(null);
@@ -494,22 +575,20 @@ export default function OrdersPage() {
         setError(data.error ?? `Gagal sync (${res.status})`);
         return;
       }
-      const result = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
-      setOrders(result.orders ?? []);
-      setTotal(result.total ?? 0);
-      setPageCount(result.pageCount ?? 1);
-      setSelected(new Set());
-      const reconcileNote = (data.results as { reconciled?: number }[] | undefined)
-        ?.map((r) => r.reconciled ?? 0)
-        .reduce((a, b) => a + b, 0);
-      const detail = data.results
-        ?.map((r: { label?: string; created?: number; skipped?: number; reconciled?: number; error?: string }) =>
-          r.error
-            ? `${r.label}: ${r.error}`
-            : `${r.label}: +${r.created ?? 0} baru, ${r.skipped ?? 0} sudah ada${(r.reconciled ?? 0) > 0 ? `, ${r.reconciled} resi dilengkapi` : ""}`
-        )
-        .join("\n");
-      alert(`Sync selesai — ${data.synced ?? 0} order baru, ${data.skipped ?? 0} sudah ada.${reconcileNote ? `\n\nResi backfill: ${reconcileNote} paket diperbarui.` : ""}${detail ? `\n\n${detail}` : ""}`);
+      const guardErrors = (data.errors as string[] | undefined) ?? [];
+      const started = Number(data.started ?? 0);
+      const stillRunning = Number(data.stillRunning ?? 0);
+      if (started > 0 || stillRunning > 0) {
+        bgWasActive.current = true; // alert penutup muncul saat run selesai
+        setBgActive(true);
+        void refreshRunStatus();
+      }
+      alert(
+        `Sync pesanan berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
+          `Anda bisa berpindah menu; progres tampil di halaman ini.` +
+          (stillRunning > 0 ? `\n\n${stillRunning} akun masih berjalan dari sync sebelumnya.` : "") +
+          (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : "")
+      );
     } catch (e) {
       console.error(e);
       setError("Terjadi kesalahan saat sync.");
@@ -734,19 +813,6 @@ export default function OrdersPage() {
     setPickupResult(result);
   };
 
-  const refreshList = async () => {
-    try {
-      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
-      setOrders(refreshed.orders ?? []);
-      setTotal(refreshed.total ?? total);
-      setPageCount(refreshed.pageCount ?? pageCount);
-      setCounts(refreshed.counts ?? counts);
-      setSelected(new Set());
-    } catch {
-      // Refresh gagal bukan hal fatal — info sudah tampil di modal.
-    }
-  };
-
   const handlePickupSuccessClose = async () => {
     setPickupResult(null);
     await refreshList();
@@ -784,11 +850,11 @@ export default function OrdersPage() {
             </Button>
             <Button
               onClick={handleSync}
-              disabled={syncing}
+              disabled={syncing || bgActive}
               className="gap-2"
             >
-              <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
-              {syncing ? "Menyinkronkan..." : "Sync Pesanan"}
+              <RefreshCw size={16} className={syncing || bgActive ? "animate-spin" : ""} />
+              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Sync Pesanan"}
             </Button>
             <Button
               variant="outline"
@@ -805,6 +871,46 @@ export default function OrdersPage() {
           </div>
         }
       />
+
+      {/* Progres background run (SyncRun) */}
+      {bgActive && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <RefreshCw size={14} className="animate-spin shrink-0" />
+          <span>
+            Menarik order di latar belakang — <b>{bgProgress?.fetched ?? 0} ditarik</b>, {bgProgress?.created ?? 0} baru,{" "}
+            {bgProgress?.skipped ?? 0} sudah ada
+            {bgProgress?.phase === "rate_wait" ? " · jeda rate limit API (wajar)" : ""}. Anda bisa berpindah menu; halaman ini
+            menampilkan progres terbaru.
+          </span>
+        </div>
+      )}
+
+      {/* Fase 1 — edukasi batas API & pola pakai */}
+      {!infoDismissed && (
+        <Alert className="mt-3 border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-700">
+          <Info size={16} className="text-amber-700" />
+          <AlertTitle className="flex w-full items-start justify-between gap-2 text-amber-900">
+            Tentang sinkronisasi pesanan masal
+            <button
+              type="button"
+              onClick={() => setInfoDismissed(true)}
+              className="rounded p-0.5 hover:bg-amber-100"
+              aria-label="Tutup informasi"
+            >
+              <X size={14} />
+            </button>
+          </AlertTitle>
+          <AlertDescription className="text-amber-900/90">
+            <p>
+              1. API marketplace mengambil pesanan maksimal ±100–1.000 data per permintaan (pagination limit). Indikator yang
+              berputar lama atau tertahan pada angka tertentu adalah <b>normal</b> — sistem menunggu jeda rate limit agar koneksi
+              toko tidak diblokir.
+            </p>
+            <p>2. Operasional harian: gunakan filter tanggal 3–7 hari terakhir atau tab &ldquo;Pesanan Baru&rdquo; / &ldquo;Siap Dikirim&rdquo;.</p>
+            <p>3. Histori lengkap (pembukuan/analisis): sync berjalan aman di latar belakang — Anda bisa berpindah menu dan kembali kapan saja.</p>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Main Card */}
       <DataCard

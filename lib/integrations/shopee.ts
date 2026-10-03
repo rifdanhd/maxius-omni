@@ -322,52 +322,66 @@ export type ShopeeOrderSummary = {
 };
 
 /**
- * getOrderList — /api/v2/order/get_order_list (daftar order + status terkini).
- * Guard A5: rate window per token. Pemanggil WAJIB membatasi halaman
- * (SHOPEE_ORDER_MAX_PAGES) supaya tarikan tidak tak-berujung pada has_more
- * yang tidak pernah habis.
+ * getOrderList — GET /api/v2/order/get_order_list (dokumen resmi v2):
+ * query WAJIB time_range_field + time_from/time_to (maks rentang 15 hari),
+ * paginasi cursor → respons `order_list` / `more` / `next_cursor`.
+ * (Sebelumnya salah kirim POST body {pagination,time_range} → Shopee balas
+ * error/kosong dan sync selalu 0 order.)
+ * Guard A5: rate window per token.
  */
+export type ShopeeOrderListPage = {
+  orders: ShopeeOrderSummary[];
+  hasMore: boolean;
+  nextCursor: string;
+};
+
 export async function getOrderList(
   accessToken: string,
   shopId: string | number,
   opts: {
-    offset?: number;
+    createTimeFrom: number;
+    createTimeTo: number;
+    cursor?: string;
     pageSize?: number;
-    createTimeFrom?: number;
-    createTimeTo?: number;
+    timeRangeField?: "create_time" | "update_time";
     orderStatus?: string[];
-  } = {},
+  },
   creds?: ShopeeCreds
-): Promise<{
-  orders: ShopeeOrderSummary[];
-  hasMore: boolean;
-  nextOffset: number;
-  totalCount: number | null;
-}> {
+): Promise<ShopeeOrderListPage> {
   checkOrderRateWindow(accessToken);
-  const { offset = 0, pageSize = 50, createTimeFrom, createTimeTo, orderStatus } = opts;
-  const body: Record<string, unknown> = { pagination: { offset, page_size: pageSize } };
-  if (createTimeFrom || createTimeTo) {
-    body.time_range = {
-      ...(createTimeFrom ? { create_time_from: createTimeFrom } : {}),
-      ...(createTimeTo ? { create_time_to: createTimeTo } : {}),
-    };
-  }
-  if (orderStatus && orderStatus.length > 0) body.order_status = orderStatus;
-  const r = await postShopApi("/api/v2/order/get_order_list", accessToken, shopId, body, creds);
+  const {
+    createTimeFrom,
+    createTimeTo,
+    cursor = "",
+    pageSize = 50,
+    timeRangeField = "create_time",
+    orderStatus,
+  } = opts;
+  // Dokumen Shopee: time_from..time_to maks 15 hari — clamp defensif.
+  const WINDOW_MAX_SEC = 15 * 86400;
+  const timeTo = Math.min(createTimeTo, createTimeFrom + WINDOW_MAX_SEC);
+  const r = await getShopApi("/api/v2/order/get_order_list", accessToken, shopId, creds, {
+    time_range_field: timeRangeField,
+    time_from: createTimeFrom,
+    time_to: timeTo,
+    page_size: pageSize,
+    cursor,
+    response_optional_fields: "order_status",
+    ...(orderStatus && orderStatus.length > 0 ? { order_status: orderStatus } : {}),
+  });
   const orders = (r.order_list as ShopeeOrderSummary[] | undefined) ?? [];
   return {
     orders,
-    hasMore: r.has_more === true,
-    nextOffset: offset + orders.length,
-    totalCount: r.total_count !== undefined && r.total_count !== null ? Number(r.total_count) : null,
+    hasMore: r.more === true,
+    nextCursor: typeof r.next_cursor === "string" ? r.next_cursor : "",
   };
 }
 
 /**
- * getOrderDetail — /api/v2/order/get_order_detail (detail per order_sn).
- * Guard A5: rate window per token + otomatis pecah batch
- * (SHOPEE_ORDER_DETAIL_BATCH, default 50 order_sn per panggilan).
+ * getOrderDetail — GET /api/v2/order/get_order_detail (dokumen resmi: query
+ * order_sn_list dipisah koma + response_optional_fields). Guard A5: rate
+ * window per token + otomatis pecah batch (SHOPEE_ORDER_DETAIL_BATCH,
+ * default 50 order_sn per panggilan).
  */
 export async function getOrderDetail(
   accessToken: string,
@@ -381,13 +395,12 @@ export async function getOrderDetail(
   const out: Array<Record<string, unknown>> = [];
   for (let i = 0; i < sns.length; i += batchSize) {
     checkOrderRateWindow(accessToken);
-    const r = await postShopApi(
-      "/api/v2/order/get_order_detail",
-      accessToken,
-      shopId,
-      { order_sn_list: sns.slice(i, i + batchSize) },
-      creds
-    );
+    const r = await getShopApi("/api/v2/order/get_order_detail", accessToken, shopId, creds, {
+      order_sn_list: sns.slice(i, i + batchSize),
+      // Field yang dibaca createShopeeOrder (wajib diminta — selain ini default).
+      response_optional_fields:
+        "buyer_username,note,recipient_address,item_list,pay_time,package_list,payment_method,total_amount",
+    });
     out.push(...((r.order_list as Array<Record<string, unknown>> | undefined) ?? []));
   }
   return out;

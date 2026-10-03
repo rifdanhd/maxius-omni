@@ -390,14 +390,26 @@ export async function searchReturns(
 export async function getOrders(
   accessToken: string,
   shopCipher?: string,
-  opts: { pageSize?: number; orderStatus?: string; pageToken?: string } = {}
+  opts: {
+    pageSize?: number;
+    orderStatus?: string;
+    pageToken?: string;
+    /** Watermark auto-sync: order dengan update_time ≥ detik epoch ini. */
+    updateTimeGe?: number;
+  } = {}
 ) {
-  const { pageSize = 20, orderStatus, pageToken } = opts;
+  const { pageSize = 20, orderStatus, pageToken, updateTimeGe } = opts;
   // Catatan penting (106001/sign invalid): bila body kosong `{}`, generateSign melewati
   // body TAPI fetch mengirim `"{}"` -> signature mismatch -> HTTP 401.
   // Karena itu kirim body null (tanpa body) saat tidak ada filter, dan hanya sertakan
   // filter non-kosong agar request body selaras dengan signature.
-  const body: Record<string, unknown> | null = orderStatus ? { order_status: orderStatus } : null;
+  const hasFilter = Boolean(orderStatus) || updateTimeGe !== undefined;
+  const body: Record<string, unknown> | null = hasFilter
+    ? {
+        ...(orderStatus ? { order_status: orderStatus } : {}),
+        ...(updateTimeGe !== undefined ? { update_time_ge: updateTimeGe } : {}),
+      }
+    : null;
   const result = await callApi(
     "POST",
     "/order/202309/orders/search",

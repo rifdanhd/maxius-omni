@@ -36,7 +36,7 @@ type RecipientAddressRaw = {
   full_address?: string;
 };
 
-type OrderRaw = {
+export type OrderRaw = {
   id?: string;
   status?: string;
   buyer_nickname?: string;
@@ -159,23 +159,37 @@ async function syncShipments(
   }
 }
 
+/** Hasil akumulasi sync order TikTok (dipakai inner & background SyncRun). */
+export type TikTokOrderSyncResult = {
+  fetched: number;
+  created: number;
+  skipped: number;
+  errors: string[];
+  reconciled: number;
+  reconcileScan: number;
+  trackingEvents: number;
+};
+
 /**
  * syncOrdersTikTok — tarik order dari TikTok API lalu simpan idempotent.
  * Dedupe by (accountId, externalOrderId) via PlatformOrderMapping; order yang
  * sudah ada di-skip (tidak duplikat). Disimpan per-order + per-line-item,
  * line item memakai identifier eksternal (product_id / sku_id) langsung.
+ * opts.since → watermark update_time_ge (auto-sync); tanpa itu = semua order.
  */
 export async function syncOrdersTikTok(
   accountId: string,
-  prisma: PrismaLike = defaultPrisma
+  prisma: PrismaLike = defaultPrisma,
+  opts?: { since?: Date }
 ) {
   // A3 — anti double-pull per akun (klik sync dobel / retry paralel).
-  return withAccountPullLock(accountId, () => syncOrdersTikTokInner(accountId, prisma));
+  return withAccountPullLock(accountId, () => syncOrdersTikTokInner(accountId, prisma, opts));
 }
 
 async function syncOrdersTikTokInner(
   accountId: string,
-  prisma: PrismaLike
+  prisma: PrismaLike,
+  opts?: { since?: Date }
 ) {
   const account = await prisma.platformAccount.findUnique({
     where: { id: accountId },
@@ -184,21 +198,49 @@ async function syncOrdersTikTokInner(
   if (!account.accessToken) throw new Error("Akun belum punya access token.");
   if (!account.shopCipher) throw new Error("Akun belum punya shop_cipher.");
 
-  // Tarik SEMUA halaman orders/search. Default API hanya 20 order/panggilan dan
+  // Tarik halaman orders/search. Default API hanya 20 order/panggilan dan
   // tanpa loop, order baru di halaman berikutnya tidak pernah ketarik
   // (insiden: "0 baru, 20 sudah ada" padahal webhook menerima order baru).
+  // opts.since → watermark update_time_ge (overlap 10 menit); tanpa itu = semua.
+  const sinceSec = opts?.since ? Math.floor(opts.since.getTime() / 1000) - 600 : null;
   const orders: OrderRaw[] = [];
   const MAX_ORDER_PAGES = 50;
   let pageToken: string | undefined;
   for (let page = 0; page < MAX_ORDER_PAGES; page++) {
-    const res = await getOrders(account.accessToken, account.shopCipher, { pageToken });
+    const res = await getOrders(account.accessToken, account.shopCipher, {
+      pageToken,
+      ...(sinceSec !== null ? { updateTimeGe: sinceSec } : {}),
+    });
     orders.push(...(res.orders as OrderRaw[]));
     if (res.orders.length === 0 || !res.nextPageToken) break;
     pageToken = res.nextPageToken;
   }
 
-  const result = { fetched: orders.length, created: 0, skipped: 0, errors: [] as string[], reconciled: 0, reconcileScan: 0, trackingEvents: 0 };
+  const result: TikTokOrderSyncResult = {
+    fetched: orders.length,
+    created: 0,
+    skipped: 0,
+    errors: [],
+    reconciled: 0,
+    reconcileScan: 0,
+    trackingEvents: 0,
+  };
+  await ingestTikTokOrdersPage(prisma, accountId, orders, result);
+  await postTikTokOrderSync(prisma, accountId, result);
+  return result;
+}
 
+/**
+ * ingestTikTokOrdersPage — ingest satu batch halaman orders/search: refresh
+ * order existing + create order baru (idempotent by PlatformOrderMapping) +
+ * penanda orphan SKU per halaman. Dipakai syncOrdersTikTok & background SyncRun.
+ */
+export async function ingestTikTokOrdersPage(
+  prisma: PrismaLike,
+  accountId: string,
+  orders: OrderRaw[],
+  result: TikTokOrderSyncResult
+): Promise<void> {
   // Akumulasi orphan SKU (channelSku → qty) utk penanda pasif SyncLog
   // kind=orphan_sku — di-flush setelah loop order, idempotent per marker.
   const orphanQty = new Map<string, number>();
@@ -400,11 +442,22 @@ async function syncOrdersTikTokInner(
   }
 
   // Penanda pasif orphan SKU: detect & tag saja (keputusan owner — mapping
-  // tetap manual via panel halaman Mapping). Tidak pernah gagalkan sync.
+  // tetap manual via panel halaman Mapping. Tidak pernah gagalkan sync.
   for (const [sku, qty] of orphanQty) {
     await logOrphanSku(accountId, sku, qty);
   }
+}
 
+/**
+ * postTikTokOrderSync — pasca-ingest: backfill resi (reconcile) + ingest
+ * tracking + tulis SyncLog order_sync. Dipakai syncOrdersTikTok & background
+ * SyncRun (dipanggil SATU KALI di akhir run, bukan per halaman).
+ */
+export async function postTikTokOrderSync(
+  prisma: PrismaLike,
+  accountId: string,
+  result: TikTokOrderSyncResult
+): Promise<void> {
   // Backfill resi & kurir untuk shipment yang tetap kosong setelah sync —
   // TikTok meng-assign nomor resi secara ASYNC (bisa muncul belakangan).
   try {
@@ -447,6 +500,4 @@ async function syncOrdersTikTokInner(
   } catch (e) {
     console.warn("[OrderSync] gagal menulis SyncLog order_sync:", e instanceof Error ? e.message : String(e));
   }
-
-  return result;
 }

@@ -164,6 +164,8 @@ model PlatformAccount {
   appCredentialId      String?
   frozenReason         String?
   isFrozen             Boolean                @default(false)
+  /// Watermark auto-sync order: tarik update_time ≥ nilainya (NULL = belum pernah).
+  lastPulledAt         DateTime?
   orders               Order[]
   appCredential        AppCredential?         @relation(fields: [appCredentialId], references: [id])
   business             Business               @relation(fields: [businessId], references: [id])
@@ -178,6 +180,7 @@ model PlatformAccount {
   stockLedger          StockLedger[]
   syncJob              SyncJob[]
   syncLog              SyncLog[]
+  syncRuns             SyncRun[]
 
   @@unique([platform, externalShopId])
 }
@@ -541,6 +544,37 @@ model SyncLog {
   handledBy       String?
   createdAt       DateTime        @default(now())
   account         PlatformAccount @relation(fields: [accountId], references: [id])
+}
+
+/// Background sync run (pesanan masal & histori) — state persist per halaman:
+/// cursor/jendela tersimpan sehingga lanjut lintas tick, resume setelah
+/// server restart, dan progres live (fetched/created/skipped) untuk UI.
+model SyncRun {
+  id         String    @id @default(cuid())
+  businessId String    @default("business-default")
+  accountId  String
+  kind       String    @default("orders")
+  /// QUEUED → RUNNING → DONE | FAILED
+  status     String    @default("QUEUED")
+  /// pulling | rate_wait | resume | done | error
+  phase      String?
+  message    String?
+  /// Resume token: TikTok page_token / Shopee get_order_list cursor
+  cursor     String?
+  /// Jendela waktu Shopee (maks 15 hari) yang sedang/sudah ditarik
+  windowFrom DateTime?
+  windowTo   DateTime?
+  fetched    Int       @default(0)
+  created    Int       @default(0)
+  skipped    Int       @default(0)
+  error      String?
+  startedAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  finishedAt DateTime?
+  account    PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
+  @@index([status, updatedAt])
 }
 
 model User {

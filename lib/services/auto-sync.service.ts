@@ -50,16 +50,35 @@ export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
   try {
     const accounts = await prisma.platformAccount.findMany({
       where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, accessToken: { not: null } },
-      select: { id: true, platform: true },
+      select: { id: true, platform: true, lastPulledAt: true },
     });
     const out: OrdersAutoSummary = { accounts: accounts.length, created: 0, skipped: 0, errors: 0 };
     for (const acc of accounts) {
+      // Guard: jangan tarik dobel saat background SyncRun (tombol manual) jalan.
+      const activeRun = await prisma.syncRun.findFirst({
+        where: { accountId: acc.id, kind: "orders", status: { in: ["QUEUED", "RUNNING"] } },
+        select: { id: true },
+      });
+      if (activeRun) continue;
+
+      // Watermark: update_time ≥ lastPulledAt (fallback 30 hari utk tick
+      // pertama) — tarikan delta kecil, bukan seluruh histori tiap 5 menit.
+      const since = acc.lastPulledAt ?? new Date(Date.now() - 30 * 86_400_000);
       try {
         const r =
-          acc.platform === "TIKTOK_SHOP" ? await syncOrdersTikTok(acc.id) : await syncOrdersShopee(acc.id);
+          acc.platform === "TIKTOK_SHOP"
+            ? await syncOrdersTikTok(acc.id, undefined, { since })
+            : await syncOrdersShopee(acc.id, undefined, { since });
         out.created += r.created;
         out.skipped += r.skipped;
         out.errors += r.errors.length;
+        // Watermark maju hanya bila tarikan bersih — error sebagian tidak
+        // boleh melewatkan order (tick berikutnya mengulang rentang yang sama).
+        if (r.errors.length === 0) {
+          await prisma.platformAccount
+            .update({ where: { id: acc.id }, data: { lastPulledAt: new Date() } })
+            .catch(() => {});
+        }
         // TikTok sudah menulis SyncLog order_sync per akun di dalam service.
         // Shopee hanya menulis log pada error eksepsi → ringkasan sukses ditulis di sini.
         if (acc.platform === "SHOPEE" && r.created > 0) {

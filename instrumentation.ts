@@ -15,11 +15,13 @@
 const TICK_MS = 30_000;
 const AUTO_ORDERS_MS = 5 * 60_000;
 const AUTO_LISTINGS_MS = 30 * 60_000;
+const RUN_SWEEP_MS = 15_000;
 
 type TimerGlobal = {
   __maxiusSyncRetryTimer?: ReturnType<typeof setInterval>;
   __maxiusAutoOrdersTimer?: ReturnType<typeof setInterval>;
   __maxiusAutoListingsTimer?: ReturnType<typeof setInterval>;
+  __maxiusRunSweepTimer?: ReturnType<typeof setInterval>;
 };
 
 export async function register() {
@@ -56,6 +58,23 @@ export async function register() {
       }, TICK_MS)
     );
     console.log(`[SyncRetry] auto-retry SyncJob aktif (tiap ${TICK_MS / 1000}dtk)`);
+  }
+
+  // --- Sweep SyncRun stale (selalu aktif; penjaga run background manual) ---
+  // Run RUNNING tanpa denyut >2 menit (proses mati / restart) → FAILED
+  // resumable; klik Sync Pesanan di UI akan lanjut dari cursor tersimpan.
+  if (!g.__maxiusRunSweepTimer) {
+    const { sweepStaleOrderRuns } = await import("./lib/services/order-run.service");
+    g.__maxiusRunSweepTimer = unref(
+      setInterval(() => {
+        void sweepStaleOrderRuns()
+          .then((n) => {
+            if (n > 0) console.warn(`[OrderRun] ${n} run stale → FAILED (resumable)`);
+          })
+          .catch((e) => console.error("[OrderRun] sweep gagal:", e instanceof Error ? e.message : e));
+      }, RUN_SWEEP_MS)
+    );
+    console.log(`[OrderRun] sweep run stale aktif (tiap ${RUN_SWEEP_MS / 1000}dtk)`);
   }
 
   // --- Auto-sync order + listing/gambar ---
