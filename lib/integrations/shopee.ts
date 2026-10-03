@@ -496,6 +496,61 @@ export type ShopeeModel = {
   model_status?: string;
 };
 
+/**
+ * Stok dari get_model_list (atau base info utk item tanpa varian).
+ * Respons kini memakai `stock_info_v2` — { summary_info.total_available_stock,
+ * seller_stock[{location_id,stock}] }; `stock_info` lama (array per lokasi)
+ * tetap dibaca utk respons lawas.
+ * null = "tidak diketahui" (BERBEDA dari 0) — caller tidak boleh menulis stok.
+ */
+export function readStockInfo(raw: unknown): number | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+
+  const v2 = r.stock_info_v2;
+  if (v2 && typeof v2 === "object") {
+    const o = v2 as Record<string, unknown>;
+    const summary = o.summary_info;
+    if (summary && typeof summary === "object") {
+      const n = stockNumber((summary as Record<string, unknown>).total_available_stock);
+      if (n !== null) return n;
+    }
+    if (Array.isArray(o.seller_stock)) {
+      const total = sumStocks(o.seller_stock);
+      if (total !== null) return total;
+    }
+  }
+
+  const legacy = r.stock_info;
+  if (Array.isArray(legacy)) {
+    const total = sumStocks(legacy);
+    if (total !== null) return total;
+  }
+  return null;
+}
+
+function stockNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.max(0, Math.trunc(v));
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+    return Math.max(0, Math.trunc(Number(v)));
+  }
+  return null;
+}
+
+function sumStocks(entries: unknown[]): number | null {
+  let total = 0;
+  let seen = false;
+  for (const e of entries) {
+    if (!e || typeof e !== "object") continue;
+    const n = stockNumber((e as Record<string, unknown>).stock);
+    if (n !== null) {
+      total += n;
+      seen = true;
+    }
+  }
+  return seen ? total : null;
+}
+
 export async function getModelList(
   accessToken: string,
   shopId: string | number,

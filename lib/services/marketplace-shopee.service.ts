@@ -12,6 +12,7 @@ import {
   getItemList,
   getModelList,
   itemBaseImage,
+  readStockInfo,
   refreshAccessToken,
   updatePrice as apiUpdatePrice,
   updateStockBatch as apiUpdateStockBatch,
@@ -358,7 +359,12 @@ export async function syncShopeeListings(businessId: string): Promise<
               if (vid && !imageByVariant.has(vid)) imageByVariant.set(vid, image);
             }
           }
-          const touch = async (candidates: Array<string | undefined>, extraTitle: string | null, extraStatus: string | null) => {
+          const touch = async (
+            candidates: Array<string | undefined>,
+            extraTitle: string | null,
+            extraStatus: string | null,
+            stock?: number | null
+          ) => {
             for (const c of candidates) {
               if (!c) continue;
               const id = byChannelSku.get(c) ?? byChannelSku.get(`${itemId}:${c}`);
@@ -370,6 +376,10 @@ export async function syncShopeeListings(businessId: string): Promise<
                   platformTitle: extraTitle,
                   platformStatus: extraStatus,
                   platformStatusRaw: JSON.stringify(info).slice(0, 8000),
+                  // Refresh snapshot stok Shopee (tampilan "Stok" di halaman
+                  // Produk) — parser stock_info_v2; null = tak diketahui →
+                  // biarkan, JANGAN menulis 0.
+                  ...(stock != null ? { platformStock: stock } : {}),
                   lastSyncedAt: new Date(),
                 },
               });
@@ -379,13 +389,14 @@ export async function syncShopeeListings(businessId: string): Promise<
             return false;
           };
           if (models.length === 0) {
-            await touch([`${itemId}:0`, itemSku], title, status);
+            await touch([`${itemId}:0`, itemSku], title, status, readStockInfo(info));
           } else {
             for (const m of models) {
               await touch(
                 [`${itemId}:${m.model_id}`, m.model_sku],
                 title ? `${title} (${m.model_sku ?? m.model_id})` : (m.model_sku ?? null),
-                m.model_status ?? status
+                m.model_status ?? status,
+                readStockInfo(m)
               );
             }
           }

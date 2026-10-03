@@ -16,15 +16,16 @@
  *    yang sudah tertaut varian lain hanya di-refresh field platform-nya, dan
  *    mapping orphan (variantId NULL) sengaja dibiarkan ke panel orphan supaya
  *    user yang memutuskan master mana yang dipakai.
- *  - Stok awal diambil dari Shopee bila API melaporkannya (stock_info); tidak
- *    dilaporkan → 0 dan TIDAK dikarang jadi angka platform. Apapun nilainya
- *    SELALU dicatat StockLedger reason INIT supaya ada titik nol audit.
+ *  - Stok awal diambil dari Shopee bila API melaporkannya (stock_info_v2 /
+ *    stock_info); tidak dilaporkan → 0 dan TIDAK dikarang jadi angka platform.
+ *    Apapun nilainya SELALU dicatat StockLedger reason INIT supaya ada titik
+ *    nol audit.
  *  - Partial progress: limit item per proses + flag hasMore, jadi sisanya
  *    bisa dilanjutkan tanpa menarik ulang listing yang sudah diproses.
  */
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
-import { getItemBaseInfo, getItemList, getModelList, itemBaseImage } from "@/lib/integrations/shopee";
+import { getItemBaseInfo, getItemList, getModelList, itemBaseImage, readStockInfo } from "@/lib/integrations/shopee";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import {
@@ -78,26 +79,6 @@ function isPrismaUniqueError(e: unknown): boolean {
     "code" in e &&
     String((e as { code?: unknown }).code) === "P2002"
   );
-}
-
-/**
- * Stok per lokasi dari get_model_list. Field ini tidak dijamin ada di semua
- * status item / tier partner → null berarti "tidak diketahui", bukan 0.
- */
-function readStockInfo(raw: unknown): number | null {
-  if (typeof raw !== "object" || raw === null) return null;
-  const info = (raw as { stock_info?: unknown }).stock_info;
-  if (!Array.isArray(info) || info.length === 0) return null;
-  let total = 0;
-  let seen = false;
-  for (const entry of info) {
-    const n = Number((entry as { stock?: unknown } | null)?.stock);
-    if (Number.isFinite(n)) {
-      total += n;
-      seen = true;
-    }
-  }
-  return seen ? Math.max(0, Math.trunc(total)) : null;
 }
 
 function trimmed(value: string | null | undefined): string | null {
