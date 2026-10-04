@@ -247,7 +247,7 @@ export default function ProductCopyPage() {
         setError(json?.error ?? `Gagal menyimpan draft (${res.status}).`);
         return;
       }
-      showToast("success", "Draft produk berhasil disimpan.");
+      showToast("success", "Draf tersimpan di katalog pusat; belum diterbitkan ke toko. Selanjutnya periksa produk di Produk Master.");
       window.setTimeout(() => router.push("/products"), 1200);
     } catch (e) {
       console.error(e);
@@ -272,7 +272,12 @@ export default function ProductCopyPage() {
         <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
           Produk › Product Copy
         </p>
-        <h1 className="text-xl font-bold text-foreground">Copy Produk dari URL</h1>
+        <h1 className="text-xl font-bold text-foreground">Tambah Produk dari Tautan (Product Copy)</h1>
+      </div>
+
+      <div className="mb-4 space-y-1 text-sm text-muted-foreground">
+        <p>Disimpan sebagai draf di katalog pusat; belum diterbitkan ke toko.</p>
+        <p>Setelah menyimpan, periksa draf di Produk Master, lengkapi harga dan gambar, lalu hubungkan produk toko melalui Mapping Stok Terpusat.</p>
       </div>
 
       <div className="mb-6 flex items-start gap-3 bg-muted border border-border rounded-lg px-4 py-3 text-xs text-foreground">
@@ -316,7 +321,7 @@ export default function ProductCopyPage() {
         <div className="max-w-2xl">
           <div className="bg-card border border-border rounded-xl shadow-sm p-6">
             <label className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-1.5">
-              <Link2 size={15} /> URL Halaman Produk
+              <Link2 size={15} /> Tautan Halaman Produk (URL)
             </label>
             <p className="text-[11px] text-muted-foreground mb-3">
               Tempel link produk dari Shopee, Tokopedia, Tokopedia | Shop, atau situs lainnya.
@@ -341,14 +346,14 @@ export default function ProductCopyPage() {
             </div>
             {busy && (
               <p className="mt-3 text-xs text-muted-foreground flex items-center gap-2">
-                <Loader2 size={13} className="animate-spin" /> Mengambil & mem-parsing halaman…
+                <Loader2 size={13} className="animate-spin" /> Membaca data dari halaman produk…
               </p>
             )}
           </div>
           <div className="mt-4 bg-muted border border-border rounded-lg px-4 py-3 text-[11px] text-muted-foreground">
             Data yang diambil hanya yang tampil publik di halaman (judul, gambar, harga, deskripsi,
             dan varian bila tersedia). Stok diisi 0 bila tidak bisa dibaca — Anda memutakhirannya
-            sebelum menyimpan draft.
+            sebelum menyimpan draf.
           </div>
         </div>
       )}
@@ -478,7 +483,7 @@ export default function ProductCopyPage() {
                     </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground mb-4">
-                    Stok kosong/unknown diisi 0 secara otomatis — perbarui sebelum menyimpan.
+                    Stok kosong atau tidak diketahui diisi 0 secara otomatis — perbarui sebelum menyimpan.
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -523,7 +528,7 @@ export default function ProductCopyPage() {
                                 type="text"
                                 value={row.sku}
                                 onChange={(e) => updateVariantRow(i, { sku: e.target.value })}
-                                placeholder="kosongkan untuk generate otomatis"
+                                placeholder="kosongkan agar kode dibuat otomatis"
                                 className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                               />
                             </td>
@@ -564,7 +569,7 @@ export default function ProductCopyPage() {
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                {saving ? "Menyimpan…" : "Simpan sebagai Draft Produk"}
+                {saving ? "Menyimpan…" : "Simpan sebagai Draf (Draft) Produk"}
                 {!saving && <ArrowRight size={14} />}
               </button>
             </div>
