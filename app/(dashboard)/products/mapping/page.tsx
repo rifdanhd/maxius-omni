@@ -104,9 +104,7 @@ export default function ProductMappingPage() {
     const [m, v, storesRes] = await Promise.all([
       api<{ mappings: Mapping[] }>("/api/inventory/mappings"),
       api<{ variants: Variant[] }>("/api/inventory/variants"),
-      authFetch("/api/stores", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      }).then((r) => r.json()),
+      api<Store[]>("/api/stores"),
     ]);
     setMappings(m.mappings ?? []);
     setVariants(v.variants ?? []);
@@ -312,13 +310,13 @@ export default function ProductMappingPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setTab("riwayat"); loadLedger(); }}
+            onClick={() => { setTab("riwayat"); loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat.")); }}
             className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
             <History size={16} /> Riwayat Stok
           </button>
           <button
-            onClick={() => { loadAll(); loadLedger(); }}
+            onClick={() => { Promise.all([loadAll(), loadLedger(), loadOrphans()]).catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat ulang.")); }}
             className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
             <RefreshCw size={16} /> Muat Ulang
@@ -343,7 +341,7 @@ export default function ProductMappingPage() {
             <button
               key={t.id}
               data-testid={`mapping-tab-${t.id}`}
-              onClick={() => { setTab(t.id); if (t.id === "riwayat") loadLedger(); }}
+              onClick={() => { setTab(t.id); if (t.id === "riwayat") loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat.")); }}
               className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
                 tab === t.id ? "border-primary text-foreground" : "border-transparent text-foreground hover:text-foreground"
               }`}
@@ -796,7 +794,7 @@ export default function ProductMappingPage() {
         {loading ? (
           <div className="p-4 md:p-8 text-center text-muted-foreground">Memuat varian...</div>
         ) : variants.length === 0 ? (
-          <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada varian stok pusat.</div>
+          <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada variasi stok pusat. Buat melalui Produk Master atau pilih mode variasi baru pada formulir Hubungkan Produk.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -854,7 +852,7 @@ export default function ProductMappingPage() {
               <History size={16} className="text-foreground" />
               <h2 className="font-semibold text-foreground">Riwayat Perubahan Stok (stock_ledger)</h2>
             </div>
-            <button onClick={loadLedger} className="text-xs font-medium text-foreground hover:underline">
+            <button onClick={() => loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat."))} className="text-xs font-medium text-foreground hover:underline">
               Muat ulang
             </button>
           </div>
