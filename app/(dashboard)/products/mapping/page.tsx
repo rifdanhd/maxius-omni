@@ -303,11 +303,11 @@ export default function ProductMappingPage() {
     <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Mapping Stok Terpusat</h1>
+          <h1 className="text-xl font-bold text-foreground">Hubungkan Produk &amp; Stok (Mapping Stok Terpusat)</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gabungkan listing di tiap toko ke satu varian stok (sku_master). Produk yang belum
-            di-mapping tetap berdiri sendiri. Stok efektif yang tampil di marketplace =
-            stok total − stok aman.
+            Hubungkan produk di tiap toko ke satu variasi stok pusat (sku_master). Produk yang belum
+            dihubungkan tetap berdiri sendiri. Stok yang bisa dijual (Stok Efektif) =
+            stok total − stok cadangan (Stok Aman).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -335,8 +335,8 @@ export default function ProductMappingPage() {
         <div className="flex items-center overflow-x-auto px-4">
           {(
             [
-              { id: "mapping", label: "Mapping", count: mappings.length },
-              { id: "varian", label: "Varian (sku_master)", count: variants.length },
+              { id: "mapping", label: "Hubungan Produk (Mapping)", count: mappings.length },
+              { id: "varian", label: "Variasi Pusat (sku_master)", count: variants.length },
               { id: "riwayat", label: "Riwayat Stok", count: ledger.length },
             ] as const
           ).map((t) => (
@@ -369,7 +369,7 @@ export default function ProductMappingPage() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-border flex items-center gap-2">
           <Plus size={16} className="text-foreground" />
-          <h2 className="font-semibold text-foreground">Tambah Mapping</h2>
+          <h2 className="font-semibold text-foreground">Hubungkan Produk (Tambah Mapping)</h2>
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -386,7 +386,7 @@ export default function ProductMappingPage() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Channel SKU di Toko</label>
+            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Kode Produk di Toko (Channel SKU)</label>
             <input
               type="text"
               value={form.channelSku}
@@ -409,7 +409,7 @@ export default function ProductMappingPage() {
 
           {!form.useNewVariant ? (
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Varian Target</label>
+              <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Variasi Pusat Tujuan (Varian Target)</label>
               <select
                 value={form.variantId}
                 onChange={(e) => setForm((f) => ({ ...f, variantId: e.target.value }))}
@@ -436,7 +436,7 @@ export default function ProductMappingPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">SKU Varian</label>
+                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Kode Variasi (SKU)</label>
                 <input
                   type="text"
                   value={form.sku}
@@ -457,7 +457,7 @@ export default function ProductMappingPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Stok Aman</label>
+                  <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Stok Cadangan (Stok Aman)</label>
                   <input
                     type="number"
                     min="0"
@@ -476,7 +476,7 @@ export default function ProductMappingPage() {
               disabled={saving}
               className="flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60 transition-colors"
             >
-              <Link2 size={16} /> {saving ? "Menyimpan..." : "Simpan Mapping"}
+              <Link2 size={16} /> {saving ? "Menyimpan..." : "Simpan Hubungan (Mapping)"}
             </button>
           </div>
         </div>
@@ -488,7 +488,7 @@ export default function ProductMappingPage() {
           <div className="px-6 py-4 border-b border-border flex items-center gap-2">
             <AlertTriangle size={16} className="text-foreground" />
             <h2 className="font-semibold text-foreground">
-              SKU Order Belum Ter-mapping ({orphans.length})
+              Kode Produk Pesanan Belum Terhubung (SKU) ({orphans.length})
             </h2>
             <span className="text-xs text-muted-foreground">
               — muncul di order ({orphans.reduce((s, o) => s + o.qty, 0)} pcs) tapi belum punya varian stok pusat. Analytics belum menampilkan nama produknya.
@@ -508,7 +508,7 @@ export default function ProductMappingPage() {
                       </div>
                       <div className="text-xs text-muted-foreground mt-1 truncate max-w-[480px]">
                         {o.sampleProductName ?? "(nama listing tidak tersedia)"} · {o.accountLabel ?? "-"}
-                        {o.existingMappingId ? " · mapping sudah ada — pakai Ganti Varian/aksi di bawah untuk backfill" : ""}
+                        {o.existingMappingId ? " · hubungan sudah ada — gunakan Ganti Varian/aksi di bawah untuk melengkapi data pesanan lama (Backfill)" : ""}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -549,7 +549,7 @@ export default function ProductMappingPage() {
                         disabled={mapSaving === o.channelSku || !mapTarget[o.channelSku]}
                         className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                       >
-                        {mapSaving === o.channelSku ? "Menyimpan..." : "Mapping + Backfill"}
+                        {mapSaving === o.channelSku ? "Menyimpan..." : "Hubungkan & Lengkapi Pesanan Lama (Mapping + Backfill)"}
                       </button>
                     </div>
                   ) : (
@@ -566,7 +566,7 @@ export default function ProductMappingPage() {
                         disabled={mapSaving === o.channelSku || !newName[o.channelSku]?.trim()}
                         className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                       >
-                        {mapSaving === o.channelSku ? "Menyimpan..." : "Buat Master + Mapping"}
+                        {mapSaving === o.channelSku ? "Menyimpan..." : "Buat Produk Pusat & Hubungkan (Master + Mapping)"}
                       </button>
                       <span className="text-xs text-muted-foreground">Stok awal 0 — isi lewat “Sesuaikan Stok” setelah ini.</span>
                     </div>
@@ -582,20 +582,20 @@ export default function ProductMappingPage() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-border flex items-center gap-2">
           <Boxes size={16} className="text-foreground" />
-          <h2 className="font-semibold text-foreground">Daftar Mapping ({mappings.length})</h2>
+          <h2 className="font-semibold text-foreground">Daftar Hubungan Produk (Mapping) ({mappings.length})</h2>
         </div>
         {loading ? (
           <div className="p-4 md:p-8 text-center text-muted-foreground">Memuat mapping...</div>
         ) : mappings.length === 0 ? (
-          <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada mapping. Tambahkan di atas.</div>
+          <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada hubungan produk (Mapping). Pilih toko dan variasi pusat melalui formulir di atas.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <th className="px-6 py-3">Toko</th>
-                  <th className="px-6 py-3">Channel SKU</th>
-                  <th className="px-6 py-3">Produk / Varian (sku_master)</th>
+                  <th className="px-6 py-3">Kode Produk di Toko (Channel SKU)</th>
+                  <th className="px-6 py-3">Produk / Variasi Pusat (sku_master)</th>
                   <th className="px-6 py-3">Stok</th>
                   <th className="px-6 py-3 text-right">Aksi</th>
                 </tr>
@@ -666,7 +666,7 @@ export default function ProductMappingPage() {
                           <button
                             onClick={() => setRepoint((p) => ({ ...p, [m.id]: variants[0]?.id ?? "" }))}
                             className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-                            title="Ganti varian target tanpa migrasi"
+                            title="Ganti variasi pusat yang dihubungkan (Varian Target)"
                           >
                             Ganti Varian
                           </button>
@@ -695,7 +695,7 @@ export default function ProductMappingPage() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-border flex items-center gap-2">
           <Boxes size={16} className="text-foreground" />
-          <h2 className="font-semibold text-foreground">Daftar Varian (sku_master)</h2>
+          <h2 className="font-semibold text-foreground">Daftar Variasi Pusat (sku_master)</h2>
         </div>
         {stockInVariant && (
           <div className="p-6 border-b border-border bg-muted/50">
@@ -852,7 +852,7 @@ export default function ProductMappingPage() {
           <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <History size={16} className="text-foreground" />
-              <h2 className="font-semibold text-foreground">Riwayat Stok (stock_ledger)</h2>
+              <h2 className="font-semibold text-foreground">Riwayat Perubahan Stok (stock_ledger)</h2>
             </div>
             <button onClick={loadLedger} className="text-xs font-medium text-foreground hover:underline">
               Muat ulang
