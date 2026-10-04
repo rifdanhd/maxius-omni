@@ -399,7 +399,7 @@ export async function getOrderDetail(
       order_sn_list: sns.slice(i, i + batchSize),
       // Field yang dibaca createShopeeOrder (wajib diminta — selain ini default).
       response_optional_fields:
-        "buyer_username,note,recipient_address,item_list,pay_time,package_list,payment_method,total_amount",
+        "buyer_username,note,recipient_address,item_list,pay_time,package_list,shipping_carrier,payment_method,total_amount",
     });
     out.push(...((r.order_list as Array<Record<string, unknown>> | undefined) ?? []));
   }

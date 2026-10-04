@@ -71,16 +71,30 @@ async function syncShopeeShipments(
   db: { shipment: typeof defaultPrisma.shipment },
   orderId: string,
   accountId: string,
-  packagesRaw: Array<Record<string, unknown>>
+  packagesRaw: Array<Record<string, unknown>>,
+  orderCarrier: string | null = null
 ): Promise<void> {
-  for (const pkg of packagesRaw) {
+  const pendingId = `shopee-carrier-${crypto.createHash("sha256").update(`${accountId}:${orderId}`).digest("hex")}`;
+  const packages = packagesRaw.filter((pkg) => s(pkg.package_number));
+  if (packages.length === 0) {
+    if (orderCarrier) {
+      await db.shipment.upsert({
+        where: { id: pendingId },
+        create: { id: pendingId, orderId, accountId, externalId: null, carrier: orderCarrier, status: "PACKAGED" },
+        update: { carrier: orderCarrier },
+      });
+    }
+    return;
+  }
+  const pending = await db.shipment.findUnique({ where: { id: pendingId }, select: { carrier: true } });
+  for (const pkg of packages) {
     const externalId = s(pkg.package_number);
     if (!externalId) continue;
     const existing = await db.shipment.findUnique({
       where: { accountId_orderId_externalId: { accountId, orderId, externalId } },
       select: { carrier: true, trackingNo: true, status: true, shippedAt: true },
     });
-    const carrier = s(pkg.shipping_provider) ?? s(pkg.shipping_provider_name) ?? existing?.carrier ?? null;
+    const carrier = s(pkg.shipping_provider) ?? s(pkg.shipping_provider_name) ?? orderCarrier ?? existing?.carrier ?? pending?.carrier ?? null;
     const trackingNo = s(pkg.tracking_number) ?? existing?.trackingNo ?? null;
     const status = s(pkg.logistics_status) ?? existing?.status ?? "PACKAGED";
     const shippedAt = existing?.shippedAt ?? null;
@@ -90,6 +104,23 @@ async function syncShopeeShipments(
       update: { carrier, trackingNo, status, shippedAt },
     });
   }
+  await db.shipment.deleteMany({ where: { id: pendingId, accountId, orderId, externalId: null } });
+}
+
+export async function refreshShopeeOrderShipment(accountId: string, orderSn: string): Promise<void> {
+  const account = await defaultPrisma.platformAccount.findUnique({
+    where: { id: accountId },
+    select: { platform: true, accessToken: true, externalShopId: true, isFrozen: true },
+  });
+  if (!account || account.platform !== "SHOPEE" || account.isFrozen || !account.accessToken || !account.externalShopId) return;
+  const mapping = await defaultPrisma.platformOrderMapping.findUnique({
+    where: { accountId_externalOrderId: { accountId, externalOrderId: orderSn } },
+    select: { orderId: true },
+  });
+  if (!mapping) return;
+  const [detail] = await getOrderDetail(account.accessToken, account.externalShopId, [orderSn]);
+  if (!detail) return;
+  await syncShopeeShipments(defaultPrisma, mapping.orderId, accountId, arr(detail.packages ?? detail.package_list), s(detail.shipping_carrier));
 }
 
 /**
@@ -201,7 +232,7 @@ export async function createShopeeOrder(
         accountId,
       },
     });
-    await syncShopeeShipments(tx, created.id, accountId, packagesRaw);
+    await syncShopeeShipments(tx, created.id, accountId, packagesRaw, s(detail.shipping_carrier));
     return created;
   });
 
@@ -321,6 +352,7 @@ export async function ingestShopeeOrderSummaries(
 ): Promise<void> {
   // A4 — order yang sudah ada: refresh status saja (progress-only).
   const newSns: string[] = [];
+  const shipmentOrders = new Map<string, string>();
   for (const sum of summaries) {
     const sn = s(sum.order_sn);
     if (!sn) continue;
@@ -339,6 +371,10 @@ export async function ingestShopeeOrderSummaries(
       continue;
     }
     result.skipped += 1;
+    const currentStatus = canonicalShopeeStatus(rawStatus ?? existing.rawStatus ?? "UNKNOWN");
+    if (["ON_HOLD", "AWAITING_SHIPMENT", "AWAITING_COLLECTION", "PARTIALLY_SHIPPING", "IN_TRANSIT"].includes(currentStatus)) {
+      shipmentOrders.set(sn, existing.orderId);
+    }
     if (!rawStatus || rawStatus === existing.rawStatus) continue;
 
     const canonical = canonicalShopeeStatus(rawStatus);
@@ -363,19 +399,28 @@ export async function ingestShopeeOrderSummaries(
   }
 
   // Order baru — detail lalu create + efek stok (A1).
-  if (newSns.length > 0) {
+  const detailSns = [...new Set([...newSns, ...shipmentOrders.keys()])];
+  if (detailSns.length > 0) {
     let details: Array<Record<string, unknown>> = [];
     try {
-      details = await getOrderDetail(accessToken, shopId, newSns);
+      details = await getOrderDetail(accessToken, shopId, detailSns);
     } catch (e) {
       const message = `get_order_detail: ${errMsg(e)}`;
       result.errors.push(message);
-      await logOrderSyncError(prisma, accountId, message, { orderSns: newSns });
+      await logOrderSyncError(prisma, accountId, message, { orderSns: detailSns });
     }
     const bySn = new Map<string, Record<string, unknown>>();
     for (const d of details) {
       const sn = s(d.order_sn);
       if (sn) bySn.set(sn, d);
+      const orderId = sn ? shipmentOrders.get(sn) : undefined;
+      if (orderId) {
+        try {
+          await syncShopeeShipments(prisma, orderId, accountId, arr(d.packages ?? d.package_list), s(d.shipping_carrier));
+        } catch (e) {
+          result.errors.push(`${sn}: refresh kurir gagal (${errMsg(e)})`);
+        }
+      }
     }
     for (const sn of newSns) {
       const detail = bySn.get(sn);

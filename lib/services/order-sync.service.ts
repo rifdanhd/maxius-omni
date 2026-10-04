@@ -54,6 +54,8 @@ export type OrderRaw = {
   recipient_address?: RecipientAddressRaw | null;
   line_items?: LineItemRaw[];
   packages?: Array<Record<string, unknown>>;
+  shipping_provider?: string;
+  shipping_provider_name?: string;
   payment?: Record<string, string | number> | null;
 };
 
@@ -107,7 +109,8 @@ async function syncShipments(
   db: { shipment: typeof defaultPrisma.shipment },
   orderId: string,
   accountId: string,
-  packagesRaw: Array<Record<string, unknown>> | undefined
+  packagesRaw: Array<Record<string, unknown>> | undefined,
+  orderCarrier?: string
 ) {
   for (const pkg of packagesRaw ?? []) {
     const externalId = pkg.id !== undefined ? String(pkg.id) : "";
@@ -118,6 +121,7 @@ async function syncShipments(
     const payloadCarrier =
       (pkg.shipping_provider_name as string) ||
       (pkg.shipping_provider as string) ||
+      orderCarrier ||
       null;
     const payloadTrackingNo = (pkg.tracking_number as string) ?? null;
     const payloadStatus = (pkg.package_status as string) ?? "PACKAGED";
@@ -277,7 +281,7 @@ export async function ingestTikTokOrdersPage(
             recommendedShippingTime: toDate(raw.recommended_shipping_time),
           },
         });
-        await syncShipments(prisma, existing.orderId, accountId, raw.packages);
+        await syncShipments(prisma, existing.orderId, accountId, raw.packages, raw.shipping_provider_name || raw.shipping_provider);
         // Central stock: order yang "lahir" atau refresh ke AWAITING_SHIPMENT
         // ikut memotong stok gudang. Idempoten via StockLedger (reason ORDER).
         if (raw.status === "AWAITING_SHIPMENT") {
@@ -399,7 +403,7 @@ export async function ingestTikTokOrdersPage(
             accountId,
           },
         });
-        await syncShipments(tx, order.id, accountId, raw.packages);
+        await syncShipments(tx, order.id, accountId, raw.packages, raw.shipping_provider_name || raw.shipping_provider);
       });
 
       // Backfill gambar produk master dari gambar line item platform

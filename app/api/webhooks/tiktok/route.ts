@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/central-stock.service";
 import { resolveTiktokCreds } from "@/lib/services/app-credential.service";
 import { upsertTikTokReturn } from "@/lib/services/return-ingest.service";
+import { reconcileShipmentTracking, NON_FINAL_ORDER_STATUSES } from "@/lib/services/shipment-reconcile.service";
 
 async function listActiveTiktokSecrets(): Promise<Array<{ appKey: string; appSecret: string }>> {
   const rows = await prisma.appCredential.findMany({
@@ -262,6 +263,16 @@ async function handleOrderStatusChange(
   if (lastWebhook === null) {
     // Webhook pertama. Skip hanya bila status juga sudah sama (duplikat retry).
     if (mapping.rawStatus === orderStatus) {
+      try {
+        if (NON_FINAL_ORDER_STATUSES.includes(orderStatus)) {
+          const result = await reconcileShipmentTracking(accountId, mapping.orderId);
+          if (result.errors.length) {
+            await logSync({ accountId, kind: "shipment_sync", status: "error", errorMessage: result.errors.join("; "), payload: rawBody });
+          }
+        }
+      } catch (e) {
+        await logSync({ accountId, kind: "shipment_sync", status: "error", errorMessage: e instanceof Error ? e.message : String(e), payload: rawBody });
+      }
       await logSync({
         accountId,
         kind: "order_status_change",
@@ -394,6 +405,16 @@ async function handleOrderStatusChange(
     message: `${externalOrderId}: ${mapping.rawStatus} -> ${orderStatus}`,
     payload: rawBody,
   });
+  if (NON_FINAL_ORDER_STATUSES.includes(orderStatus)) {
+    try {
+      const result = await reconcileShipmentTracking(accountId, mapping.orderId);
+      if (result.errors.length) {
+        await logSync({ accountId, kind: "shipment_sync", status: "error", errorMessage: result.errors.join("; "), payload: rawBody });
+      }
+    } catch (e) {
+      await logSync({ accountId, kind: "shipment_sync", status: "error", errorMessage: e instanceof Error ? e.message : String(e), payload: rawBody });
+    }
+  }
 }
 
 /**

@@ -39,14 +39,16 @@ export type ReconcileResult = {
  *                  TikTok (guard: order/token Shopee tidak boleh menyentuh API TikTok).
  */
 export async function reconcileShipmentTracking(
-  accountId: string
+  accountId: string,
+  orderId?: string
 ): Promise<ReconcileResult> {
   const shipments = await prisma.shipment.findMany({
     where: {
       accountId,
+      ...(orderId ? { orderId } : {}),
       account: { platform: "TIKTOK_SHOP" },
       externalId: { not: null },
-      OR: [{ trackingNo: null }, { trackingNo: "" }],
+      OR: [{ trackingNo: null }, { trackingNo: "" }, { carrier: null }, { carrier: "" }],
       order: { status: { in: NON_FINAL_ORDER_STATUSES } },
     },
     include: {
@@ -67,7 +69,7 @@ export async function reconcileShipmentTracking(
         s.externalId
       );
 
-      if (!detail.trackingNumber) {
+      if (!detail.trackingNumber && !detail.providerName) {
         result.noTracking += 1;
         continue;
       }
@@ -76,15 +78,15 @@ export async function reconcileShipmentTracking(
         prisma.shipment.updateMany({
           where: { id: s.id },
           data: {
-            trackingNo: detail.trackingNumber,
-            carrier: detail.providerName,
+            trackingNo: detail.trackingNumber || s.trackingNo,
+            carrier: detail.providerName || s.carrier,
             status: detail.status ?? s.status,
-            shippedAt: s.shippedAt ?? new Date(),
+            shippedAt: s.shippedAt ?? (detail.trackingNumber ? new Date() : null),
           },
         }),
         // Naikkan status order hanya bila package sudah maju & order masih
         // tertahan di AWAITING_SHIPMENT. Never downgrade.
-        ...(detail.status && s.order.status === "AWAITING_SHIPMENT" && ORDER_STATUS_FROM_PACKAGE[detail.status]
+        ...(detail.trackingNumber && detail.status && s.order.status === "AWAITING_SHIPMENT" && ORDER_STATUS_FROM_PACKAGE[detail.status]
           ? [
               prisma.order.update({
                 where: { id: s.order.id },

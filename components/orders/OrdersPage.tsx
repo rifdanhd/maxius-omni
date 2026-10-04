@@ -153,7 +153,10 @@ function toCardOrder(o: Order) {
     : "-";
   const storeName = o.account?.label ?? "-";
   const platform = PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-";
-  const shipment = o.shipments?.[0] ?? null;
+  const shipment = o.shipments?.find((s) => s.trackingNo?.trim())
+    ?? o.shipments?.find((s) => s.carrier?.trim())
+    ?? o.shipments?.[0]
+    ?? null;
 
   return {
     id: o.id,
@@ -435,9 +438,14 @@ export default function OrdersPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
+    let inFlight = false;
+    const load = async (silent = false) => {
+      if (inFlight) return;
+      inFlight = true;
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const data = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
         if (cancelled) return;
@@ -445,17 +453,26 @@ export default function OrdersPage() {
         setTotal(data.total ?? 0);
         setPageCount(data.pageCount ?? 1);
         setCounts(data.counts ?? {});
-        setSelected(new Set());
+        if (!silent) setSelected(new Set());
       } catch (e) {
         console.error(e);
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Terjadi kesalahan saat memuat pesanan.");
+        if (!silent) setError(e instanceof Error ? e.message : "Terjadi kesalahan saat memuat pesanan.");
       } finally {
-        if (!cancelled) setLoading(false);
+        inFlight = false;
+        if (!cancelled && !silent) setLoading(false);
       }
-    })();
+    };
+    void load();
+    const refresh = () => {
+      if (!document.hidden) void load(true);
+    };
+    const timer = setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
     return () => {
       cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
     };
   }, [page, currentTab, currentSubTab, q, searchType.id, sort, from, to, fetchOrders]);
 

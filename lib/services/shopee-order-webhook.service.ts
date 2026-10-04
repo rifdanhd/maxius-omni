@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { applyShopeeStockEffectsForStatus, canonicalShopeeStatus } from "@/lib/services/shopee-order-status.service";
-import { ingestShopeeOrderBySn } from "@/lib/services/shopee-order-sync.service";
+import { ingestShopeeOrderBySn, refreshShopeeOrderShipment } from "@/lib/services/shopee-order-sync.service";
 
 /** Jejak push/efek ke SyncLog (arahan "in"). Bentuk baris sama seperti sebelumnya. */
 export async function logShopeeSync(params: {
@@ -66,10 +66,10 @@ export async function handleShopeeOrderUpdate(
   data: Record<string, unknown>
 ): Promise<void> {
   const externalOrderId =
-    data.order_sn !== undefined && data.order_sn !== null ? String(data.order_sn) : null;
+    data.order_sn != null || data.ordersn != null ? String(data.order_sn ?? data.ordersn) : null;
   const orderStatus =
-    data.order_status !== undefined && data.order_status !== null
-      ? String(data.order_status)
+    data.order_status != null || data.status != null
+      ? String(data.order_status ?? data.status)
       : null;
   const updateTime = Number(data.update_time ?? NaN);
 
@@ -137,6 +137,13 @@ export async function handleShopeeOrderUpdate(
     const lastWebhook = mapping.lastWebhookUpdateTime;
     if (lastWebhook === null) {
       if (mapping.rawStatus === orderStatus) {
+        try {
+          if (["ON_HOLD", "AWAITING_SHIPMENT", "AWAITING_COLLECTION", "PARTIALLY_SHIPPING", "IN_TRANSIT"].includes(canonicalShopeeStatus(orderStatus))) {
+            await refreshShopeeOrderShipment(accountId, externalOrderId);
+          }
+        } catch (e) {
+          await logShopeeSync({ accountId, kind: "shipment_sync", status: "error", errorMessage: e instanceof Error ? e.message : String(e), payload: rawBody });
+        }
         await logShopeeSync({
           accountId,
           kind: "order_status_change",
@@ -201,4 +208,11 @@ export async function handleShopeeOrderUpdate(
     message: `${externalOrderId}: ${mapping.rawStatus} -> ${orderStatus} (${canonical})`,
     payload: rawBody,
   });
+  if (["ON_HOLD", "AWAITING_SHIPMENT", "AWAITING_COLLECTION", "PARTIALLY_SHIPPING", "IN_TRANSIT"].includes(canonical)) {
+    try {
+      await refreshShopeeOrderShipment(accountId, externalOrderId);
+    } catch (e) {
+      await logShopeeSync({ accountId, kind: "shipment_sync", status: "error", errorMessage: e instanceof Error ? e.message : String(e), payload: rawBody });
+    }
+  }
 }
