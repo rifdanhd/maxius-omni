@@ -50,6 +50,9 @@ test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => 
   await page.goto('/products/mapping');
   await expect(page.getByRole('heading', { name: 'Mapping Stok Terpusat' })).toBeVisible({ timeout: 30_000 });
 
+  // Daftar varian kini di tab terpisah.
+  await page.getByTestId('mapping-tab-varian').click();
+
   // Baris varian seed (SKU unik).
   const row = page.locator('tbody tr', { hasText: SKU }).first();
   await expect(row).toBeVisible({ timeout: 15_000 });
@@ -69,7 +72,7 @@ test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => 
   await expect(row).toContainText('2', { timeout: 15_000 });
 
   // 3. Riwayat Stok memuat baris STOCK_IN +2.
-  await page.getByRole('button', { name: 'Riwayat Stok' }).click();
+  await page.getByTestId('mapping-tab-riwayat').click();
   await expect(page.getByText('Riwayat Stok (stock_ledger)')).toBeVisible({ timeout: 15_000 });
   const ledgerRow = page.locator('tbody tr', { hasText: SKU }).filter({ hasText: 'STOCK_IN' }).first();
   await expect(ledgerRow).toBeVisible({ timeout: 15_000 });

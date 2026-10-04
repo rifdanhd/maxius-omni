@@ -80,7 +80,7 @@ export default function ProductMappingPage() {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [showLedger, setShowLedger] = useState(false);
+  const [tab, setTab] = useState<"mapping" | "varian" | "riwayat">("mapping");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -312,7 +312,7 @@ export default function ProductMappingPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setShowLedger((s) => !s); if (!showLedger) loadLedger(); }}
+            onClick={() => { setTab("riwayat"); loadLedger(); }}
             className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             <History size={16} /> Riwayat Stok
@@ -330,6 +330,41 @@ export default function ProductMappingPage() {
         <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">{error}</div>
       )}
 
+      {/* Tab — daftar panjang (ribuan baris) dipisah jadi 3 tampilan */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div className="flex items-center overflow-x-auto px-4">
+          {(
+            [
+              { id: "mapping", label: "Mapping", count: mappings.length },
+              { id: "varian", label: "Varian (sku_master)", count: variants.length },
+              { id: "riwayat", label: "Riwayat Stok", count: ledger.length },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              data-testid={`mapping-tab-${t.id}`}
+              onClick={() => { setTab(t.id); if (t.id === "riwayat") loadLedger(); }}
+              className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                tab === t.id ? "border-gray-900 text-gray-900" : "border-transparent text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {t.label}
+              {t.count > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    tab === t.id ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "mapping" && (
+        <>
       {/* Tambah Mapping */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
@@ -651,7 +686,11 @@ export default function ProductMappingPage() {
           </div>
         )}
       </div>
+        </>
+      )}
 
+      {tab === "varian" && (
+        <>
       {/* Daftar Varian (sku_master) + Sesuaikan Stok */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
@@ -804,9 +843,11 @@ export default function ProductMappingPage() {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Riwayat Stok */}
-      {showLedger && (
+      {tab === "riwayat" && (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
