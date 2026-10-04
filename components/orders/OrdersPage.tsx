@@ -20,17 +20,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZES = [20, 50, 100, 250, 500, 1000];
 
 const TABS: { id: string; label: string; statuses: string[] | null }[] = [
   { id: "all", label: "Semua Pesanan", statuses: null },
   { id: "unpaid", label: "Belum Dibayar", statuses: ["UNPAID"] },
   // ON_HOLD = pembayaran masuk & sedang dicek; belum wajib kirim.
-  { id: "new", label: "Pesanan Baru", statuses: ["ON_HOLD"] },
-  { id: "ready", label: "Siap Dikirim", statuses: ["AWAITING_SHIPMENT"] },
+  { id: "new", label: "Pembayaran Sedang Diperiksa", statuses: ["ON_HOLD"] },
+  { id: "ready", label: "Perlu Diproses", statuses: ["AWAITING_SHIPMENT"] },
   {
     id: "shipped",
-    label: "Dikirim",
+    label: "Pengiriman",
     statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT"],
   },
   { id: "completed", label: "Selesai", statuses: ["DELIVERED", "COMPLETED"] },
@@ -42,35 +42,28 @@ const TABS: { id: string; label: string; statuses: string[] | null }[] = [
 // Sub-tab untuk tab yang memiliki sub-kategori status
 type SubTab = { id: string; label: string; statuses: string[] };
 const SUB_TABS: Record<string, SubTab[]> = {
-  ready: [
-    { id: "all", label: "Semua", statuses: ["AWAITING_SHIPMENT"] },
-    { id: "need_process", label: "Perlu Diproses", statuses: ["AWAITING_SHIPMENT"] },
-    { id: "processing", label: "Diproses", statuses: ["AWAITING_SHIPMENT"] },
-    { id: "processed", label: "Telah Diproses", statuses: ["AWAITING_SHIPMENT"] },
-  ],
   shipped: [
     { id: "all", label: "Semua", statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT"] },
     { id: "in_transit", label: "Dalam Pengiriman", statuses: ["IN_TRANSIT", "PARTIALLY_SHIPPING"] },
-    { id: "delivered", label: "Telah Dikirim", statuses: ["AWAITING_COLLECTION"] },
-    { id: "failed", label: "Pengiriman Gagal", statuses: [] },
+    { id: "delivered", label: "Menunggu Diambil Kurir", statuses: ["AWAITING_COLLECTION"] },
   ],
 };
 
-const SORT_OPTIONS: { id: string; label: string; field: "createTime" | "amount"; dir: "desc" | "asc" }[] = [
-  { id: "status_new", label: "Status Pesanan Terbaru", field: "createTime", dir: "desc" },
-  { id: "status_old", label: "Status Pesanan Terlama", field: "createTime", dir: "asc" },
-  { id: "newest", label: "Tanggal Pesanan Terbaru hingga Terlama", field: "createTime", dir: "desc" },
-  { id: "oldest", label: "Tanggal Pesanan Terlama hingga Terbaru", field: "createTime", dir: "asc" },
-  { id: "courier_az", label: "Kurir: A-Z", field: "amount", dir: "asc" },
-  { id: "courier_za", label: "Kurir: Z-A", field: "amount", dir: "desc" },
-  { id: "deadline_new", label: "Batas Waktu Pengiriman Terbaru hingga Terlama", field: "amount", dir: "desc" },
-  { id: "deadline_old", label: "Batas Waktu Pengiriman Terlama hingga Terbaru", field: "amount", dir: "asc" },
+const SORT_OPTIONS: { id: string; label: string; field: "createTime" | "amount" | "shippingDueTime"; dir: "desc" | "asc" }[] = [
+  { id: "newest", label: "Tanggal Pesanan: Terbaru", field: "createTime", dir: "desc" },
+  { id: "oldest", label: "Tanggal Pesanan: Terlama", field: "createTime", dir: "asc" },
+  { id: "amount_low", label: "Nilai Pesanan: Terendah", field: "amount", dir: "asc" },
+  { id: "amount_high", label: "Nilai Pesanan: Tertinggi", field: "amount", dir: "desc" },
+  { id: "deadline_soon", label: "Batas Kirim: Paling Dekat", field: "shippingDueTime", dir: "asc" },
+  { id: "deadline_late", label: "Batas Kirim: Paling Jauh", field: "shippingDueTime", dir: "desc" },
 ];
 
 type OrderItem = {
   id: string;
   channelSku: string;
   productId: string | null;
+  productName?: string | null;
+  skuName?: string | null;
   imageUrl: string | null;
   qty: number;
   price: number | null;
@@ -145,15 +138,15 @@ function formatPrice(value: number | null | undefined, fallback = "-") {
 function toCardOrder(o: Order) {
   const totalQty = o.items.reduce((acc, it) => acc + it.qty, 0);
   const first = o.items[0];
-  const productName = first?.variant?.masterProduct?.name ?? first?.productId ?? "-";
-  const productVariant = first?.variant?.sku ?? `SKU ${first?.channelSku ?? "-"}`;
+  const productName = first?.variant?.masterProduct?.name ?? first?.productName ?? first?.productId ?? "-";
+  const productVariant = first?.skuName ?? first?.variant?.sku ?? `SKU ${first?.channelSku ?? "-"}`;
   const price = formatPrice(first?.price, "");
   const orderDate = o.createTime
     ? new Date(o.createTime).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })
     : "-";
   const storeName = o.account?.label ?? "-";
   const platform = PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-";
-  const shipment = o.shipments?.[0] ?? null;
+  const shipment = o.shipments?.find((s) => s.trackingNo) ?? o.shipments?.find((s) => s.carrier) ?? o.shipments?.[0] ?? null;
 
   return {
     id: o.id,
@@ -177,11 +170,11 @@ function toCardOrder(o: Order) {
     courier: shipment?.carrier ?? "-",
     trackingNumber: shipment?.trackingNo ?? "-",
     buyerNote: null,
-    pickupLocation: "Master Warehouse",
+    pickupLocation: null,
     fulfillmentStage: null,
     shippingDueTime: o.shippingDueTime,
     items: o.items.map((it) => ({
-      name: it.variant?.masterProduct?.name ?? it.productId ?? "-",
+      name: it.variant?.masterProduct?.name ?? it.productName ?? it.productId ?? "-",
       variant: it.variant?.sku ?? `SKU ${it.channelSku}`,
       qty: it.qty,
       price: formatPrice(it.price, "Rp 0"),
@@ -204,7 +197,7 @@ function toPrintable(o: Order): PrintableOrder {
       ? new Date(o.createTime).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })
       : "-",
     items: o.items.map((it) => ({
-      name: it.variant?.masterProduct?.name ?? it.productId ?? "-",
+      name: it.variant?.masterProduct?.name ?? it.productName ?? it.productId ?? "-",
       variant: it.variant?.sku ?? `SKU ${it.channelSku}`,
       qty: it.qty,
       price: formatPrice(it.price, "Rp 0"),
@@ -254,7 +247,7 @@ async function fetchOfficialLabel(
 }
 
 function toPrintableFromDetail(o: OrderDetail): PrintableOrder {
-  const shipment = o.shipments[0];
+  const shipment = o.shipments.find((s) => s.trackingNo) ?? o.shipments.find((s) => s.carrier) ?? o.shipments[0];
   return {
     id: "",
     orderNo: o.orderNo,
@@ -296,7 +289,7 @@ function toExportRow(o: Order): ExportOrderRow {
       : "-",
     qty: o.items.reduce((acc, it) => acc + it.qty, 0),
     products: o.items
-      .map((it) => it.variant?.masterProduct?.name ?? it.productId ?? it.channelSku)
+      .map((it) => it.variant?.masterProduct?.name ?? it.productName ?? it.productId ?? it.channelSku)
       .join("; "),
   };
 }
@@ -319,6 +312,7 @@ function toPickupOrder(o: Order): RequestPickupOrder {
 
 function buildQueryParams(input: {
   page: number;
+  pageSize: number;
   tab: { id: string; statuses: string[] | null };
   q: string;
   searchType: string;
@@ -328,7 +322,7 @@ function buildQueryParams(input: {
 }) {
   const params = new URLSearchParams();
   params.set("page", String(input.page));
-  params.set("pageSize", String(PAGE_SIZE));
+  params.set("pageSize", String(input.pageSize));
   const statuses = input.tab.statuses;
   if (statuses !== null) params.set("status", statuses.join(","));
   if (input.q.trim()) {
@@ -390,6 +384,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(1000);
   const [total, setTotal] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -420,7 +415,7 @@ export default function OrdersPage() {
       const effectiveTab = opts.subTab && opts.subTab.id !== "all"
         ? { id: opts.tab.id, label: opts.tab.label, statuses: opts.subTab.statuses }
         : opts.tab;
-      const query = buildQueryParams({ ...opts, tab: effectiveTab });
+      const query = buildQueryParams({ ...opts, pageSize, tab: effectiveTab });
       const res = await authFetch(`/api/orders?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -428,7 +423,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data;
     },
-    []
+    [pageSize]
   );
 
   useEffect(() => {
@@ -458,6 +453,7 @@ export default function OrdersPage() {
   }, [page, currentTab, currentSubTab, q, searchType.id, sort, from, to, fetchOrders]);
 
   const handleTab = (id: string) => {
+    if (id === "returned") { router.push("/orders/returns"); return; }
     setActiveTab(id);
     setActiveSubTab("all");
     setPage(1);
@@ -558,7 +554,7 @@ export default function OrdersPage() {
         if (last?.status === "DONE") {
           alert(`Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
         } else if (last?.status === "FAILED") {
-          alert(`Sync gagal: ${last.error ?? "-"}\n\nKlik "Sync Pesanan" untuk lanjut dari posisi terakhir.`);
+          alert(`Sync gagal: ${last.error ?? "-"}\n\nKlik "Perbarui Pesanan (Sync)" untuk lanjut dari posisi terakhir.`);
         }
         void refreshList().catch((e) => console.error(e));
       }
@@ -764,6 +760,8 @@ export default function OrdersPage() {
           printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
           return;
         }
+        alert("Label resmi TikTok belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
+        return;
       }
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {
@@ -853,14 +851,14 @@ export default function OrdersPage() {
     <div className="p-6 font-sans h-full flex flex-col">
       {/* Page Header */}
       <PageHeader
-        title="Pesanan"
-        description="Kelola pesanan dari semua marketplace — sync, proses pengiriman, cetak label/resi."
+        title="Kelola Pesanan"
+        description="Kelola pesanan lintas toko; mulai dengan Perbarui Pesanan, pilih Perlu Diproses, atur pengiriman, lalu cetak resi dan daftar isi paket sebelum menyerahkan barang ke kurir."
         action={
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Arsip">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button disabled title="Arsip belum tersedia" variant="ghost" size="icon" className="h-9 w-9" aria-label="Arsip">
               <Archive size={18} />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Email">
+            <Button disabled title="Email belum tersedia" variant="ghost" size="icon" className="h-9 w-9" aria-label="Email">
               <Mail size={18} />
             </Button>
             <Button
@@ -869,7 +867,7 @@ export default function OrdersPage() {
               className="gap-2"
             >
               <RefreshCw size={16} className={syncing || bgActive ? "animate-spin" : ""} />
-              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Sync Pesanan"}
+              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Perbarui Pesanan (Sync)"}
             </Button>
             <Button
               variant="outline"
@@ -878,10 +876,10 @@ export default function OrdersPage() {
               className="gap-2 text-foreground border-border hover:bg-muted"
             >
               <RefreshCw size={16} className={reconciling ? "animate-spin" : ""} />
-              {reconciling ? "Menyinkronkan Resi..." : "Sync Resi"}
+              {reconciling ? "Menyinkronkan Resi..." : "Lengkapi Data Resi (Sync)"}
             </Button>
             <Button variant="outline" onClick={handleExportVisible} className="gap-2">
-              Unduh CSV <ChevronDown size={16} />
+              Unduh Halaman Ini (CSV) <ChevronDown size={16} />
             </Button>
           </div>
         }
@@ -917,12 +915,10 @@ export default function OrdersPage() {
           </AlertTitle>
           <AlertDescription className="text-warning">
             <p>
-              1. API marketplace mengambil pesanan maksimal ±100–1.000 data per permintaan (pagination limit). Indikator yang
-              berputar lama atau tertahan pada angka tertentu adalah <b>normal</b> — sistem menunggu jeda rate limit agar koneksi
-              toko tidak diblokir.
+              Pembaruan data berjalan bertahap di latar belakang. Anda dapat berpindah menu; jika pembaruan gagal, pesan akan menjelaskan langkah berikutnya.
             </p>
-            <p>2. Operasional harian: gunakan filter tanggal 3–7 hari terakhir atau tab &ldquo;Pesanan Baru&rdquo; / &ldquo;Siap Dikirim&rdquo;.</p>
-            <p>3. Histori lengkap (pembukuan/analisis): sync berjalan aman di latar belakang — Anda bisa berpindah menu dan kembali kapan saja.</p>
+            <p>Untuk pekerjaan harian, gunakan rentang tanggal dan tab Perlu Diproses. Pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
+            <p>Dokumen invoice dan daftar isi paket dibuat oleh Maxius. Label TikTok berasal dari marketplace; untuk resi Shopee resmi, gunakan Seller Center.</p>
           </AlertDescription>
         </Alert>
       )}
@@ -1084,7 +1080,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Bulk Action & Pagination */}
-        <div className="px-4 py-3 bg-muted/50 flex items-center justify-between border-b border-border">
+        <div className="px-4 py-3 bg-muted/50 flex flex-wrap gap-3 items-center justify-between border-b border-border">
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -1120,14 +1116,19 @@ export default function OrdersPage() {
                       label: "Cetak Label",
                       description: labelMenuDescription(orders, selected),
                     },
-                    { id: "Invoice" as PrintType, label: "Cetak Invoice", description: "Faktur pesanan terpilih" },
-                    { id: "PackingList" as PrintType, label: "Cetak Packing List", description: "Daftar packing pesanan terpilih" },
+                    { id: "Invoice" as PrintType, label: "Cetak Invoice", description: "Ringkasan transaksi dibuat oleh Maxius" },
+                    { id: "PackingList" as PrintType, label: "Cetak Daftar Isi Paket (Packing List)", description: "Daftar barang pesanan terpilih dibuat oleh Maxius" },
                   ]}
                 />
               </>
             )}
           </div>
-          <div className="flex items-center gap-4 text-sm text-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-foreground">
+            <label className="flex items-center gap-2">Pesanan per halaman
+              <select aria-label="Pesanan per halaman" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); setSelected(new Set()); }} className="rounded-md border border-border bg-card px-2 py-1">
+                {PAGE_SIZES.map((size) => <option key={size} value={size}>{size.toLocaleString("id-ID")}</option>)}
+              </select>
+            </label>
             <span className="font-semibold text-foreground">{total}</span>
             <span>Total pesanan</span>
             {pageCount > 1 && (
@@ -1141,7 +1142,7 @@ export default function OrdersPage() {
                   Sebelumnya
                 </Button>
                 <span className="px-2 text-xs">
-                  Hal {page} / {pageCount}
+                  {((page - 1) * pageSize + 1).toLocaleString("id-ID")}–{Math.min(page * pageSize, total).toLocaleString("id-ID")} dari {total.toLocaleString("id-ID")} pesanan
                 </span>
                 <Button
                   variant="outline"

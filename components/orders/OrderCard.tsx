@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, RefreshCw, Pencil, MessageCircle, FileText, PackageCheck, Printer } from "lucide-react";
+import { Clock, RefreshCw, MessageCircle, FileText, PackageCheck, Printer, Store, Package } from "lucide-react";
 import OrderProgressSteps from "./OrderProgressSteps";
 import PrintDropdown from "./PrintDropdown";
 import TikTokLogo from "@/components/icons/TikTokLogo";
+import ShopeeLogo from "@/components/icons/ShopeeLogo";
 import TrackingModal, { type TrackingEvent } from "./TrackingModal";
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -88,12 +89,16 @@ export default function OrderCard({
   const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[] | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const sla = computeSla(order);
+  const platform = order.platform.trim().toUpperCase().replace(/\s+/g, "_");
+  const statusLabel: Record<string, string> = { UNPAID: "Belum Dibayar", ON_HOLD: "Pembayaran Sedang Diperiksa", AWAITING_SHIPMENT: "Perlu Diproses", AWAITING_COLLECTION: "Menunggu Diambil Kurir", IN_TRANSIT: "Dalam Pengiriman", PARTIALLY_SHIPPING: "Dikirim Sebagian", DELIVERED: "Diterima Pembeli", COMPLETED: "Selesai", CANCELLED: "Dibatalkan" };
+  const [trackingError, setTrackingError] = useState<string | null>(null);
 
   // Riwayat tracking di-fetch on-demand saat modal Lacak dibuka (sekali per
-  // buka; modal lama memakai timeline simulasi bila kosong).
+  // buka). Riwayat kosong ditampilkan tanpa simulasi.
   const handleOpenTracking = async () => {
     setShowTracking(true);
     setTrackingEvents(null);
+    setTrackingError(null);
     setTrackingLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -104,9 +109,9 @@ export default function OrderCard({
       if (res.ok && data?.ok && Array.isArray(data.trackingEvents)) {
         setTrackingEvents(data.trackingEvents as TrackingEvent[]);
       }
-      // gagal → tetap null → modal pakai fallback simulasi
+      if (!res.ok || !data?.ok) setTrackingError(data?.error ?? "Riwayat pengiriman belum dapat dimuat. Coba buka kembali atau periksa melalui situs kurir.");
     } catch {
-      // fallback simulasi tetap tampil
+      setTrackingError("Gagal memuat riwayat pengiriman. Coba buka kembali.");
     } finally {
       setTrackingLoading(false);
     }
@@ -118,10 +123,10 @@ export default function OrderCard({
       <div className="px-5 py-3 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50 rounded-t-xl">
         <div className="flex flex-wrap items-center gap-4">
           <div className="px-3 py-1 bg-muted text-foreground text-xs font-bold rounded-md border border-border">
-            {order.status}
+            {statusLabel[order.status] ?? order.status}
           </div>
           <div className="text-sm text-foreground">
-            Nomor Pesanan: <a href="#" className="text-foreground font-semibold hover:underline">{order.orderId}</a>
+            Nomor Pesanan: <a href={`/orders/detail/${encodeURIComponent(order.id)}`} className="text-foreground font-semibold hover:underline">{order.orderId}</a>
           </div>
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Clock size={14} />
@@ -138,7 +143,7 @@ export default function OrderCard({
           </button>
           
           <div className="flex items-center gap-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-xs">
-             <TikTokLogo size={14} />
+             {platform === "SHOPEE" ? <ShopeeLogo size={14} /> : platform === "TIKTOK_SHOP" ? <TikTokLogo size={14} /> : <Store size={14} />}
              <span>{order.storeName} | {order.platform}</span>
           </div>
         </div>
@@ -159,18 +164,18 @@ export default function OrderCard({
           {/* Product details */}
           <div className="col-span-1 sm:col-span-2 xl:col-span-4 min-w-0 flex gap-4">
             <div className="w-16 h-16 bg-muted rounded-lg shrink-0 border border-border overflow-hidden">
-               <img src={order.productImage || 'https://via.placeholder.com/64'} alt="product" className="w-full h-full object-cover" />
+               <>{order.productImage ? <img src={order.productImage} alt={order.productName} className="w-full h-full object-cover" /> : <Package size={24} className="mx-auto mt-4 text-muted-foreground" />}</>
             </div>
             <div>
               <h3 className="text-sm font-bold text-foreground leading-tight mb-1">{order.productName}</h3>
               <p className="text-xs text-muted-foreground mb-2">{order.productVariant}</p>
-              <p className="text-xs font-medium text-foreground">Qty: {order.qty} x {order.price}</p>
+              <p className="text-xs font-medium text-foreground">Jumlah (Qty): {order.qty} x {order.price}</p>
             </div>
           </div>
           
-          {/* Total Qty */}
+          {/* Total Barang */}
           <div className="col-span-1 min-w-0 break-words">
-            <p className="text-xs font-semibold text-foreground mb-1">Total Qty</p>
+            <p className="text-xs font-semibold text-foreground mb-1">Total Barang</p>
             <p className="text-sm text-foreground">{order.qty}</p>
           </div>
           
@@ -196,9 +201,9 @@ export default function OrderCard({
             </div>
             <div>
                <p className="text-xs font-semibold text-foreground mb-1">Catatan Penjual</p>
-               <div className="flex items-center gap-2 group cursor-pointer">
+               <div className="flex items-center gap-2 group">
                  <p className="text-xs text-foreground">{order.sellerNote || '-'}</p>
-                 <Pencil size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+
                </div>
             </div>
           </div>
@@ -250,16 +255,16 @@ export default function OrderCard({
                prefixIcon={<Printer size={14} />}
                placement="top-left"
                items={[
-                  { id: "Label", label: "Cetak Label", description: "Label pengiriman & resi kurir" },
-                  { id: "Invoice", label: "Cetak Invoice", description: "Faktur resmi pesanan pembeli" },
-                  { id: "PackingList", label: "Cetak Packing List", description: "Daftar barang untuk gudang" },
+                  { id: "Label", label: platform === "TIKTOK_SHOP" ? "Cetak Resi TikTok" : "Cetak Label Lokal", description: platform === "TIKTOK_SHOP" ? "Dokumen asli dari TikTok Shop" : "Dibuat oleh Maxius; gunakan Seller Center untuk resi resmi" },
+                  { id: "Invoice", label: "Cetak Invoice", description: "Ringkasan transaksi dibuat oleh Maxius" },
+                  { id: "PackingList", label: "Daftar Isi Paket (Packing List)", description: "Daftar barang untuk gudang" },
                ]}
                label="Cetak"
                onSelect={onPrint}
             />
             {/* Step alur kerja di sebelah Cetak */}
             <div className="ml-1">
-               <OrderProgressSteps currentStage={order.fulfillmentStage} />
+               {order.fulfillmentStage && <OrderProgressSteps currentStage={order.fulfillmentStage} />}
             </div>
          </div>
          
@@ -323,6 +328,7 @@ export default function OrderCard({
           }}
           trackingEvents={trackingEvents}
           loading={trackingLoading}
+          error={trackingError}
           onClose={() => setShowTracking(false)}
         />
       )}

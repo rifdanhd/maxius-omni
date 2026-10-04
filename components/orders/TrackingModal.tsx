@@ -50,13 +50,15 @@ export default function TrackingModal({
   order,
   trackingEvents,
   loading = false,
+  error = null,
   onClose,
 }: {
   order: TrackingModalData;
   // Riwayat nyata dari /api/orders/[id]/tracking (ShipmentTrackingEvent).
-  // undefined/kosong → fallback ke timeline simulasi lama (order lama/ambiguous).
+  // Riwayat kosong tidak boleh digantikan dengan kejadian pengiriman simulasi.
   trackingEvents?: TrackingEvent[] | null;
   loading?: boolean;
+  error?: string | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -73,55 +75,7 @@ export default function TrackingModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const getTimeline = () => {
-    const isShipped = [
-      "AWAITING_COLLECTION",
-      "IN_TRANSIT",
-      "DELIVERED",
-      "COMPLETED",
-      "SHIPPED",
-    ].includes(order.status);
-    const isDelivered = ["DELIVERED", "COMPLETED"].includes(order.status);
-
-    return [
-      {
-        title: "Pesanan Dibuat",
-        desc: `Pesanan berhasil dibuat pada ${order.orderDate}`,
-        done: true,
-      },
-      {
-        title: "Pembayaran Dikonfirmasi",
-        desc: "Pembayaran telah diverifikasi oleh marketplace",
-        done: true,
-      },
-      {
-        title: "Paket Diatur & Resi Terbit",
-        desc: hasTracking
-          ? `Nomor resi ${order.trackingNumber} berhasil dibuat (${order.courier})`
-          : "Menunggu penerbitan resi dan pengemasan pesanan",
-        done: hasTracking,
-      },
-      {
-        title: "Penjemputan / Dalam Pengiriman",
-        desc: isShipped
-          ? `Paket dalam penanganan pihak kurir ${order.courier}`
-          : "Menunggu penjemputan kurir di gudang",
-        done: isShipped,
-      },
-      {
-        title: "Pesanan Diterima",
-        desc: isDelivered
-          ? "Paket telah diterima oleh pembeli"
-          : "Paket sedang menuju alamat penerima",
-        done: isDelivered,
-      },
-    ];
-  };
-
-  // Timeline simulasi lama tetap dipakai sebagai fallback saat belum ada event
-  // tersimpan (order lama, ambiguous, atau gagal fetch).
   const hasRealEvents = !!trackingEvents && trackingEvents.length > 0;
-  const timeline = getTimeline();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs animate-in fade-in duration-150">
@@ -226,40 +180,9 @@ export default function TrackingModal({
                 })}
               </div>
             ) : (
-              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-muted">
-                {loading && (
-                  <p className="text-[11px] italic text-muted-foreground">Memuat riwayat tracking…</p>
-                )}
-                {timeline.map((step, idx) => (
-                  <div key={idx} className="relative">
-                    <div
-                      className={`absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${
-                        step.done
-                          ? "bg-muted-foreground border-border text-primary-foreground shadow-xs"
-                          : "bg-card border-border text-muted-foreground"
-                      }`}
-                    >
-                      {step.done ? <Check size={10} strokeWidth={3} /> : idx + 1}
-                    </div>
-                    <div>
-                      <p
-                        className={`text-xs font-semibold ${
-                          step.done ? "text-foreground" : "text-muted-foreground"
-                        }`}
-                      >
-                        {step.title}
-                      </p>
-                      <p
-                        className={`text-[11px] leading-tight mt-0.5 ${
-                          step.done ? "text-muted-foreground" : "text-muted-foreground"
-                        }`}
-                      >
-                        {step.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground" role={error ? "alert" : undefined}>
+                {loading ? "Memuat riwayat pengiriman…" : error ?? "Belum ada riwayat pengiriman dari kurir. Status pesanan saja tidak memastikan paket sudah diambil atau diterima pembeli."}
+              </p>
             )}
           </div>
         </div>

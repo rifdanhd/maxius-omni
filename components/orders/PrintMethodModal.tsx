@@ -7,8 +7,7 @@ import { authFetch } from "@/lib/utils/api-client";
 
 /**
  * PrintMethodModal — "Metode Cetak" ala Desty setelah paket diatur.
- * Opsi cetak "1 Label": satu lembar berisi label resmi TikTok di atas dan
- * tabel ringkasan produk (dibuat lokal dari OrderItem/ProductVariant) di bawah.
+ * Label TikTok asli; ringkasan gudang hanya ditambahkan sebagai halaman terpisah.
  * Opsional: menambahkan halaman Picking List.
  */
 export default function PrintMethodModal({
@@ -32,7 +31,7 @@ export default function PrintMethodModal({
   const [error, setError] = useState<string | null>(null);
 
   const handlePrint = async () => {
-    if (printing) return;
+    if (printing || !isTikTok) return;
     setPrinting(true);
     setError(null);
     try {
@@ -110,8 +109,8 @@ export default function PrintMethodModal({
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
                   {isTikTok
-                    ? "Label kurir resmi TikTok di bagian atas + tabel ringkasan produk (nama, varian, seller SKU, qty) yang dibuat dari data pesanan di bagian bawah."
-                    : "Tabel ringkasan produk (nama, varian, seller SKU, qty) dari data pesanan. Label resmi TikTok tidak berlaku untuk order ini — cetak label via Seller Center."}
+                    ? "Label pengiriman asli dari TikTok Shop. Daftar pengambilan barang dapat disertakan sebagai halaman terpisah."
+                    : "Resi resmi Shopee dicetak melalui Seller Center. Untuk daftar isi paket buatan Maxius, tutup modal ini dan pilih Daftar Isi Paket pada menu Cetak pesanan."}
                 </p>
               </div>
             </label>
@@ -128,7 +127,7 @@ export default function PrintMethodModal({
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <Layers size={15} className="text-muted-foreground" />
-                <p className="text-sm font-semibold text-foreground">Unduh dengan Picking List</p>
+                <p className="text-sm font-semibold text-foreground">Sertakan Daftar Pengambilan Barang (Picking List)</p>
               </div>
               <p className="text-[11px] text-muted-foreground mt-1">
                 Sertakan halaman Picking List per pesanan (daftar barang untuk gudang, per SKU & qty).
@@ -155,7 +154,8 @@ export default function PrintMethodModal({
           </button>
           <button
             onClick={handlePrint}
-            disabled={printing}
+            disabled={printing || !isTikTok}
+            title={!isTikTok ? "Gunakan Seller Center Shopee untuk resi resmi; daftar isi paket tersedia dari menu Cetak pada pesanan." : undefined}
             className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
           >
             {printing ? (
