@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -38,6 +37,7 @@ export async function restockReturnItem(
         select: {
           id: true,
           externalReturnId: true,
+          type: true,
           accountId: true,
           account: { select: { isFrozen: true } },
         },
@@ -46,6 +46,8 @@ export async function restockReturnItem(
   });
   if (!item) return { ok: false, reason: "item retur tidak ditemukan" };
   if (item.restockedAt) return { ok: true, already: true };
+  if (item.returnRequest.type === "REFUND_ONLY") return { ok: false, reason: "Pengembalian dana tanpa retur tidak dapat ditambahkan ke stok." };
+  if (item.qty <= 0) return { ok: false, reason: "Jumlah barang retur harus lebih dari 0." };
   if (!item.variantId) return { ok: false, reason: "SKU retur belum ter-mapping ke varian" };
   if (item.returnRequest.account.isFrozen) return { ok: false, reason: "akun platform dibekukan" };
 

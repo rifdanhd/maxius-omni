@@ -10,16 +10,16 @@ export const GET = withAuth(async (req) => {
   const statusParam = searchParams.get("status")?.trim();
   const platformParam = searchParams.get("platform")?.trim();
   const q = searchParams.get("q")?.trim() || null;
-  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const page = Math.max(1, Math.floor(Number(searchParams.get("page")) || 1));
   const pageSizeRaw = Number(searchParams.get("pageSize")) || DEFAULT_PAGE_SIZE;
-  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, pageSizeRaw));
+  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(pageSizeRaw)));
 
   // Tab "Menunggu Konfirmasi Gudang" = retur diterima & belum direstock.
   const tab = searchParams.get("tab")?.trim() || null;
 
   const whereStatus =
     tab === "warehouse"
-      ? { status: { in: ["IN_TRANSIT", "RECEIVED", "APPROVED", "REFUNDED"] }, returnItem: { none: { restockedAt: { not: null }, variantId: { not: null } } } }
+      ? { status: { in: ["IN_TRANSIT", "RECEIVED", "APPROVED", "REFUNDED"] }, OR: [{ type: null }, { type: { not: "REFUND_ONLY" } }], returnItem: { some: { restockedAt: null } } }
       : statusParam
         ? { status: { in: statusParam.split(",").map((s) => s.trim()).filter(Boolean) } }
         : {};
@@ -60,5 +60,5 @@ export const GET = withAuth(async (req) => {
     prisma.returnRequest.count({ where }),
   ]);
 
-  return NextResponse.json({ returns, total, page, pageSize });
+  return NextResponse.json({ returns: returns.map(({ returnItem, ...row }) => ({ ...row, items: returnItem })), total, page, pageSize });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Filter, RefreshCw, Search, Store } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -27,6 +28,7 @@ const TABS: { id: string; label: string }[] = [
   { id: "all", label: "Semua Retur" },
   { id: "pending", label: "Perlu Respons" },
   { id: "warehouse", label: "Menunggu Konfirmasi Gudang" },
+  { id: "disputed", label: "Sengketa" },
   { id: "done", label: "Selesai / Ditolak" },
 ];
 
@@ -34,7 +36,8 @@ const TAB_STATUSES: Record<string, string[] | null> = {
   all: null,
   pending: ["PENDING_SELLER", "PLATFORM_DECIDED"],
   warehouse: null,
-  done: ["REFUNDED", "REJECTED", "CANCELLED", "DISPUTED"],
+  disputed: ["DISPUTED"],
+  done: ["REFUNDED", "REJECTED", "CANCELLED"],
 };
 
 type ReturnItemRow = {
@@ -84,7 +87,7 @@ function slaBadge(slaDueDate: string | null) {
   const diffMs = new Date(slaDueDate).getTime() - Date.now();
   const hours = diffMs / 3600000;
   if (diffMs < 0) {
-    return { label: "SLA terlewat", className: "bg-primary text-primary-foreground" };
+    return { label: "Batas Waktu Respons Terlewat (SLA)", className: "bg-primary text-primary-foreground" };
   }
   if (hours <= 24) {
     return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-muted-foreground text-primary-foreground" };
@@ -110,7 +113,8 @@ export default function ReturnsPage() {
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<ReturnRow[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [detail, setDetail] = useState<ReturnRow | null>(null);
@@ -128,9 +132,11 @@ export default function ReturnsPage() {
 
   const load = useCallback(async () => {
     const res = await authFetch(`/api/returns?${fetchParams()}`);
-    const data = (await res.json()) as { returns?: ReturnRow[]; total?: number };
+    const data = (await res.json().catch(() => null)) as { returns?: ReturnRow[]; total?: number; error?: string } | null;
+    if (!res.ok || !Array.isArray(data?.returns)) throw new Error(data?.error ?? "Gagal memuat pengembalian. Coba muat ulang.");
     setRows(data.returns ?? []);
     setTotal(data.total ?? 0);
+    setLoadError(null);
   }, [fetchParams]);
 
   useEffect(() => {
@@ -139,10 +145,14 @@ export default function ReturnsPage() {
       setLoading(true);
       try {
         const res = await authFetch(`/api/returns?${fetchParams()}`);
-        const data = (await res.json()) as { returns?: ReturnRow[]; total?: number };
+        const data = (await res.json().catch(() => null)) as { returns?: ReturnRow[]; total?: number; error?: string } | null;
+        if (!res.ok || !Array.isArray(data?.returns)) throw new Error(data?.error ?? "Gagal memuat pengembalian. Coba muat ulang.");
         if (cancelled) return;
         setRows(data.returns ?? []);
         setTotal(data.total ?? 0);
+        setLoadError(null);
+      } catch (e) {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Gagal memuat pengembalian. Coba muat ulang.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -156,12 +166,14 @@ export default function ReturnsPage() {
     setSyncing(true);
     setSyncMessage(null);
     try {
-      const res = await authFetch("/api/returns/sync", { method: "POST" });
-      const data = (await res.json()) as { results?: Array<Record<string, unknown>>; errors?: string[] };
-      if (data.errors?.length) {
-        setSyncMessage(`Sinkron selesai dengan ${data.errors.length} error: ${data.errors[0]}`);
+      const res = await authFetch(`/api/returns/sync${platform ? `?platform=${encodeURIComponent(platform)}` : ""}`, { method: "POST" });
+      const data = (await res.json().catch(() => null)) as { results?: Array<{ error?: string; label?: string }>; errors?: string[]; error?: string } | null;
+      if (!res.ok || !data || !Array.isArray(data.results)) throw new Error(data?.error ?? "Gagal memperbarui pengembalian. Coba lagi.");
+      const failures = [...new Set([...(data.errors ?? []), ...data.results.filter((result) => result.error).map((result) => `${result.label ?? "Toko"}: ${result.error}`)])];
+      if (failures.length) {
+        setSyncMessage(`Pembaruan belum lengkap: ${failures.join(" · ")}`);
       } else {
-        setSyncMessage("Sinkronisasi retur selesai.");
+        setSyncMessage(data.results.length ? "Data pengembalian selesai diperbarui." : "Belum ada toko aktif yang dapat diperbarui. Hubungkan toko melalui Pengaturan Toko.");
       }
       await load();
     } catch (e) {
@@ -172,23 +184,24 @@ export default function ReturnsPage() {
   };
 
   const restock = async (itemId: string) => {
+    const item = detail?.items.find((row) => row.id === itemId);
+    if (!item || restockingId || detail?.type === "REFUND_ONLY") return;
+    if (!window.confirm(`Konfirmasi ${item.qty} barang sudah diterima, diperiksa, dan layak dijual kembali? Stok pusat akan bertambah ${item.qty}. Aksi ini tidak menyetujui pengembalian dana di marketplace.`)) return;
     setRestockingId(itemId);
+    setSyncMessage(null);
     try {
       const res = await authFetch("/api/returns/restock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId }),
       });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        alert(data.error ?? "Gagal menambah stok.");
-      }
-      if (detail) {
-        const item = detail.items.find((it) => it.id === itemId);
-        if (item) item.restockedAt = new Date().toISOString();
-        setDetail({ ...detail });
-      }
-      await load();
+      const result = (await res.json().catch(() => null)) as { ok?: boolean; already?: boolean; error?: string } | null;
+      if (!res.ok || !result?.ok) throw new Error(result?.error ?? "Gagal menambah stok. Stok belum dikonfirmasi.");
+      setDetail((current) => current ? { ...current, items: current.items.map((row) => row.id === itemId ? { ...row, restockedAt: new Date().toISOString() } : row) } : current);
+      setSyncMessage(result.already ? "Barang ini sudah pernah ditambahkan ke stok; tidak ditambahkan lagi." : "Barang berhasil ditambahkan ke stok pusat. Pengembalian dana tetap dikelola di Seller Center.");
+      try { await load(); } catch { setLoadError("Stok sudah dikonfirmasi, tetapi daftar gagal dimuat ulang. Coba muat ulang daftar."); }
+    } catch (e) {
+      setSyncMessage(e instanceof Error ? e.message : "Gagal menambah stok. Coba muat ulang sebelum mencoba lagi.");
     } finally {
       setRestockingId(null);
     }
@@ -202,8 +215,7 @@ export default function ReturnsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Kelola Pengembalian</h1>
           <p className="text-sm text-muted-foreground">
-            Retur & refund Shopee dan TikTok Shop. Approve/reject dilakukan di Seller Center masing-masing
-            (aksi API menyusul setelah scope aktif).
+            Pantau pengembalian barang dan dana (Retur & Refund) Shopee serta TikTok Shop; mulai dengan memperbarui data, lalu buka Detail. Persetujuan atau penolakan dilakukan di Seller Center masing-masing.
           </p>
         </div>
         <button
@@ -212,10 +224,12 @@ export default function ReturnsPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Menyinkronkan..." : "Sinkron Retur"}
+          {syncing ? "Menyinkronkan..." : "Perbarui Pengembalian (Sinkron Retur)"}
         </button>
       </div>
 
+      {loadError && <div role="alert" className="mb-4 rounded-lg border border-border bg-muted p-4 text-sm">{loadError}<button className="ml-2 underline" onClick={() => load().catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "Gagal memuat ulang."))}>Muat Ulang</button></div>}
+      <p className="mb-4 text-sm text-muted-foreground">Konfirmasi stok hanya setelah barang diterima dan layak dijual; pengembalian dana tanpa retur tidak menambah stok. <Link href="/settings/accounts" className="underline">Pengaturan Toko</Link></p>
       {syncMessage && (
         <div className="mb-4 rounded-lg bg-muted px-4 py-2 text-sm text-foreground">{syncMessage}</div>
       )}
@@ -278,7 +292,9 @@ export default function ReturnsPage() {
               <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Memuat...</td></tr>
             )}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Belum ada data retur. Tekan &quot;Sinkron Retur&quot; untuk menarik dari platform.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">{loadError ? "Daftar belum dapat dimuat. Gunakan Muat Ulang di pesan error." : q.trim() || platform || tab !== "all" ? (
+                <div className="space-y-2"><p>Tidak ada pengembalian yang cocok dengan pencarian atau filter.</p><button className="underline" onClick={() => { setQ(""); setPlatform(""); setTab("all"); setPage(1); }}>Hapus Pencarian dan Filter</button></div>
+              ) : <div className="space-y-2"><p>Belum ada data pengembalian. Hubungkan toko, lalu klik Perbarui Pengembalian.</p><Link href="/settings/accounts" className="underline">Buka Pengaturan Toko</Link></div>}</td></tr>
             )}
             {rows.map((r) => {
               const badge = STATUS_LABEL[r.status] ?? STATUS_LABEL.UNKNOWN;
@@ -315,7 +331,7 @@ export default function ReturnsPage() {
                     <div className="flex flex-col gap-1">
                       {r.isPlatformAutoApproved && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-                          <CheckCircle2 className="h-3 w-3" /> Platform-approved
+                          <CheckCircle2 className="h-3 w-3" /> Disetujui oleh Marketplace
                         </span>
                       )}
                       {sla && (
@@ -387,7 +403,7 @@ export default function ReturnsPage() {
               <div>
                 <div className="text-muted-foreground">Tipe</div>
                 <div className="font-medium">
-                  {detail.type === "REFUND_ONLY" ? "Refund Only" : detail.type === "RETURN_REFUND" ? "Retur & Refund" : "-"}
+                  {detail.type === "REFUND_ONLY" ? "Pengembalian Dana Tanpa Retur (Refund Only)" : detail.type === "RETURN_REFUND" ? "Pengembalian Barang dan Dana (Retur & Refund)" : "-"}
                   {detail.requestType ? ` · ${detail.requestType}` : ""}
                 </div>
               </div>
@@ -440,16 +456,18 @@ export default function ReturnsPage() {
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Stok ditambah {formatDate(it.restockedAt)}
                     </span>
+                  ) : detail.type === "REFUND_ONLY" ? (
+                    <span className="text-xs text-muted-foreground">Pengembalian dana tanpa barang; stok tidak ditambah.</span>
                   ) : it.variantId ? (
                     <button
                       onClick={() => restock(it.id)}
-                      disabled={restockingId === it.id}
+                      disabled={restockingId !== null}
                       className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                     >
-                      {restockingId === it.id ? "Memproses..." : "Terima & Tambah Stok"}
+                      {restockingId === it.id ? "Memproses..." : "Konfirmasi Barang & Tambah Stok"}
                     </button>
                   ) : (
-                    <span className="shrink-0 text-xs text-muted-foreground">Petakan SKU dulu di halaman Mapping</span>
+                    <Link href="/products/mapping" className="shrink-0 text-xs text-muted-foreground underline">Hubungkan Kode Produk (Mapping) Terlebih Dahulu</Link>
                   )}
                 </div>
               ))}
