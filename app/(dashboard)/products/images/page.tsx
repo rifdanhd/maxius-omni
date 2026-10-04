@@ -209,10 +209,10 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ isCover: true }),
       });
-      if (!res.ok) throw new Error("Gagal set cover.");
+      if (!res.ok) throw new Error("Gagal mengatur Foto Utama (Cover).");
       await loadImages();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal set cover.");
+      setError(e instanceof Error ? e.message : "Gagal mengatur Foto Utama (Cover).");
     } finally {
       setBusy(false);
     }
@@ -333,14 +333,14 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                   <img src={img.url} alt={`Gambar ${i + 1}`} className="w-full aspect-square object-cover" />
                   {img.isCover && (
                     <span className="absolute top-2 left-2 inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      <Star size={11} /> Cover
+                      <Star size={11} /> Foto Utama (Cover)
                     </span>
                   )}
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {!img.isCover && (
                       <button
                         onClick={() => setCover(img)}
-                        title="Jadikan cover"
+                        title="Jadikan Foto Utama (Cover)"
                         className="bg-card/90 hover:bg-card shadow rounded-md p-1.5 text-foreground"
                       >
                         <Star size={14} />
@@ -433,12 +433,12 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-foreground truncate">{r.product.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {r.isCover ? "Dijadikan cover" : "Gambar produk"} · update {fmtDate(r.updatedAt)}
+                      {r.isCover ? "Dijadikan Foto Utama (Cover)" : "Gambar produk"} · diperbarui {fmtDate(r.updatedAt)}
                     </div>
                   </div>
                   {r.isCover && (
                     <span className="inline-flex items-center gap-1 bg-muted text-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      <Star size={11} /> Cover
+                      <Star size={11} /> Foto Utama (Cover)
                     </span>
                   )}
                 </li>
@@ -594,7 +594,12 @@ export default function KelolaGambarPage() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-bold text-foreground">Kelola Gambar</h1>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Kelola Gambar</h1>
+            <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
+              Kelola foto, foto utama, dan urutan gambar produk di katalog pusat; mulai dengan mencari produk, klik Lihat Gambar, lalu pilih file dan unggah.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setHistoryOpen(true)}
@@ -737,7 +742,27 @@ export default function KelolaGambarPage() {
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
-                    Tidak ada produk yang cocok dengan pencarian/filter.
+                    {q.trim() || searchInput.trim() || filterActive ? (
+                      <div className="space-y-2">
+                        <p>Tidak ada produk yang cocok dengan pencarian atau filter.</p>
+                        <button
+                          onClick={() => {
+                            setSearchInput("");
+                            setQ("");
+                            resetFilter();
+                          }}
+                          className="text-foreground underline"
+                        >
+                          Hapus Pencarian dan Filter
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p>Belum ada produk di katalog pusat.</p>
+                        <p>Tambahkan produk di Produk Master terlebih dahulu, lalu kembali ke sini untuk mengunggah foto.</p>
+                        <a href="/products" className="inline-block text-foreground underline">Buka Produk Master</a>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
