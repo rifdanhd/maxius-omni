@@ -33,9 +33,9 @@ type MismatchRow = {
 type FilterId = "mismatch" | "FAILED" | "PENDING" | "SUCCESS" | "all";
 
 const FILTERS: Array<{ id: FilterId; label: string }> = [
-  { id: "mismatch", label: "Mismatch" },
+  { id: "mismatch", label: "Perlu Tindakan (Mismatch)" },
   { id: "FAILED", label: "Gagal" },
-  { id: "PENDING", label: "Pending" },
+  { id: "PENDING", label: "Menunggu (Pending)" },
   { id: "SUCCESS", label: "Berhasil" },
   { id: "all", label: "Semua" },
 ];
@@ -131,8 +131,8 @@ export default function SyncMismatchPage() {
         kind: st === "SUCCESS" ? "ok" : "err",
         text:
           st === "SUCCESS"
-            ? "Retry berhasil — stok tersalurkan ke marketplace."
-            : `Retry selesai, status job: ${st}.`,
+            ? "Pembaruan diterima marketplace. Periksa data toko jika masih ada perbedaan."
+            : `Percobaan selesai, status pembaruan: ${st}.`,
       });
       setReloadKey((k) => k + 1);
     } catch (e) {
@@ -168,10 +168,9 @@ export default function SyncMismatchPage() {
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Stok Mismatch</h1>
+          <h1 className="text-2xl font-bold text-foreground">Masalah Pengiriman Stok (Stok Mismatch)</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Push stok ke marketplace yang gagal (FAILED) atau sudah retry tapi masih pending.
-            Stok central tidak pernah berubah karena kegagalan ini — yang perlu retry hanya baris di sini.
+            Pantau pembaruan stok yang gagal dikirim atau sedang menunggu percobaan ulang; mulai dengan membaca pesan gagal dan toko tujuan, lalu pilih Coba Lagi setelah penyebabnya ditangani. Halaman ini tidak membandingkan stok aktual toko dengan stok gudang.
           </p>
         </div>
         <button
@@ -202,7 +201,7 @@ export default function SyncMismatchPage() {
           <input
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}
-            placeholder="Cari produk / SKU / channelSku…"
+            placeholder="Cari produk / kode pusat (SKU) / kode toko…"
             className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none"
           />
         </div>
@@ -234,18 +233,19 @@ export default function SyncMismatchPage() {
           </div>
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
-            Tidak ada job pada filter ini. {filter === "mismatch" && "Semua push stok tersalurkan — tidak ada mismatch."}
+            Tidak ada pembaruan stok yang tercatat pada pencarian/filter ini. Ini bukan konfirmasi stok aktual semua toko.
+            <button className="block mx-auto mt-2 underline" onClick={() => { setQInput(""); setQ(""); setFilter("mismatch"); }}>Hapus Pencarian dan Filter</button>
           </div>
         ) : (
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3">Produk / Varian</th>
-                <th className="px-4 py-3">Channel SKU</th>
+                <th className="px-4 py-3">Kode Produk di Toko (Channel SKU)</th>
                 <th className="px-4 py-3">Akun / Marketplace</th>
-                <th className="px-4 py-3 text-right">Stok Central</th>
-                <th className="px-4 py-3 text-right">Gagal di-Push</th>
-                <th className="px-4 py-3 text-center">Retry</th>
+                <th className="px-4 py-3 text-right">Target Stok Jual Pusat</th>
+                <th className="px-4 py-3 text-right">Angka yang Dikirim</th>
+                <th className="px-4 py-3 text-center">Percobaan Ulang</th>
                 <th className="px-4 py-3">Error Terakhir</th>
                 <th className="px-4 py-3">Gagal Terakhir</th>
                 <th className="px-4 py-3 text-right">Aksi</th>
@@ -280,7 +280,7 @@ export default function SyncMismatchPage() {
                     {r.retryCount}/{r.maxRetries}
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
-                    <div className="truncate text-xs text-foreground" title={r.lastError ?? ""}>
+                    <div className="break-words whitespace-normal text-xs text-foreground" title={r.lastError ?? ""}>
                       {r.lastError ?? "—"}
                     </div>
                     {r.status === "PENDING" && r.nextRetryAt && (
@@ -304,7 +304,7 @@ export default function SyncMismatchPage() {
                         disabled={retrying.has(r.id)}
                         className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
                       >
-                        {retrying.has(r.id) ? "Retrying…" : "Retry"}
+                        {retrying.has(r.id) ? "Mencoba…" : "Coba Lagi (Retry)"}
                       </button>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
