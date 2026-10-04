@@ -40,6 +40,8 @@
   ],
   "exclude": [
     "node_modules",
+    ".next.bak*/**",
+    ".next.failed*/**",
     "e2e",
     "playwright.config.ts"
   ]
