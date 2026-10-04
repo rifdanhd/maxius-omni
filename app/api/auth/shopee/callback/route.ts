@@ -6,7 +6,7 @@ import {
   isShopeeAuthorizeEnabled,
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
-import { SHOPEE_OAUTH_CRED_COOKIE, OAUTH_BRAND_COOKIE } from "../authorize/route";
+import { SHOPEE_OAUTH_CRED_COOKIE, OAUTH_BRAND_COOKIE } from "@/lib/utils/oauth-cookies";
 import { verifySessionCookie } from "@/lib/services/auth.service";
 import {
   DEFAULT_BUSINESS_ID,

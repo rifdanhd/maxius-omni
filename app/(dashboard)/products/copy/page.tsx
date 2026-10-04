@@ -56,7 +56,7 @@ function PriceInput({
 }) {
   return (
     <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
         Rp
       </span>
       <input
@@ -65,7 +65,7 @@ function PriceInput({
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ""))}
         placeholder="contoh: 25000"
-        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+        className="w-full pl-10 pr-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
       />
     </div>
   );
@@ -260,22 +260,22 @@ export default function ProductCopyPage() {
   const backButton = (
     <button
       onClick={resetToInput}
-      className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4"
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
     >
       <ArrowLeft size={14} /> Ganti URL
     </button>
   );
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-5">
-        <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
           Produk › Product Copy
         </p>
-        <h1 className="text-xl font-bold text-gray-900">Copy Produk dari URL</h1>
+        <h1 className="text-xl font-bold text-foreground">Copy Produk dari URL</h1>
       </div>
 
-      <div className="mb-6 flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-900">
+      <div className="mb-6 flex items-start gap-3 bg-muted border border-border rounded-lg px-4 py-3 text-xs text-foreground">
         <ShieldCheck size={16} className="mt-0.5 shrink-0" />
         <p>
           Fitur untuk membantu Anda meng-input ulang produk milik Anda sendiri (misal produk lama
@@ -287,7 +287,7 @@ export default function ProductCopyPage() {
       {toast && (
         <div
           className={`mb-4 px-4 py-3 rounded-md text-sm font-medium flex items-center gap-2 ${
-            toast.type === "success" ? "bg-gray-900 text-white" : "bg-gray-900 text-white"
+            toast.type === "success" ? "bg-primary text-primary-foreground" : "bg-primary text-primary-foreground"
           }`}
         >
           {toast.type === "success" ? <Check size={16} /> : <AlertTriangle size={16} />}
@@ -296,14 +296,14 @@ export default function ProductCopyPage() {
       )}
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 border border-gray-200 bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-900">
+        <div className="mb-4 flex items-start gap-2 border border-border bg-muted rounded-lg px-4 py-3 text-sm text-foreground">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <div className="flex-1">
             <p>{error}</p>
             {mode === "input" && (
               <button
                 onClick={startManual}
-                className="mt-1 text-gray-900 underline font-medium hover:text-gray-900"
+                className="mt-1 text-foreground underline font-medium hover:text-foreground"
               >
                 Isi manual saja
               </button>
@@ -314,11 +314,11 @@ export default function ProductCopyPage() {
 
       {mode === "input" && (
         <div className="max-w-2xl">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <label className="font-semibold text-gray-700 text-sm flex items-center gap-1.5 mb-1.5">
+          <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+            <label className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-1.5">
               <Link2 size={15} /> URL Halaman Produk
             </label>
-            <p className="text-[11px] text-gray-400 mb-3">
+            <p className="text-[11px] text-muted-foreground mb-3">
               Tempel link produk dari Shopee, Tokopedia, Tokopedia | Shop, atau situs lainnya.
             </p>
             <div className="flex gap-2">
@@ -328,24 +328,24 @@ export default function ProductCopyPage() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && runParse()}
                 placeholder="https://www.tokopedia.com/…"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+                className="flex-1 px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
               />
               <button
                 onClick={runParse}
                 disabled={busy}
-                className="inline-flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
               >
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 {busy ? "Mengambil data..." : "Ambil Data"}
               </button>
             </div>
             {busy && (
-              <p className="mt-3 text-xs text-gray-400 flex items-center gap-2">
+              <p className="mt-3 text-xs text-muted-foreground flex items-center gap-2">
                 <Loader2 size={13} className="animate-spin" /> Mengambil & mem-parsing halaman…
               </p>
             )}
           </div>
-          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-[11px] text-gray-500">
+          <div className="mt-4 bg-muted border border-border rounded-lg px-4 py-3 text-[11px] text-muted-foreground">
             Data yang diambil hanya yang tampil publik di halaman (judul, gambar, harga, deskripsi,
             dan varian bila tersedia). Stok diisi 0 bila tidak bisa dibaca — Anda memutakhirannya
             sebelum menyimpan draft.
@@ -356,23 +356,23 @@ export default function ProductCopyPage() {
       {(mode === "preview" || mode === "manual") && (
         <div className="relative">
           {backButton}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
             {/* Cover / form */}
             <div className="p-6">
               {/* Preview hasil scrape */}
               {mode === "preview" && parsed && (
-                <div className="mb-6 flex items-start justify-between gap-3 flex-wrap border-b border-gray-100 pb-5">
+                <div className="mb-6 flex items-start justify-between gap-3 flex-wrap border-b border-border pb-5">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-900 text-[11px] font-semibold">
+                    <span className="px-2 py-0.5 rounded-full bg-muted text-foreground text-[11px] font-semibold">
                       {parsed.sourcePlatform}
                     </span>
                     {parsed.price !== null && (
-                      <span className="text-xs text-gray-900 font-semibold">
+                      <span className="text-xs text-foreground font-semibold">
                         {fmtRupiah(parsed.price)}
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 max-w-md truncate" title={parsed.sourceUrl}>
+                  <p className="text-[11px] text-muted-foreground max-w-md truncate" title={parsed.sourceUrl}>
                     Sumber: {parsed.sourceUrl.replace(/^https?:\/\//, "")}
                   </p>
                 </div>
@@ -381,10 +381,10 @@ export default function ProductCopyPage() {
               <div className="grid gap-5 lg:grid-cols-1 md:grid-cols-2">
                 {/* Gambar */}
                 <div>
-                  <label className="font-semibold text-gray-700 text-sm flex items-center gap-1.5 mb-1.5">
+                  <label className="font-semibold text-foreground text-sm flex items-center gap-1.5 mb-1.5">
                     <ImagePlus size={15} /> Gambar Produk
                   </label>
-                  <p className="text-[11px] text-gray-400 mb-2">
+                  <p className="text-[11px] text-muted-foreground mb-2">
                     Centang gambar yang ingin dipakai ({selected.size} dipilih)
                   </p>
                   {parsed && parsed.images.length > 0 ? (
@@ -396,14 +396,14 @@ export default function ProductCopyPage() {
                             key={src}
                             type="button"
                             onClick={() => toggleImage(src)}
-                            className={`relative aspect-square rounded-md border overflow-hidden bg-gray-50 ${
-                              on ? "border-gray-500 ring-2 ring-gray-200" : "border-gray-200"
+                            className={`relative aspect-square rounded-md border overflow-hidden bg-muted ${
+                              on ? "border-ring ring-2 ring-ring" : "border-border"
                             }`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={src} alt="produk" className="w-full h-full object-cover" />
                             {on && (
-                              <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center">
+                              <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                                 <Check size={12} />
                               </span>
                             )}
@@ -412,7 +412,7 @@ export default function ProductCopyPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="border border-dashed border-gray-300 rounded-md px-4 py-8 text-center text-xs text-gray-400">
+                    <div className="border border-dashed border-border rounded-md px-4 py-8 text-center text-xs text-muted-foreground">
                       Tidak ada gambar yang berhasil diambil. Simpan dulu, tambahkan gambar nanti.
                     </div>
                   )}
@@ -421,40 +421,40 @@ export default function ProductCopyPage() {
                 {/* Field produk */}
                 <div className="space-y-4">
                   <div>
-                    <label className="font-semibold text-gray-700 text-sm block mb-1.5">
-                      Nama Produk <span className="text-gray-500">*</span>
+                    <label className="font-semibold text-foreground text-sm block mb-1.5">
+                      Nama Produk <span className="text-muted-foreground">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+                      className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {!hasVariantMode() && (
                       <div>
-                        <label className="font-semibold text-gray-700 text-sm block mb-1.5">
+                        <label className="font-semibold text-foreground text-sm block mb-1.5">
                           Harga (Rp)
                         </label>
                         <PriceInput value={form.price} onChange={(v) => setForm({ ...form, price: v })} />
                       </div>
                     )}
                     <div>
-                      <label className="font-semibold text-gray-700 text-sm block mb-1.5">
-                        Kategori <span className="text-gray-400 font-normal">(opsional)</span>
+                      <label className="font-semibold text-foreground text-sm block mb-1.5">
+                        Kategori <span className="text-muted-foreground font-normal">(opsional)</span>
                       </label>
                       <input
                         type="text"
                         value={form.category}
                         onChange={(e) => setForm({ ...form, category: e.target.value })}
                         placeholder="contoh: Makanan Ringan"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+                        className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="font-semibold text-gray-700 text-sm block mb-1.5">
+                    <label className="font-semibold text-foreground text-sm block mb-1.5">
                       Deskripsi
                     </label>
                     <textarea
@@ -462,28 +462,28 @@ export default function ProductCopyPage() {
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                       placeholder="Deskripsi produk…"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 resize-y"
+                      className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring resize-y"
                     />
                   </div>
                 </div>
               </div>
 
               {hasVariantMode() && (
-                <div className="border-t border-gray-200 px-6 py-6">
+                <div className="border-t border-border px-6 py-6">
                   <div className="flex items-center gap-2 mb-1">
-                    <Boxes size={16} className="text-[#111827]" />
-                    <h2 className="font-semibold text-gray-900">Daftar Varian</h2>
-                    <span className="text-[11px] text-gray-400 font-normal">
+                    <Boxes size={16} className="text-foreground" />
+                    <h2 className="font-semibold text-foreground">Daftar Varian</h2>
+                    <span className="text-[11px] text-muted-foreground font-normal">
                       ({variantRows.length} varian — hasil deteksi otomatis bisa diubah)
                     </span>
                   </div>
-                  <p className="text-[11px] text-gray-400 mb-4">
+                  <p className="text-[11px] text-muted-foreground mb-4">
                     Stok kosong/unknown diisi 0 secara otomatis — perbarui sebelum menyimpan.
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <tr className="bg-muted text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           <th className="px-4 py-3">Nama Varian</th>
                           <th className="px-4 py-3 w-40">Harga (Rp)</th>
                           <th className="px-4 py-3 w-28">Stok</th>
@@ -491,7 +491,7 @@ export default function ProductCopyPage() {
                           <th className="px-4 py-3 w-12"></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-border">
                         {variantRows.map((row, i) => (
                           <tr key={i} className="align-top">
                             <td className="px-4 py-2">
@@ -500,7 +500,7 @@ export default function ProductCopyPage() {
                                 value={row.name}
                                 onChange={(e) => updateVariantRow(i, { name: e.target.value })}
                                 placeholder="mis. Hitam - M"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+                                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                               />
                             </td>
                             <td className="px-4 py-2">
@@ -515,7 +515,7 @@ export default function ProductCopyPage() {
                                   updateVariantRow(i, { stock: e.target.value.replace(/[^\d]/g, "") })
                                 }
                                 placeholder="0"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+                                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                               />
                             </td>
                             <td className="px-4 py-2">
@@ -524,14 +524,14 @@ export default function ProductCopyPage() {
                                 value={row.sku}
                                 onChange={(e) => updateVariantRow(i, { sku: e.target.value })}
                                 placeholder="kosongkan untuk generate otomatis"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400"
+                                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
                               />
                             </td>
                             <td className="px-4 py-2">
                               <button
                                 type="button"
                                 onClick={() => removeVariantRow(i)}
-                                className="p-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-50"
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                                 title="Hapus varian"
                               >
                                 <Trash2 size={15} />
@@ -545,7 +545,7 @@ export default function ProductCopyPage() {
                   <button
                     type="button"
                     onClick={addVariantRow}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
                   >
                     <Plus size={14} /> Tambah varian
                   </button>
@@ -554,14 +554,14 @@ export default function ProductCopyPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3 flex-wrap bg-gray-50/60">
-              <p className="text-[11px] text-gray-400">
+            <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3 flex-wrap bg-muted/60">
+              <p className="text-[11px] text-muted-foreground">
                 Hasil ambil otomatis bisa tidak 100% akurat — periksa & edit dulu sebelum menyimpan.
               </p>
               <button
                 onClick={saveDraft}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 {saving ? "Menyimpan…" : "Simpan sebagai Draft Produk"}

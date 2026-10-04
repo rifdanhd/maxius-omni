@@ -80,7 +80,7 @@ export default function BrandSwitcher() {
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-accent/50"
               >
                 <span className="flex-1 truncate font-medium">{b.name}</span>
-                {b.id === activeId && <Check size={16} className="text-gray-900" />}
+                {b.id === activeId && <Check size={16} className="text-foreground" />}
               </button>
             ))}
           </div>

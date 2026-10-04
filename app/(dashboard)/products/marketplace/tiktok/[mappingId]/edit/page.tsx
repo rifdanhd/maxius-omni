@@ -729,7 +729,7 @@ export default function TikTokEditPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center text-gray-500 gap-2">
+      <div className="min-h-[60vh] flex items-center justify-center text-muted-foreground gap-2">
         <Loader2 className="animate-spin" size={18} /> Memuat data produk...
       </div>
     );
@@ -739,9 +739,9 @@ export default function TikTokEditPage() {
     return (
       <div className="min-h-[45vh] flex items-center justify-center">
         <div className="max-w-md text-center">
-          <AlertTriangle size={28} className="mx-auto mb-3 text-gray-500" />
-          <p className="text-gray-700 font-semibold">{loadError ?? "Data tidak ditemukan."}</p>
-          <Link href="/products/marketplace/tiktok" className="inline-flex items-center gap-1 mt-4 text-sm text-gray-900 hover:underline">
+          <AlertTriangle size={28} className="mx-auto mb-3 text-muted-foreground" />
+          <p className="text-foreground font-semibold">{loadError ?? "Data tidak ditemukan."}</p>
+          <Link href="/products/marketplace/tiktok" className="inline-flex items-center gap-1 mt-4 text-sm text-foreground hover:underline">
             <ArrowLeft size={14} /> Kembali ke listing
           </Link>
         </div>
@@ -750,11 +750,11 @@ export default function TikTokEditPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {toast && (
         <div
           className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm font-medium flex items-center gap-2 ${
-            toast.type === "success" ? "bg-gray-900 text-white" : "bg-gray-900 text-white"
+            toast.type === "success" ? "bg-primary text-primary-foreground" : "bg-primary text-primary-foreground"
           }`}
         >
           {toast.type === "success" ? <Check size={16} /> : <AlertTriangle size={16} />}
@@ -767,16 +767,16 @@ export default function TikTokEditPage() {
         <div>
           <Link
             href="/products/marketplace/tiktok"
-            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft size={14} /> Kembali ke listing TikTok Shop
           </Link>
-          <h1 className="text-xl font-bold text-gray-900 mt-2 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground mt-2 flex items-center gap-2">
             Ubah Produk
-            <span className="text-xs font-semibold text-white bg-black px-2 py-0.5 rounded-full">TikTok Shop</span>
+            <span className="text-xs font-semibold text-primary-foreground bg-primary px-2 py-0.5 rounded-full">TikTok Shop</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">{title || data.masterName}</p>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-1">{title || data.masterName}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             Master: {data.masterName} · Produk ID: {data.platformProductId}
           </p>
         </div>
@@ -794,11 +794,11 @@ export default function TikTokEditPage() {
               setFieldErrors((f) => ({ ...f, title: "" }));
             }}
               placeholder="Nama produk sesuai SKU & kategori TikTok Shop"
-            className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/30 ${
-              fieldErrors.title ? "border-gray-400" : "border-gray-300"
+            className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 ${
+              fieldErrors.title ? "border-ring" : "border-border"
             }`}
           />
-          <span className="text-[11px] text-gray-400">{title.length}/255 karakter</span>
+          <span className="text-[11px] text-muted-foreground">{title.length}/255 karakter</span>
         </Field>
 
         <Field label="Kategori" required error={fieldErrors.category} fieldKey="category">
@@ -807,16 +807,16 @@ export default function TikTokEditPage() {
               type="button"
               onClick={() => setCatOpen((v) => !v)}
               className={`w-full px-3 py-2 border rounded-md text-sm text-left flex items-center justify-between ${
-                fieldErrors.category ? "border-gray-400" : "border-gray-300"
+                fieldErrors.category ? "border-ring" : "border-border"
               }`}
             >
-              <span className={catNames.length ? "text-gray-900" : "text-gray-400"}>
+              <span className={catNames.length ? "text-foreground" : "text-muted-foreground"}>
                 {catNames.length ? catNames.join(" > ") : "Cari kategori TikTok Shop..."}
               </span>
               {catOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
             {catOpen && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg p-3">
+              <div className="absolute z-20 mt-1 w-full bg-card border border-border rounded-md shadow-lg p-3">
                 <input
                   ref={catInputRef}
                   autoFocus
@@ -826,36 +826,36 @@ export default function TikTokEditPage() {
                     if (e.target.value.trim().length >= 2) searchCategory(e.target.value);
                   }}
                   placeholder="Ketik minimal 2 huruf (mis. keripik)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/30"
+                  className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
                 />
                 <div className="mt-2 max-h-56 overflow-y-auto">
                   {catBusy && (
-                    <div className="flex items-center gap-2 text-xs text-gray-400 p-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground p-2">
                       <Loader2 size={13} className="animate-spin" /> mencari...
                     </div>
                   )}
                   {!catBusy && catResults.length === 0 && (
-                    <p className="text-xs text-gray-400 p-2">Ketik keyword untuk mencari kategori.</p>
+                    <p className="text-xs text-muted-foreground p-2">Ketik keyword untuk mencari kategori.</p>
                   )}
                   {catResults.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => pickCategory(c)}
-                      className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-gray-50 text-gray-700"
+                      className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-muted text-foreground"
                     >
                       <span className="font-medium">{c.name}</span>
-                      {!c.isLeaf && <span className="text-[10px] text-gray-400 ml-1">(parent)</span>}
+                      {!c.isLeaf && <span className="text-[10px] text-muted-foreground ml-1">(parent)</span>}
                     </button>
                   ))}
                 </div>
                 {catId && (
-                  <div className="mt-2 border-t border-gray-100 pt-2 flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400">Terpilih: {catId}</span>
+                  <div className="mt-2 border-t border-border pt-2 flex items-center justify-between flex-wrap gap-3">
+                    <span className="text-[11px] text-muted-foreground">Terpilih: {catId}</span>
                     <button
                       type="button"
                       onClick={() => setCatOpen(false)}
-                      className="text-xs font-semibold bg-[#111827] text-white px-3 py-1 rounded-md"
+                      className="text-xs font-semibold bg-primary text-primary-foreground px-3 py-1 rounded-md"
                     >
                       Terapkan
                     </button>
@@ -868,9 +868,9 @@ export default function TikTokEditPage() {
 
         <Field label="Deskripsi Produk" required error={fieldErrors.description} hint="Bullet list, numbered list, dan insert gambar didukung." fieldKey="description">
           <div
-            className={`border rounded-md overflow-hidden ${fieldErrors.description ? "border-gray-400" : "border-gray-300"}`}
+            className={`border rounded-md overflow-hidden ${fieldErrors.description ? "border-ring" : "border-border"}`}
           >
-            <div className="flex items-center gap-1 px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center gap-1 px-2 py-1.5 bg-muted border-b border-border">
               <ToolButton label="Bullet list" onClick={() => document.execCommand("insertUnorderedList")}>
                 <List size={14} />
               </ToolButton>
@@ -903,7 +903,7 @@ export default function TikTokEditPage() {
               contentEditable
               suppressContentEditableWarning
               onInput={(e) => setDescHtml(e.currentTarget.innerHTML)}
-              className="min-h-[140px] px-3 py-2 text-sm text-gray-800 focus:outline-none prose-sm"
+              className="min-h-[140px] px-3 py-2 text-sm text-foreground focus:outline-none prose-sm"
               data-placeholder="Tulis deskripsi lengkap produk..."
             />
           </div>
@@ -940,7 +940,7 @@ export default function TikTokEditPage() {
               <button
                 type="button"
                 onClick={() => setShowOptional(true)}
-                className="mt-2 text-sm font-medium text-gray-900 hover:underline inline-flex items-center gap-1"
+                className="mt-2 text-sm font-medium text-foreground hover:underline inline-flex items-center gap-1"
               >
                 Lihat lebih banyak <ChevronDown size={14} />
               </button>
@@ -948,20 +948,20 @@ export default function TikTokEditPage() {
           </>
         )}
         {attrs.length === 0 && (
-          <p className="text-sm text-gray-400">Tidak ada atribut kategori untuk ditampilkan.</p>
+          <p className="text-sm text-muted-foreground">Tidak ada atribut kategori untuk ditampilkan.</p>
         )}
       </Section>
 
       {/* C. Varian */}
       <Section title="C. Informasi Penjualan (Varian)" icon={Layers} index={3} hint="Maksimum 3 tipe varian sesuai batas TikTok Shop.">
         {dims.map((d) => (
-          <div key={d.id} className="border border-gray-200 rounded-md p-4 mb-3">
+          <div key={d.id} className="border border-border rounded-md p-4 mb-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Tipe Varian</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Tipe Varian</span>
               <button
                 type="button"
                 onClick={() => removeDim(d.id)}
-                className="text-xs text-gray-500 hover:underline inline-flex items-center gap-1"
+                className="text-xs text-muted-foreground hover:underline inline-flex items-center gap-1"
               >
                 <X size={12} /> Hapus Varian
               </button>
@@ -971,16 +971,16 @@ export default function TikTokEditPage() {
               value={d.name}
               onChange={(e) => updateDim(d.id, { name: e.target.value })}
               placeholder="Nama tipe varian, mis. Berat"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-gray-500/30"
+              className="w-full px-3 py-2 border border-border rounded-md text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
             <div className="flex flex-wrap items-center gap-2">
               {d.values.map((v) => (
                 <span
                   key={v.id}
-                  className="inline-flex items-center gap-1.5 bg-gray-50 text-gray-900 text-sm font-medium px-3 py-1.5 rounded-full"
+                  className="inline-flex items-center gap-1.5 bg-muted text-foreground text-sm font-medium px-3 py-1.5 rounded-full"
                 >
                   {v.name}
-                  <button type="button" onClick={() => removeDimValue(d.id, v.id)} className="hover:text-gray-500">
+                  <button type="button" onClick={() => removeDimValue(d.id, v.id)} className="hover:text-muted-foreground">
                     <X size={13} />
                   </button>
                 </span>
@@ -996,15 +996,15 @@ export default function TikTokEditPage() {
             onClick={() => {
               setDims((prev) => [...prev, { id: uid(), name: "", values: [] }]);
             }}
-            className="text-sm font-semibold text-gray-900 hover:underline inline-flex items-center gap-1 mb-4"
+            className="text-sm font-semibold text-foreground hover:underline inline-flex items-center gap-1 mb-4"
           >
             <Plus size={14} /> Tambah Varian
           </button>
         )}
 
         {/* Apply all */}
-        <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+        <div className="bg-muted border border-border rounded-md p-4 mb-4">
+          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
             Atur dan terapkan ke semua Varian
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
@@ -1015,7 +1015,7 @@ export default function TikTokEditPage() {
               value={applyPrice}
               onChange={(e) => setApplyPrice(e.target.value)}
               placeholder="Harga semua (Rp)"
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="px-3 py-2 border border-border rounded-md text-sm"
             />
             <input
               type="number"
@@ -1023,31 +1023,31 @@ export default function TikTokEditPage() {
               value={applyStock}
               onChange={(e) => setApplyStock(e.target.value)}
               placeholder="Stok semua"
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="px-3 py-2 border border-border rounded-md text-sm"
             />
             <input
               type="text"
               value={applySku}
               onChange={(e) => setApplySku(e.target.value)}
               placeholder="SKU semua (prefix)"
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="px-3 py-2 border border-border rounded-md text-sm"
             />
             <button
               type="button"
               onClick={applyAll}
-              className="px-3 py-2 bg-[#111827] text-white text-sm font-semibold rounded-md hover:bg-gray-900"
+              className="px-3 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-md hover:bg-primary"
             >
               Terapkan Semua
             </button>
           </div>
-          <p className="text-[11px] text-gray-400 mt-2">
+          <p className="text-[11px] text-muted-foreground mt-2">
             Hanya mengisi baris di bawah, tidak langsung submit.
           </p>
         </div>
 
-        <div className="overflow-x-auto border border-gray-200 rounded-md">
+        <div className="overflow-x-auto border border-border rounded-md">
           <table className="w-full text-sm">
-            <thead className="bg-[#f8f9fa] text-gray-600 border-b border-gray-200">
+            <thead className="bg-muted text-foreground border-b border-border">
               <tr>
                 <th className="px-4 py-3 text-left">Nama</th>
                 <th className="px-4 py-3 text-left w-36">Harga (Rp)</th>
@@ -1059,8 +1059,8 @@ export default function TikTokEditPage() {
               {rows.map((r) => {
                 const err = fieldErrors[`variant-${r.key}`];
                 return (
-                  <tr key={r.key} className="border-b border-gray-100 last:border-0" data-field-key={`variant-${r.key}`}>
-                    <td className="px-4 py-2 text-gray-700 font-semibold">{r.name || "Varian"}</td>
+                  <tr key={r.key} className="border-b border-border last:border-0" data-field-key={`variant-${r.key}`}>
+                    <td className="px-4 py-2 text-foreground font-semibold">{r.name || "Varian"}</td>
                     <td className="px-4 py-2">
                       <input
                         type="number"
@@ -1069,7 +1069,7 @@ export default function TikTokEditPage() {
                         value={r.price}
                         onChange={(e) => setRowField(r.key, "price", e.target.value)}
                         placeholder="10000"
-                        className={`w-full px-2 py-2 border rounded-md text-sm ${err ? "border-gray-400" : "border-gray-300"} focus:outline-none focus:ring-2 focus:ring-gray-500/30`}
+                        className={`w-full px-2 py-2 border rounded-md text-sm ${err ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
                       />
                     </td>
                     <td className="px-4 py-2">
@@ -1079,7 +1079,7 @@ export default function TikTokEditPage() {
                         value={r.stock}
                         onChange={(e) => setRowField(r.key, "stock", e.target.value)}
                         placeholder="0"
-                        className={`w-full px-2 py-2 border rounded-md text-sm ${err ? "border-gray-400" : "border-gray-300"} focus:outline-none focus:ring-2 focus:ring-gray-500/30`}
+                        className={`w-full px-2 py-2 border rounded-md text-sm ${err ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
                       />
                     </td>
                     <td className="px-4 py-2">
@@ -1088,9 +1088,9 @@ export default function TikTokEditPage() {
                         value={r.sellerSku}
                         onChange={(e) => setRowField(r.key, "sellerSku", e.target.value)}
                         placeholder="SKU-CHANNEL-001"
-                        className={`w-full px-2 py-2 border rounded-md text-sm ${err ? "border-gray-400" : "border-gray-300"} focus:outline-none focus:ring-2 focus:ring-gray-500/30`}
+                        className={`w-full px-2 py-2 border rounded-md text-sm ${err ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
                       />
-                      {err && <span className="text-[11px] text-gray-500 block mt-1">{err}</span>}
+                      {err && <span className="text-[11px] text-muted-foreground block mt-1">{err}</span>}
                     </td>
                   </tr>
                 );
@@ -1098,10 +1098,10 @@ export default function TikTokEditPage() {
             </tbody>
           </table>
           {rows.length === 0 && (
-            <p className="p-4 text-sm text-gray-400 text-center">Belum ada varian.</p>
+            <p className="p-4 text-sm text-muted-foreground text-center">Belum ada varian.</p>
           )}
         </div>
-        <p className="text-[11px] text-gray-400 mt-2">
+        <p className="text-[11px] text-muted-foreground mt-2">
           {rows.filter((r) => r.tiktokSkuId).length} SKU terhubung ke TikTok; baris baru akan dibuatkan SKU baru saat Publish.
         </p>
       </Section>
@@ -1110,13 +1110,13 @@ export default function TikTokEditPage() {
       <Section title="D. Unggah Foto Produk" icon={ImagePlus} index={4} error={fieldErrors.images} fieldKey="images">
         <div className="grid grid-cols-1 md:grid-cols-3 sm:grid-cols-5 gap-3">
           {images.map((img) => (
-            <div key={img.uid} className="relative group aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-50">
+            <div key={img.uid} className="relative group aspect-square rounded-md overflow-hidden border border-border bg-muted">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.src} alt="produk" className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={() => removeImage(img.uid)}
-                className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                className="absolute top-1 right-1 bg-overlay/60 text-primary-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
                 aria-label="Hapus foto"
               >
                 <X size={12} />
@@ -1127,7 +1127,7 @@ export default function TikTokEditPage() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="aspect-square rounded-md border-2 border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500 flex flex-col items-center justify-center gap-1 transition"
+              className="aspect-square rounded-md border-2 border-dashed border-border text-muted-foreground hover:border-ring hover:text-muted-foreground flex flex-col items-center justify-center gap-1 transition"
             >
               <Upload size={18} />
               <span className="text-[11px] font-medium">Tambah</span>
@@ -1145,42 +1145,42 @@ export default function TikTokEditPage() {
             e.target.value = "";
           }}
         />
-        <p className="text-[11px] text-gray-400 mt-2">
+        <p className="text-[11px] text-muted-foreground mt-2">
           {images.length}/9 foto · Gambar baru di-upload ke TikTok Shop saat Publish.
         </p>
       </Section>
 
       {/* E. Sertifikasi */}
       <Section title="E. Sertifikasi Produk" icon={Check} index={5} hint="Dokumen dari aturan kategori TikTok Shop (mis. Halal & BPOM). Maks. 3 file per sertifikat.">
-        {certs.length === 0 && <p className="text-sm text-gray-400">Kategori ini tidak mensyaratkan sertifikasi.</p>}
+        {certs.length === 0 && <p className="text-sm text-muted-foreground">Kategori ini tidak mensyaratkan sertifikasi.</p>}
         {certs.map((c) => (
-          <div key={c.id} className="border border-gray-200 rounded-md p-4 mb-3">
+          <div key={c.id} className="border border-border rounded-md p-4 mb-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                 {c.title}
                 {c.required && (
-                  <span className="text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">Wajib</span>
+                  <span className="text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full">Wajib</span>
                 )}
               </span>
-              <span className="text-[11px] text-gray-400">{c.items.length}/3 file</span>
+              <span className="text-[11px] text-muted-foreground">{c.items.length}/3 file</span>
             </div>
-            {c.documentDetails && <p className="text-[11px] text-gray-400 mb-2">{c.documentDetails}</p>}
+            {c.documentDetails && <p className="text-[11px] text-muted-foreground mb-2">{c.documentDetails}</p>}
             <div className="flex flex-wrap gap-2">
               {c.items.map((it) => (
                 <span
                   key={it.uid}
-                  className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 text-xs px-3 py-1.5 rounded-full"
+                  className="inline-flex items-center gap-1.5 bg-muted text-foreground text-xs px-3 py-1.5 rounded-full"
                   title={it.kind === "image" ? "Gambar sertifikat" : "File sertifikat"}
                 >
                   {it.kind === "image" ? <ImagePlus size={12} /> : <Check size={12} />}
                   <span className="max-w-[160px] truncate">{it.name ?? (it.uri ? "gambar yang ada" : "file")}</span>
-                  <button type="button" onClick={() => removeCertItem(c.id, it.uid)} className="hover:text-gray-500">
+                  <button type="button" onClick={() => removeCertItem(c.id, it.uid)} className="hover:text-muted-foreground">
                     <X size={12} />
                   </button>
                 </span>
               ))}
               {c.items.length < 3 && (
-                <label className="inline-flex items-center gap-1 text-xs font-medium text-gray-900 border border-dashed border-gray-300 rounded-full px-3 py-1.5 cursor-pointer hover:bg-gray-50">
+                <label className="inline-flex items-center gap-1 text-xs font-medium text-foreground border border-dashed border-border rounded-full px-3 py-1.5 cursor-pointer hover:bg-muted">
                   <Upload size={12} /> Tambah file
                   <input
                     type="file"
@@ -1214,18 +1214,18 @@ export default function TikTokEditPage() {
                   setFieldErrors((f) => ({ ...f, weight: "" }));
                 }}
                 placeholder="0.5"
-                className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.weight ? "border-gray-400" : "border-gray-300"} focus:outline-none focus:ring-2 focus:ring-gray-500/30`}
+                className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.weight ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
               />
               <select
                 value={weight.unit}
                 onChange={(e) => setWeight((w) => ({ ...w, unit: e.target.value as "KG" | "G" }))}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                className="px-3 py-2 border border-border rounded-md text-sm bg-card"
               >
                 <option value="KG">kg</option>
                 <option value="G">g</option>
               </select>
             </div>
-            {fieldErrors.weight && <span className="text-[11px] text-gray-500 block mt-1">{fieldErrors.weight}</span>}
+            {fieldErrors.weight && <span className="text-[11px] text-muted-foreground block mt-1">{fieldErrors.weight}</span>}
           </Field>
         </div>
 
@@ -1233,7 +1233,7 @@ export default function TikTokEditPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {(["length", "width", "height"] as const).map((k) => (
               <div key={k}>
-                <label className="text-[11px] text-gray-500 mb-1 block capitalize">{k === "length" ? "Panjang" : k === "width" ? "Lebar" : "Tinggi"} (cm)</label>
+                <label className="text-[11px] text-muted-foreground mb-1 block capitalize">{k === "length" ? "Panjang" : k === "width" ? "Lebar" : "Tinggi"} (cm)</label>
                 <input
                   type="number"
                   min={1}
@@ -1245,9 +1245,9 @@ export default function TikTokEditPage() {
                     setFieldErrors((f) => ({ ...f, [k]: "" }));
                   }}
                   placeholder="1 - 1.000"
-                  className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors[k] ? "border-gray-400" : "border-gray-300"} focus:outline-none focus:ring-2 focus:ring-gray-500/30`}
+                  className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors[k] ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
                 />
-                {fieldErrors[k] && <span className="text-[11px] text-gray-500 block mt-1">{fieldErrors[k]}</span>}
+                {fieldErrors[k] && <span className="text-[11px] text-muted-foreground block mt-1">{fieldErrors[k]}</span>}
               </div>
             ))}
           </div>
@@ -1273,7 +1273,7 @@ export default function TikTokEditPage() {
           {data.platforms.map((p) => (
             <label
               key={p.key}
-              className="flex items-center gap-3 px-3 py-2.5 border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50"
+              className="flex items-center gap-3 px-3 py-2.5 border border-border rounded-md cursor-pointer hover:bg-muted"
             >
               <input
                 type="checkbox"
@@ -1284,24 +1284,24 @@ export default function TikTokEditPage() {
                   );
                   setFieldErrors((f) => ({ ...f, platforms: "" }));
                 }}
-                className="w-4 h-4 rounded border-gray-300"
+                className="w-4 h-4 rounded border-border"
               />
-              <span className="text-sm font-medium text-gray-800">{p.label}</span>
-              <span className="text-[10px] text-gray-400 ml-auto">{p.key}</span>
+              <span className="text-sm font-medium text-foreground">{p.label}</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">{p.key}</span>
             </label>
           ))}
         </div>
-        {fieldErrors.platforms && <span className="text-[11px] text-gray-500 block mt-1">{fieldErrors.platforms}</span>}
-        <p className="text-[11px] text-gray-400 mt-2">
+        {fieldErrors.platforms && <span className="text-[11px] text-muted-foreground block mt-1">{fieldErrors.platforms}</span>}
+        <p className="text-[11px] text-muted-foreground mt-2">
           Melepas centang platform yang sedang tayang akan menyembunyikan produk dari storefront tersebut saat Publish.
         </p>
       </Section>
 
       {/* Footer */}
-      <div className="mt-8 flex items-center justify-end gap-3 border-t border-gray-200 pt-6">
+      <div className="mt-8 flex items-center justify-end gap-3 border-t border-border pt-6">
         <Link
           href="/products/marketplace/tiktok"
-          className="px-5 py-2.5 border border-gray-300 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="px-5 py-2.5 border border-border rounded-md text-sm font-semibold text-foreground hover:bg-muted"
         >
           Batal
         </Link>
@@ -1309,14 +1309,14 @@ export default function TikTokEditPage() {
           type="button"
           onClick={submit}
           disabled={saving}
-          className="px-6 py-2.5 bg-[#111827] text-white text-sm font-bold rounded-md hover:bg-gray-900 disabled:opacity-50 inline-flex items-center gap-2"
+          className="px-6 py-2.5 bg-primary text-primary-foreground text-sm font-bold rounded-md hover:bg-primary disabled:opacity-50 inline-flex items-center gap-2"
         >
           {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
           {saving ? "Publish..." : "Publish Semua"}
         </button>
       </div>
       {saving && (
-        <p className="text-right text-xs text-gray-400 mt-2">
+        <p className="text-right text-xs text-muted-foreground mt-2">
           Mungkin butuh beberapa detik: upload foto & sertifikasi, lalu update produk ke TikTok Shop.
         </p>
       )}
@@ -1362,16 +1362,16 @@ function Section({
     <section className="mb-8" data-field-key={fieldKey}>
       <div className="flex items-center gap-2 mb-3">
         {index && (
-          <span className="w-6 h-6 rounded-full bg-[#111827] text-white text-xs font-bold flex items-center justify-center">
+          <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
             {index}
           </span>
         )}
-        <Icon size={16} className="text-gray-400" />
-        <h2 className="text-base font-bold text-gray-900">{title}</h2>
+        <Icon size={16} className="text-muted-foreground" />
+        <h2 className="text-base font-bold text-foreground">{title}</h2>
       </div>
-      {hint && <p className="text-[11px] text-gray-400 mb-3 -mt-2">{hint}</p>}
-      {error && <p className="text-xs text-gray-500 mb-2">{error}</p>}
-      <div className="bg-white border border-gray-200 rounded-lg p-5">{children}</div>
+      {hint && <p className="text-[11px] text-muted-foreground mb-3 -mt-2">{hint}</p>}
+      {error && <p className="text-xs text-muted-foreground mb-2">{error}</p>}
+      <div className="bg-card border border-border rounded-lg p-5">{children}</div>
     </section>
   );
 }
@@ -1393,13 +1393,13 @@ function Field({
 }) {
   return (
     <div className="mb-4 last:mb-0" data-field-key={fieldKey}>
-      <label className="font-semibold text-gray-700 text-sm flex items-center gap-1 mb-1.5">
+      <label className="font-semibold text-foreground text-sm flex items-center gap-1 mb-1.5">
         {label}
-        {required && <span className="text-gray-500">*</span>}
+        {required && <span className="text-muted-foreground">*</span>}
       </label>
-      {hint && <p className="text-[11px] text-gray-400 mb-1">{hint}</p>}
+      {hint && <p className="text-[11px] text-muted-foreground mb-1">{hint}</p>}
       {children}
-      {error && <span className="text-[11px] text-gray-500 block mt-1">{error}</span>}
+      {error && <span className="text-[11px] text-muted-foreground block mt-1">{error}</span>}
     </div>
   );
 }
@@ -1421,7 +1421,7 @@ function ToolButton({
         e.preventDefault();
         onClick();
       }}
-      className="p-1.5 rounded hover:bg-gray-200 text-gray-600"
+      className="p-1.5 rounded hover:bg-muted text-foreground"
     >
       {children}
     </button>
@@ -1444,10 +1444,10 @@ function AttributeField({
   const isCustomEntry = attr.options.length === 0;
   return (
     <div className="mb-4">
-      <label className="font-semibold text-gray-700 text-sm flex items-center gap-1 mb-1.5">
+      <label className="font-semibold text-foreground text-sm flex items-center gap-1 mb-1.5">
         {attr.name}
-        {attr.required && <span className="text-gray-500">*</span>}
-        <span className="text-[10px] font-normal text-gray-400 ml-1">{attr.type}</span>
+        {attr.required && <span className="text-muted-foreground">*</span>}
+        <span className="text-[10px] font-normal text-muted-foreground ml-1">{attr.type}</span>
       </label>
       {!isCustomEntry ? (
         <>
@@ -1464,8 +1464,8 @@ function AttributeField({
                   }}
                   className={`px-3 py-1.5 rounded-full text-sm border font-medium transition ${
                     active
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-foreground border-border hover:border-ring"
                   }`}
                 >
                   {o.name}
@@ -1482,7 +1482,7 @@ function AttributeField({
                 onErrorClear();
               }}
               placeholder={`Nilai tambahan (opsional) — ${attr.name}`}
-              className="mt-2 w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/30"
+              className="mt-2 w-full max-w-sm px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
             />
           )}
         </>
@@ -1495,11 +1495,11 @@ function AttributeField({
             onErrorClear();
           }}
           placeholder={`Isi ${attr.name}`}
-          className={`w-full max-w-md px-3 py-2 border rounded-md text-sm ${error ? "border-gray-400" : "border-gray-300"} focus:outline-none focus:ring-2 focus:ring-gray-500/30`}
+          className={`w-full max-w-md px-3 py-2 border rounded-md text-sm ${error ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
         />
       )}
       {attr.required && attr.selected.length === 0 && !attr.customInput.trim() && error && (
-        <span className="text-[11px] text-gray-500 block mt-1">{error}</span>
+        <span className="text-[11px] text-muted-foreground block mt-1">{error}</span>
       )}
     </div>
   );
@@ -1517,10 +1517,10 @@ function ToggleRow({
   desc: string;
 }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+    <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
       <div>
-        <p className="text-sm font-semibold text-gray-800">{title}</p>
-        <p className="text-[11px] text-gray-400">{desc}</p>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="text-[11px] text-muted-foreground">{desc}</p>
       </div>
       <button
         type="button"
@@ -1528,11 +1528,11 @@ function ToggleRow({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-          checked ? "bg-gray-500" : "bg-gray-300"
+          checked ? "bg-muted-foreground" : "bg-muted"
         }`}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${
             checked ? "translate-x-[18px]" : "translate-x-0.5"
           }`}
         />
@@ -1544,7 +1544,7 @@ function ToggleRow({
 function AddChip({ onAdd, placeholder }: { onAdd: (name: string) => void; placeholder: string }) {
   const [value, setValue] = useState("");
   return (
-    <span className="inline-flex items-center gap-1 border border-dashed border-gray-300 rounded-full px-2 py-1">
+    <span className="inline-flex items-center gap-1 border border-dashed border-border rounded-full px-2 py-1">
       <input
         type="text"
         value={value}
@@ -1557,7 +1557,7 @@ function AddChip({ onAdd, placeholder }: { onAdd: (name: string) => void; placeh
           }
         }}
         placeholder={placeholder}
-        className="w-24 bg-transparent text-sm text-gray-600 focus:outline-none placeholder:text-gray-300"
+        className="w-24 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground"
       />
       <button
         type="button"
@@ -1565,7 +1565,7 @@ function AddChip({ onAdd, placeholder }: { onAdd: (name: string) => void; placeh
           onAdd(value);
           setValue("");
         }}
-        className="text-gray-900 hover:text-gray-900"
+        className="text-foreground hover:text-foreground"
       >
         <Plus size={14} />
       </button>

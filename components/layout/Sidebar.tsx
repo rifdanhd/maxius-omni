@@ -182,7 +182,7 @@ export default function Sidebar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   }, [pathname]);
 
-  const sidebarBase = "fixed inset-y-0 left-0 z-40 flex flex-col bg-white border-r border-gray-200 transition-all duration-300";
+  const sidebarBase = "fixed inset-y-0 left-0 z-40 flex flex-col bg-card border-r border-border transition-all duration-300";
   const sidebarWidth = isMobile ? (mobileOpen ? "w-72" : "w-0 opacity-0 pointer-events-none") : (collapsed ? "w-20" : "w-64");
 
   return (
@@ -190,19 +190,19 @@ export default function Sidebar() {
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-30 bg-overlay/50 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside className={`${sidebarBase} ${sidebarWidth}`}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
           <div className="h-14 flex items-center justify-center shrink-0 relative aspect-[278/307]">
             <Image src="/Logo/Logo_backroundNO.png" alt="Maxius.id Logo" fill className="object-contain" priority />
           </div>
-          {!collapsed && !isMobile && <span className="font-bold text-gray-900 text-xl">Maxius.id</span>}
-          {isMobile && mobileOpen && <span className="font-bold text-gray-900 text-lg ml-2">Maxius.id</span>}
+          {!collapsed && !isMobile && <span className="font-bold text-foreground text-xl">Maxius.id</span>}
+          {isMobile && mobileOpen && <span className="font-bold text-foreground text-lg ml-2">Maxius.id</span>}
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 hide-scrollbar">
@@ -213,16 +213,16 @@ export default function Sidebar() {
 
             const buttonContent = (
               <span className={`flex items-center ${collapsed ? 'justify-center w-full' : 'gap-3 w-full'}`}>
-                <item.icon size={18} className={active ? "text-gray-900" : "text-gray-500 group-hover:text-gray-700"} />
+                <item.icon size={18} className={active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"} />
                 {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
-                {!collapsed && hasChildren && (open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />)}
+                {!collapsed && hasChildren && (open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />)}
               </span>
             );
 
             const className = "w-full flex items-center px-3 py-2.5 rounded-lg text-sm transition-colors group " +
               (active
-                ? (collapsed ? "bg-gray-100 text-gray-900 justify-center" : "bg-gray-100 text-gray-900 font-medium border-l-[3px] border-gray-900")
-                : (collapsed ? "text-gray-600 hover:bg-gray-50 justify-center" : "text-gray-600 hover:bg-gray-50 font-medium"));
+                ? (collapsed ? "bg-muted text-foreground justify-center" : "bg-muted text-foreground font-medium border-l-[3px] border-primary")
+                : (collapsed ? "text-foreground hover:bg-muted justify-center" : "text-foreground hover:bg-muted font-medium"));
 
             return (
               <div key={item.key}>
@@ -251,11 +251,11 @@ export default function Sidebar() {
                               onClick={() => setMarketplaceOpen((v) => !v)}
                               className={
                                 "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors group " +
-                                (mpActive ? "text-gray-900 font-semibold" : "text-gray-500 hover:text-gray-900")
+                                (mpActive ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")
                               }
                             >
                               <span className="flex-1 text-left">{child.label}</span>
-                              {marketplaceOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                              {marketplaceOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
                             </button>
                             {marketplaceOpen && (
                               <div className="mt-1 ml-2 flex flex-col gap-1">
@@ -263,13 +263,13 @@ export default function Sidebar() {
                                   platforms.map((p) => (
                                     <Link key={p.key} href={p.href} className={
                                       "text-left px-3 py-1.5 rounded-lg text-sm transition-colors block " +
-                                      (platformActive(p.href) ? "text-gray-900 font-semibold" : "text-gray-400 hover:text-gray-900")
+                                      (platformActive(p.href) ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")
                                     }>
                                       {p.label}
                                     </Link>
                                   ))
                                 ) : (
-                                  <span className="px-3 py-1.5 text-xs text-gray-400 italic">Belum ada channel terhubung.</span>
+                                  <span className="px-3 py-1.5 text-xs text-muted-foreground italic">Belum ada channel terhubung.</span>
                                 )}
                               </div>
                             )}
@@ -279,7 +279,7 @@ export default function Sidebar() {
                       return (
                         <Link key={child.key} href={child.href!} className={
                           "text-left px-3 py-2 rounded-lg text-sm transition-colors block " +
-                          (pathname === child.href ? "text-gray-900 font-semibold" : "text-gray-500 hover:text-gray-900")
+                          (pathname === child.href ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")
                         }>
                           {child.label}
                         </Link>
@@ -293,33 +293,33 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer Actions */}
-        <div className="px-3 pb-3 pt-2 border-t border-gray-100 flex flex-col gap-2 bg-white">
+        <div className="px-3 pb-3 pt-2 border-t border-border flex flex-col gap-2 bg-card">
           {!collapsed && !isMobile ? (
             <div className="flex items-center gap-2">
-              <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 transition-colors">
+              <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-foreground bg-muted hover:bg-muted rounded-lg py-2 transition-colors">
                 <MessageCircle size={14} /> Contact Us
               </button>
-              <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg py-2 transition-colors">
+              <button className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-foreground bg-muted hover:bg-muted rounded-lg py-2 transition-colors">
                 <Rss size={14} /> Follow Channel
               </button>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <button className="w-full flex justify-center text-gray-700 bg-gray-100 rounded-lg py-2 hover:bg-gray-200 transition-colors" title="Contact Us">
+              <button className="w-full flex justify-center text-foreground bg-muted rounded-lg py-2 hover:bg-muted transition-colors" title="Contact Us">
                 <MessageCircle size={16} />
               </button>
-              <button className="w-full flex justify-center text-gray-700 bg-gray-100 rounded-lg py-2 hover:bg-gray-200 transition-colors" title="Follow Channel">
+              <button className="w-full flex justify-center text-foreground bg-muted rounded-lg py-2 hover:bg-muted transition-colors" title="Follow Channel">
                 <Rss size={16} />
               </button>
             </div>
           )}
 
-          <button onClick={() => setCollapsed(!collapsed)} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors mt-2`} title={collapsed ? "Tampilkan Menu" : "Sembunyikan Menu"}>
+          <button onClick={() => setCollapsed(!collapsed)} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors mt-2`} title={collapsed ? "Tampilkan Menu" : "Sembunyikan Menu"}>
             {collapsed ? <ArrowRightToLine size={18} /> : <ArrowLeftToLine size={18} />}
             {!collapsed && "Sembunyikan Menu"}
           </button>
 
-          <button onClick={handleLogout} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors`} title={collapsed ? "Keluar" : undefined}>
+          <button onClick={handleLogout} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors`} title={collapsed ? "Keluar" : undefined}>
             <LogOut size={18} /> {!collapsed && "Keluar"}
           </button>
         </div>

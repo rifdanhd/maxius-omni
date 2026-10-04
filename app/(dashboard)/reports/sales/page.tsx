@@ -134,14 +134,14 @@ export default function SalesReportPage() {
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Laporan Penjualan</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Laporan Penjualan</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Omset & produk paling laku, dihitung langsung dari order (tanpa cancelled/refunded).
           </p>
         </div>
         <button
           onClick={() => setReloadKey((k) => k + 1)}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Muat Ulang
@@ -149,15 +149,15 @@ export default function SalesReportPage() {
       </div>
 
       {/* Filter */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4">
         {PRESETS.map((t) => (
           <button
             key={t.id}
             onClick={() => setPreset(t.id)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
               preset === t.id
-                ? "border-gray-300 bg-gray-50 text-gray-900"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                ? "border-border bg-muted text-foreground"
+                : "border-border bg-card text-foreground hover:bg-muted"
             }`}
           >
             {t.label}
@@ -169,14 +169,14 @@ export default function SalesReportPage() {
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-lg border border-border px-2 py-1.5 text-sm"
             />
-            <span className="text-sm text-gray-500">s/d</span>
+            <span className="text-sm text-muted-foreground">s/d</span>
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-lg border border-border px-2 py-1.5 text-sm"
             />
           </>
         )}
@@ -186,7 +186,7 @@ export default function SalesReportPage() {
             setPlatform(e.target.value);
             setAccountId("");
           }}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+          className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground"
         >
           <option value="">Semua Marketplace</option>
           <option value="SHOPEE">Shopee</option>
@@ -196,7 +196,7 @@ export default function SalesReportPage() {
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+          className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground"
         >
           <option value="">Semua Akun</option>
           {visibleAccounts.map((a) => (
@@ -208,69 +208,71 @@ export default function SalesReportPage() {
       </div>
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
 
       {loading && !omset ? (
-        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-10 text-gray-500">
+        <div className="flex items-center justify-center rounded-xl border border-border bg-card p-10 text-muted-foreground">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Memuat…
         </div>
       ) : (
         <>
           {/* Ringkasan */}
           <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="text-sm font-medium text-gray-500">Total Omset</div>
-              <div className="mt-1 text-2xl font-bold text-gray-900">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <div className="text-sm font-medium text-muted-foreground">Total Omset</div>
+              <div className="mt-1 text-2xl font-bold text-foreground">
                 {omset ? fmtRp(omset.total.revenue) : "—"}
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="text-sm font-medium text-gray-500">Total Order</div>
-              <div className="mt-1 text-2xl font-bold text-gray-900">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <div className="text-sm font-medium text-muted-foreground">Total Order</div>
+              <div className="mt-1 text-2xl font-bold text-foreground">
                 {omset ? fmt(omset.total.orders) : "—"}
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="text-sm font-medium text-gray-500">Produk Terjual</div>
-              <div className="mt-1 text-2xl font-bold text-gray-900">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <div className="text-sm font-medium text-muted-foreground">Produk Terjual</div>
+              <div className="mt-1 text-2xl font-bold text-foreground">
                 {omset ? fmt(omset.total.units) : "—"}
               </div>
             </div>
           </div>
 
           {/* Grafik */}
-          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-5">
-            <h2 className="mb-4 text-base font-bold text-gray-800">Tren Omset</h2>
+          <div className="mb-4 rounded-xl border border-border bg-card p-5">
+            <h2 className="mb-4 text-base font-bold text-foreground">Tren Omset</h2>
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={(omset?.buckets ?? []).map((b) => ({ bucket: b.bucket, Omset: b.revenue, Order: b.orders }))}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="bucket" axisLine={false} tickLine={false} tick={{ fill: "#9ca3af", fontSize: 12 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#9ca3af", fontSize: 12 }} dx={-10} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="bucket" axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dx={-10} />
                   <Tooltip
-                    contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
+                    labelStyle={{ color: "var(--popover-foreground)" }}
+                    itemStyle={{ color: "var(--popover-foreground)" }}
+                    contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)", boxShadow: "var(--chart-tooltip-shadow)" }}
                     formatter={(v, name) =>
                       name === "Omset" ? fmtRp(Number(v ?? 0)) : fmt(Number(v ?? 0))
                     }
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="Omset" stroke="#111827" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Omset" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Winning */}
-          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-bold text-gray-800">Produk Paling Laku</h2>
+          <div className="mb-4 rounded-xl border border-border bg-card p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-base font-bold text-foreground">Produk Paling Laku</h2>
               <div className="flex gap-2">
                 {(["variant", "product"] as const).map((g) => (
                   <button
@@ -278,8 +280,8 @@ export default function SalesReportPage() {
                     onClick={() => setGroupBy(g)}
                     className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
                       groupBy === g
-                        ? "border-gray-300 bg-gray-50 text-gray-900"
-                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        ? "border-border bg-muted text-foreground"
+                        : "border-border text-foreground hover:bg-muted"
                     }`}
                   >
                     {g === "variant" ? "Per Varian" : "Per Produk"}
@@ -288,11 +290,12 @@ export default function SalesReportPage() {
               </div>
             </div>
             {winning.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-500">Belum ada penjualan pada periode & filter ini.</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">Belum ada penjualan pada periode & filter ini.</p>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="py-2 pr-3">#</th>
                     <th className="px-3 py-2">Produk</th>
                     {groupBy === "variant" && <th className="px-3 py-2">SKU</th>}
@@ -304,25 +307,26 @@ export default function SalesReportPage() {
                 </thead>
                 <tbody>
                   {winning.map((r, i) => (
-                    <tr key={r.key} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="py-2.5 pr-3 font-bold text-gray-400">{i + 1}</td>
+                    <tr key={r.key} className="border-b border-border last:border-0 hover:bg-muted">
+                      <td className="py-2.5 pr-3 font-bold text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2.5">
-                        <div className="font-medium text-gray-900">{r.productName}</div>
+                        <div className="font-medium text-foreground">{r.productName}</div>
                         {groupBy === "variant" && r.variantName && (
-                          <div className="text-xs text-gray-500">{r.variantName}</div>
+                          <div className="text-xs text-muted-foreground">{r.variantName}</div>
                         )}
                       </td>
                       {groupBy === "variant" && (
-                        <td className="px-3 py-2.5 font-mono text-xs text-gray-600">{r.sku}</td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-foreground">{r.sku}</td>
                       )}
-                      <td className="px-3 py-2.5 text-gray-600">{r.category ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-foreground">{r.category ?? "—"}</td>
                       <td className="px-3 py-2.5 text-right font-semibold">{fmt(r.qty)} pcs</td>
-                      <td className="px-3 py-2.5 text-right text-gray-700">{fmtRp(r.revenue)}</td>
-                      <td className="px-3 py-2.5 text-right text-gray-500">{fmt(r.orders)}</td>
+                      <td className="px-3 py-2.5 text-right text-foreground">{fmtRp(r.revenue)}</td>
+                      <td className="px-3 py-2.5 text-right text-muted-foreground">{fmt(r.orders)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
@@ -341,28 +345,28 @@ export default function SalesReportPage() {
 function BreakdownCard({ title, rows }: { title: string; rows: Slice[] }) {
   const max = Math.max(1, ...rows.map((r) => r.revenue));
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <h2 className="mb-3 text-base font-bold text-gray-800">{title}</h2>
+    <div className="rounded-xl border border-border bg-card p-5">
+      <h2 className="mb-3 text-base font-bold text-foreground">{title}</h2>
       {rows.length === 0 ? (
-        <p className="py-4 text-center text-sm text-gray-500">Tidak ada data.</p>
+        <p className="py-4 text-center text-sm text-muted-foreground">Tidak ada data.</p>
       ) : (
         <ul className="space-y-3">
           {rows.map((r) => (
             <li key={r.id}>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-800">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-foreground">
                   {r.label}
-                  {r.platform && <span className="ml-1 text-xs text-gray-400">{r.platform}</span>}
+                  {r.platform && <span className="ml-1 text-xs text-muted-foreground">{r.platform}</span>}
                 </span>
-                <span className="font-semibold text-gray-900">{fmtRp(r.revenue)}</span>
+                <span className="font-semibold text-foreground">{fmtRp(r.revenue)}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gray-500"
+                  className="h-full rounded-full bg-muted-foreground"
                   style={{ width: `${Math.round((r.revenue / max) * 100)}%` }}
                 />
               </div>
-              <div className="mt-0.5 text-xs text-gray-500">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 {fmt(r.orders)} order · {fmt(r.units)} pcs
               </div>
             </li>

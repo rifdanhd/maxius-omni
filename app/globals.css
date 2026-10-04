@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "./theme.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   * {
@@ -12,9 +12,24 @@
   }
   html {
     @apply overflow-x-hidden;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
   body {
     @apply min-h-svh w-full bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar;
+  }
+  input, select, textarea {
+    color: var(--foreground);
+    background-color: var(--background);
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--muted-foreground);
+  }
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
   button:not(:disabled),
   [role='button']:not(:disabled) {
@@ -64,9 +79,22 @@
   -webkit-overflow-scrolling: touch;
 }
 .table-responsive::-webkit-scrollbar { height: 6px; }
-.table-responsive::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
-.table-responsive::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-.table-responsive::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+.table-responsive::-webkit-scrollbar-track { background: var(--muted); border-radius: 3px; }
+.table-responsive::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.table-responsive::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+[data-sonner-toaster] {
+  max-width: calc(100vw - 2rem);
+}
+
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-sonner-theme] {
+    width: calc(100vw - var(--mobile-offset-left) - var(--mobile-offset-right));
+  }
+  [data-sonner-toaster][data-sonner-theme] [data-sonner-toast] {
+    width: 100%;
+  }
+}
 
 @media (max-width: 767px) {
   aside { position: fixed !important; z-index: 40; }

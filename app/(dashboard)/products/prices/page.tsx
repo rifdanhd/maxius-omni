@@ -65,10 +65,10 @@ const SORT_OPTIONS = [
 ];
 
 const PLATFORM_BADGE: Record<string, string> = {
-  SHOPEE: "bg-gray-100 text-gray-900",
-  TOKOPEDIA: "bg-gray-100 text-gray-900",
-  TIKTOK_SHOP: "bg-black text-white",
-  DEFAULT: "bg-gray-100 text-gray-700",
+  SHOPEE: "bg-muted text-foreground",
+  TOKOPEDIA: "bg-muted text-foreground",
+  TIKTOK_SHOP: "bg-primary text-primary-foreground",
+  DEFAULT: "bg-muted text-foreground",
 };
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -136,7 +136,7 @@ function InlinePrice({
   if (!editing) {
     return (
       <div className="group/price flex items-center justify-end gap-2">
-        <span className={value === null ? "text-gray-400" : "text-gray-900 font-semibold"}>
+        <span className={value === null ? "text-muted-foreground" : "text-foreground font-semibold"}>
           {fmtRp(value)}
         </span>
         <button
@@ -144,7 +144,7 @@ function InlinePrice({
             setDraft(value === null ? "" : String(Math.round(value)));
             setEditing(true);
           }}
-          className="text-gray-400 hover:text-gray-900 opacity-0 group-hover/price:opacity-100 transition-opacity"
+          className="text-muted-foreground hover:text-foreground opacity-0 group-hover/price:opacity-100 transition-opacity"
           title="Ubah harga"
           aria-label="Ubah harga"
         >
@@ -156,8 +156,8 @@ function InlinePrice({
 
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <div className="flex items-center gap-1 border border-gray-300 rounded-md px-2 py-1 bg-gray-50/50">
-        <span className="text-xs text-gray-500 font-semibold">Rp</span>
+      <div className="flex items-center gap-1 border border-border rounded-md px-2 py-1 bg-muted/50">
+        <span className="text-xs text-muted-foreground font-semibold">Rp</span>
         <input
           ref={inputRef}
           value={draft}
@@ -172,14 +172,14 @@ function InlinePrice({
           onBlur={() => {
             if (!saving) setEditing(false);
           }}
-          className="w-24 bg-transparent outline-none text-sm font-semibold text-gray-900"
+          className="w-24 bg-transparent outline-none text-sm font-semibold text-foreground"
           inputMode="decimal"
         />
       </div>
       <button
         onClick={commit}
         disabled={saving}
-        className="text-gray-900 hover:text-gray-900 disabled:opacity-50"
+        className="text-foreground hover:text-foreground disabled:opacity-50"
         title="Simpan"
         aria-label="Simpan"
       >
@@ -190,14 +190,14 @@ function InlinePrice({
           setEditing(false);
           setError(null);
         }}
-        className="text-gray-400 hover:text-gray-600"
+        className="text-muted-foreground hover:text-foreground"
         title="Batal"
         aria-label="Batal"
       >
         <X size={14} />
       </button>
       {error && (
-        <span className="text-[10px] text-gray-900 whitespace-nowrap absolute right-0 top-full mt-0.5">
+        <span className="text-[10px] text-foreground whitespace-nowrap absolute right-0 top-full mt-0.5">
           {error}
         </span>
       )}
@@ -303,11 +303,11 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Unggah Massal Harga</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 backdrop-blur-sm p-4">
+      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card rounded-xl shadow-xl w-full max-w-lg">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <h2 className="text-lg font-bold text-foreground">Unggah Massal Harga</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
             <X size={20} />
           </button>
         </div>
@@ -315,13 +315,13 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
         <div className="p-6">
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full border-2 border-dashed border-gray-300 rounded-xl py-8 flex flex-col items-center gap-2 text-gray-500 hover:border-gray-400 hover:text-gray-900 transition-colors"
+            className="w-full border-2 border-dashed border-border rounded-xl py-8 flex flex-col items-center gap-2 text-muted-foreground hover:border-ring hover:text-foreground transition-colors"
           >
             <Upload size={24} />
             <span className="text-sm font-medium">
               {fileName ?? "Pilih file CSV untuk diunggah"}
             </span>
-            <span className="text-xs text-gray-400">hanya format .csv yang didukung</span>
+            <span className="text-xs text-muted-foreground">hanya format .csv yang didukung</span>
           </button>
           <input
             ref={fileRef}
@@ -334,21 +334,21 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
             }}
           />
 
-          <p className="mt-4 text-xs text-gray-500">
-            Kolom: <code className="bg-gray-100 px-1 rounded">sku, price, store, channel_sku</code>.
+          <p className="mt-4 text-xs text-muted-foreground">
+            Kolom: <code className="bg-muted px-1 rounded">sku, price, store, channel_sku</code>.
             <br />
-            <code className="bg-gray-100 px-1 rounded">store</code> kosong → set harga default varian.
-            <code className="bg-gray-100 px-1 rounded">store</code> terisi → override per toko.
+            <code className="bg-muted px-1 rounded">store</code> kosong → set harga default varian.
+            <code className="bg-muted px-1 rounded">store</code> terisi → override per toko.
           </p>
 
           {preview.length > 0 && (
-            <div className="mt-4 overflow-x-auto border border-gray-200 rounded-lg max-h-32 overflow-y-auto">
+            <div className="mt-4 overflow-x-auto border border-border rounded-lg max-h-32 overflow-y-auto">
               <table className="w-full text-xs">
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {preview.map((cells, i) => (
-                    <tr key={i} className={i === 0 ? "bg-gray-50 font-semibold" : ""}>
+                    <tr key={i} className={i === 0 ? "bg-muted font-semibold" : ""}>
                       {cells.map((c, j) => (
-                        <td key={j} className="px-2 py-1 text-gray-700 whitespace-nowrap">
+                        <td key={j} className="px-2 py-1 text-foreground whitespace-nowrap">
                           {c}
                         </td>
                       ))}
@@ -360,7 +360,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           )}
 
           {err && (
-            <div className="mt-4 bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl border border-gray-100">
+            <div className="mt-4 bg-muted text-foreground text-xs px-4 py-3 rounded-xl border border-border">
               {err}
             </div>
           )}
@@ -369,8 +369,8 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
             <div
               className={`mt-4 text-xs px-4 py-3 rounded-xl border ${
                 result.ok
-                  ? "bg-gray-50 text-gray-900 border-gray-100"
-                  : "bg-gray-50 text-gray-900 border-gray-100"
+                  ? "bg-muted text-foreground border-border"
+                  : "bg-muted text-foreground border-border"
               }`}
             >
               <div className="font-semibold">
@@ -390,24 +390,24 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3 gap-3">
           <button
             onClick={downloadTemplate}
-            className="text-sm font-medium text-gray-900 hover:underline inline-flex items-center gap-1.5"
+            className="text-sm font-medium text-foreground hover:underline inline-flex items-center gap-1.5"
           >
             <FileDown size={14} /> Unduh template
           </button>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 text-sm font-medium border border-border rounded-md text-foreground hover:bg-muted"
             >
               Tutup
             </button>
             <button
               onClick={submit}
               disabled={!fileName || submitting}
-              className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-md hover:bg-gray-900 disabled:opacity-50 inline-flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary disabled:opacity-50 inline-flex items-center gap-2"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
               Proses Unggah
@@ -691,26 +691,26 @@ export default function KelolaHargaPage() {
     setSort((prev) => (prev.id === "name_asc" ? SORT_OPTIONS[1] : SORT_OPTIONS[0]));
 
   return (
-    <div className="p-8">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+    <div className="p-4 md:p-8">
+      <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-bold text-gray-900">Kelola Harga</h1>
+        <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <h1 className="text-xl font-bold text-foreground">Kelola Harga</h1>
           <div className="relative" ref={uploadRef}>
             <button
               onClick={() => setUploadOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 transition-colors"
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary transition-colors"
             >
               <Upload size={16} /> Unggah Massal <ChevronDown size={14} />
             </button>
             {uploadOpen && (
-              <div className="flex flex-col w-52 absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-1.5">
+              <div className="flex flex-col w-52 absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-30 py-1.5">
                 <button
                   onClick={() => {
                     setUploadOpen(false);
                     setBulkModalOpen(true);
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted"
                 >
                   Unggah File Harga
                 </button>
@@ -720,16 +720,16 @@ export default function KelolaHargaPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           <div className="relative w-80">
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cari nama produk, SKU induk, SKU marketplace"
-              className="border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
+              className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
             />
-            <Search size={16} className="text-gray-400 absolute right-3 top-2.5" />
+            <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
           </div>
 
           {/* Sort */}
@@ -738,15 +738,15 @@ export default function KelolaHargaPage() {
               onClick={() => setSortOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-3 text-sm font-medium h-[38px] min-w-[150px] justify-between ${
                 sortOpen
-                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
-                  : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
+                  ? "border-ring bg-muted/70 text-foreground"
+                  : "border-border text-muted-foreground bg-card hover:bg-muted"
               }`}
             >
               <span className="truncate">{sort.label}</span>
               <ChevronDown size={14} className="shrink-0" />
             </button>
             {sortOpen && (
-              <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-1.5 max-h-80 overflow-y-auto">
+              <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-30 py-1.5 max-h-80 overflow-y-auto">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
@@ -757,8 +757,8 @@ export default function KelolaHargaPage() {
                     }}
                     className={`w-full text-left px-4 py-2 text-sm ${
                       sort.id === opt.id
-                        ? "font-semibold text-gray-900 bg-gray-50"
-                        : "text-gray-700 hover:bg-gray-50"
+                        ? "font-semibold text-foreground bg-muted"
+                        : "text-foreground hover:bg-muted"
                     }`}
                   >
                     {opt.label}
@@ -780,13 +780,13 @@ export default function KelolaHargaPage() {
               }}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] min-w-[120px] justify-between ${
                 filterOpen || filterActive
-                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
-                  : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
+                  ? "border-ring bg-muted/70 text-foreground"
+                  : "border-border text-muted-foreground bg-card hover:bg-muted"
               }`}
             >
               <span>Filter</span>
               {filterActive && (
-                <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
+                <span className="px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
                   {
                     selectedStores.size +
                       (categoryFilter ? 1 : 0) +
@@ -797,9 +797,9 @@ export default function KelolaHargaPage() {
               <ChevronDown size={14} />
             </button>
             {filterOpen && (
-              <div className="absolute left-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-30 p-4 flex flex-col gap-4">
+              <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-80 bg-card border border-border rounded-xl shadow-xl z-30 p-4 flex flex-col gap-4">
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                  <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">
                     Kategori
                   </p>
                   <input
@@ -808,7 +808,7 @@ export default function KelolaHargaPage() {
                     onChange={(e) => setDraftCategory(e.target.value)}
                     placeholder="Mis. Makanan"
                     list="pricing-categories"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                    className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                   />
                   <datalist id="pricing-categories">
                     {categories.map((c) => (
@@ -818,25 +818,25 @@ export default function KelolaHargaPage() {
                 </div>
 
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                  <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">
                     Toko / Marketplace
                   </p>
-                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 border border-gray-200 rounded-lg p-2">
+                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 border border-border rounded-lg p-2">
                     {accounts.length === 0 && (
-                      <p className="text-xs text-gray-400">Belum ada toko terhubung.</p>
+                      <p className="text-xs text-muted-foreground">Belum ada toko terhubung.</p>
                     )}
                     {accounts.map((acc) => {
                       const on = draftStores.has(acc.id);
                       return (
                         <label
                           key={acc.id}
-                          className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5"
+                          className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-muted rounded px-1 py-0.5"
                         >
                           <input
                             type="checkbox"
                             checked={on}
                             onChange={() => toggleStore(acc.id)}
-                            className="w-4 h-4 rounded border-gray-300"
+                            className="w-4 h-4 rounded border-border"
                           />
                           {PLATFORM_LABEL[acc.platform] ?? acc.platform} — {acc.label}
                         </label>
@@ -846,7 +846,7 @@ export default function KelolaHargaPage() {
                 </div>
 
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                  <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">
                     Rentang Harga Default
                   </p>
                   <div className="flex items-center gap-2">
@@ -856,16 +856,16 @@ export default function KelolaHargaPage() {
                       value={draftMin}
                       onChange={(e) => setDraftMin(e.target.value)}
                       placeholder="Min"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                     />
-                    <span className="text-gray-400">—</span>
+                    <span className="text-muted-foreground">—</span>
                     <input
                       type="number"
                       min={0}
                       value={draftMax}
                       onChange={(e) => setDraftMax(e.target.value)}
                       placeholder="Max"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                     />
                   </div>
                 </div>
@@ -873,13 +873,13 @@ export default function KelolaHargaPage() {
                 <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={resetFilter}
-                    className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
+                    className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md"
                   >
                     Reset
                   </button>
                   <button
                     onClick={applyFilter}
-                    className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-md hover:bg-gray-900"
+                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary"
                   >
                     Terapkan
                   </button>
@@ -889,11 +889,11 @@ export default function KelolaHargaPage() {
           </div>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-muted text-foreground text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} baris dipilih
               <button
                 onClick={() => setSelected(new Set())}
-                className="text-gray-500 hover:text-gray-900 underline"
+                className="text-muted-foreground hover:text-foreground underline"
               >
                 Batal
               </button>
@@ -904,12 +904,12 @@ export default function KelolaHargaPage() {
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-[#f8f9fa] border-b border-gray-200 text-gray-600 font-semibold">
+            <thead className="bg-muted border-b border-border text-foreground font-semibold">
               <tr>
                 <th className="px-5 py-3 w-10">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300"
+                    className="w-4 h-4 rounded border-border"
                     checked={allPageSelected}
                     onChange={toggleAll}
                   />
@@ -917,7 +917,7 @@ export default function KelolaHargaPage() {
                 <th className="px-5 py-3">
                   <button
                     onClick={toggleNameSort}
-                    className="inline-flex items-center gap-1 hover:text-gray-900"
+                    className="inline-flex items-center gap-1 hover:text-foreground"
                   >
                     Informasi Produk
                     <ChevronDown size={12} className="opacity-40" />
@@ -933,19 +933,19 @@ export default function KelolaHargaPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     Memuat data harga...
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-900">
+                  <td colSpan={7} className="px-5 py-12 text-center text-foreground">
                     {error}
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
                     Tidak ada data harga. Ubah kata kunci/filter atau buat produk terlebih dahulu.
                   </td>
@@ -954,11 +954,11 @@ export default function KelolaHargaPage() {
                 rows.map((row) => {
                   const checked = selected.has(row.id);
                   return (
-                    <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
+                    <tr key={row.id} className="border-b border-border hover:bg-muted/50 align-top">
                       <td className="px-5 py-4 pt-5">
                         <input
                           type="checkbox"
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-border"
                           checked={checked}
                           onChange={() =>
                             setSelected((prev) => {
@@ -979,21 +979,21 @@ export default function KelolaHargaPage() {
                             <img
                               src={row.product.imageUrl}
                               alt={row.product.name ?? row.sku}
-                              className="w-12 h-12 rounded object-cover shrink-0 bg-gray-100"
+                              className="w-12 h-12 rounded object-cover shrink-0 bg-muted"
                             />
                           ) : (
-                            <div className="w-12 h-12 bg-gray-200 rounded object-cover shrink-0"></div>
+                            <div className="w-12 h-12 bg-muted rounded object-cover shrink-0"></div>
                           )}
                           <div className="max-w-[220px]">
-                            <div className="text-gray-900 font-bold leading-tight">
+                            <div className="text-foreground font-bold leading-tight">
                               {row.product?.name ?? row.sku}
                             </div>
                             {row.product?.category && (
-                              <span className="mt-1 inline-block text-[10px] font-semibold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                              <span className="mt-1 inline-block text-[10px] font-semibold bg-muted text-foreground px-1.5 py-0.5 rounded">
                                 {row.product.category}
                               </span>
                             )}
-                            <div className="text-xs text-gray-400 mt-0.5">
+                            <div className="text-xs text-muted-foreground mt-0.5">
                               Varian: {row.sku}
                             </div>
                           </div>
@@ -1009,7 +1009,7 @@ export default function KelolaHargaPage() {
                           />
                         </div>
                         {row.defaultPriceUpdatedAt && (
-                          <p className="text-[10px] text-gray-400 text-right mt-1">
+                          <p className="text-[10px] text-muted-foreground text-right mt-1">
                             update {fmtDate(row.defaultPriceUpdatedAt)}
                           </p>
                         )}
@@ -1019,7 +1019,7 @@ export default function KelolaHargaPage() {
                       <td className="px-5 py-4">
                         <div className="flex flex-col gap-1.5">
                           {row.markets.length === 0 && (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                           {row.markets.map((m) => (
                             <span
@@ -1039,12 +1039,12 @@ export default function KelolaHargaPage() {
                       <td className="px-5 py-4">
                         <div className="flex flex-col gap-1.5">
                           {row.markets.length === 0 && (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                           {row.markets.map((m) => (
                             <code
                               key={m.id}
-                              className="text-[11px] text-gray-600 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 w-fit"
+                              className="text-[11px] text-foreground bg-muted border border-border rounded px-1.5 py-0.5 w-fit"
                             >
                               {m.channelSku}
                             </code>
@@ -1056,7 +1056,7 @@ export default function KelolaHargaPage() {
                       <td className="px-5 py-4">
                         <div className="flex flex-col gap-1.5 items-end">
                           {row.markets.length === 0 && (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                           {row.markets.map((m) => (
                             <div key={m.id} className="relative flex flex-col items-end">
@@ -1067,7 +1067,7 @@ export default function KelolaHargaPage() {
                               {m.overridePrice !== null && (
                                 <button
                                   onClick={() => clearOverridePrice(row, m)}
-                                  className="text-[10px] text-gray-500 hover:text-gray-900 underline mt-0.5"
+                                  className="text-[10px] text-muted-foreground hover:text-foreground underline mt-0.5"
                                   title="Hapus override → ikuti harga default"
                                 >
                                   ikuti default
@@ -1079,13 +1079,13 @@ export default function KelolaHargaPage() {
                       </td>
 
                       {/* Waktu */}
-                      <td className="px-5 py-4 text-xs text-gray-400 whitespace-nowrap">
+                      <td className="px-5 py-4 text-xs text-muted-foreground whitespace-nowrap">
                         <div>
                           Dibuat:{" "}
-                          <span className="text-gray-600">{fmtDate(row.createdAt)}</span>
+                          <span className="text-foreground">{fmtDate(row.createdAt)}</span>
                         </div>
                         <div className="mt-1">
-                          Update: <span className="text-gray-600">{fmtDate(row.updatedAt)}</span>
+                          Update: <span className="text-foreground">{fmtDate(row.updatedAt)}</span>
                         </div>
                       </td>
                     </tr>
@@ -1097,18 +1097,18 @@ export default function KelolaHargaPage() {
         </div>
 
         {/* Pagination */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">
+          <span className="text-sm text-muted-foreground">
             {total.toLocaleString("id-ID")} varian · halaman {page} dari {totalPages}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => {
                 setLoading(true);
                 setPage((p) => Math.max(1, p - 1));
               }}
               disabled={page <= 1}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft size={14} /> Sebelumnya
             </button>
@@ -1121,8 +1121,8 @@ export default function KelolaHargaPage() {
                 }}
                 className={`w-9 h-9 text-sm rounded-md ${
                   n === page
-                    ? "bg-[#111827] text-white font-semibold"
-                    : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "border border-border text-foreground hover:bg-muted"
                 }`}
               >
                 {n}
@@ -1134,7 +1134,7 @@ export default function KelolaHargaPage() {
                 setPage((p) => Math.min(totalPages, p + 1));
               }}
               disabled={page >= totalPages}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Selanjutnya <ChevronRight size={14} />
             </button>

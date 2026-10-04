@@ -30,14 +30,14 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 backdrop-blur-sm p-4">
+      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card rounded-xl shadow-xl w-full max-w-2xl font-sans">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Pilih Marketplace</h2>
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <h2 className="text-lg font-bold text-foreground">Pilih Marketplace</h2>
           <button 
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
@@ -46,7 +46,7 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
         {/* Body */}
         <div className="p-6">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 bg-gray-50 px-3 py-1 rounded-full inline-block mb-4">Marketplace</h3>
+            <h3 className="text-sm font-semibold text-foreground bg-muted px-3 py-1 rounded-full inline-block mb-4">Marketplace</h3>
             <div className="grid grid-cols-2 gap-4">
               {marketplaces.map((item) => (
                 <PlatformCard
@@ -68,12 +68,12 @@ function PlatformCard({ name, icon, onClick }: { name: string, icon: React.React
   return (
     <button 
       onClick={onClick}
-      className="flex flex-col items-center justify-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-gray-500 hover:shadow-md transition-all group bg-white"
+      className="flex flex-col items-center justify-center gap-3 p-4 border border-border rounded-xl hover:border-ring hover:shadow-md transition-all group bg-card"
     >
-      <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:scale-110 transition-transform">
+      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
         {icon}
       </div>
-      <span className="text-sm font-medium text-gray-700">{name}</span>
+      <span className="text-sm font-medium text-foreground">{name}</span>
     </button>
   );
 }

@@ -70,8 +70,8 @@ const FAQ = [
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-6 rounded-2xl border border-gray-200 bg-white p-5 md:p-6">
-      <h2 className="mb-4 text-lg font-bold text-gray-900">{title}</h2>
+    <section id={id} className="scroll-mt-6 rounded-2xl border border-border bg-card p-5 md:p-6">
+      <h2 className="mb-4 text-lg font-bold text-foreground">{title}</h2>
       {children}
     </section>
   );
@@ -81,8 +81,8 @@ function Steps({ items }: { items: readonly string[] }) {
   return (
     <ol className="space-y-2.5">
       {items.map((line, i) => (
-        <li key={line} className="flex gap-3 text-sm leading-relaxed text-gray-700">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[11px] font-bold text-white">
+        <li key={line} className="flex gap-3 text-sm leading-relaxed text-foreground">
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
             {i + 1}
           </span>
           <span>{line}</span>
@@ -96,21 +96,21 @@ export default function PanduanPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Panduan Penggunaan</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Panduan Penggunaan</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Tutorial lengkap dari login sampai laporan. Klik judul di daftar isi untuk melompat ke bagian yang dibutuhkan.
         </p>
       </div>
 
       {/* Daftar Isi */}
-      <nav className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Daftar Isi</h2>
+      <nav className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Daftar Isi</h2>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {TOC.map((t) => (
             <a
               key={t.id}
               href={`#${t.id}`}
-              className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100"
+              className="rounded-lg border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               {t.title}
             </a>
@@ -119,22 +119,22 @@ export default function PanduanPage() {
       </nav>
 
       <Section id="menu" title="Kenalan dengan Menu">
-        <p className="mb-4 text-sm text-gray-600">
+        <p className="mb-4 text-sm text-foreground">
           Menu ada di bilah kiri. Ini ringkasan tiap menu supaya Anda tahu harus ke mana:
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[560px]">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pr-4">Menu</th>
                 <th className="py-2">Fungsi</th>
               </tr>
             </thead>
             <tbody>
               {MENU_TABLE.map(([menu, desc]) => (
-                <tr key={menu} className="border-b border-gray-100 last:border-0">
-                  <td className="whitespace-nowrap py-2.5 pr-4 font-semibold text-gray-900">{menu}</td>
-                  <td className="py-2.5 text-gray-700">{desc}</td>
+                <tr key={menu} className="border-b border-border last:border-0">
+                  <td className="whitespace-nowrap py-2.5 pr-4 font-semibold text-foreground">{menu}</td>
+                  <td className="py-2.5 text-foreground">{desc}</td>
                 </tr>
               ))}
             </tbody>
@@ -162,8 +162,8 @@ export default function PanduanPage() {
             "Ulangi langkah di atas untuk setiap toko yang dimiliki.",
           ]}
         />
-        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-          <span className="font-semibold text-gray-900">Troubleshooting:</span> toko terputus / Token tertulis
+        <div className="mt-4 rounded-lg border border-border bg-muted p-4 text-sm text-foreground">
+          <span className="font-semibold text-foreground">Troubleshooting:</span> toko terputus / Token tertulis
           &quot;Hilang&quot; → cukup klik Hubungkan lagi dan setujui ulang di halaman seller. Akun yang dipakai harus
           akun seller toko tersebut (bukan akun pembeli).
         </div>
@@ -178,8 +178,8 @@ export default function PanduanPage() {
             "Produk yang sama nantinya dipakai bersama oleh semua toko — tidak perlu membuat produk terpisah per marketplace.",
           ]}
         />
-        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-          <span className="font-semibold text-gray-900">Ingat:</span> stok selalu dihitung per varian (per SKU),
+        <div className="mt-4 rounded-lg border border-border bg-muted p-4 text-sm text-foreground">
+          <span className="font-semibold text-foreground">Ingat:</span> stok selalu dihitung per varian (per SKU),
           bukan per produk induk. Ukuran &quot;L&quot; warna Hitam adalah stok tersendiri dari ukuran &quot;L&quot; warna Putih.
         </div>
       </Section>
@@ -193,8 +193,8 @@ export default function PanduanPage() {
             "SKU toko yang belum masuk daftar muncul di status Belum Terhubung — selesaikan mapping-nya supaya stok terpusat terkirim ke toko itu.",
           ]}
         />
-        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-          <span className="font-semibold text-gray-900">Cara cepat:</span> ambil kode SKU dari halaman listing di
+        <div className="mt-4 rounded-lg border border-border bg-muted p-4 text-sm text-foreground">
+          <span className="font-semibold text-foreground">Cara cepat:</span> ambil kode SKU dari halaman listing di
           Shopee/TikTok, lalu tempel ke kolom mapping varian yang sesuai. Mapping cukup dilakukan sekali.
         </div>
       </Section>
@@ -209,19 +209,19 @@ export default function PanduanPage() {
             ["Stok Mismatch", "Daftar stok di aplikasi ≠ stok di marketplace. Perbaiki dari sini, lalu sinkron."],
             ["Riwayat Inventori", "Jejak lengkap semua perubahan stok: siapa, kapan, berapa, dan karena apa."],
           ].map(([title, desc]) => (
-            <div key={title} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="text-sm font-bold text-gray-900">{title}</div>
-              <div className="mt-1 text-sm leading-relaxed text-gray-700">{desc}</div>
+            <div key={title} className="rounded-lg border border-border bg-muted p-4">
+              <div className="text-sm font-bold text-foreground">{title}</div>
+              <div className="mt-1 text-sm leading-relaxed text-foreground">{desc}</div>
             </div>
           ))}
         </div>
         <ol className="mt-4 space-y-2.5">
-          <li className="flex gap-3 text-sm text-gray-700">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[11px] font-bold text-white">1</span>
+          <li className="flex gap-3 text-sm text-foreground">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">1</span>
             <span>Alur normal: pesanan masuk → stok otomatis berkurang → stok menipis → Anda catat Barang Masuk.</span>
           </li>
-          <li className="flex gap-3 text-sm text-gray-700">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[11px] font-bold text-white">2</span>
+          <li className="flex gap-3 text-sm text-foreground">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">2</span>
             <span>Safety stock membuat sistem membatasi stok yang boleh dijual, sehingga selalu ada cadangan minimal.</span>
           </li>
         </ol>
@@ -252,41 +252,41 @@ export default function PanduanPage() {
 
       <Section id="laporan" title="8. Laporan">
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="text-sm font-bold text-gray-900">Laporan Penjualan</div>
-            <div className="mt-1 text-sm leading-relaxed text-gray-700">
+          <div className="rounded-lg border border-border bg-muted p-4">
+            <div className="text-sm font-bold text-foreground">Laporan Penjualan</div>
+            <div className="mt-1 text-sm leading-relaxed text-foreground">
               Omset per periode, perbandingan dengan periode sebelumnya, produk/varian terlaris (Winning Product),
               dan penjualan per toko.
             </div>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="text-sm font-bold text-gray-900">Laporan Stok</div>
-            <div className="mt-1 text-sm leading-relaxed text-gray-700">
+          <div className="rounded-lg border border-border bg-muted p-4">
+            <div className="text-sm font-bold text-foreground">Laporan Stok</div>
+            <div className="mt-1 text-sm leading-relaxed text-foreground">
               Ringkasan stok fisik, safety stock, dan sisa yang benar-benar tersedia untuk dijual per varian.
             </div>
           </div>
         </div>
-        <p className="mt-4 text-sm text-gray-600">
+        <p className="mt-4 text-sm text-foreground">
           Buka dari menu kiri → Laporan. Grafik penjualan terbaru juga tampil di Dashboard (Analisis Bisnis).
         </p>
       </Section>
 
       <Section id="notifikasi" title="9. Notifikasi & Kesehatan Toko">
-        <div className="space-y-3 text-sm leading-relaxed text-gray-700">
+        <div className="space-y-3 text-sm leading-relaxed text-foreground">
           <p>
-            <span className="font-semibold text-gray-900">Lonceng (pojok kanan atas):</span> daftar peringatan stok
+            <span className="font-semibold text-foreground">Lonceng (pojok kanan atas):</span> daftar peringatan stok
             menipis/habis. Klik untuk melihat, lalu segera restock lewat Barang Masuk.
           </p>
           <p>
-            <span className="font-semibold text-gray-900">Kesehatan Operasional (Dashboard):</span> Stok Central,
+            <span className="font-semibold text-foreground">Kesehatan Operasional (Dashboard):</span> Stok Central,
             Stok Kritis, Stok Mismatch, dan Sync Error (7 hari) — angka yang harus dijaga tetap aman.
           </p>
           <p>
-            <span className="font-semibold text-gray-900">Kesehatan Toko (Dashboard):</span> status tiap toko —
+            <span className="font-semibold text-foreground">Kesehatan Toko (Dashboard):</span> status tiap toko —
             Token, jumlah error, mismatch, dan SKU belum mapping. Titik gelap berarti perlu perhatian.
           </p>
           <p>
-            <span className="font-semibold text-gray-900">Panduan Awal (Dashboard):</span> checklist 6 langkah
+            <span className="font-semibold text-foreground">Panduan Awal (Dashboard):</span> checklist 6 langkah
             penyiapan yang menyesuaikan otomatis dengan kondisi data Anda — klik tiap langkah untuk langsung ke
             halaman kerjanya.
           </p>
@@ -302,8 +302,8 @@ export default function PanduanPage() {
             "Stok menipis? Catat Barang Masuk dari supplier sebelum kehabisan.",
             "Sekali seminggu: jalankan Sinkron di Produk Marketplace & cek Laporan Penjualan.",
           ].map((line, i) => (
-            <li key={line} className="flex gap-3 text-sm leading-relaxed text-gray-700">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-gray-300 text-[11px] font-bold text-gray-500">
+            <li key={line} className="flex gap-3 text-sm leading-relaxed text-foreground">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-border text-[11px] font-bold text-muted-foreground">
                 {i + 1}
               </span>
               <span>{line}</span>
@@ -315,15 +315,15 @@ export default function PanduanPage() {
       <Section id="faq" title="FAQ (Pertanyaan Umum)">
         <div className="space-y-4">
           {FAQ.map((f) => (
-            <div key={f.q} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-              <p className="text-sm font-semibold text-gray-900">{f.q}</p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-700">{f.a}</p>
+            <div key={f.q} className="border-b border-border pb-4 last:border-0 last:pb-0">
+              <p className="text-sm font-semibold text-foreground">{f.q}</p>
+              <p className="mt-1 text-sm leading-relaxed text-foreground">{f.a}</p>
             </div>
           ))}
         </div>
       </Section>
 
-      <p className="pb-4 text-center text-xs text-gray-400">
+      <p className="pb-4 text-center text-xs text-muted-foreground">
         Panduan ini bisa dibuka kapan saja dari menu Panduan di bilah kiri.
       </p>
     </div>

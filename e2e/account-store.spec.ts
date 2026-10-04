@@ -61,9 +61,9 @@ test('modal Tambah Marketplace: 2 kartu (Shopee logo resmi + TikTok Shop), sisan
     // accessible name-nya jadi "TikTok Shop TikTok Shop".
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
-  // Shopee: ikon = logo brand asli (path fill #EE4D2D), bukan ikon lucide.
+  // Shopee: ikon = logo brand asli (path fill token tema brand), bukan ikon lucide.
   await expect(
-    page.getByRole('button', { name: 'Shopee' }).locator('svg path[fill="#EE4D2D"]')
+    page.getByRole('button', { name: 'Shopee' }).locator('svg path[fill="var(--brand-shopee)"]')
   ).toBeVisible();
   await page.screenshot({ path: SHOT('modal') });
 

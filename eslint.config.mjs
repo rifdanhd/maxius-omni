@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     // Artefak dev server e2e (next.config.ts → distDir ".next-e2e" saat
     // MAXIUS_E2E=1) — sama dengan .next, jangan dilint.
     ".next-e2e/**",
+    ".next-office-check/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

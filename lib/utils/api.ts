@@ -31,7 +31,7 @@ export function withAuth(
 ) {
   return async (
     req: NextRequest,
-    ctx?: { params: Promise<Record<string, string | undefined>> }
+    ctx: { params: Promise<Record<string, string | undefined>> }
   ): Promise<Response> => {
     const authHeader = req.headers.get("authorization");
     const token = authHeader?.startsWith("Bearer ")

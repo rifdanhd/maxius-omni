@@ -4,11 +4,11 @@ import { Toaster } from "sonner";
 import { useTheme } from "@/context/theme-provider";
 
 export function AppToaster() {
-  const { theme = "system" } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   return (
     <Toaster
-      theme={theme as "light" | "dark" | "system"}
+      theme={resolvedTheme}
       className="toaster group [&_div[data-content]]:w-full"
       style={
         {

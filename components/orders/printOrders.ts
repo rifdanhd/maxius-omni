@@ -19,34 +19,44 @@ export type PrintableOrder = {
   items: (OrderCardItem & { category?: string })[];
 };
 
+function printThemeStyles(): string {
+  const theme = getComputedStyle(document.documentElement);
+  const tokens = [
+    "background", "overlay", "print-background", "print-foreground", "print-muted",
+    "print-muted-foreground", "print-border", "print-strong-border", "print-inverse",
+    "print-secondary", "print-warning", "print-warning-border",
+  ];
+  return `:root { ${tokens.map((token) => `--${token}: ${theme.getPropertyValue(`--${token}`).trim()};`).join(" ")} }`;
+}
+
 const PRINT_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #111; background: #fff; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--print-foreground); background: var(--print-background); }
   .sheet { padding: 24px; page-break-after: always; }
   .sheet:last-child { page-break-after: auto; }
-  .order-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
+  .order-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--print-foreground); padding-bottom: 12px; margin-bottom: 16px; }
   .store { font-size: 18px; font-weight: 800; }
-  .meta { font-size: 12px; color: #444; margin-top: 2px; }
+  .meta { font-size: 12px; color: var(--print-muted-foreground); margin-top: 2px; }
   .title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
   .label-row { margin-bottom: 10px; }
-  .label-key { font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; }
+  .label-key { font-size: 11px; font-weight: 700; color: var(--print-muted-foreground); text-transform: uppercase; }
   .label-val { font-size: 14px; font-weight: 600; }
   .address { font-size: 14px; line-height: 1.5; }
   table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
-  th { text-align: left; border-bottom: 2px solid #111; padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-  td { border-bottom: 1px solid #ddd; padding: 8px; }
+  th { text-align: left; border-bottom: 2px solid var(--print-foreground); padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  td { border-bottom: 1px solid var(--print-border); padding: 8px; }
   .num { text-align: right; }
   .totals { margin-top: 12px; font-size: 14px; }
-  .totals .grand { display: flex; justify-content: space-between; font-weight: 800; border-top: 2px solid #111; padding-top: 8px; }
+  .totals .grand { display: flex; justify-content: space-between; font-weight: 800; border-top: 2px solid var(--print-foreground); padding-top: 8px; }
   .barcode { margin-top: 24px; font-size: 32px; font-family: monospace; letter-spacing: .15em; }
-  .footer { margin-top: 32px; font-size: 11px; color: #666; }
+  .footer { margin-top: 32px; font-size: 11px; color: var(--print-muted-foreground); }
 `;
 
 // Label pengiriman gaya resi thermal: kertas 100mm x 150mm (4x6"/10x15cm).
 const LABEL_STYLE = `
   @page { size: 100mm 150mm; margin: 0; }
   @media print {
-    html, body { width: 100mm; margin: 0; padding: 0; background: #fff; }
+    html, body { width: 100mm; margin: 0; padding: 0; background: var(--print-background); }
     .sheet { page-break-after: always; break-after: page; }
     .sheet:last-child { page-break-after: auto; break-after: auto; }
   }
@@ -56,12 +66,12 @@ const LABEL_STYLE = `
     box-sizing: border-box;
     padding: 3.5mm 4.5mm;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    color: #111;
-    background: #fff;
+    color: var(--print-foreground);
+    background: var(--print-background);
     font-size: 9.5px;
   }
   .l-box {
-    border: 1.5px solid #000;
+    border: 1.5px solid var(--print-strong-border);
     border-radius: 3px;
     overflow: hidden;
   }
@@ -70,8 +80,8 @@ const LABEL_STYLE = `
     align-items: center;
     justify-content: space-between;
     padding: 5px 8px;
-    border-bottom: 1.5px solid #000;
-    background: #fafafa;
+    border-bottom: 1.5px solid var(--print-strong-border);
+    background: var(--print-muted);
   }
   .l-brand {
     display: flex;
@@ -91,8 +101,8 @@ const LABEL_STYLE = `
   }
   .l-badge {
     display: inline-block;
-    background: #000;
-    color: #fff;
+    background: var(--print-strong-border);
+    color: var(--print-background);
     font-size: 8px;
     font-weight: 800;
     padding: 1px 5px;
@@ -102,7 +112,7 @@ const LABEL_STYLE = `
   .l-barcode-area {
     padding: 6px 8px 5px;
     text-align: center;
-    border-bottom: 1.5px solid #000;
+    border-bottom: 1.5px solid var(--print-strong-border);
   }
   .l-barcode-area svg {
     width: 96%;
@@ -122,28 +132,28 @@ const LABEL_STYLE = `
     display: flex;
     justify-content: space-between;
     font-size: 8.5px;
-    color: #444;
+    color: var(--print-muted-foreground);
     margin-top: 3px;
     padding: 0 4px;
   }
   .l-addresses {
     display: flex;
-    border-bottom: 1.5px solid #000;
+    border-bottom: 1.5px solid var(--print-strong-border);
   }
   .l-recipient {
     flex: 1.4;
     padding: 5px 7px;
-    border-right: 1.5px solid #000;
+    border-right: 1.5px solid var(--print-strong-border);
   }
   .l-sender {
     flex: 1;
     padding: 5px 7px;
-    background: #fbfbfb;
+    background: var(--print-muted);
   }
   .l-k {
     font-size: 8px;
     font-weight: 800;
-    color: #555;
+    color: var(--print-muted-foreground);
     text-transform: uppercase;
     letter-spacing: .05em;
     margin-bottom: 2px;
@@ -156,19 +166,19 @@ const LABEL_STYLE = `
   .l-phone {
     font-size: 9.5px;
     font-weight: 700;
-    color: #222;
+    color: var(--print-foreground);
     margin-bottom: 2px;
   }
   .l-addr {
     font-size: 9px;
     font-weight: 500;
     line-height: 1.35;
-    color: #222;
+    color: var(--print-foreground);
     word-break: break-word;
   }
   .l-items-box {
     padding: 5px 7px;
-    border-bottom: 1.5px solid #000;
+    border-bottom: 1.5px solid var(--print-strong-border);
   }
   .l-items-title {
     display: flex;
@@ -180,7 +190,7 @@ const LABEL_STYLE = `
     letter-spacing: .04em;
     margin-bottom: 3px;
     padding-bottom: 2px;
-    border-bottom: 1px dashed #bbb;
+    border-bottom: 1px dashed var(--print-border);
   }
   .l-table {
     width: 100%;
@@ -191,28 +201,28 @@ const LABEL_STYLE = `
     text-align: left;
     font-size: 8px;
     text-transform: uppercase;
-    color: #555;
+    color: var(--print-muted-foreground);
     padding: 2px 3px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--print-border);
   }
   .l-table td {
     padding: 3px 3px;
     vertical-align: top;
-    border-bottom: 1px dashed #eee;
+    border-bottom: 1px dashed var(--print-border);
   }
   .l-table tr:last-child td {
     border-bottom: none;
   }
   .l-prod-name {
     font-weight: 700;
-    color: #111;
+    color: var(--print-foreground);
     line-height: 1.25;
   }
   .l-prod-var {
     font-size: 8.5px;
     font-weight: 700;
-    color: #000;
-    background: #f0f0f0;
+    color: var(--print-strong-border);
+    background: var(--print-secondary);
     display: inline-block;
     padding: 1px 4px;
     border-radius: 2px;
@@ -226,8 +236,8 @@ const LABEL_STYLE = `
   .l-note {
     margin-top: 3px;
     padding: 3px 5px;
-    background: #fffbeb;
-    border: 1px solid #fef3c7;
+    background: var(--print-warning);
+    border: 1px solid var(--print-warning-border);
     border-radius: 2px;
     font-size: 8px;
     line-height: 1.3;
@@ -237,7 +247,7 @@ const LABEL_STYLE = `
     justify-content: space-between;
     padding: 4px 7px;
     font-size: 8px;
-    background: #fafafa;
+    background: var(--print-muted);
   }
   .l-foot-item strong {
     font-weight: 800;
@@ -281,7 +291,7 @@ function buildLabel(o: PrintableOrder) {
           : "";
       return `
         <tr>
-          <td style="width: 18px; color: #666; font-size: 8px; text-align: center;">${idx + 1}</td>
+          <td style="width: 18px; color: var(--print-muted-foreground); font-size: 8px; text-align: center;">${idx + 1}</td>
           <td>
             <div class="l-prod-name">${escapeHtml(i.name)}</div>
             ${variantText ? `<div class="l-prod-var">Varian: ${variantText}</div>` : ""}
@@ -346,7 +356,7 @@ function buildLabel(o: PrintableOrder) {
               </tr>
             </thead>
             <tbody>
-              ${rows || `<tr><td colspan="3" style="text-align:center;color:#666;">-</td></tr>`}
+              ${rows || `<tr><td colspan="3" style="text-align:center;color:var(--print-muted-foreground);">-</td></tr>`}
             </tbody>
           </table>
           ${note}
@@ -364,7 +374,7 @@ function buildLabel(o: PrintableOrder) {
 function buildInvoice(o: PrintableOrder) {
   const rows = o.items
     .map(
-      (i) => `<tr><td>${escapeHtml(i.name)}<br/><span style="color:#666;font-size:11px">${escapeHtml(i.variant)}</span></td><td class="num">${i.qty}</td><td class="num">${i.price}</td><td class="num">${(i.qty * (Number(i.price.replace(/[^0-9]/g, "")) || 0)).toLocaleString("id-ID")}</td></tr>`
+      (i) => `<tr><td>${escapeHtml(i.name)}<br/><span style="color:var(--print-muted-foreground);font-size:11px">${escapeHtml(i.variant)}</span></td><td class="num">${i.qty}</td><td class="num">${i.price}</td><td class="num">${(i.qty * (Number(i.price.replace(/[^0-9]/g, "")) || 0)).toLocaleString("id-ID")}</td></tr>`
     )
     .join("");
   return `
@@ -435,7 +445,7 @@ function openPrintWindow(title: string, bodyHtml: string, extraStyle = "") {
     return;
   }
   win.document.write(
-    `<html><head><title>${title}</title><style>${PRINT_STYLES}${extraStyle}</style></head><body>${bodyHtml}</body></html>`
+    `<html><head><title>${title}</title><style>${printThemeStyles()}${PRINT_STYLES}${extraStyle}</style></head><body>${bodyHtml}</body></html>`
   );
   win.document.close();
   win.focus();
@@ -473,9 +483,10 @@ export function printShippingDocument(docUrl: string, title = "Label Pengiriman 
       <head>
         <title>${escapeHtml(title)}</title>
         <style>
+          ${printThemeStyles()}
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: #eee; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 16px; font-family: ui-sans-serif, system-ui, sans-serif; }
-          .frame { background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,.15); }
+          body { background: var(--background); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 16px; font-family: ui-sans-serif, system-ui, sans-serif; }
+          .frame { background: var(--print-background); box-shadow: 0 4px 24px color-mix(in srgb, var(--overlay) 15%, transparent); }
           img { display: block; max-height: 100vh; }
           iframe { border: 0; width: 100vw; height: 100vh; }
         </style>
@@ -514,8 +525,9 @@ export function printPdfWindow(url: string, title: string) {
       <head>
         <title>${escapeHtml(title)}</title>
         <style>
+          ${printThemeStyles()}
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: #eee; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 16px; font-family: ui-sans-serif, system-ui, sans-serif; }
+          body { background: var(--background); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 16px; font-family: ui-sans-serif, system-ui, sans-serif; }
           iframe { border: 0; width: 100vw; height: 100vh; }
         </style>
       </head>

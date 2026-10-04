@@ -67,11 +67,11 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        checked ? "bg-gray-900" : "bg-gray-300"
+        checked ? "bg-primary" : "bg-muted"
       } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-transform ${
           checked ? "translate-x-[22px]" : "translate-x-0.5"
         }`}
       />
@@ -91,14 +91,14 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex items-start gap-3">
-        <span className="rounded-lg bg-gray-50 p-2 text-gray-900">
+        <span className="rounded-lg bg-muted p-2 text-foreground">
           <Icon className="h-5 w-5" />
         </span>
         <div>
-          <h2 className="font-bold text-gray-900">{title}</h2>
-          <p className="mt-0.5 text-sm text-gray-500">{desc}</p>
+          <h2 className="font-bold text-foreground">{title}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{desc}</p>
         </div>
       </div>
       {children}
@@ -161,7 +161,7 @@ export default function InventorySettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-[60vh] items-center justify-center text-gray-500">
+      <div className="flex h-full min-h-[60vh] items-center justify-center text-muted-foreground">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Memuat…
       </div>
     );
@@ -171,22 +171,22 @@ export default function InventorySettingsPage() {
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pengaturan Inventori</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Pengaturan Inventori</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Ambang stok rendah, notifikasi, sinkronisasi ke marketplace, dan preferensi stok
             opname.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <CheckCircle2 className="h-4 w-4" /> Tersimpan
             </span>
           )}
           <button
             onClick={save}
             disabled={saving || !settings}
-            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Simpan Pengaturan
@@ -195,14 +195,14 @@ export default function InventorySettingsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
-          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" />
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
           <div>{error}</div>
         </div>
       )}
 
       {!settings ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
+        <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
           Pengaturan tidak tersedia.
         </div>
       ) : (
@@ -221,11 +221,11 @@ export default function InventorySettingsPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, lowStockDefaultThreshold: Number(e.target.value) })
                 }
-                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                className="w-28 rounded-lg border border-border px-3 py-2 text-sm focus:border-ring focus:outline-none"
               />
-              <span className="text-sm text-gray-500">unit atau kurang = stok menipis</span>
+              <span className="text-sm text-muted-foreground">unit atau kurang = stok menipis</span>
             </div>
-            <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Berlaku untuk <b>produk baru</b> (Pemetaan Produk &amp; Salin Produk). Produk yang
               sudah ada memakai ambang per-produk masing-masing dan tetap bisa diubah di halaman
               Produk Master. Nilai ini dipakai dashboard &ldquo;Yang Perlu Dilakukan&rdquo;,
@@ -239,11 +239,11 @@ export default function InventorySettingsPage() {
             title="Notifikasi Stok"
             desc="Peringatan saat stok produk menyentuh ambang batas."
           >
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border">
               <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
                 <div>
-                  <div className="font-medium text-gray-900">Notifikasi in-app</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="font-medium text-foreground">Notifikasi in-app</div>
+                  <div className="text-sm text-muted-foreground">
                     Lonceng notifikasi &ldquo;Stok Menipis&rdquo; di kanan atas dashboard.
                   </div>
                 </div>
@@ -254,10 +254,10 @@ export default function InventorySettingsPage() {
               </label>
               <div className="flex items-center justify-between gap-4 py-3">
                 <div>
-                  <div className="flex items-center gap-1.5 font-medium text-gray-900">
-                    <Mail className="h-4 w-4 text-gray-400" /> Notifikasi email
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Mail className="h-4 w-4 text-muted-foreground" /> Notifikasi email
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-muted-foreground">
                     Belum tersedia — sistem belum terhubung ke layanan email.
                   </div>
                 </div>
@@ -276,7 +276,7 @@ export default function InventorySettingsPage() {
             title="Sinkronisasi Stok ke Marketplace"
             desc="Push otomatis stok terbaru setelah penyesuaian manual atau stok opname."
           >
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border">
               {(
                 [
                   {
@@ -298,8 +298,8 @@ export default function InventorySettingsPage() {
               ).map((p) => (
                 <label key={p.key} className="flex cursor-pointer items-center justify-between gap-4 py-3">
                   <div>
-                    <div className="font-medium text-gray-900">{p.label}</div>
-                    <div className="text-sm text-gray-500">{p.note}</div>
+                    <div className="font-medium text-foreground">{p.label}</div>
+                    <div className="text-sm text-muted-foreground">{p.note}</div>
                   </div>
                   <Toggle
                     checked={settings[p.key]}
@@ -308,7 +308,7 @@ export default function InventorySettingsPage() {
                 </label>
               ))}
             </div>
-            <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Mematikan push tidak mengubah stok pusat — hanya menahan pengiriman angka ke
               marketplace. Setiap penahanan tercatat di log sinkronisasi.
             </p>
@@ -321,13 +321,13 @@ export default function InventorySettingsPage() {
             desc="Pengingat rutin untuk menghitung fisik ulang stok gudang."
           >
             <label className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-gray-700">Frekuensi pengingat</span>
+              <span className="text-sm font-medium text-foreground">Frekuensi pengingat</span>
               <select
                 value={settings.opnameReminderFrequency}
                 onChange={(e) =>
                   setSettings({ ...settings, opnameReminderFrequency: e.target.value })
                 }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm focus:border-ring focus:outline-none"
               >
                 {FREQ_OPTIONS.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -336,7 +336,7 @@ export default function InventorySettingsPage() {
                 ))}
               </select>
             </label>
-            <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Preferensi disimpan dulu — pengingat otomatis (penjadwal) belum berjalan dan akan
               dikerjakan terpisah.
             </p>

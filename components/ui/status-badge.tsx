@@ -25,24 +25,24 @@ export type StatusVariant =
   | "info";
 
 const statusStyles: Record<StatusVariant, string> = {
-  success: "bg-gray-100 text-gray-900 border-gray-200",
-  failed: "bg-gray-100 text-gray-900 border-gray-200",
-  pending: "bg-gray-100 text-gray-900 border-gray-200",
-  processing: "bg-gray-100 text-gray-900 border-gray-200",
-  shipped: "bg-gray-100 text-gray-900 border-gray-200",
-  delivered: "bg-gray-100 text-gray-900 border-gray-200",
-  cancelled: "bg-gray-100 text-gray-700 border-gray-200",
-  returned: "bg-gray-100 text-gray-900 border-gray-200",
-  refunded: "bg-gray-100 text-gray-900 border-gray-200",
-  mismatch: "bg-gray-100 text-gray-900 border-gray-200",
-  active: "bg-gray-100 text-gray-900 border-gray-200",
-  inactive: "bg-gray-100 text-gray-700 border-gray-200",
-  draft: "bg-gray-100 text-gray-900 border-gray-200",
-  low: "bg-gray-100 text-gray-900 border-gray-200",
-  out: "bg-gray-100 text-gray-900 border-gray-200",
-  ok: "bg-gray-100 text-gray-900 border-gray-200",
-  warning: "bg-gray-100 text-gray-900 border-gray-200",
-  info: "bg-gray-100 text-gray-900 border-gray-200",
+  success: "bg-muted text-foreground border-border",
+  failed: "bg-muted text-foreground border-border",
+  pending: "bg-muted text-foreground border-border",
+  processing: "bg-muted text-foreground border-border",
+  shipped: "bg-muted text-foreground border-border",
+  delivered: "bg-muted text-foreground border-border",
+  cancelled: "bg-muted text-foreground border-border",
+  returned: "bg-muted text-foreground border-border",
+  refunded: "bg-muted text-foreground border-border",
+  mismatch: "bg-muted text-foreground border-border",
+  active: "bg-muted text-foreground border-border",
+  inactive: "bg-muted text-foreground border-border",
+  draft: "bg-muted text-foreground border-border",
+  low: "bg-muted text-foreground border-border",
+  out: "bg-muted text-foreground border-border",
+  ok: "bg-muted text-foreground border-border",
+  warning: "bg-muted text-foreground border-border",
+  info: "bg-muted text-foreground border-border",
 };
 
 export interface StatusBadgeProps {
@@ -52,7 +52,7 @@ export interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const style = statusStyles[status as StatusVariant] ?? "bg-gray-100 text-gray-700 border-gray-200";
+  const style = statusStyles[status as StatusVariant] ?? "bg-muted text-foreground border-border";
   return (
     <Badge
       variant="outline"

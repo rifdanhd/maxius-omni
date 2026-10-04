@@ -82,11 +82,11 @@ const ACTIVITY_TYPE_LABEL: Record<string, string> = {
 
 // Badge warna per status activity (nilai API TikTok).
 const STATUS_BADGE: Record<string, string> = {
-  ONGOING: "bg-gray-100 text-gray-900 border-gray-200",
-  NOT_START: "bg-gray-100 text-gray-900 border-gray-200",
-  DEACTIVATED: "bg-gray-100 text-gray-900 border-gray-200",
-  ENDED: "bg-gray-100 text-gray-500 border-gray-200",
-  NOT_EFFECTIVE: "bg-gray-100 text-gray-900 border-gray-200",
+  ONGOING: "bg-muted text-foreground border-border",
+  NOT_START: "bg-muted text-foreground border-border",
+  DEACTIVATED: "bg-muted text-foreground border-border",
+  ENDED: "bg-muted text-muted-foreground border-border",
+  NOT_EFFECTIVE: "bg-muted text-foreground border-border",
 };
 
 const PRODUCT_LEVEL_LABEL: Record<string, string> = {
@@ -139,7 +139,7 @@ function formatRelativeTime(iso: string | null | undefined): string {
 }
 
 function statusBadgeClass(status: string): string {
-  return STATUS_BADGE[status] ?? "bg-gray-100 text-gray-600 border-gray-200";
+  return STATUS_BADGE[status] ?? "bg-muted text-foreground border-border";
 }
 
 function activityTypeLabel(type: string): string {
@@ -151,17 +151,17 @@ function activityTypeLabel(type: string): string {
 function ActivityItemsDetail({ activity }: { activity: PromotionActivity }) {
   if (activity.items.length === 0) {
     return (
-      <p className="px-4 py-3 text-xs italic text-gray-400">
+      <p className="px-4 py-3 text-xs italic text-muted-foreground">
         Tidak ada item tersimpan untuk activity ini.
       </p>
     );
   }
 
   return (
-    <div className="overflow-x-auto bg-gray-50/60">
+    <div className="overflow-x-auto bg-muted/60">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wider text-gray-400">
+          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="pl-11 pr-4 py-2 font-semibold">Produk / SKU</th>
             <th className="px-4 py-2 font-semibold">Diskon</th>
             <th className="px-4 py-2 font-semibold">Harga Aktivitas</th>
@@ -173,42 +173,42 @@ function ActivityItemsDetail({ activity }: { activity: PromotionActivity }) {
           {activity.items.map((item) => {
             const productName = item.productMapping?.channelSku ?? null;
             return (
-              <tr key={item.id} className="border-b border-gray-100 last:border-0 hover:bg-white/60">
+              <tr key={item.id} className="border-b border-border last:border-0 hover:bg-card/60">
                 <td className="pl-11 pr-4 py-3">
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-foreground">
                     {productName ?? item.platformProductId}
                   </p>
-                  <p className="text-[11px] text-gray-400 font-mono">
+                  <p className="text-[11px] text-muted-foreground font-mono">
                     {item.platformSkuId ? `SKU ${item.platformSkuId}` : `Product ${item.platformProductId}`}
                     {item.productMapping ? "" : " · belum ter-mapping di Maxius"}
                   </p>
                 </td>
                 <td className="px-4 py-3">
                   {item.discount ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs font-bold text-gray-900 border border-gray-200">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-bold text-foreground border border-border">
                       <Percent size={11} />
                       {item.discount}
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-400">-</span>
+                    <span className="text-xs text-muted-foreground">-</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-700">
+                <td className="px-4 py-3 text-xs text-foreground">
                   {item.activityPriceAmount
                     ? `${item.activityPriceCurrency ?? ""} ${item.activityPriceAmount}`.trim()
                     : item.activityPriceCurrency
                       ? `${item.activityPriceCurrency} (tanpa amount)`
                       : "-"}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-700">
+                <td className="px-4 py-3 text-xs text-foreground">
                   {item.quantityLimit ?? "-"}
                   {item.quantityPerUser !== null && item.quantityPerUser !== undefined ? (
-                    <span className="text-[11px] text-gray-400 block">
+                    <span className="text-[11px] text-muted-foreground block">
                       max {item.quantityPerUser}/pembeli
                     </span>
                   ) : null}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-700">{item.usedQuantity ?? "-"}</td>
+                <td className="px-4 py-3 text-xs text-foreground">{item.usedQuantity ?? "-"}</td>
               </tr>
             );
           })}
@@ -360,36 +360,36 @@ export default function PromotionsPage() {
   const filterActive = q.trim() !== "" || accountFilter !== "ALL";
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {/* Page header + badge mode monitoring */}
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl font-bold text-gray-900">Promosi Marketplace</h1>
+            <h1 className="text-xl font-bold text-foreground">Promosi Marketplace</h1>
             <span
-              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-bold text-gray-900"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-bold text-foreground"
               title="Halaman ini menampilkan data dari TikTok Shop & Shopee — tidak ada aksi kelola"
             >
               <Info size={12} />
               Mode monitoring (baca-saja)
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-gray-400 uppercase tracking-wider">
+          <p className="mt-0.5 text-xs text-muted-foreground uppercase tracking-wider">
             Marketplace › Promosi
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href="/promotions/create"
-            className="flex items-center gap-1.5 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900"
+            className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary"
           >
             <Plus size={16} />
             Buat Promosi Baru
           </Link>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-muted-foreground">
             {activities.length > 0 ? (
               <>
-                <b className="text-gray-600">{activities.length}</b> activity terpantau
+                <b className="text-foreground">{activities.length}</b> activity terpantau
               </>
             ) : (
               "Data diperbarui lewat ingest"
@@ -398,7 +398,7 @@ export default function PromotionsPage() {
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
             disabled={loading}
-            className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {loading ? "Memuat..." : "Muat Ulang"}
@@ -408,7 +408,7 @@ export default function PromotionsPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -418,8 +418,8 @@ export default function PromotionsPage() {
           zombie terlewat: create sukses menurut sebagian sumber tapi tidak
           terkonfirmasi, atau intent PENDING >30 menit (proses crash). */}
       {visibleAlerts.length > 0 && (
-        <div className="mb-4 rounded-lg border border-gray-300 bg-gray-50 px-4 py-3">
-          <div className="flex items-start gap-2 text-sm text-gray-900">
+        <div className="mb-4 rounded-lg border border-border bg-muted px-4 py-3">
+          <div className="flex items-start gap-2 text-sm text-foreground">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="font-bold">
@@ -434,13 +434,13 @@ export default function PromotionsPage() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-[11px] text-gray-900">
+              <p className="mt-1 text-[11px] text-foreground">
                 Cek TikTok Seller Center — nonaktifkan activity zombie bila ada.
               </p>
             </div>
             <button
               onClick={() => setDismissedAlertIds(new Set(alerts.map((a) => a.auditLogId)))}
-              className="shrink-0 rounded px-2 py-1 text-[11px] font-semibold text-gray-900 hover:bg-gray-100"
+              className="shrink-0 rounded px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-muted"
             >
               Tutup
             </button>
@@ -448,26 +448,26 @@ export default function PromotionsPage() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+      <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Toolbar: search + dropdown toko + reset filter — satu baris */}
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           <div className="relative w-80">
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cari nama promosi, produk, atau SKU"
-              className="border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
+              className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
             />
-            <Search size={16} className="text-gray-400 absolute right-3 top-2.5" />
+            <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
           </div>
 
           <div className="relative">
-            <Store size={14} className="text-gray-400 absolute left-3 top-3 pointer-events-none" />
+            <Store size={14} className="text-muted-foreground absolute left-3 top-3 pointer-events-none" />
             <select
               value={accountFilter}
               onChange={(e) => setAccountFilter(e.target.value)}
-              className="border border-gray-300 rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-white cursor-pointer font-medium"
+              className="border border-border rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-card cursor-pointer font-medium"
             >
               <option value="ALL">Semua Toko</option>
               {accounts.map((acc) => (
@@ -484,7 +484,7 @@ export default function PromotionsPage() {
                 setSearchInput("");
                 setAccountFilter("ALL");
               }}
-              className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-500 h-[38px] hover:bg-gray-50"
+              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground h-[38px] hover:bg-muted"
             >
               Reset Filter
             </button>
@@ -493,7 +493,7 @@ export default function PromotionsPage() {
 
         {/* Tabs per status — SELALU terlihat (badge 0 saat kosong) supaya
             struktur halaman jelas, bukan hanya muncul saat ada data. */}
-        <div className="px-4 pt-3 flex items-center gap-2 flex-wrap border-b border-gray-200">
+        <div className="px-4 pt-3 flex items-center gap-2 flex-wrap border-b border-border">
             {TAB_ORDER.map((key) => {
               const active = tab === key;
               return (
@@ -505,14 +505,14 @@ export default function PromotionsPage() {
                   }}
                   className={`px-4 py-2 rounded-t-lg text-sm font-semibold flex items-center gap-2 border border-b-0 transition-colors ${
                     active
-                      ? "bg-[#111827] text-white border-transparent"
-                      : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                      ? "bg-primary text-primary-foreground border-transparent"
+                      : "bg-muted text-foreground border-border hover:bg-muted"
                   }`}
                 >
                   {TAB_LABEL[key]}
                   <span
                     className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      active ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"
+                      active ? "bg-card/20 text-primary-foreground" : "bg-muted/70 text-muted-foreground"
                     }`}
                   >
                     {counts[key]}
@@ -524,23 +524,23 @@ export default function PromotionsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <Loader2 size={28} className="animate-spin mb-3 text-[#111827]" />
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <Loader2 size={28} className="animate-spin mb-3 text-foreground" />
             <p className="text-sm">Memuat daftar promosi…</p>
           </div>
         ) : activities.length === 0 ? (
           /* Empty state global — belum ada data ingest sama sekali */
           <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
-            <div className="mb-5 rounded-2xl bg-gray-100 p-5">
-              <PackageOpen size={32} className="mx-auto text-gray-400" />
+            <div className="mb-5 rounded-2xl bg-muted p-5">
+              <PackageOpen size={32} className="mx-auto text-muted-foreground" />
             </div>
-            <h2 className="mb-1.5 text-base font-bold text-gray-900">
+            <h2 className="mb-1.5 text-base font-bold text-foreground">
               Belum ada promo aktif dari marketplace
             </h2>
-            <p className="max-w-md text-sm text-gray-500">
+            <p className="max-w-md text-sm text-muted-foreground">
               Data promosi muncul otomatis — ingest berjalan tiap 30 menit (TikTok &
 amp; Shopee). Untuk tarik sekarang, jalankan{" "}
-              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-700">
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
                 scripts/run-promotion-ingest.mts
               </code>
               .
@@ -549,16 +549,16 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
         ) : rows.length === 0 ? (
           /* Empty state per tab */
           <div className="flex flex-col items-center justify-center py-14 px-8 text-center">
-            <div className="mb-4 rounded-2xl bg-gray-100 p-4">
-              <Tag size={24} className="mx-auto text-gray-400" />
+            <div className="mb-4 rounded-2xl bg-muted p-4">
+              <Tag size={24} className="mx-auto text-muted-foreground" />
             </div>
-            <h2 className="mb-1 text-sm font-bold text-gray-900">{TAB_EMPTY_TEXT[tab]}</h2>
+            <h2 className="mb-1 text-sm font-bold text-foreground">{TAB_EMPTY_TEXT[tab]}</h2>
             {filterActive ? (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Coba ubah kata kunci atau reset filter toko — activity bisa saja ada di tab lain.
               </p>
             ) : (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Activity dengan status lain tetap tampil di tab yang sesuai.
               </p>
             )}
@@ -569,7 +569,7 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wider text-gray-400 bg-gray-50/50">
+                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground bg-muted/50">
                     <th className="px-4 py-3 font-semibold w-[24%]">Nama Promosi</th>
                     <th className="px-4 py-3 font-semibold w-[24%]">Informasi Produk</th>
                     <th className="px-4 py-3 font-semibold w-[14%]">Toko</th>
@@ -588,22 +588,22 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
                     return (
                       <Fragment key={activity.id}>
                         <tr
-                          className="border-b border-gray-100 hover:bg-gray-50/50 align-top"
+                          className="border-b border-border hover:bg-muted/50 align-top"
                         >
                           <td className="px-4 py-3.5">
                             <div className="flex items-start gap-2">
                               <div
                                 className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                                   activity.status === "ONGOING"
-                                    ? "bg-gray-50 text-gray-900"
-                                    : "bg-gray-100 text-gray-400"
+                                    ? "bg-muted text-foreground"
+                                    : "bg-muted text-muted-foreground"
                                 }`}
                               >
                                 <Tag size={14} />
                               </div>
                               <div className="min-w-0">
                                 <p
-                                  className="font-bold text-gray-900 leading-tight truncate max-w-[260px]"
+                                  className="font-bold text-foreground leading-tight truncate max-w-[260px]"
                                   title={activity.title}
                                 >
                                   {activity.title}
@@ -616,17 +616,17 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
                                   </span>
                                   {unverifiedActivityIds.has(activity.externalActivityId) && (
                                     <span
-                                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-full border bg-gray-100 text-gray-900 border-gray-300"
+                                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-full border bg-muted text-foreground border-border"
                                       title="Create dari Maxius tidak terkonfirmasi — cek TikTok Seller Center"
                                     >
                                       Perlu cek manual
                                     </span>
                                   )}
-                                  <span className="text-[11px] text-gray-500">
+                                  <span className="text-[11px] text-muted-foreground">
                                     {activityTypeLabel(activity.activityType)}
                                   </span>
-                                  <span className="text-[11px] text-gray-300">•</span>
-                                  <span className="text-[11px] text-gray-400">
+                                  <span className="text-[11px] text-muted-foreground">•</span>
+                                  <span className="text-[11px] text-muted-foreground">
                                     {PRODUCT_LEVEL_LABEL[activity.productLevel] ??
                                       activity.productLevel}
                                   </span>
@@ -645,15 +645,15 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
                             >
                               <ChevronDown
                                 size={14}
-                                className={`mt-0.5 shrink-0 text-gray-400 transition-transform ${
+                                className={`mt-0.5 shrink-0 text-muted-foreground transition-transform ${
                                   isExpanded ? "rotate-180" : ""
                                 }`}
                               />
                               <span className="min-w-0">
-                                <span className="block text-sm font-bold text-gray-900 group-hover:text-[#111827]">
+                                <span className="block text-sm font-bold text-foreground group-hover:text-foreground">
                                   {activity.items.length} produk
                                 </span>
-                                <span className="block text-[11px] text-gray-500 truncate max-w-[220px]">
+                                <span className="block text-[11px] text-muted-foreground truncate max-w-[220px]">
                                   {firstProduct ?? "-"}
                                   {activity.items.length > 1
                                     ? ` +${activity.items.length - 1} lainnya`
@@ -665,7 +665,7 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
 
                           <td className="px-4 py-3.5">
                             <span
-                              className="text-xs font-semibold text-gray-700 block truncate max-w-[150px]"
+                              className="text-xs font-semibold text-foreground block truncate max-w-[150px]"
                               title={activity.account.label}
                             >
                               {activity.account.label}
@@ -673,20 +673,20 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
                           </td>
 
                           <td className="px-4 py-3.5">
-                            <p className="text-xs font-semibold text-gray-900">
+                            <p className="text-xs font-semibold text-foreground">
                               {fmtDateTime(activity.startsAt)}
                             </p>
-                            <p className="text-[11px] text-gray-500">
+                            <p className="text-[11px] text-muted-foreground">
                               s/d {fmtDateTime(activity.endsAt)}
                             </p>
                           </td>
 
                           <td className="px-4 py-3.5">
-                            <p className="text-xs text-gray-700">
+                            <p className="text-xs text-foreground">
                               {formatRelativeTime(activity.lastConfirmedAt)}
                             </p>
                             <p
-                              className="text-[11px] text-gray-400"
+                              className="text-[11px] text-muted-foreground"
                               title={fmtDateTime(activity.lastConfirmedAt)}
                             >
                               Terakhir disinkron
@@ -695,7 +695,7 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
 
                           {/* Kolom Info — pengganti "Atur": TIDAK ada aksi kelola */}
                           <td className="px-4 py-3.5 text-right">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500 border border-gray-200">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground border border-border">
                               <Info size={10} />
                               Baca saja
                             </span>
@@ -704,13 +704,13 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
 
                         {isExpanded && (
                           <tr>
-                            <td colSpan={6} className="p-0 border-b border-gray-100">
+                            <td colSpan={6} className="p-0 border-b border-border">
                               <ActivityItemsDetail activity={activity} />
-                              <div className="px-4 py-2 flex items-center justify-between bg-gray-50/60">
-                                <p className="text-[11px] font-mono text-gray-400">
+                              <div className="px-4 py-2 flex items-center justify-between bg-muted/60">
+                                <p className="text-[11px] font-mono text-muted-foreground">
                                   ID: {activity.externalActivityId}
                                 </p>
-                                <p className="text-[11px] text-gray-400">
+                                <p className="text-[11px] text-muted-foreground">
                                   Terakhir dikonfirmasi: {fmtDateTime(activity.lastConfirmedAt)}
                                 </p>
                               </div>
@@ -725,8 +725,8 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
             </div>
 
             {/* Catatan read-only */}
-            <div className="m-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50/60 px-4 py-3 text-xs text-gray-500">
-              <Info size={14} className="mt-0.5 shrink-0 text-gray-400" />
+            <div className="m-4 flex items-start gap-2 rounded-lg border border-border bg-muted/60 px-4 py-3 text-xs text-muted-foreground">
+              <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
               <span>
                 Halaman ini <b>mode monitoring (baca-saja)</b>: data ditampilkan apa adanya dari
                 TikTok Shop &amp; Shopee tanpa aksi buat/ubah/nonaktifkan promo. Data diperbarui
