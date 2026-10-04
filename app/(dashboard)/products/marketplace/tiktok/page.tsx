@@ -104,7 +104,7 @@ type UnmappedAccount = {
 
 /* ------------------------------ Constants / helpers ------------------------------ */
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 250, 500, 1000];
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: "Aktif di platform",
@@ -194,6 +194,7 @@ export default function TikTokMarketplacePage() {
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [tab, setTab] = useState<TabKey>("all");
   const [sort, setSort] = useState<string>("name_asc");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -226,7 +227,7 @@ export default function TikTokMarketplacePage() {
   const filterRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const filterActive = accountFilter.length > 0;
 
   const notify = (type: "success" | "error", message: string) => {
@@ -236,7 +237,7 @@ export default function TikTokMarketplacePage() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+    const sp = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (q) sp.set("search", q);
     sp.set("sort", sort);
     sp.set("tab", tab);
@@ -275,7 +276,7 @@ export default function TikTokMarketplacePage() {
     return () => {
       cancelled = true;
     };
-  }, [page, q, sort, tab, accountFilter, refreshKey]);
+  }, [page, pageSize, q, sort, tab, accountFilter, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -849,9 +850,27 @@ export default function TikTokMarketplacePage() {
 
         {/* Pagination */}
         <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">
-          <span className="text-sm text-muted-foreground">
-            {total.toLocaleString("id-ID")} listing · halaman {page} dari {totalPages}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground">
+              {total.toLocaleString("id-ID")} listing · halaman {page} dari {totalPages}
+            </span>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              Per halaman
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                  setSelected(new Set());
+                }}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>{size.toLocaleString("id-ID")}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}

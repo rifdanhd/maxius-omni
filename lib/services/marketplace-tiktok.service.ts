@@ -578,7 +578,7 @@ export async function listTikTokProducts(
   counts: Record<TikTokTabKey, number>;
 }> {
   const page = Math.max(1, params.page ?? 1);
-  const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+  const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 20));
 
   const search = params.search?.trim();
   const mappings = await prisma.productMapping.findMany({
