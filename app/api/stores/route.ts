@@ -11,7 +11,7 @@ export const GET = withAuth(async (req) => {
   try {
     const accounts = await prisma.platformAccount.findMany({
       where: { businessId: req.businessId },
-      include: { business: { select: { id: true, name: true } } },
+      include: { business: { select: { id: true, name: true } }, productMapping: { select: { lastSyncedAt: true }, orderBy: { lastSyncedAt: { sort: "desc", nulls: "last" } }, take: 1 } },
       orderBy: { createdAt: "asc" },
     });
 
@@ -29,7 +29,7 @@ export const GET = withAuth(async (req) => {
         businessName: acc.business.name,
         isFrozen: acc.isFrozen,
         frozenReason: acc.frozenReason,
-        lastSyncAt: acc.updatedAt.toISOString(),
+        lastSyncAt: acc.productMapping[0]?.lastSyncedAt?.toISOString() ?? null,
         status: !hasToken ? "disconnected" : expired ? "expired" : "connected",
         connectedAt: acc.createdAt.toISOString(),
         tokenExpiresAt: acc.tokenExpiresAt?.toISOString() ?? null,

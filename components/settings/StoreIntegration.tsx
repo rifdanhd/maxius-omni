@@ -25,16 +25,16 @@ const OAUTH_MESSAGES: Record<string, { ok: boolean; text: string }> = {
   success: { ok: true, text: "Toko berhasil terhubung." },
   missing_code: { ok: false, text: "Otorisasi gagal: kode dari marketplace tidak diterima." },
   auth_denied: { ok: false, text: "Otorisasi dibatalkan di halaman marketplace." },
-  invalid_state: { ok: false, text: "Otorisasi gagal: state tidak valid (coba lagi)." },
-  token_exchange_failed: { ok: false, text: "Gagal menukar kode menjadi token — coba hubungkan ulang." },
-  token_missing: { ok: false, text: "Token tidak lengkap dari marketplace — coba lagi." },
-  save_failed: { ok: false, text: "Token diterima tapi gagal disimpan — hubungi admin." },
+  invalid_state: { ok: false, text: "Sesi penyambungan toko tidak valid atau sudah kedaluwarsa. Coba hubungkan ulang." },
+  token_exchange_failed: { ok: false, text: "Koneksi belum berhasil dibuat. Coba hubungkan ulang." },
+  token_missing: { ok: false, text: "Izin koneksi yang diterima belum lengkap. Coba hubungkan ulang." },
+  save_failed: { ok: false, text: "Koneksi gagal disimpan. Hubungi admin." },
   missing_env: { ok: false, text: "Kredensial aplikasi belum dikonfigurasi di server." },
-  missing_auth_url: { ok: false, text: "URL otorisasi TikTok belum dikonfigurasi di server (isi TIKTOK_AUTHORIZE_URL / TIKTOK_SERVICE_ID di .env) — hubungi admin." },
+  missing_auth_url: { ok: false, text: "Penyambungan TikTok Shop belum dikonfigurasi. Hubungi admin." },
   shopee_missing_env: { ok: false, text: "Partner ID/Key Shopee belum dikonfigurasi di server." },
   shopee_token_exchange_failed: { ok: false, text: "Gagal menukar kode Shopee — coba hubungkan ulang." },
-  shopee_authorize_disabled: { ok: false, text: "Authorize Shopee dinonaktifkan server (SHOPEE_AUTHORIZE_ENABLED=false) — hubungi admin untuk mengaktifkan." },
-  account_frozen: { ok: false, text: "Akun ini dibekukan — authorize/refresh ditolak. Hubungi admin." },
+  shopee_authorize_disabled: { ok: false, text: "Penyambungan Shopee sedang dinonaktifkan. Hubungi admin." },
+  account_frozen: { ok: false, text: "Toko dibekukan sehingga koneksi belum dapat diperbarui. Hubungi admin." },
   token_request_failed: { ok: false, text: "Gagal menghubungi server token TikTok — coba lagi." },
 };
 
@@ -53,6 +53,7 @@ export default function StoreIntegration() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
 
   useEffect(() => {
     // Banner hasil OAuth dibaca dari query string redirect callback
@@ -109,20 +110,25 @@ export default function StoreIntegration() {
   };
 
   const handleSync = async (id: string) => {
+    if (syncingId) return;
+    setSyncingId(id);
+    setNotice(null);
     try {
       const res = await authFetch(`/api/stores/${id}/sync`, { method: "POST" });
-      if (!res.ok) throw new Error("Sync failed");
-      alert("Sinkronisasi berhasil!");
+      const data = await res.json().catch(() => null) as { error?: string; message?: string; success?: boolean } | null;
+      if (!res.ok || !data?.success) throw new Error(data?.error ?? "Pembaruan data belum berhasil.");
+      setNotice({ ok: true, text: data.message ?? "Data produk toko selesai diperbarui." });
+      await loadStores();
     } catch (e) {
-      alert("Gagal sinkronisasi: " + (e instanceof Error ? e.message : String(e)));
-    }
+      setNotice({ ok: false, text: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
+    } finally { setSyncingId(null); }
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Apakah kamu yakin ingin menghapus toko ${name}?`)) {
       try {
         const res = await authFetch(`/api/stores/${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error("Delete failed");
+        if (!res.ok) throw new Error("Gagal menghapus toko. Coba lagi.");
         alert("Toko berhasil dihapus!");
         loadStores();
       } catch (e) {
@@ -137,7 +143,7 @@ export default function StoreIntegration() {
       : store.status === "connected"
         ? { dot: "bg-muted-foreground", text: "Terhubung" }
         : store.status === "expired"
-          ? { dot: "bg-muted-foreground", text: "Token kedaluwarsa" }
+          ? { dot: "bg-muted-foreground", text: "Koneksi perlu diperbarui" }
           : { dot: "bg-muted-foreground", text: "Terputus" };
 
   const platformLabel = (platform?: string) =>
@@ -162,7 +168,7 @@ export default function StoreIntegration() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-foreground">Tambahkan Semua Toko Marketplace kamu</h2>
-            <p className="text-sm text-muted-foreground mt-1">Setelah terhubung, semua produk kamu akan diunduh secara otomatis</p>
+            <p className="text-sm text-muted-foreground mt-1">Mulai dengan Tambahkan Marketplace dan selesaikan pemberian izin. Setelah terhubung, buka Produk Marketplace untuk memperbarui data, mengimpor produk, atau menghubungkannya ke katalog pusat.</p>
           </div>
         </div>
         <button 
@@ -196,7 +202,7 @@ export default function StoreIntegration() {
                 </tr>
               ) : stores.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">Belum ada toko terhubung.</td>
+                <td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">Belum ada toko terhubung. Klik Tambahkan Marketplace di atas, pilih Shopee atau TikTok Shop, lalu berikan izin akses.</td>
               </tr>
             ) : (
               stores.map((store) => (
@@ -213,7 +219,7 @@ export default function StoreIntegration() {
                     <span className="text-sm text-foreground">{store.platform ? platformLabel(store.platform) : "—"}</span>
                     {store.scope && (
                       <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={store.scope}>
-                        {store.scope.split(",").length} scope
+                        {store.scope.split(",").length} izin akses (Scope)
                       </div>
                     )}
                   </td>
@@ -251,10 +257,11 @@ export default function StoreIntegration() {
                       )}
                       <button 
                         onClick={() => handleSync(store.id)}
+                        disabled={syncingId !== null || store.isFrozen || store.status !== "connected"}
                         className="text-foreground hover:bg-muted p-1.5 rounded transition-colors"
-                        title="Sync"
+                        title={syncingId === store.id ? "Memperbarui data produk…" : "Perbarui Data Produk Toko"}
                       >
-                        <RefreshCw size={16} />
+                        <RefreshCw size={16} className={syncingId === store.id ? "animate-spin" : ""} />
                       </button>
                       <button 
                         onClick={() => handleDelete(store.id, store.name)}

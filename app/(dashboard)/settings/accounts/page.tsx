@@ -8,13 +8,15 @@ export default function SettingsAccountsPage() {
 
   return (
     <div className="p-4 md:p-8 font-sans">
+      <h1 className="mb-2 text-xl font-bold">Pengaturan Toko</h1>
+      <p className="mb-4 text-sm text-muted-foreground">Hubungkan toko dan periksa koneksinya; mulai dari tab Koneksi Toko, lalu pilih Tambahkan Marketplace.</p>
       <div className="bg-card rounded-xl shadow-sm border border-border flex flex-col min-h-[600px]">
         {/* Tabs */}
         <div className="flex items-center overflow-x-auto border-b border-border px-2">
-          <TabButton active={activeTab === 'integrasi'} onClick={() => setActiveTab('integrasi')}>Integrasi</TabButton>
-          <TabButton active={activeTab === 'umum'} onClick={() => setActiveTab('umum')}>Umum</TabButton>
-          <TabButton active={activeTab === 'pesanan'} onClick={() => setActiveTab('pesanan')}>Pesanan</TabButton>
-          <TabButton active={activeTab === 'addon'} onClick={() => setActiveTab('addon')}>Add-On</TabButton>
+          <TabButton active={activeTab === 'integrasi'} onClick={() => setActiveTab('integrasi')}>Koneksi Toko (Integrasi)</TabButton>
+          <TabButton active={activeTab === 'umum'} disabled>Umum (Segera Hadir)</TabButton>
+          <TabButton active={activeTab === 'pesanan'} disabled>Pesanan (Segera Hadir)</TabButton>
+          <TabButton active={activeTab === 'addon'} disabled>Fitur Tambahan (Add-On, Segera Hadir)</TabButton>
         </div>
 
         {/* Tab Content */}
@@ -29,11 +31,12 @@ export default function SettingsAccountsPage() {
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean, onClick: () => void, children: React.ReactNode }) {
+function TabButton({ active, onClick, children, disabled = false }: { active: boolean; onClick?: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
     <button 
       onClick={onClick}
-      className={`shrink-0 px-4 sm:px-6 py-4 text-sm font-semibold border-b-2 transition-colors ${
+      disabled={disabled}
+      className={`disabled:opacity-50 disabled:cursor-not-allowed shrink-0 px-4 sm:px-6 py-4 text-sm font-semibold border-b-2 transition-colors ${
         active 
           ? 'border-primary text-foreground'
           : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'

@@ -317,6 +317,7 @@ function findUnmappedProducts(
 type SyncAccountResult = {
   accountId: string;
   label: string;
+  error?: string;
   productsOnPlatform: number;
   synced: number;
   notFound: number;
@@ -338,9 +339,9 @@ async function backfillMasterImageUrl(masterProductId: string | null, image: str
   await applyMarketplaceCover(masterProductId, image);
 }
 
-export async function syncTikTokListings(businessId: string): Promise<SyncAccountResult[]> {
+export async function syncTikTokListings(businessId: string, accountId?: string): Promise<SyncAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "TIKTOK_SHOP", businessId },
+    where: { platform: "TIKTOK_SHOP", businessId, ...(accountId ? { id: accountId } : {}) },
 include: {
        productMapping: {
          include: {
@@ -353,11 +354,12 @@ include: {
    const results: SyncAccountResult[] = [];
    for (const account of accounts) {
      const base = { accountId: account.id, label: account.label };
-     if (!account.accessToken || !account.shopCipher) {
-       results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [] });
+     if (account.isFrozen || !account.accessToken || !account.shopCipher) {
+       results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: account.isFrozen ? "Toko dibekukan. Hubungi admin." : "Koneksi toko belum lengkap. Hubungkan ulang melalui Pengaturan Toko." });
        continue;
      }
 
+     try {
      const products = await enumerateAccountProducts(account);
      const skuKeys = buildSkuKeyMap(products);
      const matchedProductIds = new Set<string>();
@@ -406,6 +408,9 @@ include: {
       .filter((p) => !matchedProductIds.has(String(p.id ?? "")) && isUnmappedVisible(p))
       .map(toUnmappedProduct);
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
+    } catch (e) {
+      results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
+    }
   }
   return results;
 }

@@ -357,17 +357,17 @@ export async function backfillMasterImages(imageByVariant: Map<string, string>):
   }
 }
 
-export async function syncShopeeListings(businessId: string): Promise<
+export async function syncShopeeListings(businessId: string, accountId?: string): Promise<
   Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }>
 > {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "SHOPEE", businessId },
+    where: { platform: "SHOPEE", businessId, ...(accountId ? { id: accountId } : {}) },
     include: { appCredential: true },
   });
   const results: Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }> = [];
   for (const account of accounts) {
-    if (!account.accessToken || !account.externalShopId) {
-      results.push({ accountId: account.id, label: account.label, items: 0, models: 0, matched: 0, error: "Belum OAuth." });
+    if (account.isFrozen || !account.accessToken || !account.externalShopId) {
+      results.push({ accountId: account.id, label: account.label, items: 0, models: 0, matched: 0, error: account.isFrozen ? "Toko dibekukan. Hubungi admin." : "Koneksi toko belum lengkap. Hubungkan ulang melalui Pengaturan Toko." });
       continue;
     }
     try {
