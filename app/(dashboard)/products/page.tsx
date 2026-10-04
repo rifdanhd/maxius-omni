@@ -350,7 +350,12 @@ export default function MasterProductsPage() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header Title */}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-bold text-foreground">Produk Master</h1>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Produk Master</h1>
+            <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
+              Katalog pusat untuk melihat produk, variasi, stok, dan toko yang terhubung; mulai dengan mencari produk dan membuka Lihat varian, atau tambahkan produk dari TikTok Shop maupun Product Copy jika katalog masih kosong.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <button className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
               Unduh <ChevronDown size={16} />
@@ -389,7 +394,7 @@ export default function MasterProductsPage() {
                   >
                     <Store size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <span>
-                      <span className="block text-sm font-semibold text-foreground">Tambah dari Marketplace</span>
+                      <span className="block text-sm font-semibold text-foreground">Tambah dari TikTok Shop</span>
                       <span className="block text-[11px] text-muted-foreground">Mapping produk TikTok yang belum terdaftar</span>
                     </span>
                   </button>
@@ -581,12 +586,12 @@ export default function MasterProductsPage() {
                   </div>
                 </th>
                 <th className="px-5 py-3">Informasi Produk</th>
-                <th className="px-5 py-3">Master SKU</th>
-                <th className="px-5 py-3">Range Harga</th>
+                <th className="px-5 py-3">Kode Produk Pusat (Master SKU)</th>
+                <th className="px-5 py-3">Rentang Harga (Range Harga)</th>
                 <th className="px-5 py-3">Stok</th>
                 <th className="px-5 py-3">Produk Terkait</th>
                 <th className="px-5 py-3">Toko Terkait</th>
-                <th className="px-5 py-3">Waktu dibuat/update</th>
+                <th className="px-5 py-3">Waktu Dibuat / Diperbarui</th>
                 <th className="px-5 py-3">Atur</th>
               </tr>
             </thead>
@@ -606,9 +611,28 @@ export default function MasterProductsPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-5 py-10 text-center text-muted-foreground">
-                    {activeTab === "produk_bundle"
-                      ? "Belum ada produk bundle."
-                      : "Tidak ada produk master."}
+                    {products.length === 0 ? (
+                      <div className="space-y-2">
+                        <p>Belum ada produk di katalog pusat pada tampilan ini.</p>
+                        <p>Mulai dengan Tambah dari TikTok Shop, atau buat draf dari tautan melalui Product Copy.</p>
+                        <a href="/products/copy" className="inline-block text-foreground underline">Tambah Produk dari Tautan (Product Copy)</a>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p>Tidak ada produk yang cocok dengan pencarian, tab, atau filter stok.</p>
+                        <button
+                          onClick={() => {
+                            setSearchInput("");
+                            setQ("");
+                            setFilterLevel("all");
+                            switchTab("semua_produk");
+                          }}
+                          className="text-foreground underline"
+                        >
+                          Hapus Pencarian dan Filter
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -656,7 +680,7 @@ export default function MasterProductsPage() {
                                 {product.name}
                                 {product.status === "draft" && (
                                   <span className="px-1.5 py-0.5 rounded-full bg-muted text-foreground text-[10px] font-bold uppercase tracking-wide">
-                                    Draft
+                                    Draf (Draft)
                                   </span>
                                 )}
                                 {isBundle(product) && (
@@ -807,7 +831,7 @@ export default function MasterProductsPage() {
                                 <thead className="bg-muted border-b border-border text-muted-foreground font-semibold text-xs">
                                   <tr>
                                     <th className="px-4 py-2">Varian</th>
-                                    <th className="px-4 py-2">SKU Varian</th>
+                                    <th className="px-4 py-2">Kode Variasi (SKU)</th>
                                     <th className="px-4 py-2">Harga</th>
                                     <th className="px-4 py-2">Stok</th>
                                     <th className="px-4 py-2">Produk Terkait</th>
