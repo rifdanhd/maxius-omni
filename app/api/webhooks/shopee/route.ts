@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { shopeePushUrlCandidates, verifyPushSignature } from "@/lib/integrations/shopee";
+import {
+  isPushSignatureFormatValid,
+  pushUrlVariants,
+  shopeePushUrlCandidates,
+  verifyPushSignature,
+} from "@/lib/integrations/shopee";
 import { listActiveShopeeSecrets } from "@/lib/services/app-credential.service";
 import {
   handleShopeeOrderUpdate,
@@ -37,7 +42,21 @@ export async function POST(req: NextRequest) {
   );
   if (!verified) {
     console.warn(
-      `[webhook/shopee] signature invalid (skip process) auth=${authHeader ? "ada" : "kosong"} urls=${urlCandidates.join(" , ")} body=${rawBody.slice(0, 200)}`
+      "[webhook/shopee] signature invalid (skip process)",
+      {
+        reason: !authHeader
+          ? "missing_authorization"
+          : !isPushSignatureFormatValid(authHeader)
+            ? "invalid_signature_format"
+            : secrets.length === 0
+              ? "no_candidate_keys"
+              : "signature_mismatch",
+        candidateKeyCount: secrets.length,
+        authorizationPresent: authHeader !== null,
+        authorizationLength: authHeader?.length ?? 0,
+        rawBodyBytes: Buffer.byteLength(rawBody, "utf8"),
+        urlCandidates: [...new Set(urlCandidates.flatMap(pushUrlVariants))],
+      }
     );
     return new Response(null, { status: 200 });
   }
