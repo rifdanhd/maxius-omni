@@ -58,8 +58,8 @@ const SORT_OPTIONS = [
   { id: "name_desc", label: "Nama: Z-A" },
   { id: "sku_asc", label: "SKU: A-Z" },
   { id: "sku_desc", label: "SKU: Z-A" },
-  { id: "price_asc", label: "Harga Default: Terendah" },
-  { id: "price_desc", label: "Harga Default: Tertinggi" },
+  { id: "price_asc", label: "Harga Utama (Default): Terendah" },
+  { id: "price_desc", label: "Harga Utama (Default): Tertinggi" },
   { id: "updated_desc", label: "Pembaruan Terakhir" },
   { id: "created_desc", label: "Dibuat Terbaru" },
 ];
@@ -337,8 +337,8 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           <p className="mt-4 text-xs text-muted-foreground">
             Kolom: <code className="bg-muted px-1 rounded">sku, price, store, channel_sku</code>.
             <br />
-            <code className="bg-muted px-1 rounded">store</code> kosong → set harga default varian.
-            <code className="bg-muted px-1 rounded">store</code> terisi → override per toko.
+            <code className="bg-muted px-1 rounded">store</code> kosong → gunakan Harga Utama (Default) untuk variasi.
+            <code className="bg-muted px-1 rounded">store</code> terisi → gunakan Harga Khusus (Override) untuk toko tersebut.
           </p>
 
           {preview.length > 0 && (
@@ -603,7 +603,7 @@ export default function KelolaHargaPage() {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      throw new Error(data?.error ?? "Gagal menyimpan harga default.");
+      throw new Error(data?.error ?? "Gagal menyimpan harga utama (default).");
     }
     setRows((prev) =>
       prev.map((r) =>
@@ -663,7 +663,7 @@ export default function KelolaHargaPage() {
     );
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      throw new Error(data?.error ?? "Gagal menghapus override.");
+      throw new Error(data?.error ?? "Gagal menghapus Harga Khusus (Override).");
     }
     setRows((prev) =>
       prev.map((r) =>
@@ -695,7 +695,15 @@ export default function KelolaHargaPage() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-bold text-foreground">Kelola Harga</h1>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Kelola Harga</h1>
+            <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
+              Atur harga setiap variasi dan harga khusus per toko; mulai dengan mencari produk, lalu klik ikon pensil untuk mengisi Harga Utama (Default).
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
+              Harga Utama berlaku untuk toko yang mengikuti harga utama; Harga Khusus hanya berlaku di toko itu. Menyimpan harga memicu pembaruan ke marketplace, tetapi belum berarti pembaruan di toko sudah berhasil.
+            </p>
+          </div>
           <div className="relative" ref={uploadRef}>
             <button
               onClick={() => setUploadOpen((v) => !v)}
@@ -726,7 +734,7 @@ export default function KelolaHargaPage() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Cari nama produk, SKU induk, SKU marketplace"
+              placeholder="Cari nama produk, kode variasi pusat (SKU), SKU marketplace"
               className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
             />
             <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
@@ -847,7 +855,7 @@ export default function KelolaHargaPage() {
 
                 <div>
                   <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">
-                    Rentang Harga Default
+                    Rentang Harga Utama (Default)
                   </p>
                   <div className="flex items-center gap-2">
                     <input
@@ -923,10 +931,10 @@ export default function KelolaHargaPage() {
                     <ChevronDown size={12} className="opacity-40" />
                   </button>
                 </th>
-                <th className="px-5 py-3 text-right">Harga Default</th>
+                <th className="px-5 py-3 text-right">Harga Utama (Default)</th>
                 <th className="px-5 py-3">Toko</th>
                 <th className="px-5 py-3">SKU Marketplace</th>
-                <th className="px-5 py-3 text-right">Harga</th>
+                <th className="px-5 py-3 text-right">Harga Toko (Utama / Khusus)</th>
                 <th className="px-5 py-3">Waktu</th>
               </tr>
             </thead>
@@ -1068,9 +1076,9 @@ export default function KelolaHargaPage() {
                                 <button
                                   onClick={() => clearOverridePrice(row, m)}
                                   className="text-[10px] text-muted-foreground hover:text-foreground underline mt-0.5"
-                                  title="Hapus override → ikuti harga default"
+                                  title="Hapus Harga Khusus (Override) → gunakan Harga Utama (Default)"
                                 >
-                                  ikuti default
+                                  Gunakan Harga Utama (Default)
                                 </button>
                               )}
                             </div>
