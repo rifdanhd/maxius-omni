@@ -111,7 +111,7 @@ export const GET = withAuth(async (req) => {
       include: {
         items: {
           include: {
-            variant: { include: { masterProduct: { select: { name: true } } } },
+            variant: { include: { masterProduct: { select: { name: true, imageUrl: true } } } },
           },
         },
         account: { select: { id: true, platform: true, label: true } },
