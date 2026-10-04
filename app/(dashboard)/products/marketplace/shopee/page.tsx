@@ -307,9 +307,9 @@ export default function ShopeeMarketplacePage() {
             <div className="space-y-4 px-5 py-4 text-sm text-foreground">
               <ul className="space-y-1 rounded-lg bg-muted border border-border p-3 text-xs text-foreground">
                 <li>• 1 listing Shopee = 1 produk induk; tiap varian (model) = 1 SKU stok sendiri.</li>
-                <li>• SKU memakai <b>model_sku / item_sku</b> yang sama dengan yang terlihat di Seller Center, jadi order masuk langsung match.</li>
+                <li>• Kode produk di Shopee (<b>model_sku / item_sku</b>) dipakai untuk membuat hubungan produk; periksa variasi yang sesuai sebelum menggabungkan stok lintas toko.</li>
                 <li>• Listing yang SKU-nya sudah ter-mapping tidak disentuh (aman dijalankan berulang).</li>
-                <li>• Stok awal diambil dari Shopee bila tersedia; sisanya 0 dan dicatat di kartu stok — isi lewat <b>Stok Masuk</b>/<b>Opname</b> sebelum push.</li>
+                <li>• Stok awal diambil dari Shopee bila tersedia; sisanya 0 dan dicatat di kartu stok — isi lewat <b>Barang Masuk</b>/<b>Hitung Stok Fisik (Opname)</b> sebelum mengirim pembaruan stok.</li>
                 <li>• Gambar produk, harga, dan kategori belum ikut diimport.</li>
               </ul>
 
@@ -381,19 +381,20 @@ export default function ShopeeMarketplacePage() {
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Produk Marketplace › Shopee</p>
           <h1 className="text-xl font-bold text-foreground">Produk Shopee</h1>
+          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Periksa produk yang dijual di Shopee dan hubungannya dengan katalog pusat; mulai dengan menghubungkan toko di Pengaturan Toko, lalu Import dari Shopee untuk menambahkan produk baru atau Perbarui Data untuk memperbarui produk yang terhubung.</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setImportAccounts(accountFilter); setImportOpen(true); }}
             disabled={accounts.length === 0 || importing}
-            title={accounts.length === 0 ? "Hubungkan akun Shopee dulu di Settings › Accounts." : "Tarik listing Shopee menjadi produk + varian + mapping di Maxius"}
+            title={accounts.length === 0 ? "Hubungkan toko Shopee dahulu melalui Pengaturan Toko." : "Tarik listing Shopee menjadi produk + varian + mapping di Maxius"}
             className="flex items-center gap-2 rounded-md border border-primary px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
             <Download size={16} /> Import dari Shopee
           </button>
           <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60">
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
+            {syncingAll ? "Menyinkronkan..." : "Perbarui Data (Sync Semua)"}
           </button>
         </div>
       </div>
@@ -519,8 +520,7 @@ export default function ShopeeMarketplacePage() {
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
-                    Tidak ada produk Shopee ditemukan. Klik <b>&quot;Import dari Shopee&quot;</b> untuk membuat produk + SKU dari listing toko
-                    (atau <b>&quot;Sync Semua&quot;</b> untuk memperbarui SKU yang sudah termapping).
+                    {q.trim() || accountFilter.length || tab !== "all" ? <div className="space-y-2"><p>Tidak ada produk yang cocok dengan pencarian/filter.</p><button className="underline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setTab("all"); setPage(1); }}>Hapus Pencarian dan Filter</button></div> : <div className="space-y-2"><p>Belum ada produk Shopee pada tampilan ini. Gunakan Import dari Shopee untuk menambahkan produk ke katalog pusat.</p><Link href="/settings/accounts" className="underline">Hubungkan atau Periksa Toko Shopee</Link></div>}
                   </td>
                 </tr>
               ) : (
@@ -558,7 +558,7 @@ export default function ShopeeMarketplacePage() {
                           {isMapped ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full">✅ Mapped</span>
                           ) : (
-                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full hover:bg-muted">⚠️ Belum Mapped</Link>
+                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full hover:bg-muted">Belum Terhubung (Mapping)</Link>
                           )}
                         </td>
                         <td className="px-5 py-4 text-sm text-foreground">{row.accountLabel}</td>
