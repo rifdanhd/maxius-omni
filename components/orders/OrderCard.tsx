@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, RefreshCw, Pencil, MessageCircle, FileText, PackageCheck, Printer } from "lucide-react";
+import { Clock, RefreshCw, Pencil, MessageCircle, FileText, PackageCheck, Printer, Store } from "lucide-react";
 import OrderProgressSteps from "./OrderProgressSteps";
 import PrintDropdown from "./PrintDropdown";
 import TikTokLogo from "@/components/icons/TikTokLogo";
+import ShopeeLogo from "@/components/icons/ShopeeLogo";
 import TrackingModal, { type TrackingEvent } from "./TrackingModal";
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -88,6 +89,7 @@ export default function OrderCard({
   const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[] | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const sla = computeSla(order);
+  const platform = order.platform.trim().toUpperCase().replace(/\s+/g, "_");
 
   // Riwayat tracking di-fetch on-demand saat modal Lacak dibuka (sekali per
   // buka; modal lama memakai timeline simulasi bila kosong).
@@ -138,7 +140,13 @@ export default function OrderCard({
           </button>
           
           <div className="flex items-center gap-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-xs">
-             <TikTokLogo size={14} />
+             {platform === "SHOPEE" ? (
+               <ShopeeLogo size={14} />
+             ) : platform === "TIKTOK_SHOP" ? (
+               <TikTokLogo size={14} />
+             ) : (
+               <Store size={14} aria-hidden="true" />
+             )}
              <span>{order.storeName} | {order.platform}</span>
           </div>
         </div>
