@@ -14,7 +14,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "all", label: "Semua Produk" },
   { id: "empty", label: "Habis" },
   { id: "low", label: "Stok Menipis" },
-  { id: "oversells", label: "Oversells" },
+  { id: "oversells", label: "Pesanan Melebihi Stok (Oversell)" },
 ];
 
 const fmt = (n: number) => n.toLocaleString("id-ID");
@@ -208,23 +208,6 @@ export default function InventoryStockPage() {
     }
   }
 
-  async function handleToggleEmail(row: StockRow) {
-    setError(null);
-    try {
-      await api(`/api/inventory/variant/${row.variantId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ notifyEmail: !row.notifyEmail }),
-      });
-      setRows((prev) =>
-        prev.map((r) =>
-          r.variantId === row.variantId ? { ...r, notifyEmail: !row.notifyEmail } : r
-        )
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menyimpan toggle.");
-    }
-  }
-
   async function openSafetyHistory(row: StockRow) {
     setSafetyHist({ variantId: row.variantId, sku: row.sku });
     setSafetyEntries([]);
@@ -277,12 +260,10 @@ export default function InventoryStockPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Stok Varian</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Stok gudang bersama per varian — angka Tersedia memakai effectiveStock() yang sama
-            dengan marketplace.
+            Pantau stok gudang per variasi; mulai dengan mencari produk dan memeriksa stok Fisik serta Cadangan sebelum mengubahnya.
           </p>
           <p className="text-xs text-muted-foreground mt-1" title="effectiveStock() = max(0, Fisik − Cadangan)">
-            Stok yang tayang di marketplace = Stok fisik − Stok cadangan (buffer). Kalau cadangan
-            lebih besar dari stok fisik, stok tayang jadi 0.
+            Target stok jual = stok fisik − stok cadangan (buffer), minimal 0. Angka di toko baru berubah jika pengiriman pembaruan berhasil; periksa masalah pengiriman di Stok Mismatch.
           </p>
         </div>
         <button
@@ -342,21 +323,21 @@ export default function InventoryStockPage() {
           {loading ? (
             <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Memuat…</p>
           ) : rows.length === 0 ? (
-            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Tidak ada varian di tab ini.</p>
+            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">{q.trim() || tab !== "all" ? <><span>Tidak ada variasi yang cocok dengan pencarian atau tab.</span><button className="block mx-auto mt-2 underline" onClick={() => { setQ(""); setTab("all"); }}>Hapus Pencarian dan Filter</button></> : <>Belum ada variasi stok pusat. <a href="/products" className="underline">Tambahkan produk di Produk Master</a>, lalu hubungkan produk toko melalui Mapping.</>}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3 font-semibold">Produk / Varian</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="ProductVariant.stock — stok mentah di database. Klik pensil untuk atur langsung (tersimpan + di-push ke marketplace)">Fisik</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="safetyStock — buffer yang tidak dijual. Stok tayang di marketplace = Fisik − Cadangan (min. 0). Klik ikon riwayat untuk melihat siapa mengubahnya.">Cadangan</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Stok fisik yang dicatat di gudang. Klik pensil untuk mengoreksi jumlah total; pembaruan toko mengikuti pengaturan inventori.">Fisik</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Stok yang disisihkan dan tidak ditawarkan ke toko. Klik riwayat untuk memeriksa perubahan.">Cadangan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Info saja: jumlah activity promosi AKTIF yang mencakup varian. Tidak mengurangi Tersedia (tidak ada konsep reserve di skema).">Promosi</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok (belum AWAITING_SHIPMENT) — demand yang akan datang">Pesanan</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="effectiveStock() = max(0, Fisik − Cadangan) — fungsi yang sama dengan marketplace">Tersedia</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Belum ada konsep restock terjadwal di skema — selalu 0 di iterasi ini">Akan Datang</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Target stok jual: fisik dikurangi cadangan, minimal 0.">Tersedia</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Belum ada konsep restock terjadwal di skema — selalu 0 di iterasi ini">Stok Masuk Terjadwal (Belum Tersedia)</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Batas minimum per varian. Kosong = ikut threshold produk induk">Batas Min</th>
-                    <th className="px-4 py-3 font-semibold text-center" title="Toggle saja — belum ada provider email, belum ada pengiriman aktif">Email Notif</th>
+                    <th className="px-4 py-3 font-semibold text-center" title="Toggle saja — belum ada provider email, belum ada pengiriman aktif">Email (Belum Tersedia)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -542,9 +523,9 @@ export default function InventoryStockPage() {
                       <td className="px-4 py-3 text-center">
                         <button
                           role="switch"
+                          disabled
                           aria-checked={r.notifyEmail}
-                          title={r.notifyEmail ? "Nonaktifkan notifikasi" : "Aktifkan notifikasi (toggle saja — belum ada pengiriman email)"}
-                          onClick={() => handleToggleEmail(r)}
+                          title="Pengiriman notifikasi email belum tersedia."
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                             r.notifyEmail ? "bg-muted-foreground" : "bg-muted"
                           }`}
@@ -585,7 +566,7 @@ export default function InventoryStockPage() {
             <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Memuat…</p>
           ) : entries.length === 0 ? (
             <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">
-              Tidak ada kejadian oversell tercatat (SyncLog kind central_stock_deduct kosong).
+              Belum ada pesanan melebihi stok yang tercatat pada tampilan ini.
             </p>
           ) : (
             <div className="overflow-x-auto">
