@@ -12,7 +12,7 @@ import {
  * Opsi "Atur Pengiriman" untuk order Shopee.
  * GET /api/orders/:id/shipping-parameter
  *
- * Meneruskan hasil GET /api/v2/logistics/shipping_parameter — mode yang
+ * Meneruskan hasil GET /api/v2/logistics/get_shipping_parameter — mode yang
  * didukung (pickup/dropoff/non_integrated), alamat penjemputan + slot waktu,
  * dan cabang drop-off. Dipakai ShopeeShipModal untuk membangun form.
  */

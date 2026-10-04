@@ -431,7 +431,7 @@ export type ShopeeShippingParameter = {
 };
 
 /**
- * getShippingParameter — GET /api/v2/logistics/shipping_parameter.
+ * getShippingParameter — GET /api/v2/logistics/get_shipping_parameter.
  * Wajib dipanggil SEBELUM ship_order: menentukan mode yang didukung
  * (pickup/dropoff/non_integrated) + daftar alamat penjemputan, slot waktu,
  * dan cabang drop-off untuk order tsb.
@@ -442,7 +442,7 @@ export async function getShippingParameter(
   orderSn: string,
   creds?: ShopeeCreds
 ): Promise<ShopeeShippingParameter> {
-  const r = await getShopApi("/api/v2/logistics/shipping_parameter", accessToken, shopId, creds, {
+  const r = await getShopApi("/api/v2/logistics/get_shipping_parameter", accessToken, shopId, creds, {
     order_sn: orderSn,
   });
   const info = (r.info_needed ?? {}) as Record<string, unknown>;
