@@ -286,7 +286,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                 />
               </div>
             </div>
-            {pendingFiles.length > 0 && (
+            {(pendingFiles.length > 0 || pendingUrls.trim()) && (
               <div className="flex items-center gap-2 flex-wrap text-xs text-foreground">
                 {pendingFiles.map((f, i) => (
                   <span key={i} className="inline-flex items-center gap-1 bg-muted px-2 py-1 rounded-md">
@@ -597,7 +597,7 @@ export default function KelolaGambarPage() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Kelola Gambar</h1>
             <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-              Kelola foto, foto utama, dan urutan gambar produk di katalog pusat; mulai dengan mencari produk, klik Lihat Gambar, lalu pilih file dan unggah.
+              Kelola foto, foto utama, dan urutan gambar produk di katalog pusat; mulai dengan mencari produk, klik Lihat Gambar, lalu pilih file atau tempel tautan gambar dan unggah. Status Lengkap berarti jumlah foto minimal sama dengan jumlah variasi (minimal satu foto).
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -611,7 +611,7 @@ export default function KelolaGambarPage() {
               disabled
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-60 cursor-not-allowed"
             >
-              <Upload size={16} /> Unggah Massal
+              <Upload size={16} /> Unggah Massal (Segera Hadir)
             </button>
           </div>
         </div>
