@@ -52,6 +52,7 @@ export const GET = withAuth(async (req) => {
       mappings: productMapping,
     })),
     bundleItems: bundleItem,
+    type: bundleItem.length > 0 ? "bundle" : "single",
   }));
   return NextResponse.json({ products: payload });
 });

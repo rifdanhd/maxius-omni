@@ -45,9 +45,6 @@ type Product = {
   isActive: boolean;
   importedFrom?: string | null;
   variants: Variant[];
-  // Opsional: belum dikirim oleh /api/products saat ini. Begitu backend
-  // menambahkan field ini (mis. "single" | "bundle"), tab "Produk Bundle"
-  // di bawah otomatis mulai memfilter dengan benar tanpa perubahan lain.
   type?: "single" | "bundle";
 };
 
@@ -132,6 +129,7 @@ export default function MasterProductsPage() {
         }
         const data = await res.json();
         setProducts(data.products ?? []);
+        setError(null);
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Terjadi kesalahan saat memuat produk.");
@@ -150,9 +148,10 @@ export default function MasterProductsPage() {
     const res = await authFetch(productsUrl(showInactive), {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error(`Gagal memperbarui daftar produk (${res.status}).`);
     const data = await res.json();
     setProducts(data.products ?? []);
+    setError(null);
   }
 
   async function setProductActive(product: Product, active: boolean) {
@@ -357,8 +356,8 @@ export default function MasterProductsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
-              Unduh <ChevronDown size={16} />
+            <button disabled title="Unduh katalog belum tersedia" className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground opacity-60">
+              Unduh (Segera Hadir) <ChevronDown size={16} />
             </button>
             <div className="relative" ref={addRef}>
               <button
@@ -395,7 +394,7 @@ export default function MasterProductsPage() {
                     <Store size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <span>
                       <span className="block text-sm font-semibold text-foreground">Tambah dari TikTok Shop</span>
-                      <span className="block text-[11px] text-muted-foreground">Mapping produk TikTok yang belum terdaftar</span>
+                      <span className="block text-[11px] text-muted-foreground">Hubungkan produk TikTok Shop yang belum masuk katalog pusat</span>
                     </span>
                   </button>
                   <button
@@ -605,7 +604,12 @@ export default function MasterProductsPage() {
               ) : error ? (
                 <tr>
                   <td colSpan={9} className="px-5 py-10 text-center text-foreground">
-                    {error}
+                    <p>{error}</p>
+                    <button className="mt-2 underline" onClick={() => {
+                      void refreshProducts().catch((e: unknown) => {
+                        setError(e instanceof Error ? e.message : "Gagal memuat produk.");
+                      });
+                    }}>Coba Lagi</button>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
@@ -735,8 +739,7 @@ export default function MasterProductsPage() {
 
                         <td className="px-5 py-4 align-top pt-5">
                           <a
-                            href="#"
-                            onClick={(e) => e.preventDefault()}
+                            href="/products/mapping"
                             className="text-foreground font-semibold hover:underline"
                           >
                             {storeN} Toko
@@ -774,10 +777,10 @@ export default function MasterProductsPage() {
                                   <ImageIcon size={14} /> Ubah Gambar
                                 </button>
                                 <button
-                                  onClick={() => setAturFor(null)}
-                                  className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
+                                  disabled title="Pengeditan informasi produk belum tersedia"
+                                  className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-muted-foreground opacity-60"
                                 >
-                                  <Pencil size={14} /> Edit
+                                  <Pencil size={14} /> Edit (Segera Hadir)
                                 </button>
                                 {product.isActive !== false ? (
                                   <button
@@ -822,7 +825,7 @@ export default function MasterProductsPage() {
                                     title="Harga belum tersedia di model data"
                                     className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-border text-muted-foreground bg-card rounded-md cursor-not-allowed"
                                   >
-                                    <Pencil size={12} /> Ubah semua harga
+                                    <Pencil size={12} /> Ubah semua harga (Segera Hadir)
                                   </button>
                                 </div>
                               </div>
@@ -917,7 +920,9 @@ export default function MasterProductsPage() {
             setBundleOpen(false);
             notify("success", `Produk bundle "${name}" berhasil dibuat.`);
             setActiveTab("produk_bundle");
-            void refreshProducts();
+            void refreshProducts().catch((e: unknown) => {
+              setError(e instanceof Error ? e.message : "Gagal memperbarui daftar produk.");
+            });
           }}
         />
       )}
