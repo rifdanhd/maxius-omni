@@ -42,19 +42,19 @@ const KIND_STYLE: Record<
   HistoryItem["eventKind"],
   { icon: typeof Package; cls: string; label: string }
 > = {
-  ORDER: { icon: Package, cls: "bg-muted text-foreground", label: "Order" },
+  ORDER: { icon: Package, cls: "bg-muted text-foreground", label: "Pesanan (Order)" },
   ORDER_CANCEL: { icon: ArrowUpRight, cls: "bg-muted text-foreground", label: "Batal/Refund" },
   SALE: { icon: Tag, cls: "bg-muted text-foreground", label: "Penjualan" },
   MANUAL: { icon: ClipboardCheck, cls: "bg-muted text-foreground", label: "Manual" },
   OPNAME: { icon: ClipboardCheck, cls: "bg-muted text-foreground", label: "Stok Opname" },
-  OVERSELL: { icon: AlertOctagon, cls: "bg-muted text-foreground", label: "Oversell" },
+  OVERSELL: { icon: AlertOctagon, cls: "bg-muted text-foreground", label: "Pesanan Melebihi Stok (Oversell)" },
   OTHER: { icon: Minus, cls: "bg-muted text-muted-foreground", label: "Lainnya" },
 };
 
 const SOURCE_FILTERS = [
   { id: "", label: "Semua" },
   { id: "ledger", label: "Pergerakan Stok" },
-  { id: "synclog", label: "Oversell" },
+  { id: "synclog", label: "Pesanan Melebihi Stok (Oversell)" },
 ] as const;
 
 const fmt = (n: number) => n.toLocaleString("id-ID");
@@ -170,8 +170,7 @@ export default function InventoryHistoryPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Riwayat Inventori</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Semua pergerakan stok dalam satu tempat — order, penjualan, penyesuaian, stok opname,
-            dan oversell tertangkap.
+            Telusuri perubahan stok dari pesanan, penjualan, koreksi, dan hitung fisik; mulai dengan mencari produk dan memilih jenis aktivitas yang ingin diperiksa.
           </p>
         </div>
         <button
@@ -251,7 +250,9 @@ export default function InventoryHistoryPage() {
           <div className="flex items-center justify-center p-10 text-muted-foreground">Memuat…</div>
         ) : items.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
-            Tidak ada pergerakan stok pada filter ini.
+            Tidak ada perubahan stok pada pencarian/filter ini. Jika baru mulai, aktivitas muncul setelah ada perubahan stok.
+            <button className="block mx-auto mt-2 underline" onClick={() => { setQInput(""); setQ(""); setFrom(""); setTo(""); setSource(""); }}>Hapus Pencarian dan Filter</button>
+            <a href="/inventory" className="block mt-2 underline">Periksa Stok Varian</a>
           </div>
         ) : (
           <div className="overflow-x-auto">
