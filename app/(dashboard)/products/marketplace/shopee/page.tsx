@@ -280,11 +280,11 @@ export default function ShopeeMarketplacePage() {
   { const start = Math.max(1, Math.min(page - 2, totalPages - 4)); const end = Math.min(totalPages, start + 4); for (let i = start; i <= end; i++) pageNumbers.push(i); }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] max-w-sm">
           <div className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
-            toast.type === "success" ? "bg-gray-50 border-gray-200 text-gray-900" : "bg-gray-50 border-gray-200 text-gray-900"}`}>
+            toast.type === "success" ? "bg-muted border-border text-foreground" : "bg-muted border-border text-foreground"}`}>
             <span className="flex-1">{toast.message}</span>
             <button onClick={() => setToast(null)} className="underline text-xs opacity-70">Tutup</button>
           </div>
@@ -292,20 +292,20 @@ export default function ShopeeMarketplacePage() {
       )}
 
       {importOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay/50 p-4">
+          <div className="w-full max-w-lg rounded-xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <div>
-                <h2 className="text-base font-bold text-gray-900">Import Listing dari Shopee</h2>
-                <p className="text-xs text-gray-500">Tarik produk Shopee ke katalog Maxius</p>
+                <h2 className="text-base font-bold text-foreground">Import Listing dari Shopee</h2>
+                <p className="text-xs text-muted-foreground">Tarik produk Shopee ke katalog Maxius</p>
               </div>
-              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40">
+              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40">
                 <X size={16} />
               </button>
             </div>
 
-            <div className="space-y-4 px-5 py-4 text-sm text-gray-600">
-              <ul className="space-y-1 rounded-lg bg-gray-50 border border-gray-100 p-3 text-xs text-gray-900">
+            <div className="space-y-4 px-5 py-4 text-sm text-foreground">
+              <ul className="space-y-1 rounded-lg bg-muted border border-border p-3 text-xs text-foreground">
                 <li>• 1 listing Shopee = 1 produk induk; tiap varian (model) = 1 SKU stok sendiri.</li>
                 <li>• SKU memakai <b>model_sku / item_sku</b> yang sama dengan yang terlihat di Seller Center, jadi order masuk langsung match.</li>
                 <li>• Listing yang SKU-nya sudah ter-mapping tidak disentuh (aman dijalankan berulang).</li>
@@ -314,13 +314,13 @@ export default function ShopeeMarketplacePage() {
               </ul>
 
               <div>
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-600">Toko yang diimport</p>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-foreground">Toko yang diimport</p>
                 {accounts.length === 0 ? (
-                  <p className="text-xs text-gray-400">Tidak ada akun Shopee terhubung.</p>
+                  <p className="text-xs text-muted-foreground">Tidak ada akun Shopee terhubung.</p>
                 ) : (
-                  <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
+                  <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">
                     {accounts.map((a) => (
-                      <label key={a.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                      <label key={a.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm text-foreground hover:bg-muted cursor-pointer">
                         <input
                           type="checkbox"
                           className="w-4 h-4"
@@ -336,38 +336,38 @@ export default function ShopeeMarketplacePage() {
                 )}
                 {accounts.length > 0 && (
                   <div className="mt-1.5 flex gap-3 text-xs">
-                    <button onClick={() => setImportAccounts(accounts.map((a) => a.id))} className="font-medium text-[#111827] hover:underline">Pilih semua</button>
-                    <button onClick={() => setImportAccounts([])} className="font-medium text-gray-500 hover:underline">Kosongkan</button>
+                    <button onClick={() => setImportAccounts(accounts.map((a) => a.id))} className="font-medium text-foreground hover:underline">Pilih semua</button>
+                    <button onClick={() => setImportAccounts([])} className="font-medium text-muted-foreground hover:underline">Kosongkan</button>
                   </div>
                 )}
               </div>
 
               <div>
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-600">Batas item per proses</p>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-foreground">Batas item per proses</p>
                 <div className="flex items-center gap-2">
                   <select
                     value={importLimit}
                     onChange={(e) => setImportLimit(Number(e.target.value))}
-                    className="h-[38px] rounded-md border border-gray-300 bg-white px-3 text-sm outline-none cursor-pointer"
+                    className="h-[38px] rounded-md border border-border bg-card px-3 text-sm outline-none cursor-pointer"
                   >
                     <option value={50}>50 listing</option>
                     <option value={100}>100 listing</option>
                     <option value={200}>200 listing</option>
                     <option value={500}>500 listing</option>
                   </select>
-                  <span className="text-xs text-gray-500">Bisa diulang sampai semua listing masuk.</span>
+                  <span className="text-xs text-muted-foreground">Bisa diulang sampai semua listing masuk.</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-3">
-              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
                 Batal
               </button>
               <button
                 onClick={runImport}
                 disabled={importing || importAccounts.length === 0}
-                className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
               >
                 {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                 {importing ? "Mengimport..." : "Mulai Import"}
@@ -379,19 +379,19 @@ export default function ShopeeMarketplacePage() {
 
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Produk Marketplace › Shopee</p>
-          <h1 className="text-xl font-bold text-gray-900">Produk Shopee</h1>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Produk Marketplace › Shopee</p>
+          <h1 className="text-xl font-bold text-foreground">Produk Shopee</h1>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setImportAccounts(accountFilter); setImportOpen(true); }}
             disabled={accounts.length === 0 || importing}
             title={accounts.length === 0 ? "Hubungkan akun Shopee dulu di Settings › Accounts." : "Tarik listing Shopee menjadi produk + varian + mapping di Maxius"}
-            className="flex items-center gap-2 rounded-md border border-[#111827] px-4 py-2 text-sm font-medium text-[#111827] hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md border border-primary px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
             <Download size={16} /> Import dari Shopee
           </button>
-          <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60">
+          <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60">
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
           </button>
@@ -399,16 +399,16 @@ export default function ShopeeMarketplacePage() {
       </div>
 
       {!loading && accounts.length === 0 && (
-        <div className="mb-6 bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-          <PackageOpen size={32} className="mx-auto mb-3 text-gray-500" />
-          <p className="text-sm font-semibold text-gray-900">Belum ada akun Shopee terhubung</p>
-          <p className="text-xs text-gray-900 mt-1">Hubungkan toko Shopee melalui <Link href="/settings/accounts" className="underline font-semibold">Tambahkan Marketplace</Link> untuk mulai sync produk.</p>
+        <div className="mb-6 bg-muted border border-border rounded-xl p-6 text-center">
+          <PackageOpen size={32} className="mx-auto mb-3 text-muted-foreground" />
+          <p className="text-sm font-semibold text-foreground">Belum ada akun Shopee terhubung</p>
+          <p className="text-xs text-foreground mt-1">Hubungkan toko Shopee melalui <Link href="/settings/accounts" className="underline font-semibold">Tambahkan Marketplace</Link> untuk mulai sync produk.</p>
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+      <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Tab status — paritas dgn halaman TikTok (badge count dari server) */}
-        <div className="flex items-center overflow-x-auto border-b border-gray-200 px-4 bg-white">
+        <div className="flex items-center overflow-x-auto border-b border-border px-4 bg-card">
           {TABS.map((t) => {
             const count = counts[t.id] ?? 0;
             return (
@@ -419,14 +419,14 @@ export default function ShopeeMarketplacePage() {
                   setPage(1);
                 }}
                 className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
-                  tab === t.id ? "border-gray-900 text-gray-900" : "border-transparent text-gray-600 hover:text-gray-900"
+                  tab === t.id ? "border-primary text-foreground" : "border-transparent text-foreground hover:text-foreground"
                 }`}
               >
                 {t.label}
                 {count > 0 && (
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                      tab === t.id ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                      tab === t.id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
                     }`}
                   >
                     {count}
@@ -436,19 +436,19 @@ export default function ShopeeMarketplacePage() {
             );
           })}
         </div>
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           <div className="relative w-80">
             <input ref={searchRef} type="text" value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cari nama produk atau SKU marketplace"
-              className="border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium" />
-            <Search size={16} className="text-gray-400 absolute right-3 top-2.5" />
+              className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium" />
+            <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
           </div>
 
           <div className="relative">
-            <ChevronDown size={14} className="text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
+            <ChevronDown size={14} className="text-muted-foreground absolute left-3 top-2.5 pointer-events-none" />
             <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}
-              className="border border-gray-300 rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-white cursor-pointer font-medium">
+              className="border border-border rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-card cursor-pointer font-medium">
               <option value="name_asc">Urutkan: Nama A–Z</option>
               <option value="name_desc">Urutkan: Nama Z–A</option>
               <option value="sku_asc">SKU: A–Z</option>
@@ -462,19 +462,19 @@ export default function ShopeeMarketplacePage() {
           <div className="relative" ref={filterRef}>
             <button onClick={() => setFilterOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] ${
-                filterOpen || filterActive ? "border-gray-500 bg-gray-50/70 text-gray-900" : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"}`}>
+                filterOpen || filterActive ? "border-ring bg-muted/70 text-foreground" : "border-border text-muted-foreground bg-card hover:bg-muted"}`}>
               <Filter size={14} />
               <span>Toko/Akun</span>
-              {filterActive && <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">{accountFilter.length}</span>}
+              {filterActive && <span className="px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{accountFilter.length}</span>}
               <ChevronDown size={14} />
             </button>
             {filterOpen && (
-              <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-30 p-4">
-                <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Akun Shopee</p>
+              <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-72 bg-card border border-border rounded-xl shadow-xl z-30 p-4">
+                <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">Akun Shopee</p>
                 <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
-                  {accounts.length === 0 && <p className="text-xs text-gray-400">Tidak ada akun Shopee terdaftar.</p>}
+                  {accounts.length === 0 && <p className="text-xs text-muted-foreground">Tidak ada akun Shopee terdaftar.</p>}
                   {accounts.map((a) => (
-                    <label key={a.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-1">
+                    <label key={a.id} className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-muted rounded px-1 py-1">
                       <input type="checkbox" className="w-4 h-4" checked={accountFilter.includes(a.id)}
                         onChange={() => setAccountFilter((prev) => prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id])} />
                       <span className="truncate">{a.label}</span>
@@ -482,15 +482,15 @@ export default function ShopeeMarketplacePage() {
                   ))}
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <button onClick={() => setAccountFilter([])} className="text-xs font-medium text-gray-500 hover:text-gray-800 underline">Reset</button>
-                  <button onClick={() => setFilterOpen(false)} className="text-xs font-semibold bg-[#111827] text-white px-3 py-1.5 rounded-md">Terapkan</button>
+                  <button onClick={() => setAccountFilter([])} className="text-xs font-medium text-muted-foreground hover:text-foreground underline">Reset</button>
+                  <button onClick={() => setFilterOpen(false)} className="text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-md">Terapkan</button>
                 </div>
               </div>
             )}
           </div>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-muted text-foreground text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} produk dipilih
               <button onClick={() => setSelected(new Set())} className="underline">Batal</button>
             </div>
@@ -499,9 +499,9 @@ export default function ShopeeMarketplacePage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-[#f8f9fa] border-b border-gray-200 text-gray-600 font-semibold">
+            <thead className="bg-muted border-b border-border text-foreground font-semibold">
               <tr>
-                <th className="px-5 py-3 w-10"><input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={allPageSelected} onChange={toggleAll} /></th>
+                <th className="px-5 py-3 w-10"><input type="checkbox" className="w-4 h-4 rounded border-border" checked={allPageSelected} onChange={toggleAll} /></th>
                 <th className="px-5 py-3">Informasi Produk</th>
                 <th className="px-5 py-3">SKU</th>
                 <th className="px-5 py-3">Stok</th>
@@ -512,12 +512,12 @@ export default function ShopeeMarketplacePage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-500">Memuat data...</td></tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">Memuat data...</td></tr>
               ) : error ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-900">{error}</td></tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-foreground">{error}</td></tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
                     Tidak ada produk Shopee ditemukan. Klik <b>&quot;Import dari Shopee&quot;</b> untuk membuat produk + SKU dari listing toko
                     (atau <b>&quot;Sync Semua&quot;</b> untuk memperbarui SKU yang sudah termapping).
@@ -529,46 +529,46 @@ export default function ShopeeMarketplacePage() {
                   const isMapped = row.variantId && row.variantId !== "";
                   return (
                     <Fragment key={row.key}>
-                      <tr className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
-                        <td className="px-5 py-4 pt-5"><input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={selected.has(row.key)} onChange={() => toggleRow(row.key)} /></td>
+                      <tr className="border-b border-border hover:bg-muted/50 align-top">
+                        <td className="px-5 py-4 pt-5"><input type="checkbox" className="w-4 h-4 rounded border-border" checked={selected.has(row.key)} onChange={() => toggleRow(row.key)} /></td>
                         <td className="px-5 py-4">
                           <div className="flex items-start gap-3">
                             {row.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={row.imageUrl} alt="" className="w-12 h-12 rounded object-cover bg-gray-100 shrink-0" />
+                              <img src={row.imageUrl} alt="" className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
                             ) : (
-                              <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+                              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
                                 <PackageOpen size={18} />
                               </div>
                             )}
                             <div className="max-w-[240px]">
-                              <div className="text-gray-900 font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
-                              <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
+                              <div className="text-foreground font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
+                              <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
                               {row.variantCount > 1 && (
-                                <span className="inline-flex items-center gap-1 mt-1.5 ml-1 text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full" title="Satu produk Shopee dengan banyak model/SKU — stok diakumulasi dari semua varian.">
+                                <span className="inline-flex items-center gap-1 mt-1.5 ml-1 text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded-full" title="Satu produk Shopee dengan banyak model/SKU — stok diakumulasi dari semua varian.">
                                   {row.variantCount} varian
                                 </span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-4"><span className="text-sm text-gray-700 font-mono font-semibold">{row.variantCount > 1 ? `${row.variantCount} SKU` : (row.channelSku ?? "-")}</span></td>
-                        <td className="px-5 py-4 text-gray-700 font-semibold">{fmtNumber(row.stockTotal)}</td>
+                        <td className="px-5 py-4"><span className="text-sm text-foreground font-mono font-semibold">{row.variantCount > 1 ? `${row.variantCount} SKU` : (row.channelSku ?? "-")}</span></td>
+                        <td className="px-5 py-4 text-foreground font-semibold">{fmtNumber(row.stockTotal)}</td>
                         <td className="px-5 py-4">
                           {isMapped ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full">✅ Mapped</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full">✅ Mapped</span>
                           ) : (
-                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-gray-100 text-gray-900 px-2 py-0.5 rounded-full hover:bg-gray-200">⚠️ Belum Mapped</Link>
+                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full hover:bg-muted">⚠️ Belum Mapped</Link>
                           )}
                         </td>
-                        <td className="px-5 py-4 text-sm text-gray-600">{row.accountLabel}</td>
-                        <td className="px-5 py-4 text-xs text-gray-400">{fmtDate(row.lastSyncedAt)}</td>
+                        <td className="px-5 py-4 text-sm text-foreground">{row.accountLabel}</td>
+                        <td className="px-5 py-4 text-xs text-muted-foreground">{fmtDate(row.lastSyncedAt)}</td>
                       </tr>
                       {isExpanded && (
-                        <tr className="bg-gray-50/70 border-b border-gray-100">
+                        <tr className="bg-muted/70 border-b border-border">
                           <td colSpan={7} className="px-5 py-4">
-                            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Detail Produk</div>
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                            <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Detail Produk</div>
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-foreground">
                               <div>Platform Product ID: <span className="font-mono">{row.platformProductId ?? "-"}</span></div>
                               <div>Jumlah SKU: <span className="font-mono">{row.variantCount}</span></div>
                               <div>Channel SKU: <span className="font-mono">{row.channelSku ?? (row.variantCount > 1 ? "per varian" : "-")}</span></div>
@@ -586,19 +586,19 @@ export default function ShopeeMarketplacePage() {
         </div>
 
         {total > 0 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <span className="text-sm text-gray-500">{total.toLocaleString("id-ID")} produk · halaman {page} dari {totalPages}</span>
-            <div className="flex items-center gap-1">
+          <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">
+            <span className="text-sm text-muted-foreground">{total.toLocaleString("id-ID")} produk · halaman {page} dari {totalPages}</span>
+            <div className="flex flex-wrap items-center gap-1">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
                 <ChevronLeft size={14} /> Sebelumnya
               </button>
               {pageNumbers.map((n) => (
                 <button key={n} onClick={() => setPage(n)}
-                  className={`w-9 h-9 text-sm rounded-md ${n === page ? "bg-[#111827] text-white font-semibold" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}>{n}</button>
+                  className={`w-9 h-9 text-sm rounded-md ${n === page ? "bg-primary text-primary-foreground font-semibold" : "border border-border text-foreground hover:bg-muted"}`}>{n}</button>
               ))}
               <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
                 Selanjutnya <ChevronRight size={14} />
               </button>
             </div>

@@ -9,9 +9,7 @@ import {
 import { verifySessionCookie } from "@/lib/services/auth.service";
 import { getUserBusinessIds } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
-
-export const SHOPEE_OAUTH_CRED_COOKIE = "shopee_oauth_cred";
-export const OAUTH_BRAND_COOKIE = "maxius_oauth_brand";
+import { SHOPEE_OAUTH_CRED_COOKIE, OAUTH_BRAND_COOKIE } from "@/lib/utils/oauth-cookies";
 
 export async function GET(req: NextRequest) {
   // Feature flag: authorize Shopee diblokir total sampai ISV approved

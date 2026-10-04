@@ -86,14 +86,14 @@ export function DataTable<T>({
 
   if (loading) {
     return (
-      <div className={cn("rounded-xl border border-gray-200 bg-white overflow-hidden", className)}>
+      <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
         <Table>
           <TableHeader>
             <TableRow>
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
-                  className={cn("h-10 px-4 font-semibold text-xs uppercase tracking-wider text-gray-500", col.headerClassName, alignClass(col.align))}
+                  className={cn("h-10 px-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground", col.headerClassName, alignClass(col.align))}
                 >
                   {col.header}
                 </TableHead>
@@ -108,14 +108,14 @@ export function DataTable<T>({
 
   if (data.length === 0) {
     return (
-      <div className={cn("rounded-xl border border-gray-200 bg-white overflow-hidden", className)}>
+      <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
         <Table>
           <TableHeader>
             <TableRow>
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
-                  className={cn("h-10 px-4 font-semibold text-xs uppercase tracking-wider text-gray-500", col.headerClassName, alignClass(col.align))}
+                  className={cn("h-10 px-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground", col.headerClassName, alignClass(col.align))}
                 >
                   {col.header}
                 </TableHead>
@@ -140,15 +140,15 @@ export function DataTable<T>({
   }
 
   return (
-    <div className={cn("rounded-xl border border-gray-200 bg-white overflow-hidden", className)}>
+    <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
       <Table className="min-w-full">
         <TableHeader>
-          <TableRow className="bg-gray-50 border-b border-gray-200">
+          <TableRow className="bg-muted border-b border-border">
             {columns.map((col) => (
               <TableHead
                 key={col.key}
                 className={cn(
-                  "h-10 px-4 font-semibold text-xs uppercase tracking-wider text-gray-500",
+                  "h-10 px-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground",
                   col.headerClassName,
                   alignClass(col.align)
                 )}
@@ -163,7 +163,7 @@ export function DataTable<T>({
             <TableRow
               key={keyExtractor(row)}
               className={cn(
-                "border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors",
+                "border-b border-border last:border-0 hover:bg-muted/50 transition-colors",
                 rowClassName?.(row, index)
               )}
             >
@@ -180,10 +180,10 @@ export function DataTable<T>({
         </TableBody>
       </Table>
       {caption && (
-        <TableCaption className={cn("mt-2 text-[11px] text-gray-400 px-2", caption)} />
+        <TableCaption className={cn("mt-2 text-[11px] text-muted-foreground px-2", caption)} />
       )}
       {hasMore && onLoadMore && (
-        <div className="px-4 py-3 border-t border-gray-100 text-center bg-gray-50/50">
+        <div className="px-4 py-3 border-t border-border text-center bg-muted/50">
           <Button
             variant="outline"
             size="sm"

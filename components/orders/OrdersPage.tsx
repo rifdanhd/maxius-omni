@@ -875,7 +875,7 @@ export default function OrdersPage() {
               variant="outline"
               onClick={handleReconcile}
               disabled={reconciling}
-              className="gap-2 text-gray-900 border-gray-200 hover:bg-gray-50"
+              className="gap-2 text-foreground border-border hover:bg-muted"
             >
               <RefreshCw size={16} className={reconciling ? "animate-spin" : ""} />
               {reconciling ? "Menyinkronkan Resi..." : "Sync Resi"}
@@ -889,7 +889,7 @@ export default function OrdersPage() {
 
       {/* Progres background run (SyncRun) */}
       {bgActive && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-info bg-info-subtle px-3 py-2 text-sm text-info">
           <RefreshCw size={14} className="animate-spin shrink-0" />
           <span>
             Menarik order di latar belakang — <b>{bgProgress?.fetched ?? 0} ditarik</b>, {bgProgress?.created ?? 0} baru,{" "}
@@ -902,20 +902,20 @@ export default function OrdersPage() {
 
       {/* Fase 1 — edukasi batas API & pola pakai */}
       {!infoDismissed && (
-        <Alert className="mt-3 border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-700">
-          <Info size={16} className="text-amber-700" />
-          <AlertTitle className="flex w-full items-start justify-between gap-2 text-amber-900">
+        <Alert className="mt-3 border-warning bg-warning-subtle text-warning [&>svg]:text-warning">
+          <Info size={16} className="text-warning" />
+          <AlertTitle className="flex w-full items-start justify-between gap-2 text-warning">
             Tentang sinkronisasi pesanan masal
             <button
               type="button"
               onClick={() => setInfoDismissed(true)}
-              className="rounded p-0.5 hover:bg-amber-100"
+              className="rounded p-0.5 hover:bg-warning-subtle"
               aria-label="Tutup informasi"
             >
               <X size={14} />
             </button>
           </AlertTitle>
-          <AlertDescription className="text-amber-900/90">
+          <AlertDescription className="text-warning">
             <p>
               1. API marketplace mengambil pesanan maksimal ±100–1.000 data per permintaan (pagination limit). Indikator yang
               berputar lama atau tertahan pada angka tertentu adalah <b>normal</b> — sistem menunggu jeda rate limit agar koneksi
@@ -933,7 +933,7 @@ export default function OrdersPage() {
         contentClassName="flex-1 flex flex-col overflow-hidden p-0"
       >
         {/* Tabs */}
-        <div className="flex items-center overflow-x-auto border-b border-gray-200 px-4 bg-white">
+        <div className="flex items-center overflow-x-auto border-b border-border px-4 bg-card">
           {TABS.map((tab) => {
             const count = tab.statuses === null
               ? Object.values(counts).reduce((a, b) => a + b, 0)
@@ -944,8 +944,8 @@ export default function OrdersPage() {
                 onClick={() => handleTab(tab.id)}
                 className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
                   activeTab === tab.id
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-600 hover:text-gray-900"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-foreground hover:text-foreground"
                 }`}
               >
                 {tab.label}
@@ -959,7 +959,7 @@ export default function OrdersPage() {
 
         {/* Sub-Tabs (hanya untuk tab tertentu) */}
         {currentSubTabs && (
-          <div className="flex items-center gap-0 border-b border-gray-100 px-4 bg-gray-50/50">
+          <div className="flex items-center gap-0 border-b border-border px-4 bg-muted/50">
             {currentSubTabs.map((sub) => {
               const subCount = sub.id === "all"
                 ? (currentTab.statuses ?? []).reduce((acc, s) => acc + (counts[s] ?? 0), 0)
@@ -970,8 +970,8 @@ export default function OrdersPage() {
                   onClick={() => handleSubTab(sub.id)}
                   className={`whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
                     activeSubTab === sub.id
-                      ? "border-gray-900 text-gray-900"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {sub.label}
@@ -983,21 +983,21 @@ export default function OrdersPage() {
         )}
 
         {/* Filter Row */}
-        <div className="p-4 border-b border-gray-100 flex items-center gap-3 flex-wrap bg-white">
-          <div className="flex bg-white border border-gray-200 rounded-lg h-10 flex-1 max-w-xl relative">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap bg-card">
+          <div className="flex min-w-0 basis-full sm:basis-auto bg-card border border-border rounded-lg h-10 flex-1 max-w-xl relative">
             {/* Keyword type dropdown */}
             <div className="relative" ref={searchTypeRef}>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setSearchTypeOpen((v) => !v)}
-                className="h-full px-3 bg-gray-50 border-r border-gray-200 text-sm text-gray-700 font-medium flex items-center gap-1.5 hover:bg-gray-100 min-w-[130px] rounded-l-lg"
+                className="h-full px-3 bg-muted border-r border-border text-sm text-foreground font-medium flex items-center gap-1.5 hover:bg-muted min-w-[130px] rounded-l-lg"
               >
                 <span>{searchType.label}</span>
-                <ChevronDown size={13} className="ml-auto text-gray-400" />
+                <ChevronDown size={13} className="ml-auto text-muted-foreground" />
               </Button>
               {searchTypeOpen && (
-                <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-1.5">
+                <div className="absolute left-0 top-full mt-1 w-48 bg-card border border-border rounded-xl shadow-xl z-30 py-1.5">
                   {SEARCH_TYPES.map((type) => (
                     <Button
                       key={type.id}
@@ -1011,42 +1011,42 @@ export default function OrdersPage() {
                 </div>
               )}
             </div>
-            <div className="flex-1 flex items-center px-3 gap-2">
+            <div className="min-w-0 flex-1 flex items-center px-3 gap-2">
               <input
                 type="text"
                 value={searchInput}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder={searchType.placeholder}
-                className="w-full text-sm outline-none bg-transparent"
+                className="min-w-0 w-full text-sm outline-none bg-transparent"
               />
-              <Search size={16} className="text-gray-400 shrink-0" />
+              <Search size={16} className="text-muted-foreground shrink-0" />
             </div>
           </div>
 
           <div className="relative" ref={sortRef}>
             <button
               onClick={() => setSortOpen((v) => !v)}
-              className={`h-10 px-4 border rounded-lg text-sm bg-white flex items-center gap-2 min-w-[140px] max-w-[200px] justify-between ${
+              className={`h-10 px-4 border rounded-lg text-sm bg-card flex items-center gap-2 min-w-[140px] max-w-[200px] justify-between ${
                 sortOpen
-                  ? "border-gray-500 text-gray-900 bg-gray-50/70 ring-2 ring-gray-500/15"
-                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  ? "border-ring text-foreground bg-muted/70 ring-2 ring-ring/15"
+                  : "border-border text-muted-foreground hover:bg-muted"
               }`}
             >
               <span className="truncate">{sort.label}</span> <ChevronDown size={14} className="shrink-0" />
             </button>
             {sortOpen && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-20 py-2">
+              <div className="absolute max-w-[calc(100vw-2rem)] right-0 top-full mt-1 w-80 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
                     onClick={() => handleSortChange(opt)}
                     className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${
                       sort.id === opt.id
-                        ? "font-semibold text-gray-900 bg-gray-50"
-                        : "text-gray-700 hover:bg-gray-50"
+                        ? "font-semibold text-foreground bg-muted"
+                        : "text-foreground hover:bg-muted"
                     }`}
                   >
-                    {sort.id === opt.id && <span className="w-1.5 h-1.5 rounded-full bg-gray-900 shrink-0" />}
+                    {sort.id === opt.id && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                     {sort.id !== opt.id && <span className="w-1.5 h-1.5 shrink-0" />}
                     {opt.label}
                   </button>
@@ -1055,20 +1055,20 @@ export default function OrdersPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 h-10 border border-gray-200 rounded-lg px-3 bg-white">
-            <Calendar size={16} className="text-gray-400" />
+          <div className="flex max-w-full flex-wrap items-center gap-2 min-h-10 py-2 sm:py-0 border border-border rounded-lg px-3 bg-card">
+            <Calendar size={16} className="text-muted-foreground" />
             <input
               type="date"
               value={from}
               onChange={(e) => handleDateChange("from", e.target.value)}
-              className="text-sm outline-none w-[130px] text-gray-600"
+              className="text-sm outline-none w-[130px] text-foreground"
             />
-            <span className="text-gray-400">s.d.</span>
+            <span className="text-muted-foreground">s.d.</span>
             <input
               type="date"
               value={to}
               onChange={(e) => handleDateChange("to", e.target.value)}
-              className="text-sm outline-none w-[130px] text-gray-600"
+              className="text-sm outline-none w-[130px] text-foreground"
             />
           </div>
 
@@ -1076,7 +1076,7 @@ export default function OrdersPage() {
             <Button
               variant="outline"
               onClick={handleClearFilters}
-              className="h-10 gap-2 text-gray-600"
+              className="h-10 gap-2 text-foreground"
             >
               <Filter size={16} /> Reset
             </Button>
@@ -1084,16 +1084,16 @@ export default function OrdersPage() {
         </div>
 
         {/* Bulk Action & Pagination */}
-        <div className="px-4 py-3 bg-gray-50/50 flex items-center justify-between border-b border-gray-100">
+        <div className="px-4 py-3 bg-muted/50 flex items-center justify-between border-b border-border">
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+                className="w-4 h-4 rounded border-border text-foreground focus:ring-ring"
                 checked={allSelected}
                 onChange={toggleSelectAll}
               />
-              <span className="text-sm font-medium text-gray-700">Pilih Semua</span>
+              <span className="text-sm font-medium text-foreground">Pilih Semua</span>
             </label>
             {selected.size > 0 && (
               <>
@@ -1101,7 +1101,7 @@ export default function OrdersPage() {
                   <button
                     onClick={handlePickup}
                     disabled={printingBulk}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 rounded-md text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-50 shadow-xs transition-colors"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary rounded-md text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50 shadow-xs transition-colors"
                   >
                     <PackageCheck size={14} /> Atur Pengiriman ({selected.size})
                   </button>
@@ -1127,8 +1127,8 @@ export default function OrdersPage() {
               </>
             )}
           </div>
-          <div className="flex items-center gap-4 text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">{total}</span>
+          <div className="flex items-center gap-4 text-sm text-foreground">
+            <span className="font-semibold text-foreground">{total}</span>
             <span>Total pesanan</span>
             {pageCount > 1 && (
               <div className="flex items-center gap-1">
@@ -1157,13 +1157,13 @@ export default function OrdersPage() {
         </div>
 
         {/* Orders List */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 bg-muted">
           {loading ? (
             <div className="space-y-3" aria-busy="true">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-28 rounded-xl bg-white border border-gray-200 animate-pulse"
+                  className="h-28 rounded-xl bg-card border border-border animate-pulse"
                   style={{ animationDelay: `${i * 80}ms` }}
                 />
               ))}

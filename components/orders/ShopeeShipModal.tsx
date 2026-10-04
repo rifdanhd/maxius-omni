@@ -141,19 +141,19 @@ export default function ShopeeShipModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-card rounded-2xl max-w-3xl w-full shadow-2xl border border-border overflow-y-auto flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#EE4D2D]/10 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-brand-shopee/10 flex items-center justify-center">
               <ShopeeLogo size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900 leading-tight">
+              <h2 className="text-base font-bold text-foreground leading-tight">
                 Atur Pengiriman Shopee ({orders.length})
               </h2>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Booking pickup / drop-off langsung ke Shopee Open API
               </p>
             </div>
@@ -161,7 +161,7 @@ export default function ShopeeShipModal({
           <button
             onClick={onClose}
             disabled={busy}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           >
             <X size={18} />
           </button>
@@ -171,14 +171,14 @@ export default function ShopeeShipModal({
         <div className="p-6 overflow-y-auto space-y-5">
           {/* Daftar pesanan */}
           <div>
-            <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-              <Truck size={14} className="text-gray-900" /> Daftar Pesanan
+            <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+              <Truck size={14} className="text-foreground" /> Daftar Pesanan
             </p>
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <div className="border border-border rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[520px]">
                   <thead>
-                    <tr className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200">
+                    <tr className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted border-b border-border">
                       <th className="px-4 py-2.5">No. Pesanan</th>
                       <th className="px-4 py-2.5">Toko</th>
                       <th className="px-4 py-2.5 text-center">Total Qty</th>
@@ -187,19 +187,19 @@ export default function ShopeeShipModal({
                   </thead>
                   <tbody>
                     {orders.map((order) => (
-                      <tr key={order.id} className="border-b border-gray-50 last:border-none">
+                      <tr key={order.id} className="border-b border-border last:border-none">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 bg-[#EE4D2D] text-white rounded text-[9px] font-bold flex items-center gap-0.5">
+                            <span className="px-1.5 py-0.5 bg-brand-shopee text-brand-shopee-foreground rounded text-[9px] font-bold flex items-center gap-0.5">
                               <ShopeeLogo size={8} /> {order.platform}
                             </span>
-                            <span className="text-xs font-bold text-gray-900">{order.orderNo}</span>
+                            <span className="text-xs font-bold text-foreground">{order.orderNo}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-600">{order.storeName}</td>
-                        <td className="px-4 py-3 text-xs text-gray-700 text-center font-semibold">{order.totalQty}</td>
+                        <td className="px-4 py-3 text-xs text-foreground">{order.storeName}</td>
+                        <td className="px-4 py-3 text-xs text-foreground text-center font-semibold">{order.totalQty}</td>
                         <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-900 text-[10px] font-bold rounded border border-gray-200">
+                          <span className="px-2 py-0.5 bg-muted text-foreground text-[10px] font-bold rounded border border-border">
                             {order.status}
                           </span>
                         </td>
@@ -212,13 +212,13 @@ export default function ShopeeShipModal({
           </div>
 
           {loading && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 flex items-center gap-2">
+            <div className="rounded-xl border border-border bg-muted px-4 py-3 text-xs text-foreground flex items-center gap-2">
               <Loader2 size={14} className="animate-spin" /> Memuat opsi pengiriman dari Shopee...
             </div>
           )}
 
           {paramError && (
-            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-900 flex items-start gap-2">
+            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               <span>
                 {paramError} — pesanan ini bisa dikirim via Seller Center Shopee bila API tidak
@@ -228,7 +228,7 @@ export default function ShopeeShipModal({
           )}
 
           {!loading && !paramError && !canPickup && !canDropoff && (
-            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-900 flex items-start gap-2">
+            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               Shopee tidak menawarkan pickup/drop-off API untuk order ini (non-integrated) —
               kirim via Seller Center Shopee.
@@ -238,10 +238,10 @@ export default function ShopeeShipModal({
           {/* Mode penyerahan */}
           {!loading && !paramError && (canPickup || canDropoff) && (
             <div>
-              <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                <Truck size={14} className="text-gray-900" /> Metode Penyerahan Paket
+              <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                <Truck size={14} className="text-foreground" /> Metode Penyerahan Paket
               </p>
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="border border-border rounded-xl overflow-hidden">
                 <div className="grid grid-cols-2 gap-2 p-4">
                   <button
                     type="button"
@@ -249,8 +249,8 @@ export default function ShopeeShipModal({
                     onClick={() => setMode("PICKUP")}
                     className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
                       mode === "PICKUP"
-                        ? "border-gray-900 bg-gray-900 text-white shadow-xs"
-                        : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                        : "border-border text-foreground hover:bg-muted"
                     } ${!canPickup ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <Truck size={14} /> Request Pickup
@@ -261,8 +261,8 @@ export default function ShopeeShipModal({
                     onClick={() => setMode("DROPOFF")}
                     className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
                       mode === "DROPOFF"
-                        ? "border-gray-900 bg-gray-900 text-white shadow-xs"
-                        : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                        : "border-border text-foreground hover:bg-muted"
                     } ${!canDropoff ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <Warehouse size={14} /> Drop Off
@@ -275,12 +275,12 @@ export default function ShopeeShipModal({
           {/* Alamat + slot pickup */}
           {mode === "PICKUP" && selectedAddress && (
             <div>
-              <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                <MapPin size={14} className="text-gray-900" /> Lokasi & Jadwal Penjemputan
+              <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                <MapPin size={14} className="text-foreground" /> Lokasi & Jadwal Penjemputan
               </p>
-              <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-                <div className="px-4 py-3 bg-white">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 block mb-1.5">
+              <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
+                <div className="px-4 py-3 bg-card">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
                     Alamat Penjemputan
                   </label>
                   {pickupAddresses.length > 1 ? (
@@ -292,7 +292,7 @@ export default function ShopeeShipModal({
                         const addr = pickupAddresses.find((a) => a.addressId === id);
                         setPickupTimeId(addr?.timeSlots[0]?.pickupTimeId ?? "");
                       }}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                     >
                       {pickupAddresses.map((a) => (
                         <option key={a.addressId} value={a.addressId}>
@@ -301,18 +301,18 @@ export default function ShopeeShipModal({
                       ))}
                     </select>
                   ) : (
-                    <p className="text-sm text-gray-800">{selectedAddress.label}</p>
+                    <p className="text-sm text-foreground">{selectedAddress.label}</p>
                   )}
                 </div>
-                <div className="px-4 py-3 bg-white">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 block mb-1.5 flex items-center gap-1.5">
+                <div className="px-4 py-3 bg-card">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5 flex items-center gap-1.5">
                     <Clock size={12} /> Jadwal Penjemputan
                   </label>
                   {selectedAddress.timeSlots.length > 0 ? (
                     <select
                       value={pickupTimeId}
                       onChange={(e) => setPickupTimeId(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                     >
                       {selectedAddress.timeSlots.map((s) => (
                         <option key={s.pickupTimeId} value={s.pickupTimeId}>
@@ -321,7 +321,7 @@ export default function ShopeeShipModal({
                       ))}
                     </select>
                   ) : (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       Shopee tidak memberi slot waktu — kurir menyesuaikan jadwal penjemputan.
                     </p>
                   )}
@@ -333,19 +333,19 @@ export default function ShopeeShipModal({
           {/* Cabang / titik drop-off */}
           {mode === "DROPOFF" && (branches.length > 0 || slugs.length > 0) && (
             <div>
-              <p className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-                <Warehouse size={14} className="text-gray-900" /> Titik Drop-off
+              <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                <Warehouse size={14} className="text-foreground" /> Titik Drop-off
               </p>
-              <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white space-y-3">
+              <div className="border border-border rounded-xl px-4 py-3 bg-card space-y-3">
                 {branches.length > 0 && (
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 block mb-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
                       Cabang Kurir
                     </label>
                     <select
                       value={branchId ?? ""}
                       onChange={(e) => setBranchId(Number(e.target.value))}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                     >
                       {branches.map((b) => (
                         <option key={b.branchId} value={b.branchId}>
@@ -357,13 +357,13 @@ export default function ShopeeShipModal({
                 )}
                 {slugs.length > 0 && (
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 block mb-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
                       Drop Point
                     </label>
                     <select
                       value={slug}
                       onChange={(e) => setSlug(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                      className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                     >
                       {slugs.map((s) => (
                         <option key={s.slug} value={s.slug}>
@@ -373,7 +373,7 @@ export default function ShopeeShipModal({
                     </select>
                   </div>
                 )}
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-muted-foreground">
                   Paket diantar sendiri ke titik penyerahan — resi terbit setelah drop-off.
                 </p>
               </div>
@@ -381,7 +381,7 @@ export default function ShopeeShipModal({
           )}
 
           {actionError && (
-            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-900 flex items-start gap-2">
+            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               {actionError}
             </div>
@@ -389,18 +389,18 @@ export default function ShopeeShipModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+        <div className="px-6 py-3.5 bg-muted border-t border-border flex items-center justify-end gap-2.5">
           <button
             onClick={onClose}
             disabled={busy}
-            className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
           >
             Batal
           </button>
           <button
             onClick={handleConfirm}
             disabled={busy || loading || !!paramError || (!canPickup && !canDropoff)}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
           >
             {busy ? (
               <>

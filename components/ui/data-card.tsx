@@ -39,7 +39,7 @@ export function DataCard({
   return (
     <Card className={cn("shadow-sm", className)}>
       {hasHeader && (
-        <CardHeader className={cn("border-b border-gray-100", headerClassName)}>
+        <CardHeader className={cn("border-b border-border", headerClassName)}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full">
             <div>
               {title && <CardTitle className="text-lg">{title}</CardTitle>}
@@ -51,7 +51,7 @@ export function DataCard({
       )}
       <CardContent className={cn(hasHeader ? "pt-0" : "", contentClassName)}>{children}</CardContent>
       {footer && (
-        <CardFooter className={cn("border-t border-gray-100", footerClassName)}>
+        <CardFooter className={cn("border-t border-border", footerClassName)}>
           {footer}
         </CardFooter>
       )}

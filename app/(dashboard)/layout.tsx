@@ -37,7 +37,7 @@ export default function DashboardLayout({
 
   if (!hydrated || !accessToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
         Memeriksa sesi...
       </div>
     );

@@ -164,8 +164,8 @@ function Toast({
       <div
         className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
           toast.type === "success"
-            ? "bg-gray-50 border-gray-200 text-gray-900"
-            : "bg-gray-50 border-gray-200 text-gray-900"
+            ? "bg-muted border-border text-foreground"
+            : "bg-muted border-border text-foreground"
         }`}
       >
         <span className="flex-1">{toast.message}</span>
@@ -491,7 +491,7 @@ export default function TikTokMarketplacePage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <Toast toast={toast} onClose={() => setToast(null)} />
       {mapTarget && (
         <MapUnmappedModal
@@ -507,15 +507,15 @@ export default function TikTokMarketplacePage() {
 
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
             Produk Marketplace › TikTok Shop
           </p>
-          <h1 className="text-xl font-bold text-gray-900">Produk TikTok Shop</h1>
+          <h1 className="text-xl font-bold text-foreground">Produk TikTok Shop</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-muted-foreground">
             {lastSyncedAt ? (
-              <>Terakhir sync <b className="text-gray-600">{fmtDate(lastSyncedAt)}</b></>
+              <>Terakhir sync <b className="text-foreground">{fmtDate(lastSyncedAt)}</b></>
             ) : (
               "Belum pernah sync"
             )}
@@ -523,7 +523,7 @@ export default function TikTokMarketplacePage() {
           <button
             onClick={syncAll}
             disabled={syncingAll}
-            className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
@@ -552,14 +552,14 @@ export default function TikTokMarketplacePage() {
               onClick={() => switchTab(key)}
               className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors ${
                 active
-                  ? "bg-[#111827] text-white border-transparent"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "bg-card text-foreground border-border hover:bg-muted"
               }`}
             >
               {label}
               <span
                 className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                  active ? "bg-card/20 text-primary-foreground" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {counts[key] ?? 0}
@@ -571,29 +571,29 @@ export default function TikTokMarketplacePage() {
 
       {/* Produk belum ter-mapping (discovery, bukan auto-import) */}
       {unmappedChecked && unmappedTotal > 0 && (
-        <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="mb-4 bg-muted border border-border rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-3 flex items-center justify-between flex-wrap gap-2">
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-sm font-bold text-foreground">
               {unmappedTotal} produk di TikTok Shop belum ter-mapping ke stok pusat
             </p>
             <button
               onClick={loadUnmapped}
               disabled={unmappedLoading}
-              className="text-xs font-semibold text-gray-900 underline hover:text-gray-900 disabled:opacity-50"
+              className="text-xs font-semibold text-foreground underline hover:text-foreground disabled:opacity-50"
             >
               {unmappedLoading ? "Memeriksa..." : "Periksa ulang"}
             </button>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {unmapped.filter((a) => a.unmapped.length > 0).map((a) => (
               <div key={a.accountId}>
                 <button
                   onClick={() => toggleUnmappedAccount(a.accountId)}
-                  className="w-full px-5 py-2.5 flex items-center justify-between text-sm hover:bg-gray-100/50"
+                  className="w-full px-5 py-2.5 flex items-center justify-between text-sm hover:bg-muted/50"
                 >
-                  <span className="font-semibold text-gray-800">
+                  <span className="font-semibold text-foreground">
                     {a.label}
-                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-gray-500 text-white text-[10px] font-bold">
+                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-muted-foreground text-primary-foreground text-[10px] font-bold">
                       {a.unmapped.length}
                     </span>
                   </span>
@@ -602,21 +602,21 @@ export default function TikTokMarketplacePage() {
                 {unmappedOpen.has(a.accountId) && (
                   <div className="px-5 pb-3 flex flex-col gap-2">
                     {a.unmapped.map((p) => (
-                      <div key={p.platformProductId} className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div key={p.platformProductId} className="bg-card border border-border rounded-lg p-3">
                         <div className="flex gap-3">
                           {p.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.imageUrl} alt={p.title ?? p.platformProductId} className="w-12 h-12 rounded object-cover bg-gray-100 shrink-0" />
+                            <img src={p.imageUrl} alt={p.title ?? p.platformProductId} className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
                           ) : (
-                            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+                            <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
                               <PackageOpen size={18} />
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-gray-900 leading-tight" title={p.title ?? undefined}>
+                            <p className="text-sm font-bold text-foreground leading-tight" title={p.title ?? undefined}>
                               {p.title ?? p.platformProductId}
                             </p>
-                            <p className="text-[11px] text-gray-400 mt-0.5">
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
                               ID {p.platformProductId}
                               {p.status ? ` · ${STATUS_LABEL[p.status] ?? p.status}` : ""}
                             </p>
@@ -626,14 +626,14 @@ export default function TikTokMarketplacePage() {
                           {p.skus.map((s) => {
                             const channelSku = s.sellerSku ?? s.skuId;
                             return (
-                              <div key={s.skuId || channelSku} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-md px-2 py-1.5 flex-wrap">
-                                <span className="text-gray-600">
+                              <div key={s.skuId || channelSku} className="flex items-center justify-between gap-2 text-xs bg-muted rounded-md px-2 py-1.5 flex-wrap">
+                                <span className="text-foreground">
                                   <span className="font-mono font-semibold">{channelSku}</span>
-                                  <span className="text-gray-400"> · stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}</span>
+                                  <span className="text-muted-foreground"> · stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}</span>
                                 </span>
                                 <button
                                   onClick={() => setMapTarget({ accountId: a.accountId, accountLabel: a.label, product: p, sku: s })}
-                                  className="shrink-0 text-xs font-semibold bg-[#111827] text-white px-3 py-1 rounded-md hover:bg-gray-900"
+                                  className="shrink-0 text-xs font-semibold bg-primary text-primary-foreground px-3 py-1 rounded-md hover:bg-primary"
                                 >
                                   Mapping
                                 </button>
@@ -651,9 +651,9 @@ export default function TikTokMarketplacePage() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+      <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           <div className="relative w-80">
             <input
               ref={searchRef}
@@ -661,15 +661,15 @@ export default function TikTokMarketplacePage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cari nama produk, SKU, atau SKU channel"
-              className="border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
+              className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
             />
-            <Search size={16} className="text-gray-400 absolute right-3 top-2.5" />
+            <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
           </div>
 
           <div className="relative">
             <ChevronDown
               size={14}
-              className="text-gray-400 absolute left-3 top-2.5 pointer-events-none"
+              className="text-muted-foreground absolute left-3 top-2.5 pointer-events-none"
             />
             <select
               value={sort}
@@ -677,7 +677,7 @@ export default function TikTokMarketplacePage() {
                 setSort(e.target.value);
                 setPage(1);
               }}
-              className="border border-gray-300 rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-white cursor-pointer font-medium"
+              className="border border-border rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-card cursor-pointer font-medium"
             >
               <option value="name_asc">Urutkan: Nama A–Z</option>
               <option value="name_desc">Urutkan: Nama Z–A</option>
@@ -694,32 +694,32 @@ export default function TikTokMarketplacePage() {
               onClick={() => setFilterOpen((v) => !v)}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] ${
                 filterOpen || filterActive
-                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
-                  : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
+                  ? "border-ring bg-muted/70 text-foreground"
+                  : "border-border text-muted-foreground bg-card hover:bg-muted"
               }`}
             >
               <Filter size={14} />
               <span>Toko/Akun</span>
               {filterActive && (
-                <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
+                <span className="px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
                   {accountFilter.length}
                 </span>
               )}
               <ChevronDown size={14} />
             </button>
             {filterOpen && (
-              <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-30 p-4">
-                <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
+              <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-72 bg-card border border-border rounded-xl shadow-xl z-30 p-4">
+                <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">
                   Akun TikTok Shop
                 </p>
                 <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
                   {accounts.length === 0 && (
-                    <p className="text-xs text-gray-400">Tidak ada akun TIKTOK_SHOP terdaftar.</p>
+                    <p className="text-xs text-muted-foreground">Tidak ada akun TIKTOK_SHOP terdaftar.</p>
                   )}
                   {accounts.map((a) => (
                     <label
                       key={a.id}
-                      className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-1"
+                      className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-muted rounded px-1 py-1"
                     >
                       <input
                         type="checkbox"
@@ -738,13 +738,13 @@ export default function TikTokMarketplacePage() {
                 <div className="mt-2 flex items-center justify-between">
                   <button
                     onClick={() => setAccountFilter([])}
-                    className="text-xs font-medium text-gray-500 hover:text-gray-800 underline"
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground underline"
                   >
                     Reset
                   </button>
                   <button
                     onClick={() => setFilterOpen(false)}
-                    className="text-xs font-semibold bg-[#111827] text-white px-3 py-1.5 rounded-md"
+                    className="text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-md"
                   >
                     Terapkan
                   </button>
@@ -757,19 +757,19 @@ export default function TikTokMarketplacePage() {
             onClick={loadUnmapped}
             disabled={unmappedLoading}
             title="Periksa produk TikTok yang belum ter-mapping ke stok pusat (tanpa mengubah data)"
-            className="flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] border-gray-300 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-60"
+            className="flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] border-border text-muted-foreground bg-card hover:bg-muted disabled:opacity-60"
           >
             {unmappedLoading ? <Loader2 size={14} className="animate-spin" /> : <PackageOpen size={14} />}
             <span>Belum ter-mapping</span>
             {unmappedChecked && unmappedTotal > 0 && (
-              <span className="px-1.5 rounded-full bg-gray-500 text-white text-[10px] font-bold">
+              <span className="px-1.5 rounded-full bg-muted-foreground text-primary-foreground text-[10px] font-bold">
                 {unmappedTotal}
               </span>
             )}
           </button>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-muted text-foreground text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} listing dipilih
               <button onClick={() => setSelected(new Set())} className="underline">Batal</button>
             </div>
@@ -779,10 +779,10 @@ export default function TikTokMarketplacePage() {
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-[#f8f9fa] border-b border-gray-200 text-gray-600 font-semibold">
+            <thead className="bg-muted border-b border-border text-foreground font-semibold">
               <tr>
                 <th className="px-5 py-3 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={allPageSelected} onChange={toggleAll} />
+                  <input type="checkbox" className="w-4 h-4 rounded border-border" checked={allPageSelected} onChange={toggleAll} />
                 </th>
                 <th className="px-5 py-3">Informasi Produk</th>
                 <th className="px-5 py-3">Publish Platform</th>
@@ -797,15 +797,15 @@ export default function TikTokMarketplacePage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-gray-500">Memuat data...</td>
+                  <td colSpan={9} className="px-5 py-12 text-center text-muted-foreground">Memuat data...</td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-gray-900">{error}</td>
+                  <td colSpan={9} className="px-5 py-12 text-center text-foreground">{error}</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
                     Tidak ada listing yang cocok. Klik <b>&quot;Sync Semua&quot;</b> untuk menarik data dari TikTok Shop.
                   </td>
@@ -848,15 +848,15 @@ export default function TikTokMarketplacePage() {
         </div>
 
         {/* Pagination */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">
+          <span className="text-sm text-muted-foreground">
             {total.toLocaleString("id-ID")} listing · halaman {page} dari {totalPages}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft size={14} /> Sebelumnya
             </button>
@@ -866,8 +866,8 @@ export default function TikTokMarketplacePage() {
                 onClick={() => setPage(n)}
                 className={`w-9 h-9 text-sm rounded-md ${
                   n === page
-                    ? "bg-[#111827] text-white font-semibold"
-                    : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "border border-border text-foreground hover:bg-muted"
                 }`}
               >
                 {n}
@@ -876,7 +876,7 @@ export default function TikTokMarketplacePage() {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Selanjutnya <ChevronRight size={14} />
             </button>
@@ -992,18 +992,18 @@ function MapUnmappedModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5"
+        className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-base font-bold text-gray-900">Mapping produk TikTok</h2>
-        <p className="text-xs text-gray-500 mt-1">
+        <h2 className="text-base font-bold text-foreground">Mapping produk TikTok</h2>
+        <p className="text-xs text-muted-foreground mt-1">
           {target.product.title ?? target.product.platformProductId} · {target.accountLabel}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Channel SKU: <span className="font-mono font-semibold text-gray-700">{channelSku}</span>
-          <span className="text-gray-400"> · stok TikTok {fmtNumber(target.sku.stock)} · {fmtPrice(target.sku.price)}</span>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Channel SKU: <span className="font-mono font-semibold text-foreground">{channelSku}</span>
+          <span className="text-muted-foreground"> · stok TikTok {fmtNumber(target.sku.stock)} · {fmtPrice(target.sku.price)}</span>
         </p>
 
         <div className="mt-3 flex gap-2 text-xs font-semibold">
@@ -1019,8 +1019,8 @@ function MapUnmappedModal({
               onClick={() => setMode(key)}
               className={`px-3 py-1.5 rounded-md border ${
                 mode === key
-                  ? "bg-[#111827] text-white border-transparent"
-                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "bg-card text-foreground border-border hover:bg-muted"
               }`}
             >
               {label}
@@ -1030,13 +1030,13 @@ function MapUnmappedModal({
 
         <div className="mt-3 flex flex-col gap-2.5">
           {mode === "existing" ? (
-            <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+            <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
               Varian tujuan
               <select
                 value={variantId}
                 onChange={(e) => setVariantId(e.target.value)}
                 disabled={loadingMasters}
-                className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none bg-white"
+                className="border border-border rounded-md px-2 py-2 text-sm font-normal outline-none bg-card"
               >
                 <option value="">{loadingMasters ? "Memuat..." : "— Pilih varian —"}</option>
                 {masters.map((m) => (
@@ -1053,13 +1053,13 @@ function MapUnmappedModal({
           ) : (
             <>
               {mode === "new-variant" ? (
-                <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
                   Produk master yang sudah ada
                   <select
                     value={masterId}
                     onChange={(e) => setMasterId(e.target.value)}
                     disabled={loadingMasters}
-                    className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none bg-white"
+                    className="border border-border rounded-md px-2 py-2 text-sm font-normal outline-none bg-card"
                   >
                     <option value="">{loadingMasters ? "Memuat..." : "— Pilih produk master —"}</option>
                     {masters.map((m) => (
@@ -1069,46 +1069,46 @@ function MapUnmappedModal({
                 </label>
               ) : (
                 <>
-                  <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
                     Nama produk master baru
                     <input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none"
+                      className="border border-border rounded-md px-2 py-2 text-sm font-normal outline-none"
                     />
                   </label>
-                  <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
                     URL gambar (opsional, dari TikTok)
                     <input
                       value={imageUrl}
                       onChange={(e) => setImageUrl(e.target.value)}
                       placeholder="https://..."
-                      className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none"
+                      className="border border-border rounded-md px-2 py-2 text-sm font-normal outline-none"
                     />
                   </label>
                 </>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
                   SKU lokal
                   <input
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
-                    className="border border-gray-300 rounded-md px-2 py-2 text-sm font-mono font-normal outline-none"
+                    className="border border-border rounded-md px-2 py-2 text-sm font-mono font-normal outline-none"
                   />
                 </label>
-                <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
                   Stok fisik awal
                   <input
                     type="number"
                     min={0}
                     value={stock}
                     onChange={(e) => setStock(e.target.value)}
-                    className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none"
+                    className="border border-border rounded-md px-2 py-2 text-sm font-normal outline-none"
                   />
                 </label>
               </div>
-              <label className="text-xs font-semibold text-gray-600 flex flex-col gap-1">
+              <label className="text-xs font-semibold text-foreground flex flex-col gap-1">
                 Harga default / tayang (Rp, opsional)
                 <input
                   type="number"
@@ -1116,26 +1116,26 @@ function MapUnmappedModal({
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder={target.sku.price !== null ? String(target.sku.price) : "Ikut harga TikTok tampilan saja"}
-                  className="border border-gray-300 rounded-md px-2 py-2 text-sm font-normal outline-none"
+                  className="border border-border rounded-md px-2 py-2 text-sm font-normal outline-none"
                 />
               </label>
             </>
           )}
         </div>
 
-        {error && <p className="mt-2 text-xs text-gray-900">{error}</p>}
+        {error && <p className="mt-2 text-xs text-foreground">{error}</p>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-md hover:bg-muted"
           >
             Batal
           </button>
           <button
             onClick={submit}
             disabled={saving || loadingMasters}
-            className="px-4 py-2 text-sm font-semibold bg-[#111827] text-white rounded-md hover:bg-gray-900 disabled:opacity-60 flex items-center gap-2"
+            className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-md hover:bg-primary disabled:opacity-60 flex items-center gap-2"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             {saving ? "Menyimpan..." : "Simpan mapping"}
@@ -1190,47 +1190,47 @@ function FragmentRow({
 
   return (
     <>
-      <tr className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
+      <tr className="border-b border-border hover:bg-muted/50 align-top">
         <td className="px-5 py-4 pt-5">
-          <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={selected} onChange={onSelect} />
+          <input type="checkbox" className="w-4 h-4 rounded border-border" checked={selected} onChange={onSelect} />
         </td>
 
         <td className="px-5 py-4">
           <div className="flex gap-3">
             {row.master?.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={row.master.imageUrl} alt={name} className="w-12 h-12 rounded object-cover bg-gray-100 shrink-0" />
+              <img src={row.master.imageUrl} alt={name} className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
             ) : (
-              <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
                 <PackageOpen size={18} />
               </div>
             )}
             <div className="max-w-[240px]">
-              <div className="text-gray-900 font-bold leading-tight flex items-start gap-1.5">
+              <div className="text-foreground font-bold leading-tight flex items-start gap-1.5">
                 <span className="min-w-0 truncate" title={name}>{name}</span>
                 {row.titleUnsynced && (
                   <span
-                    className="shrink-0 inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    className="shrink-0 inline-flex items-center gap-1 bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                     title="Judul asli di TikTok belum pernah tersinkron — menampilkan nama produk master. Klik Sinkron untuk menarik judul asli."
                   >
                     Judul belum sync
                   </span>
                 )}
                 {deleted && (
-                  <span className="shrink-0 inline-flex items-center gap-1 bg-gray-100 text-gray-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="shrink-0 inline-flex items-center gap-1 bg-muted text-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     Del
                   </span>
                 )}
               </div>
               <button
                 onClick={onExpand}
-                className="text-xs text-gray-900 hover:underline mt-1 inline-flex items-center gap-1"
+                className="text-xs text-foreground hover:underline mt-1 inline-flex items-center gap-1"
               >
                 {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 Lihat {row.variantCount} varian produk
               </button>
               {row.accountLabel && (
-                <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-black text-white px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
                   TikTok Shop
                 </span>
               )}
@@ -1241,45 +1241,45 @@ function FragmentRow({
         <td className="px-5 py-4">
           <div className="flex flex-col gap-1">
             <span
-              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit bg-gray-100 text-gray-900`}
+              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit bg-muted text-foreground`}
               title={row.platformProductId ?? row.channelSku ?? undefined}
             >
               <Radio size={11} /> TikTok Shop {effectiveActive ? "●" : ""}
             </span>
-            <span className="text-[10px] text-gray-400 max-w-[120px] truncate">
+            <span className="text-[10px] text-muted-foreground max-w-[120px] truncate">
               {row.platformProductId ?? row.channelSku}
             </span>
           </div>
         </td>
 
-        <td className="px-5 py-4 text-gray-700 font-semibold">
+        <td className="px-5 py-4 text-foreground font-semibold">
           {single ? row.channelSku ?? "-" : "-"}
-          {!single && <span className="block text-[10px] text-gray-400 font-normal">{row.variantCount} varian</span>}
+          {!single && <span className="block text-[10px] text-muted-foreground font-normal">{row.variantCount} varian</span>}
         </td>
 
-        <td className="px-5 py-4 text-gray-700 font-semibold whitespace-nowrap">
+        <td className="px-5 py-4 text-foreground font-semibold whitespace-nowrap">
           {row.priceMin !== null && row.priceMin !== row.priceMax
             ? `${fmtPrice(row.priceMin)} – ${fmtPrice(row.priceMax)}`
             : fmtPrice(row.priceMin)}
         </td>
 
-        <td className="px-5 py-4 text-gray-700 font-semibold whitespace-nowrap">
+        <td className="px-5 py-4 text-foreground font-semibold whitespace-nowrap">
           <span className="cursor-help" title={stockTitle}>
             {fmtNumber(row.stockTotal)}
           </span>
-          <span className="block text-[10px] text-gray-400 font-normal">{row.accountLabel}</span>
+          <span className="block text-[10px] text-muted-foreground font-normal">{row.accountLabel}</span>
         </td>
 
         <td className="px-5 py-4">
           {row.master ? (
             <Link
               href={`/products?highlight=${encodeURIComponent(row.master.id ?? "")}`}
-              className="text-xs font-semibold text-gray-900 hover:underline inline-flex items-center gap-1"
+              className="text-xs font-semibold text-foreground hover:underline inline-flex items-center gap-1"
             >
               {row.master.name ?? "-"} <ExternalLink size={11} />
             </Link>
           ) : (
-            <span className="text-xs text-gray-300">-</span>
+            <span className="text-xs text-muted-foreground">-</span>
           )}
         </td>
 
@@ -1289,7 +1289,7 @@ function FragmentRow({
               onClick={onToggle}
               disabled={busy || !row.platformProductId || deleted}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                effectiveActive ? "bg-gray-500" : "bg-gray-300"
+                effectiveActive ? "bg-muted-foreground" : "bg-muted"
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               role="switch"
               aria-checked={effectiveActive}
@@ -1302,16 +1302,16 @@ function FragmentRow({
               }
             >
               {busy ? (
-                <Loader2 size={11} className="text-white mx-auto animate-spin" />
+                <Loader2 size={11} className="text-primary-foreground mx-auto animate-spin" />
               ) : (
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${
                     effectiveActive ? "translate-x-[18px]" : "translate-x-0.5"
                   }`}
                 />
               )}
             </button>
-            <span className="text-[10px] text-gray-400 max-w-[90px] leading-tight">
+            <span className="text-[10px] text-muted-foreground max-w-[90px] leading-tight">
               {busy ? "proses..." : statusText}
             </span>
           </div>
@@ -1323,13 +1323,13 @@ function FragmentRow({
               onClick={onSyncRow}
               disabled={syncing}
               title="Sync ulang status dari TikTok Shop"
-              className="p-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              className="p-1.5 rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-50"
             >
               {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             </button>
             <button
               onClick={onExpand}
-              className="p-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+              className="p-1.5 rounded-md border border-border text-foreground hover:bg-muted"
               title="Detail varian"
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -1340,32 +1340,32 @@ function FragmentRow({
                   e.stopPropagation();
                   onMenuToggle();
                 }}
-                className={`p-1.5 rounded-md border text-gray-600 hover:bg-gray-50 ${menuOpen ? "border-gray-300 bg-gray-50" : "border-gray-300"}`}
+                className={`p-1.5 rounded-md border text-foreground hover:bg-muted ${menuOpen ? "border-border bg-muted" : "border-border"}`}
                 title="Atur"
               >
                 <MoreVertical size={14} />
               </button>
               {menuOpen && (
                 <div
-                  className="absolute right-0 top-9 z-20 w-44 bg-white border border-gray-200 rounded-md shadow-lg py-1"
+                  className="absolute right-0 top-9 z-20 w-44 bg-card border border-border rounded-md shadow-lg py-1"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Link
                     href={`/products/marketplace/tiktok/${encodeURIComponent(row.variants[0]?.mappingId ?? "")}/edit`}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
                   >
                     Ubah
-                    <span className="block text-[10px] text-gray-400">Edit & publish ke TikTok Shop</span>
+                    <span className="block text-[10px] text-muted-foreground">Edit & publish ke TikTok Shop</span>
                   </Link>
                   <button
                     onClick={onSyncRow}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
                   >
                     Sync ulang status
                   </button>
                   <button
                     onClick={onExpand}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
                   >
                     Detail varian
                   </button>
@@ -1373,19 +1373,19 @@ function FragmentRow({
               )}
             </div>
           </div>
-          <span className="block text-[10px] text-gray-300 mt-1">{lastSync}</span>
+          <span className="block text-[10px] text-muted-foreground mt-1">{lastSync}</span>
         </td>
       </tr>
 
       {isExpanded && (
-        <tr className="bg-gray-50/70 border-b border-gray-100">
+        <tr className="bg-muted/70 border-b border-border">
           <td colSpan={9} className="px-5 py-4">
-            <div className="mb-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+            <div className="mb-2 text-xs font-bold text-muted-foreground uppercase tracking-wide">
               Varian — {row.accountLabel}
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[10px] text-gray-400 uppercase tracking-wide border-b border-gray-200">
+                <tr className="text-left text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border">
                   <th className="py-2 pr-4">SKU Lokal</th>
                   <th className="py-2 pr-4">SKU Channel</th>
                   <th className="py-2 pr-4">Harga</th>
@@ -1396,17 +1396,17 @@ function FragmentRow({
               </thead>
               <tbody>
                 {row.variants.map((v) => (
-                  <tr key={v.mappingId} className="border-b border-gray-100 last:border-0">
-                    <td className="py-2 pr-4 text-gray-700 font-semibold">{v.sku}</td>
-                    <td className="py-2 pr-4 text-gray-500">{v.channelSku}</td>
-                    <td className="py-2 pr-4 text-gray-700 font-semibold">{fmtPrice(v.price)}</td>
-                    <td className="py-2 pr-4 text-gray-700">{fmtNumber(v.stock)}</td>
+                  <tr key={v.mappingId} className="border-b border-border last:border-0">
+                    <td className="py-2 pr-4 text-foreground font-semibold">{v.sku}</td>
+                    <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
+                    <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
+                    <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>
                     <td className="py-2 pr-4">
-                      <span className="text-[10px] font-bold text-gray-600">
+                      <span className="text-[10px] font-bold text-foreground">
                         {STATUS_LABEL[v.status ?? ""] ?? "Belum di-sync"}
                       </span>
                     </td>
-                    <td className="py-2 text-xs text-gray-400">{fmtDate(v.lastSyncedAt)}</td>
+                    <td className="py-2 text-xs text-muted-foreground">{fmtDate(v.lastSyncedAt)}</td>
                   </tr>
                 ))}
               </tbody>

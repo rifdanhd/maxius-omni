@@ -272,42 +272,42 @@ export default function InventoryStockPage() {
     id === "all" ? counts.all : id === "empty" ? counts.empty : id === "low" ? counts.low : counts.oversells;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Stok Varian</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-xl font-bold text-foreground">Stok Varian</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Stok gudang bersama per varian — angka Tersedia memakai effectiveStock() yang sama
             dengan marketplace.
           </p>
-          <p className="text-xs text-gray-500 mt-1" title="effectiveStock() = max(0, Fisik − Cadangan)">
+          <p className="text-xs text-muted-foreground mt-1" title="effectiveStock() = max(0, Fisik − Cadangan)">
             Stok yang tayang di marketplace = Stok fisik − Stok cadangan (buffer). Kalau cadangan
             lebih besar dari stok fisik, stok tayang jadi 0.
           </p>
         </div>
         <button
           onClick={() => setReloadKey((k) => k + 1)}
-          className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-1.5 rounded-md text-sm text-gray-600 font-medium hover:bg-gray-50"
+          className="flex items-center gap-2 border border-border bg-card px-3 py-1.5 rounded-md text-sm text-foreground font-medium hover:bg-muted"
         >
           <RefreshCw size={14} /> Muat Ulang
         </button>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+            className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
               tab === t.id
-                ? "bg-gray-900 text-white border-gray-900"
-                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card text-foreground border-border hover:bg-muted"
             }`}
           >
             {t.label}
             <span
               className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                tab === t.id ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                tab === t.id ? "bg-card/20 text-primary-foreground" : "bg-muted text-foreground"
               }`}
             >
               {fmt(badge(t.id))}
@@ -317,16 +317,16 @@ export default function InventoryStockPage() {
       </div>
 
       {error && (
-        <div className="mb-4 bg-gray-50 text-gray-900 text-sm px-4 py-3 rounded-xl border border-gray-100">
+        <div className="mb-4 bg-muted text-foreground text-sm px-4 py-3 rounded-xl border border-border">
           {error}
         </div>
       )}
 
       {tab !== "oversells" ? (
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-border">
             <div className="relative max-w-sm">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={qInput}
                 onChange={(e) => setQInput(e.target.value)}
@@ -334,20 +334,20 @@ export default function InventoryStockPage() {
                   if (e.key === "Enter") setQ(qInput.trim());
                 }}
                 placeholder="Cari SKU / nama varian / produk…"
-                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-900"
+                className="w-full border border-border rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
           </div>
 
           {loading ? (
-            <p className="p-4 md:p-8 text-center text-sm text-gray-500">Memuat…</p>
+            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Memuat…</p>
           ) : rows.length === 0 ? (
-            <p className="p-4 md:p-8 text-center text-sm text-gray-500">Tidak ada varian di tab ini.</p>
+            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Tidak ada varian di tab ini.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
+                  <tr className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3 font-semibold">Produk / Varian</th>
                     <th className="px-4 py-3 font-semibold text-right" title="ProductVariant.stock — stok mentah di database. Klik pensil untuk atur langsung (tersimpan + di-push ke marketplace)">Fisik</th>
                     <th className="px-4 py-3 font-semibold text-right" title="safetyStock — buffer yang tidak dijual. Stok tayang di marketplace = Fisik − Cadangan (min. 0). Klik ikon riwayat untuk melihat siapa mengubahnya.">Cadangan</th>
@@ -359,22 +359,22 @@ export default function InventoryStockPage() {
                     <th className="px-4 py-3 font-semibold text-center" title="Toggle saja — belum ada provider email, belum ada pengiriman aktif">Email Notif</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {rows.map((r) => (
-                    <tr key={r.variantId} className="hover:bg-gray-50">
+                    <tr key={r.variantId} className="hover:bg-muted">
                       <td className="px-4 py-3">
                         <div className="flex items-start gap-3">
                           {r.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={r.imageUrl} alt="" className="w-10 h-10 rounded object-cover bg-gray-100 shrink-0" />
+                            <img src={r.imageUrl} alt="" className="w-10 h-10 rounded object-cover bg-muted shrink-0" />
                           ) : (
-                            <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+                            <div className="w-10 h-10 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
                               <PackageOpen size={16} />
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-gray-800 leading-tight">{r.productName}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="font-semibold text-foreground leading-tight">{r.productName}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {r.variantName ?? r.sku} · <span className="font-mono">{r.sku}</span>
                             </p>
                           </div>
@@ -395,17 +395,17 @@ export default function InventoryStockPage() {
                                 }}
                                 disabled={saving}
                                 autoFocus
-                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-gray-900"
+                                className="w-20 border border-border rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-ring"
                               />
                               <button
                                 onClick={handleSaveEdit}
                                 disabled={saving}
-                                className="text-xs font-bold text-gray-900 hover:underline disabled:opacity-50"
+                                className="text-xs font-bold text-foreground hover:underline disabled:opacity-50"
                               >
                                 Simpan
                               </button>
                             </span>
-                            <span className="text-[11px] text-gray-500">
+                            <span className="text-[11px] text-muted-foreground">
                               Tersimpan &amp; di-push ke marketplace
                             </span>
                           </span>
@@ -417,7 +417,7 @@ export default function InventoryStockPage() {
                               onClick={() =>
                                 setEditing({ variantId: r.variantId, field: "stock", value: String(r.stock) })
                               }
-                              className="text-gray-400 hover:text-gray-700"
+                              className="text-muted-foreground hover:text-foreground"
                             >
                               <Pencil size={13} />
                             </button>
@@ -439,18 +439,18 @@ export default function InventoryStockPage() {
                                 }}
                                 disabled={saving}
                                 autoFocus
-                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-gray-900"
+                                className="w-20 border border-border rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-ring"
                               />
                               <button
                                 onClick={handleSaveEdit}
                                 disabled={saving}
-                                className="text-xs font-bold text-gray-900 hover:underline disabled:opacity-50"
+                                className="text-xs font-bold text-foreground hover:underline disabled:opacity-50"
                               >
                                 Simpan
                               </button>
                             </span>
                             {Number(editing.value) > r.stock && (
-                              <span className="text-[11px] font-medium text-gray-900">
+                              <span className="text-[11px] font-medium text-foreground">
                                 Cadangan melebihi stok fisik ({fmt(r.stock)}) — stok tayang akan jadi 0.
                               </span>
                             )}
@@ -463,14 +463,14 @@ export default function InventoryStockPage() {
                               onClick={() =>
                                 setEditing({ variantId: r.variantId, field: "safetyStock", value: String(r.safetyStock) })
                               }
-                              className="text-gray-400 hover:text-gray-700"
+                              className="text-muted-foreground hover:text-foreground"
                             >
                               <Pencil size={13} />
                             </button>
                             <button
                               title="Riwayat perubahan cadangan"
                               onClick={() => openSafetyHistory(r)}
-                              className="text-gray-400 hover:text-gray-700"
+                              className="text-muted-foreground hover:text-foreground"
                             >
                               <History size={13} />
                             </button>
@@ -479,16 +479,16 @@ export default function InventoryStockPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {r.promoActive > 0 ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
                             {r.promoActive} aktif
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(r.orderedQty)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(r.available)}</td>
-                      <td className="px-4 py-3 text-right text-gray-400">0</td>
+                      <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(r.available)}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">0</td>
                       <td className="px-4 py-3 text-right">
                         {editing?.variantId === r.variantId && editing.field === "minStock" ? (
                           <span className="inline-flex items-center gap-1">
@@ -504,12 +504,12 @@ export default function InventoryStockPage() {
                               }}
                               disabled={saving}
                               autoFocus
-                              className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-gray-900"
+                              className="w-20 border border-border rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-ring"
                             />
                             <button
                               onClick={handleSaveEdit}
                               disabled={saving}
-                              className="text-xs font-bold text-gray-900 hover:underline disabled:opacity-50"
+                              className="text-xs font-bold text-foreground hover:underline disabled:opacity-50"
                             >
                               Simpan
                             </button>
@@ -517,7 +517,7 @@ export default function InventoryStockPage() {
                         ) : (
                           <span className="inline-flex items-center gap-1">
                             {r.minStock === null ? (
-                              <span className="text-gray-500" title="Mengikuti threshold produk induk">
+                              <span className="text-muted-foreground" title="Mengikuti threshold produk induk">
                                 {fmt(r.minStockResolved)}*
                               </span>
                             ) : (
@@ -532,7 +532,7 @@ export default function InventoryStockPage() {
                                   value: r.minStock === null ? "" : String(r.minStock),
                                 })
                               }
-                              className="text-gray-400 hover:text-gray-700"
+                              className="text-muted-foreground hover:text-foreground"
                             >
                               <Pencil size={13} />
                             </button>
@@ -546,11 +546,11 @@ export default function InventoryStockPage() {
                           title={r.notifyEmail ? "Nonaktifkan notifikasi" : "Aktifkan notifikasi (toggle saja — belum ada pengiriman email)"}
                           onClick={() => handleToggleEmail(r)}
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            r.notifyEmail ? "bg-gray-500" : "bg-gray-200"
+                            r.notifyEmail ? "bg-muted-foreground" : "bg-muted"
                           }`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                            className={`inline-block h-4 w-4 rounded-full bg-card shadow transition-transform ${
                               r.notifyEmail ? "translate-x-4" : "translate-x-0.5"
                             }`}
                           />
@@ -564,34 +564,34 @@ export default function InventoryStockPage() {
           )}
 
           {nextCursor && !loading && (
-            <div className="p-4 border-t border-gray-100 text-center">
+            <div className="p-4 border-t border-border text-center">
               <button
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50"
+                className="text-sm font-semibold text-foreground border border-border rounded-lg px-4 py-2 hover:bg-muted disabled:opacity-50"
               >
                 {loadingMore ? "Memuat…" : "Muat Lebih Banyak"}
               </button>
             </div>
           )}
-          <p className="px-4 pb-3 text-[11px] text-gray-400">
+          <p className="px-4 pb-3 text-[11px] text-muted-foreground">
             * Mengikuti threshold produk induk. Badge tab = total global (tanpa filter pencarian),
             dihitung fresh tiap buka tab.
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           {loading ? (
-            <p className="p-4 md:p-8 text-center text-sm text-gray-500">Memuat…</p>
+            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Memuat…</p>
           ) : entries.length === 0 ? (
-            <p className="p-4 md:p-8 text-center text-sm text-gray-500">
+            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">
               Tidak ada kejadian oversell tercatat (SyncLog kind central_stock_deduct kosong).
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
+                  <tr className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3 font-semibold">Produk / Varian (SKU)</th>
                     <th className="px-4 py-3 font-semibold">Toko</th>
                     <th className="px-4 py-3 font-semibold">Waktu</th>
@@ -600,38 +600,38 @@ export default function InventoryStockPage() {
                     <th className="px-4 py-3 font-semibold">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {entries.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
+                    <tr key={e.id} className="hover:bg-muted">
                       <td className="px-4 py-3">
                         {e.skus.length === 0 ? (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-muted-foreground">—</span>
                         ) : (
-                          <ul className="list-disc list-inside text-gray-800">
+                          <ul className="list-disc list-inside text-foreground">
                             {e.skus.map((s) => (
                               <li key={s} className="font-mono text-xs">{s}</li>
                             ))}
                           </ul>
                         )}
                         {e.message && (
-                          <p className="text-xs text-gray-500 mt-1 max-w-md truncate" title={e.message}>
+                          <p className="text-xs text-muted-foreground mt-1 max-w-md truncate" title={e.message}>
                             {e.message}
                           </p>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-medium text-gray-800">{e.accountLabel}</span>
-                        <span className="block text-xs text-gray-500">{e.platform}</span>
+                        <span className="font-medium text-foreground">{e.accountLabel}</span>
+                        <span className="block text-xs text-muted-foreground">{e.platform}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(e.occurredAt)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(e.failedQty)}</td>
+                      <td className="px-4 py-3 text-foreground whitespace-nowrap">{fmtDate(e.occurredAt)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(e.failedQty)}</td>
                       <td className="px-4 py-3">
                         {e.handledAt ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
                             Sudah ditangani
                           </span>
                         ) : (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
                             Belum ditangani
                           </span>
                         )}
@@ -641,7 +641,7 @@ export default function InventoryStockPage() {
                           <button
                             onClick={() => handleMarkHandled(e.id)}
                             disabled={handlingId === e.id}
-                            className="text-xs font-semibold border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                            className="text-xs font-semibold border border-border rounded-lg px-3 py-1.5 hover:bg-muted disabled:opacity-50"
                           >
                             {handlingId === e.id ? "Menyimpan…" : "Tandai sudah ditangani"}
                           </button>
@@ -658,30 +658,30 @@ export default function InventoryStockPage() {
 
       {safetyHist && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
           onClick={() => setSafetyHist(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto p-5"
+            className="bg-card rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-base font-bold text-gray-900">Riwayat cadangan</h2>
-                <p className="text-xs text-gray-500 mt-0.5 font-mono">{safetyHist.sku}</p>
+                <h2 className="text-base font-bold text-foreground">Riwayat cadangan</h2>
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">{safetyHist.sku}</p>
               </div>
               <button
                 onClick={() => setSafetyHist(null)}
-                className="text-gray-400 hover:text-gray-700"
+                className="text-muted-foreground hover:text-foreground"
                 title="Tutup"
               >
                 <X size={16} />
               </button>
             </div>
             {safetyLoading ? (
-              <p className="py-6 text-center text-sm text-gray-500">Memuat…</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">Memuat…</p>
             ) : safetyEntries.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-400">
+              <p className="py-6 text-center text-sm text-muted-foreground">
                 Belum ada perubahan cadangan tercatat untuk varian ini.
               </p>
             ) : (
@@ -689,15 +689,15 @@ export default function InventoryStockPage() {
                 {safetyEntries.map((e) => {
                   const parsed = parseSafetyNote(e.note);
                   return (
-                    <li key={e.id} className="border border-gray-100 rounded-lg px-3 py-2 text-sm">
-                      <p className="font-semibold text-gray-800">
+                    <li key={e.id} className="border border-border rounded-lg px-3 py-2 text-sm">
+                      <p className="font-semibold text-foreground">
                         {parsed ? (
                           <>Cadangan {parsed.from} → {parsed.to}</>
                         ) : (
                           e.note ?? "Perubahan cadangan"
                         )}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {e.user?.username ?? "sistem"} · {fmtDate(e.createdAt)} · stok fisik {fmt(e.stockAfter)}
                       </p>
                     </li>

@@ -496,8 +496,8 @@ export default function PromotionCreatePage() {
     return (
       <div className="p-4 md:p-8 max-w-3xl mx-auto">
         {createResult.ok && createResult.resultStatus === "SUCCESS" ? (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-gray-900">
+          <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-foreground">
               <CheckCircle2 size={28} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-bold text-lg">Promosi berhasil dibuat & terverifikasi.</p>
@@ -505,7 +505,7 @@ export default function PromotionCreatePage() {
                   &quot;{createResult.title}&quot; — {createResult.attachedCount} produk terpasang (ID{" "}
                   {createResult.externalActivityId}).
                 </p>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Harga mulai berlaku sesuai jadwal yang dipilih. Status terbaru muncul di halaman monitoring setelah sinkronisasi.
                 </p>
               </div>
@@ -514,9 +514,9 @@ export default function PromotionCreatePage() {
         ) : createResult.ok ? (
           /* UNVERIFIED / PARTIAL — warning BESAR: activity ada di TikTok tapi
              produk belum pasti ter-attach → wajib cek manual. */
-          <div className="bg-white border-2 border-gray-400 rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-gray-900">
-              <AlertTriangle size={32} className="mt-0.5 shrink-0 text-gray-500" />
+          <div className="bg-card border-2 border-ring rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-foreground">
+              <AlertTriangle size={32} className="mt-0.5 shrink-0 text-muted-foreground" />
               <div>
                 <p className="font-bold text-lg">
                   {createResult.resultStatus === "PARTIAL"
@@ -531,10 +531,10 @@ export default function PromotionCreatePage() {
                   nonaktifkan di sana agar pembeli tidak terkena diskon yang tidak diinginkan.
                 </p>
                 {createResult.unverifiedReason && (
-                  <p className="text-xs text-gray-900 mt-2">Penyebab: {createResult.unverifiedReason}</p>
+                  <p className="text-xs text-foreground mt-2">Penyebab: {createResult.unverifiedReason}</p>
                 )}
                 {(createResult.failedBatches?.length ?? 0) > 0 && (
-                  <ul className="text-xs mt-2 space-y-1 text-gray-900">
+                  <ul className="text-xs mt-2 space-y-1 text-foreground">
                     {createResult.failedBatches!.map((b) => (
                       <li key={b.batchIndex}>
                         Batch {b.batchIndex} gagal: {b.error}
@@ -546,18 +546,18 @@ export default function PromotionCreatePage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-gray-900">
+          <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-foreground">
               <AlertCircle size={28} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-bold text-lg">Promosi TIDAK jadi dibuat.</p>
                 <p className="text-sm mt-1">{createResult.error}</p>
                 {(createResult.itemErrors?.length ?? 0) > 1 && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     {createResult.itemErrors!.length} produk bermasalah — perbaiki lalu coba buat lagi secara manual.
                   </p>
                 )}
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Tidak ada percobaan ulang otomatis. Setelah yakin sudah benar, tekan &quot;Coba buat lagi&quot; di bawah.
                 </p>
               </div>
@@ -565,7 +565,7 @@ export default function PromotionCreatePage() {
           </div>
         )}
         <div className="mt-5 flex gap-2">
-          <Link href="/promotions" className="rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900">
+          <Link href="/promotions" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary">
             Lihat daftar promosi
           </Link>
           <button
@@ -575,7 +575,7 @@ export default function PromotionCreatePage() {
               setStep(1);
               setDiscountByListingKey({});
             }}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+            className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
           >
             {createResult.ok ? "Buat promosi lain" : "Coba buat lagi"}
           </button>
@@ -588,12 +588,12 @@ export default function PromotionCreatePage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      <Link href="/promotions" className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-[#111827] mb-2">
+      <Link href="/promotions" className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground mb-2">
         <ChevronLeft size={14} /> Kembali ke daftar promosi
       </Link>
       <div className="flex items-center gap-2.5 flex-wrap">
-        <h1 className="text-xl font-bold text-gray-900">Buat Promosi Baru</h1>
-        <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[11px] font-bold text-gray-900">
+        <h1 className="text-xl font-bold text-foreground">Buat Promosi Baru</h1>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-bold text-foreground">
           <ShieldAlert size={12} />
           Mengubah harga jual nyata
         </span>
@@ -610,16 +610,16 @@ export default function PromotionCreatePage() {
               <div
                 className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold border ${
                   active
-                    ? "bg-[#111827] text-white border-transparent"
+                    ? "bg-primary text-primary-foreground border-transparent"
                     : done
-                      ? "bg-gray-50 text-gray-900 border-gray-200"
-                      : "bg-gray-50 text-gray-400 border-gray-200"
+                      ? "bg-muted text-foreground border-border"
+                      : "bg-muted text-muted-foreground border-border"
                 }`}
               >
                 <span>{done ? "✓" : n}</span>
                 {label}
               </div>
-              {n < 3 && <ArrowRight size={14} className="text-gray-300" />}
+              {n < 3 && <ArrowRight size={14} className="text-muted-foreground" />}
             </div>
           );
         })}
@@ -628,10 +628,10 @@ export default function PromotionCreatePage() {
       {/* ── STEP 1: pilih produk ── */}
       {step === 1 && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+          <div className="bg-card border border-border rounded-xl shadow-sm">
+            <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Toko</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Toko</label>
                 <select
                   value={accountId}
                   onChange={(e) => {
@@ -639,7 +639,7 @@ export default function PromotionCreatePage() {
                     setDiscountByListingKey({});
                     setPreview(null);
                   }}
-                  className="mt-1 border border-gray-300 rounded-md px-3 py-2 text-sm h-[36px] bg-white cursor-pointer font-medium"
+                  className="mt-1 border border-border rounded-md px-3 py-2 text-sm h-[36px] bg-card cursor-pointer font-medium"
                 >
                   {accounts.length === 0 && <option value="">(memuat toko…)</option>}
                   {accounts.map((a) => (
@@ -655,46 +655,46 @@ export default function PromotionCreatePage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Cari nama / SKU…"
-                  className="border border-gray-300 rounded-md pl-3 pr-8 py-2 text-sm w-full outline-none"
+                  className="border border-border rounded-md pl-3 pr-8 py-2 text-sm w-full outline-none"
                 />
-                <Search size={14} className="text-gray-400 absolute right-2.5 top-3" />
+                <Search size={14} className="text-muted-foreground absolute right-2.5 top-3" />
               </div>
             </div>
 
             {loadingListings ? (
-              <div className="flex items-center justify-center py-12 text-gray-400">
-                <Loader2 size={22} className="animate-spin mr-2 text-[#111827]" />
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 size={22} className="animate-spin mr-2 text-foreground" />
                 <span className="text-sm">Memuat produk…</span>
               </div>
             ) : (
               <>
                 {loadError && (
-                  <p className="mx-4 mt-3 text-xs text-gray-900 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                  <p className="mx-4 mt-3 text-xs text-foreground bg-muted border border-border rounded-md px-3 py-2">
                     {loadError}
                   </p>
                 )}
                 {priceError && (
-                  <p className="mx-4 mt-3 text-xs text-gray-900 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">{priceError}</p>
+                  <p className="mx-4 mt-3 text-xs text-foreground bg-muted border border-border rounded-md px-3 py-2">{priceError}</p>
                 )}
-                <div className="m-4 rounded-lg border border-gray-100 divide-y divide-gray-100 max-h-[420px] overflow-y-auto">
-                  {listings.length === 0 && <p className="px-4 py-8 text-center text-sm text-gray-400">Tidak ada listing aktif.</p>}
+                <div className="m-4 rounded-lg border border-border divide-y divide-border max-h-[420px] overflow-y-auto">
+                  {listings.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tidak ada listing aktif.</p>}
                   {listings.map((listing) => {
                     const isSelected = listing.key in discountByListingKey;
                     const needsPrice = isSelected && listing.variants.some((v) => v.price === null);
                     return (
-                      <div key={listing.key} className={`px-4 py-3 ${isSelected ? "bg-gray-50/40" : ""}`}>
+                      <div key={listing.key} className={`px-4 py-3 ${isSelected ? "bg-muted/40" : ""}`}>
                         <div className="flex items-start gap-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleListing(listing)}
-                            className="mt-1 h-4 w-4 accent-[#111827] cursor-pointer"
+                            className="mt-1 h-4 w-4 accent-primary cursor-pointer"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-gray-900 truncate" title={listing.platformTitle ?? listing.master?.name ?? ""}>
+                            <p className="text-sm font-bold text-foreground truncate" title={listing.platformTitle ?? listing.master?.name ?? ""}>
                               {listing.platformTitle ?? listing.master?.name ?? listing.channelSku ?? "-"}
                             </p>
-                            <p className="text-[11px] text-gray-500">
+                            <p className="text-[11px] text-muted-foreground">
                               {listing.variantCount} varian · {listingPrice(listing)}
                               {listing.channelSku ? ` · ${listing.channelSku}` : ""}
                             </p>
@@ -711,13 +711,13 @@ export default function PromotionCreatePage() {
                                 }
                                 className={`border rounded-md px-2 py-1 text-sm w-16 text-right outline-none ${
                                   discountIssue(discountByListingKey[listing.key])
-                                    ? "border-gray-400 bg-gray-50"
+                                    ? "border-ring bg-muted"
                                     : isExtreme(discountByListingKey[listing.key])
-                                      ? "border-gray-400 bg-gray-50"
-                                      : "border-gray-300"
+                                      ? "border-ring bg-muted"
+                                      : "border-border"
                                 }`}
                               />
-                              <Percent size={13} className="text-gray-400" />
+                              <Percent size={13} className="text-muted-foreground" />
                             </div>
                           )}
                         </div>
@@ -727,24 +727,24 @@ export default function PromotionCreatePage() {
                             .filter((v) => v.price === null)
                             .map((v) =>
                               v.variantId ? (
-                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-gray-300 bg-gray-50 p-2.5">
-                                  <p className="text-[11px] font-bold text-gray-900">
+                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-border bg-muted p-2.5">
+                                  <p className="text-[11px] font-bold text-foreground">
                                     Produk belum punya harga — isi dulu agar bisa dipromosikan (SKU: {v.sku})
                                   </p>
                                   <div className="mt-1.5 flex items-center gap-2">
-                                    <span className="text-xs text-gray-500">Rp</span>
+                                    <span className="text-xs text-muted-foreground">Rp</span>
                                     <input
                                       type="number"
                                       min={1}
                                       value={priceDraft[variantIdentityKey(v)] ?? ""}
                                       onChange={(e) => setPriceDraft((prev) => setVariantDraft(prev, v, e.target.value))}
                                       placeholder="100000"
-                                      className="border border-gray-300 rounded-md px-2 py-1 text-sm w-32 text-right outline-none"
+                                      className="border border-border rounded-md px-2 py-1 text-sm w-32 text-right outline-none"
                                     />
                                     <button
                                       onClick={() => savePrice(v)}
                                       disabled={priceSavingFor === variantIdentityKey(v)}
-                                      className="rounded-md bg-[#111827] px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-60 flex items-center gap-1"
+                                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-60 flex items-center gap-1"
                                     >
                                       {priceSavingFor === variantIdentityKey(v) && <Loader2 size={12} className="animate-spin" />}
                                       Simpan harga
@@ -752,8 +752,8 @@ export default function PromotionCreatePage() {
                                   </div>
                                 </div>
                               ) : (
-                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-gray-300 bg-gray-50 p-2.5">
-                                  <p className="text-[11px] font-bold text-gray-900">
+                                <div key={variantIdentityKey(v)} className="mt-2 ml-7 rounded-lg border border-border bg-muted p-2.5">
+                                  <p className="text-[11px] font-bold text-foreground">
                                     Belum di-mapping ke varian — hubungkan varian dulu (menu Mapping) sebelum set harga. (SKU: {v.sku})
                                   </p>
                                 </div>
@@ -767,12 +767,12 @@ export default function PromotionCreatePage() {
             )}
           </div>
 
-          {step1Problem && <p className="text-xs text-gray-900">{step1Problem}</p>}
+          {step1Problem && <p className="text-xs text-foreground">{step1Problem}</p>}
           <div className="flex justify-end">
             <button
               onClick={() => setStep(2)}
               disabled={step1Problem !== null}
-              className="flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Lanjut ke Diskon & Jadwal <ArrowRight size={15} />
             </button>
@@ -783,10 +783,10 @@ export default function PromotionCreatePage() {
       {/* ── STEP 2: diskon + preview ── */}
       {step === 2 && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+          <div className="bg-card border border-border rounded-xl shadow-sm p-4 space-y-3">
             <div className="flex items-end gap-3 flex-wrap">
               <div>
-                <p className="text-[11px] text-gray-500 mb-1">Diskon seragam (%) — bisa diubah per produk di daftar</p>
+                <p className="text-[11px] text-muted-foreground mb-1">Diskon seragam (%) — bisa diubah per produk di daftar</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -794,20 +794,20 @@ export default function PromotionCreatePage() {
                     max={95}
                     value={bulkDiscount}
                     onChange={(e) => setBulkDiscount(Number(e.target.value))}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm w-20 text-right outline-none"
+                    className="border border-border rounded-md px-3 py-2 text-sm w-20 text-right outline-none"
                   />
-                  <Percent size={14} className="text-gray-400" />
+                  <Percent size={14} className="text-muted-foreground" />
                   <button
                     onClick={applyBulkDiscount}
                     disabled={selectedKeys.length === 0}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
                   >
                     Terapkan ke {selectedKeys.length} produk
                   </button>
                 </div>
               </div>
               <div>
-                <p className="text-[11px] text-gray-500 mb-1">Mulai (minimal 2 jam dari sekarang)</p>
+                <p className="text-[11px] text-muted-foreground mb-1">Mulai (minimal 2 jam dari sekarang)</p>
                 <input
                   type="datetime-local"
                   value={beginAt}
@@ -815,11 +815,11 @@ export default function PromotionCreatePage() {
                     setBeginAt(e.target.value);
                     setPreview(null);
                   }}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                  className="border border-border rounded-md px-3 py-2 text-sm outline-none"
                 />
               </div>
               <div>
-                <p className="text-[11px] text-gray-500 mb-1">Durasi (hari, maks 90)</p>
+                <p className="text-[11px] text-muted-foreground mb-1">Durasi (hari, maks 90)</p>
                 <input
                   type="number"
                   min={1}
@@ -829,22 +829,22 @@ export default function PromotionCreatePage() {
                     setDurationDays(Number(e.target.value));
                     setPreview(null);
                   }}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm w-24 outline-none"
+                  className="border border-border rounded-md px-3 py-2 text-sm w-24 outline-none"
                 />
               </div>
             </div>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-[11px] text-muted-foreground">
               Kebijakan: diskon 1–95% langsung boleh. 0% / ≥96% (hampir gratis) butuh konfirmasi tambahan.
               Limit pembelian mengikuti default TikTok (tanpa batas).
             </p>
-            {step2Problem && <p className="text-xs text-gray-900">{step2Problem}</p>}
+            {step2Problem && <p className="text-xs text-foreground">{step2Problem}</p>}
           </div>
 
           {/* Tabel produk + diskon + hasil preview */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wider text-gray-400 bg-gray-50/50">
+                <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground bg-muted/50">
                   <th className="px-4 py-2.5 font-semibold">Produk</th>
                   <th className="px-4 py-2.5 font-semibold w-24">Diskon</th>
                   <th className="px-4 py-2.5 font-semibold w-44">Harga</th>
@@ -858,13 +858,13 @@ export default function PromotionCreatePage() {
                     ? (previewByProduct.get(listing.platformProductId)?.overlaps.length ?? 0)
                     : 0;
                   return (
-                    <tr key={listing.key} className="border-b border-gray-100 last:border-0">
+                    <tr key={listing.key} className="border-b border-border last:border-0">
                       <td className="px-4 py-2.5">
-                        <p className="text-xs font-bold text-gray-800 truncate max-w-[280px]">
+                        <p className="text-xs font-bold text-foreground truncate max-w-[280px]">
                           {listing.platformTitle ?? listing.master?.name ?? "-"}
                         </p>
                         {overlapCount > 0 && preview?.ok && (
-                          <p className="text-[10px] text-gray-900 mt-0.5">⚠ sedang ikut promo aktif lain</p>
+                          <p className="text-[10px] text-foreground mt-0.5">⚠ sedang ikut promo aktif lain</p>
                         )}
                       </td>
                       <td className="px-4 py-2.5">
@@ -879,15 +879,15 @@ export default function PromotionCreatePage() {
                               setPreview(null);
                             }}
                             className={`border rounded-md px-2 py-1 text-sm w-16 text-right outline-none ${
-                              invalid ? "border-gray-400 bg-gray-50" : isExtreme(d) ? "border-gray-400 bg-gray-50" : "border-gray-300"
+                              invalid ? "border-ring bg-muted" : isExtreme(d) ? "border-ring bg-muted" : "border-border"
                             }`}
                           />
-                          <Percent size={12} className="text-gray-400" />
+                          <Percent size={12} className="text-muted-foreground" />
                         </div>
                       </td>
                       <td className="px-4 py-2.5">
-                        <p className="text-xs text-gray-500">{listingPrice(listing)}</p>
-                        <p className="text-xs font-bold text-gray-900">{preview?.ok ? finalPriceText(listing) : "—"}</p>
+                        <p className="text-xs text-muted-foreground">{listingPrice(listing)}</p>
+                        <p className="text-xs font-bold text-foreground">{preview?.ok ? finalPriceText(listing) : "—"}</p>
                       </td>
                     </tr>
                   );
@@ -899,14 +899,14 @@ export default function PromotionCreatePage() {
           <button
             onClick={runPreview}
             disabled={previewing || step2Problem !== null}
-            className="w-full flex items-center justify-center gap-2 rounded-md bg-[#111827] px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
           >
             {previewing ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
             {previewing ? "Menghitung…" : "Preview Harga Akhir"}
           </button>
 
           {preview && !preview.ok && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 flex items-start gap-2">
+            <div className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground flex items-start gap-2">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <span>{preview.error}</span>
             </div>
@@ -916,7 +916,7 @@ export default function PromotionCreatePage() {
             <div className="space-y-3">
               {/* Blocking error (G1) */}
               {hasBlockingError && (
-                <div className="rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 flex items-start gap-2">
+                <div className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground flex items-start gap-2">
                   <AlertCircle size={16} className="mt-0.5 shrink-0" />
                   <div>
                     <p className="font-bold">Ada produk yang tidak bisa ikut promosi:</p>
@@ -938,23 +938,23 @@ export default function PromotionCreatePage() {
 
               {/* Pesan dampak ekstrem — VERBATIM dari backend, border merah (G2) */}
               {(preview.extremeConfirmMessages?.length ?? 0) > 0 && (
-                <div className="rounded-lg border-2 border-gray-400 bg-gray-50 p-4">
-                  <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                <div className="rounded-lg border-2 border-ring bg-muted p-4">
+                  <p className="text-xs font-bold text-foreground uppercase tracking-wider mb-2">
                     Peringatan — dampak sangat besar:
                   </p>
                   <ul className="space-y-2">
                     {preview.extremeConfirmMessages!.map((m) => (
-                      <li key={m.mappingId} className="text-sm font-semibold text-gray-900 leading-snug">
+                      <li key={m.mappingId} className="text-sm font-semibold text-foreground leading-snug">
                         {m.message}
                       </li>
                     ))}
                   </ul>
-                  <label className="mt-3 flex items-start gap-2 text-sm font-bold text-gray-900 cursor-pointer">
+                  <label className="mt-3 flex items-start gap-2 text-sm font-bold text-foreground cursor-pointer">
                     <input
                       type="checkbox"
                       checked={confirmExtreme}
                       onChange={(e) => setConfirmExtreme(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-gray-900"
+                      className="mt-0.5 h-4 w-4 accent-primary"
                     />
                     Saya sudah membaca peringatan di atas dan tetap ingin lanjut.
                   </label>
@@ -963,17 +963,17 @@ export default function PromotionCreatePage() {
 
               {/* Overlap aktif (G3) */}
               {hasActiveOverlap && (
-                <div className="rounded-lg border border-gray-300 bg-gray-50 p-4">
-                  <p className="text-sm font-bold text-gray-900">Ada produk yang sedang ikut promo lain yang masih aktif.</p>
-                  <p className="text-xs text-gray-900 mt-1">
+                <div className="rounded-lg border border-border bg-muted p-4">
+                  <p className="text-sm font-bold text-foreground">Ada produk yang sedang ikut promo lain yang masih aktif.</p>
+                  <p className="text-xs text-foreground mt-1">
                     TikTok bisa menolak produk yang ikut dua promo sekaligus. Penolakan resmi tetap tampil apa adanya.
                   </p>
-                  <label className="mt-2 flex items-start gap-2 text-sm font-bold text-gray-900 cursor-pointer">
+                  <label className="mt-2 flex items-start gap-2 text-sm font-bold text-foreground cursor-pointer">
                     <input
                       type="checkbox"
                       checked={acknowledgeActiveOverlap}
                       onChange={(e) => setAcknowledgeActiveOverlap(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-gray-900"
+                      className="mt-0.5 h-4 w-4 accent-primary"
                     />
                     Tetap lanjutkan meski ada tumpang tindih.
                   </label>
@@ -983,14 +983,14 @@ export default function PromotionCreatePage() {
               <div className="flex justify-between">
                 <button
                   onClick={() => setStep(1)}
-                  className="rounded-md border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                  className="rounded-md border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
                 >
                   Kembali
                 </button>
                 <button
                   onClick={() => setStep(3)}
                   disabled={!step2GateOk}
-                  className="flex items-center gap-2 rounded-md bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Lanjut ke Konfirmasi <ArrowRight size={15} />
                 </button>
@@ -1003,18 +1003,18 @@ export default function PromotionCreatePage() {
       {/* ── STEP 3: konfirmasi type-to-confirm ── */}
       {step === 3 && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Ringkasan</p>
+          <div className="bg-card border border-border rounded-xl shadow-sm p-5">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Ringkasan</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <p>
-                <span className="text-gray-500">Toko:</span>{" "}
+                <span className="text-muted-foreground">Toko:</span>{" "}
                 <b>{accounts.find((a) => a.id === accountId)?.label ?? "-"}</b>
               </p>
               <p>
-                <span className="text-gray-500">Jumlah produk:</span> <b>{selected.length}</b>
+                <span className="text-muted-foreground">Jumlah produk:</span> <b>{selected.length}</b>
               </p>
               <p>
-                <span className="text-gray-500">Diskon:</span>{" "}
+                <span className="text-muted-foreground">Diskon:</span>{" "}
                 <b>
                   {Array.from(new Set(selectedKeys.map((k) => discountByListingKey[k])))
                     .sort((a, b) => a - b)
@@ -1023,7 +1023,7 @@ export default function PromotionCreatePage() {
                 </b>
               </p>
               <p>
-                <span className="text-gray-500">Jadwal:</span>{" "}
+                <span className="text-muted-foreground">Jadwal:</span>{" "}
                 <b>
                   {new Date(beginAt).toLocaleString("id-ID", {
                     day: "numeric",
@@ -1035,39 +1035,39 @@ export default function PromotionCreatePage() {
                 </b>
               </p>
             </div>
-            <div className="mt-3 rounded-lg bg-gray-50 border border-gray-200 p-3">
-              <p className="text-xs text-gray-600 mb-1">Contoh harga akhir (hasil preview):</p>
+            <div className="mt-3 rounded-lg bg-muted border border-border p-3">
+              <p className="text-xs text-foreground mb-1">Contoh harga akhir (hasil preview):</p>
               <div className="space-y-0.5">
                 {selected.slice(0, 3).map((l) => (
                   <p key={l.key} className="text-xs">
-                    <span className="text-gray-500">{l.platformTitle ?? l.master?.name}:</span>{" "}
+                    <span className="text-muted-foreground">{l.platformTitle ?? l.master?.name}:</span>{" "}
                     <b>{finalPriceText(l)}</b>{" "}
-                    <span className="text-gray-400">(dari {listingPrice(l)})</span>
+                    <span className="text-muted-foreground">(dari {listingPrice(l)})</span>
                   </p>
                 ))}
-                {selected.length > 3 && <p className="text-[11px] text-gray-400">…dan {selected.length - 3} produk lainnya.</p>}
+                {selected.length > 3 && <p className="text-[11px] text-muted-foreground">…dan {selected.length - 3} produk lainnya.</p>}
               </div>
             </div>
             {(hasExtreme || hasActiveOverlap) && (
-              <p className="mt-3 text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+              <p className="mt-3 text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <AlertTriangle size={13} />
                 Termasuk konfirmasi khusus yang sudah Anda centang di langkah sebelumnya.
               </p>
             )}
           </div>
 
-          <div className="bg-white border-2 border-gray-200 rounded-xl shadow-sm p-5">
+          <div className="bg-card border-2 border-border rounded-xl shadow-sm p-5">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-gray-50 p-2.5 text-gray-900 shrink-0">
+              <div className="rounded-lg bg-muted p-2.5 text-foreground shrink-0">
                 <ShieldAlert size={20} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-gray-900">Konfirmasi terakhir</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-bold text-foreground">Konfirmasi terakhir</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Setelah langkah ini, harga jual di TikTok benar-benar berubah sesuai jadwal di atas.
                 </p>
-                <label className="block mt-4 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Ketik <span className="text-gray-900">BUAT</span> (huruf besar semua) untuk melanjutkan
+                <label className="block mt-4 text-xs font-bold text-foreground uppercase tracking-wider">
+                  Ketik <span className="text-foreground">BUAT</span> (huruf besar semua) untuk melanjutkan
                 </label>
                 <input
                   type="text"
@@ -1075,13 +1075,13 @@ export default function PromotionCreatePage() {
                   onChange={(e) => setConfirmationWord(e.target.value)}
                   placeholder="BUAT"
                   autoFocus
-                  className="mt-1.5 border border-gray-300 rounded-md px-3 py-2 text-sm w-full outline-none focus:border-gray-400"
+                  className="mt-1.5 border border-border rounded-md px-3 py-2 text-sm w-full outline-none focus:border-ring"
                 />
                 <div className="mt-4 flex gap-2 justify-end">
                   <button
                     onClick={() => setStep(2)}
                     disabled={creating}
-                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                    className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
                   >
                     Kembali
                   </button>
@@ -1089,13 +1089,13 @@ export default function PromotionCreatePage() {
                     onClick={runCreate}
                     // Persis & case-sensitive — tanpa trim di sini (server tetap validasi ulang).
                     disabled={confirmationWord !== "BUAT" || creating}
-                    className="flex items-center gap-2 rounded-md bg-gray-900 px-5 py-2 text-sm font-bold text-white hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-bold text-primary-foreground hover:bg-primary disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {creating && <Loader2 size={14} className="animate-spin" />}
                     {creating ? "Sedang membuat…" : "Ya, Buat Promosi Sekarang"}
                   </button>
                 </div>
-                <p className="mt-3 text-[11px] text-gray-400">
+                <p className="mt-3 text-[11px] text-muted-foreground">
                   Tidak ada percobaan ulang otomatis. Jika gagal, Anda akan diminta memeriksa dulu lalu mencoba manual.
                 </p>
               </div>

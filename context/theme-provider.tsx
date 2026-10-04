@@ -1,13 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { createContext, useContext, useEffect, useSyncExternalStore, useRef, useCallback } from 'react'
 
 type Theme = 'dark' | 'light' | 'system'
 type ResolvedTheme = Exclude<Theme, 'system'>
 
 const DEFAULT_THEME = 'system'
 const THEME_COOKIE_NAME = 'vite-ui-theme'
-const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -33,67 +32,80 @@ const initialState: ThemeProviderState = {
 
 const ThemeContext = createContext<ThemeProviderState>(initialState)
 
+function applyTheme(preference: Theme) {
+  const resolved = preference === 'system'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    : preference
+  const root = document.documentElement
+  root.classList.remove('light', 'dark')
+  root.classList.add(resolved)
+  root.style.colorScheme = resolved
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = DEFAULT_THEME,
   storageKey = THEME_COOKIE_NAME,
   ...props
 }: ThemeProviderProps) {
-  const [theme, _setTheme] = useState<Theme>(
-    () => {
-      if (typeof window !== 'undefined') {
-        return (localStorage.getItem(storageKey) as Theme) || defaultTheme
-      }
-      return defaultTheme
-    }
-  )
+  const fallbackTheme = useRef<Theme | null>(null)
 
-  // Optimized: Memoize the resolved theme calculation to prevent unnecessary re-computations
-  const resolvedTheme = useMemo((): ResolvedTheme => {
-    if (typeof window === 'undefined') return 'light'
-    if (theme === 'system') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light'
+  const readTheme = useCallback((): Theme => {
+    if (fallbackTheme.current) return fallbackTheme.current
+    try {
+      const stored = localStorage.getItem(storageKey)
+      if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+    } catch {}
+    return defaultTheme
+  }, [storageKey, defaultTheme])
+
+  const subscribe = useCallback((notify: () => void) => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === storageKey || event.key === null) notify()
     }
-    return theme as ResolvedTheme
-  }, [theme])
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener('maxius-theme-change', notify)
+    media.addEventListener('change', notify)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('maxius-theme-change', notify)
+      media.removeEventListener('change', notify)
+    }
+  }, [storageKey])
+
+  const theme = useSyncExternalStore(subscribe, readTheme, () => defaultTheme)
+  const resolvedTheme = useSyncExternalStore(subscribe, (): ResolvedTheme => {
+    const preference = readTheme()
+    return preference === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      : preference
+  }, () => 'light' as ResolvedTheme)
 
   useEffect(() => {
-    const root = window.document.documentElement
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    applyTheme(readTheme())
+  }, [resolvedTheme, readTheme])
 
-    const applyTheme = (currentResolvedTheme: ResolvedTheme) => {
-      root.classList.remove('light', 'dark') // Remove existing theme classes
-      root.classList.add(currentResolvedTheme) // Add the new theme class
+  const setTheme = (preference: Theme) => {
+    try {
+      localStorage.setItem(storageKey, preference)
+      fallbackTheme.current = null
+    } catch {
+      fallbackTheme.current = preference
     }
-
-    const handleChange = () => {
-      if (theme === 'system') {
-        const systemTheme = mediaQuery.matches ? 'dark' : 'light'
-        applyTheme(systemTheme)
-      }
-    }
-
-    applyTheme(resolvedTheme)
-
-    mediaQuery.addEventListener('change', handleChange)
-
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [theme, resolvedTheme])
-
-  const setTheme = (theme: Theme) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(storageKey, theme)
-    }
-    _setTheme(theme)
+    applyTheme(preference)
+    window.dispatchEvent(new Event('maxius-theme-change'))
   }
 
   const resetTheme = () => {
-    if (typeof window !== 'undefined') {
+    try {
       localStorage.removeItem(storageKey)
+      fallbackTheme.current = null
+    } catch {
+      fallbackTheme.current = defaultTheme
     }
-    _setTheme(DEFAULT_THEME)
+    applyTheme(defaultTheme)
+    window.dispatchEvent(new Event('maxius-theme-change'))
   }
 
   const contextValue = {

@@ -21,12 +21,12 @@ export default function OrderProgressSteps({ currentStage }: Props) {
           <div key={stage} className="flex items-center gap-1">
             <div 
               className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1
-                ${isCompleted ? 'bg-gray-500 text-white' : 'bg-gray-200 text-gray-500'}`}
+                ${isCompleted ? 'bg-muted-foreground text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
             >
               {stage}
             </div>
             {idx < STAGES.length - 1 && (
-              <span className="text-gray-300 text-xs">&gt;</span>
+              <span className="text-muted-foreground text-xs">&gt;</span>
             )}
           </div>
         );

@@ -25,28 +25,28 @@ const PRODUCTS = [
     name: "Everyday Cotton",
     price: "Rp29.000",
     tag: "Best seller",
-    colors: ["bg-gray-900", "bg-gray-400", "bg-white border"],
+    colors: ["bg-primary", "bg-muted-foreground", "bg-card border"],
     desc: "Katun combed 24s, adem dipakai seharian.",
   },
   {
     name: "Sport Ankle",
     price: "Rp39.000",
     tag: "Olahraga",
-    colors: ["bg-gray-900", "bg-gray-500", "bg-black"],
+    colors: ["bg-primary", "bg-muted-foreground", "bg-primary"],
     desc: "Rib kaki stabil, kering cepat saat lari.",
   },
   {
     name: "Knee High Stripe",
     price: "Rp45.000",
     tag: "Pilihan baru",
-    colors: ["bg-gray-500", "bg-gray-400", "bg-gray-900"],
+    colors: ["bg-muted-foreground", "bg-muted-foreground", "bg-primary"],
     desc: "Setinggi lutut, motif stripe klasik.",
   },
   {
     name: "Wool Warm",
     price: "Rp59.000",
     tag: "Musim dingin",
-    colors: ["bg-gray-900", "bg-gray-900", "bg-gray-900"],
+    colors: ["bg-primary", "bg-primary", "bg-primary"],
     desc: "Wool blend tebal, hangat tanpa gerah.",
   },
 ];
@@ -92,8 +92,8 @@ const STEPS = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans">
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-100">
+    <div className="min-h-screen bg-card text-foreground font-sans">
+      <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <span className="relative h-10 w-10 block">
@@ -101,14 +101,14 @@ export default function LandingPage() {
             </span>
             <span className="font-bold text-lg">KausKaki.id</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
-            <a href="#koleksi" className="hover:text-gray-900">Koleksi</a>
-            <a href="#keunggulan" className="hover:text-gray-900">Keunggulan</a>
-            <a href="#cara-beli" className="hover:text-gray-900">Cara Beli</a>
+          <nav className="hidden md:flex items-center gap-6 text-sm text-foreground">
+            <a href="#koleksi" className="hover:text-foreground">Koleksi</a>
+            <a href="#keunggulan" className="hover:text-foreground">Keunggulan</a>
+            <a href="#cara-beli" className="hover:text-foreground">Cara Beli</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/login" className="text-sm font-medium px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100">Masuk</Link>
-            <Link href="/dashboard" className="text-sm font-semibold px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black flex items-center gap-1">
+            <Link href="/login" className="text-sm font-medium px-4 py-2 rounded-lg text-foreground hover:bg-muted">Masuk</Link>
+            <Link href="/dashboard" className="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary flex items-center gap-1">
               Belanja <ArrowRight size={16} />
             </Link>
           </div>
@@ -122,38 +122,38 @@ export default function LandingPage() {
               <Image src="/Logo/Logo_backroundNO.png" alt="KausKaki.id" fill className="object-contain" priority />
             </span>
           </div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold bg-gray-50 text-gray-900 border border-gray-200 rounded-full px-3 py-1 mb-5">
-            <span className="w-2 h-2 rounded-full bg-gray-500 animate-pulse" />
+          <div className="inline-flex items-center gap-2 text-xs font-semibold bg-muted text-foreground border border-border rounded-full px-3 py-1 mb-5">
+            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse" />
             Gratis ongkir untuk belanja di atas Rp150.000
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
             Kaos kaki yang enak
             <br className="hidden md:block" /> dipakai seharian.
           </h1>
-          <p className="mt-5 text-gray-600 max-w-2xl mx-auto text-base md:text-lg">
+          <p className="mt-5 text-foreground max-w-2xl mx-auto text-base md:text-lg">
             Dibuat dari katun premium, adem, anti-bau, dan pas di kaki.
             Tersedia segala warna dan ukuran untuk kerja, olahraga, sampai
             santai di rumah.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
-            <a href="#koleksi" className="px-6 py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black flex items-center gap-2">
+            <a href="#koleksi" className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary flex items-center gap-2">
               Lihat Koleksi <ArrowRight size={16} />
             </a>
-            <a href="#keunggulan" className="px-6 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">Kenapa Kami</a>
+            <a href="#keunggulan" className="px-6 py-3 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted">Kenapa Kami</a>
           </div>
-          <div className="mt-6 flex items-center justify-center gap-5 text-xs text-gray-500 flex-wrap">
-            <span className="flex items-center gap-1"><Check size={14} className="text-gray-900" /> Katun lembut</span>
-            <span className="flex items-center gap-1"><Check size={14} className="text-gray-900" /> Anti-bau</span>
-            <span className="flex items-center gap-1"><Check size={14} className="text-gray-900" /> Ukuran 35–45</span>
+          <div className="mt-6 flex items-center justify-center gap-5 text-xs text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1"><Check size={14} className="text-foreground" /> Katun lembut</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-foreground" /> Anti-bau</span>
+            <span className="flex items-center gap-1"><Check size={14} className="text-foreground" /> Ukuran 35–45</span>
           </div>
         </section>
 
-        <section className="border-y border-gray-100 bg-gray-50/60">
-          <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-10 text-sm font-semibold text-gray-700">
-            <span className="text-xs uppercase tracking-wider text-gray-400 font-bold">Dipercaya oleh</span>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">20.000+ pelanggan</span>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">Rating 4.9/5</span>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg">Tukar ukuran gratis</span>
+        <section className="border-y border-border bg-muted/60">
+          <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-10 text-sm font-semibold text-foreground">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Dipercaya oleh</span>
+            <span className="px-4 py-2 bg-card border border-border rounded-lg">20.000+ pelanggan</span>
+            <span className="px-4 py-2 bg-card border border-border rounded-lg">Rating 4.9/5</span>
+            <span className="px-4 py-2 bg-card border border-border rounded-lg">Tukar ukuran gratis</span>
           </div>
         </section>
 
@@ -164,7 +164,7 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {PRODUCTS.map((p) => (
-              <Card key={p.name} className="hover:border-gray-900 transition-colors">
+              <Card key={p.name} className="hover:border-primary transition-colors">
                 <CardContent className="p-5 pt-6">
                   <div className="flex items-center gap-2 mb-4">
                     {p.colors.map((c, i) => (
@@ -176,7 +176,7 @@ export default function LandingPage() {
                   <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{p.desc}</p>
                   <div className="mt-3 flex items-center justify-between">
                     <span className="font-bold">{p.price}</span>
-                    <Link href="#cara-beli" className="text-xs font-semibold text-gray-600 hover:text-gray-900">Lihat →</Link>
+                    <Link href="#cara-beli" className="text-xs font-semibold text-foreground hover:text-foreground">Lihat →</Link>
                   </div>
                 </CardContent>
               </Card>
@@ -191,9 +191,9 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((f) => (
-              <Card key={f.title} className="hover:border-gray-900 transition-colors">
+              <Card key={f.title} className="hover:border-primary transition-colors">
                 <CardContent className="p-5 pt-6">
-                  <f.icon size={20} className="text-gray-900 mb-3" />
+                  <f.icon size={20} className="text-foreground mb-3" />
                   <h3 className="font-semibold mt-1">{f.title}</h3>
                   <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{f.desc}</p>
                 </CardContent>
@@ -202,35 +202,35 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="cara-beli" className="bg-gray-900 text-white">
+        <section id="cara-beli" className="bg-primary text-primary-foreground">
           <div className="max-w-6xl mx-auto px-6 py-14">
             <div className="text-center mb-10">
               <h2 className="text-2xl font-bold">Cara beli</h2>
-              <p className="text-sm text-gray-400 mt-1">Tiga langkah, langsung sampai rumah.</p>
+              <p className="text-sm text-primary-foreground mt-1">Tiga langkah, langsung sampai rumah.</p>
             </div>
             <div className="grid md:grid-cols-3 gap-4">
               {STEPS.map((s) => (
-                <div key={s.n} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-                  <div className="w-8 h-8 rounded-full bg-white text-gray-900 font-bold text-sm flex items-center justify-center">{s.n}</div>
+                <div key={s.n} className="bg-card/5 border border-primary-foreground/30 rounded-2xl p-5">
+                  <div className="w-8 h-8 rounded-full bg-card text-foreground font-bold text-sm flex items-center justify-center">{s.n}</div>
                   <h3 className="font-semibold mt-3">{s.title}</h3>
-                  <p className="text-sm text-gray-400 mt-1">{s.desc}</p>
+                  <p className="text-sm text-primary-foreground mt-1">{s.desc}</p>
                 </div>
               ))}
             </div>
             <div className="mt-8 flex flex-wrap gap-3 justify-center">
-              <a href="#koleksi" className="px-6 py-3 rounded-xl bg-white text-gray-900 text-sm font-semibold hover:bg-gray-100 flex items-center gap-2">
+              <a href="#koleksi" className="px-6 py-3 rounded-xl bg-card text-foreground text-sm font-semibold hover:bg-muted flex items-center gap-2">
                 Mulai belanja <ArrowRight size={16} />
               </a>
-              <Link href="/login" className="px-6 py-3 rounded-xl border border-white/20 text-sm font-semibold hover:bg-white/10">Masuk</Link>
+              <Link href="/login" className="px-6 py-3 rounded-xl border border-primary-foreground/40 text-sm font-semibold hover:bg-card/10">Masuk</Link>
             </div>
           </div>
         </section>
 
         <section className="max-w-6xl mx-auto px-6 py-14">
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 grid md:grid-cols-2 gap-8 items-center">
+          <div className="bg-muted border border-border rounded-2xl p-8 grid md:grid-cols-2 gap-8 items-center">
             <div>
               <h2 className="text-2xl font-bold mb-3">Pernah merasakan ini?</h2>
-              <ul className="text-sm text-gray-700 space-y-2 list-disc pl-5">
+              <ul className="text-sm text-foreground space-y-2 list-disc pl-5">
                 <li>Kaos kaki melar, melorot, dan harus ditarik terus.</li>
                 <li>Kaki cepat bau karena bahan yang tidak menyerap keringat.</li>
                 <li>Beli online, ternyata ukuran kekecilan dan ribet tukar.</li>
@@ -238,7 +238,7 @@ export default function LandingPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold mb-3">Dengan KausKaki.id…</h2>
-              <ul className="text-sm text-gray-700 space-y-2 list-disc pl-5">
+              <ul className="text-sm text-foreground space-y-2 list-disc pl-5">
                 <li>Pas di kaki sejak pasangan pertama, tidak melar.</li>
                 <li>Katun premium yang adem dan anti-bau seharian.</li>
                 <li>Tukar ukuran gratis dalam 7 hari, tanpa ribet.</li>
@@ -253,12 +253,12 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-gray-100">
+      <footer className="border-t border-border">
         <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} KausKaki.id — semua hak cipta dilindungi</span>
           <div className="flex items-center gap-4">
-            <a href="#koleksi" className="hover:text-gray-900">Koleksi</a>
-            <Link href="/login" className="hover:text-gray-900">Masuk</Link>
+            <a href="#koleksi" className="hover:text-foreground">Koleksi</a>
+            <Link href="/login" className="hover:text-foreground">Masuk</Link>
           </div>
         </div>
       </footer>
