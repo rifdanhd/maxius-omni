@@ -48,9 +48,11 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <Header>
           <div className="flex items-center gap-2 md:gap-4">
-            <NotificationBell />
             <Search />
             <ThemeSwitch />
+          </div>
+          <div className="ml-auto">
+            <NotificationBell />
           </div>
         </Header>
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
