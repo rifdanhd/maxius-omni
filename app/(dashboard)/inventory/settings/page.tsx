@@ -173,8 +173,7 @@ export default function InventorySettingsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Pengaturan Inventori</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ambang stok rendah, notifikasi, sinkronisasi ke marketplace, dan preferensi stok
-            opname.
+            Atur batas stok rendah dan pengiriman stok ke toko; mulai dengan meninjau nilai setiap pengaturan, lalu klik Simpan Pengaturan. Perubahan tidak otomatis berarti stok toko sudah berhasil diperbarui.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -203,7 +202,7 @@ export default function InventorySettingsPage() {
 
       {!settings ? (
         <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
-          Pengaturan tidak tersedia.
+          Pengaturan belum dapat dimuat. Muat ulang halaman untuk mencoba lagi; jangan mengubah stok sebelum pengaturan dapat diperiksa.
         </div>
       ) : (
         <div className="grid gap-4">
@@ -227,8 +226,7 @@ export default function InventorySettingsPage() {
             </div>
             <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Berlaku untuk <b>produk baru</b> (Pemetaan Produk &amp; Salin Produk). Produk yang
-              sudah ada memakai ambang per-produk masing-masing dan tetap bisa diubah di halaman
-              Produk Master. Nilai ini dipakai dashboard &ldquo;Yang Perlu Dilakukan&rdquo;,
+              sudah ada memakai ambang per-produk masing-masing dan tetap bisa diubah melalui Batas Min di halaman Stok Varian. Nilai ini dipakai dashboard &ldquo;Yang Perlu Dilakukan&rdquo;,
               lonceng notifikasi, dan penanda stok di halaman produk.
             </p>
           </Section>
@@ -242,7 +240,7 @@ export default function InventorySettingsPage() {
             <div className="divide-y divide-border">
               <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
                 <div>
-                  <div className="font-medium text-foreground">Notifikasi in-app</div>
+                  <div className="font-medium text-foreground">Notifikasi di Aplikasi (In-App)</div>
                   <div className="text-sm text-muted-foreground">
                     Lonceng notifikasi &ldquo;Stok Menipis&rdquo; di kanan atas dashboard.
                   </div>
@@ -274,7 +272,7 @@ export default function InventorySettingsPage() {
           <Section
             icon={Store}
             title="Sinkronisasi Stok ke Marketplace"
-            desc="Push otomatis stok terbaru setelah penyesuaian manual atau stok opname."
+            desc="Kirim target stok terbaru setelah penyesuaian manual atau hitung stok fisik. Periksa kegagalan di Stok Mismatch."
           >
             <div className="divide-y divide-border">
               {(
@@ -282,7 +280,7 @@ export default function InventorySettingsPage() {
                   {
                     key: "syncPushTiktok" as const,
                     label: "TikTok Shop",
-                    note: "Terhubung — push masuk antrean debounce (tergabung per ±8 detik).",
+                    note: "Pembaruan masuk antrean dan digabung sebelum dikirim. Status koneksi toko diperiksa di Pengaturan Toko.",
                   },
                   {
                     key: "syncPushShopee" as const,
@@ -302,6 +300,7 @@ export default function InventorySettingsPage() {
                     <div className="text-sm text-muted-foreground">{p.note}</div>
                   </div>
                   <Toggle
+                    disabled={p.key !== "syncPushTiktok"}
                     checked={settings[p.key]}
                     onChange={(v) => setSettings({ ...settings, [p.key]: v })}
                   />
@@ -317,12 +316,13 @@ export default function InventorySettingsPage() {
           {/* 4 — Preferensi Stok Opname */}
           <Section
             icon={ClipboardList}
-            title="Preferensi Stok Opname"
+            title="Pengingat Hitung Stok Fisik (Belum Tersedia)"
             desc="Pengingat rutin untuk menghitung fisik ulang stok gudang."
           >
             <label className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium text-foreground">Frekuensi pengingat</span>
               <select
+                disabled
                 value={settings.opnameReminderFrequency}
                 onChange={(e) =>
                   setSettings({ ...settings, opnameReminderFrequency: e.target.value })
