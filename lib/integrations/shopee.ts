@@ -1002,10 +1002,14 @@ function pushAuthCandidates(authHeader: string): string[] {
     out.add(v);
     out.add(v.replace(/^sha256[=\s]+/i, ""));
   }
-  return [...out];
+  return [...out].filter((value) => /^[0-9a-f]{64}$/i.test(value));
 }
 
-function pushUrlVariants(url: string): string[] {
+export function isPushSignatureFormatValid(authHeader: string | null): boolean {
+  return !!authHeader && pushAuthCandidates(authHeader).length > 0;
+}
+
+export function pushUrlVariants(url: string): string[] {
   const out = new Set<string>([url]);
   if (url.endsWith("/")) out.add(url.slice(0, -1));
   else out.add(`${url}/`);
