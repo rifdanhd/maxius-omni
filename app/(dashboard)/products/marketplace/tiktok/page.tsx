@@ -342,10 +342,10 @@ export default function TikTokMarketplacePage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Sync gagal.");
-      const accountsMsg = (data.accounts as Array<{ label: string; synced: number; notFound: number; unmapped?: UnmappedProduct[] }>)
-        .map((a) => `${a.label}: ${a.synced} update, ${a.notFound} tidak ditemukan${(a.unmapped?.length ?? 0) > 0 ? `, ${a.unmapped!.length} belum ter-mapping` : ""}`)
+      const accountsMsg = (data.accounts as Array<{ label: string; synced: number; notFound: number; unmapped?: UnmappedProduct[]; error?: string }>)
+        .map((a) => a.error ? `${a.label}: ${a.error}` : `${a.label}: ${a.synced} diperbarui, ${a.notFound} tidak ditemukan${(a.unmapped?.length ?? 0) > 0 ? `, ${a.unmapped!.length} belum terhubung` : ""}`)
         .join(" · ");
-      notify("success", `Sync selesai. ${accountsMsg}`);
+      notify(data.accounts.some((a: { error?: string }) => a.error) || !data.accounts.length ? "error" : "success", data.accounts.length ? `Hasil pembaruan: ${accountsMsg}` : "Belum ada toko TikTok Shop. Hubungkan toko melalui Pengaturan Toko.");
       setUnmapped(
         (data.accounts as Array<{ accountId?: string; id?: string; label: string; unmapped?: UnmappedProduct[] }>)
           .map((a) => ({
@@ -360,7 +360,7 @@ export default function TikTokMarketplacePage() {
       setPage(1);
       // refetch via effect
       setRefreshKey((k) => k + 1);
-      setLastSyncedAt(new Date().toISOString());
+      if (data.accounts.length && !data.accounts.some((a: { error?: string }) => a.error)) setLastSyncedAt(new Date().toISOString());
     } catch (e) {
       notify("error", e instanceof Error ? e.message : "Sync gagal.");
     } finally {
@@ -511,6 +511,7 @@ export default function TikTokMarketplacePage() {
             Produk Marketplace › TikTok Shop
           </p>
           <h1 className="text-xl font-bold text-foreground">Produk TikTok Shop</h1>
+          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Periksa produk yang dijual di TikTok Shop dan hubungannya dengan katalog pusat; mulai dengan menghubungkan toko di Pengaturan Toko, lalu Perbarui Data dan periksa produk Belum Terhubung untuk memilih variasi stok pusat.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-muted-foreground">
@@ -526,7 +527,7 @@ export default function TikTokMarketplacePage() {
             className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {syncingAll ? "Menyinkronkan..." : "Sync Semua"}
+            {syncingAll ? "Menyinkronkan..." : "Perbarui Data (Sync Semua)"}
           </button>
         </div>
       </div>
@@ -543,7 +544,7 @@ export default function TikTokMarketplacePage() {
             attention: "Perlu Tindakan",
             pending: "Pending",
             draft: "Draf",
-            failed: "Gagal Publish",
+            failed: "Gagal Diterbitkan (Publish)",
           }[key];
           const active = tab === key;
           return (
@@ -807,7 +808,7 @@ export default function TikTokMarketplacePage() {
                 <tr>
                   <td colSpan={9} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
-                    Tidak ada listing yang cocok. Klik <b>&quot;Sync Semua&quot;</b> untuk menarik data dari TikTok Shop.
+                    {q.trim() || accountFilter.length || tab !== "all" ? <div className="space-y-2"><p>Tidak ada produk yang cocok dengan pencarian/filter.</p><button className="underline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setTab("all"); setPage(1); }}>Hapus Pencarian dan Filter</button></div> : <div className="space-y-2"><p>Belum ada produk TikTok Shop pada tampilan ini. Perbarui Data, lalu hubungkan produk yang belum masuk katalog pusat.</p><Link href="/settings/accounts" className="underline">Hubungkan atau Periksa Toko TikTok Shop</Link></div>}
                   </td>
                 </tr>
               ) : (
@@ -997,12 +998,12 @@ function MapUnmappedModal({
         className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-base font-bold text-foreground">Mapping produk TikTok</h2>
+        <h2 className="text-base font-bold text-foreground">Hubungkan Produk TikTok (Mapping)</h2>
         <p className="text-xs text-muted-foreground mt-1">
           {target.product.title ?? target.product.platformProductId} · {target.accountLabel}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Channel SKU: <span className="font-mono font-semibold text-foreground">{channelSku}</span>
+          Kode Produk di Toko (Channel SKU): <span className="font-mono font-semibold text-foreground">{channelSku}</span>
           <span className="text-muted-foreground"> · stok TikTok {fmtNumber(target.sku.stock)} · {fmtPrice(target.sku.price)}</span>
         </p>
 
