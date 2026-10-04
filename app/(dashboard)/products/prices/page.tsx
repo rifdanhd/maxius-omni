@@ -144,7 +144,7 @@ function InlinePrice({
             setDraft(value === null ? "" : String(Math.round(value)));
             setEditing(true);
           }}
-          className="text-muted-foreground hover:text-foreground opacity-0 group-hover/price:opacity-100 transition-opacity"
+          className="text-muted-foreground hover:text-foreground opacity-100 transition-opacity"
           title="Ubah harga"
           aria-label="Ubah harga"
         >
@@ -168,9 +168,6 @@ function InlinePrice({
               setEditing(false);
               setError(null);
             }
-          }}
-          onBlur={() => {
-            if (!saving) setEditing(false);
           }}
           className="w-24 bg-transparent outline-none text-sm font-semibold text-foreground"
           inputMode="decimal"
@@ -1074,7 +1071,7 @@ export default function KelolaHargaPage() {
                               />
                               {m.overridePrice !== null && (
                                 <button
-                                  onClick={() => clearOverridePrice(row, m)}
+                                  onClick={() => clearOverridePrice(row, m).catch((e: unknown) => window.alert(e instanceof Error ? e.message : "Gagal mengubah harga khusus."))}
                                   className="text-[10px] text-muted-foreground hover:text-foreground underline mt-0.5"
                                   title="Hapus Harga Khusus (Override) → gunakan Harga Utama (Default)"
                                 >
