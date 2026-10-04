@@ -73,6 +73,28 @@ test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan
   expect(slots.status()).toBe(400);
   expect((await slots.json()).code).toBe('unsupported_platform');
 
+  // Shipping-parameter (opsi Atur Pengiriman Shopee): TikTok ditolak guard,
+  // Shopee tanpa token → error eksplisit, tanpa panggilan API Shopee apa pun.
+  const spTt = await page.request.get(`/api/orders/${ORD_T}/shipping-parameter`, { headers: auth });
+  expect(spTt.status()).toBe(400);
+  expect((await spTt.json()).code).toBe('unsupported_platform');
+
+  const spS = await page.request.get(`/api/orders/${ORD_S}/shipping-parameter`, { headers: auth });
+  expect(spS.status()).toBe(502);
+  expect((await spS.json()).ok).toBe(false);
+
+  // Shopee-ship: gagal per-order (akun tanpa token) & status order TIDAK berubah.
+  const ss = await page.request.post('/api/orders/fulfillment/shopee-ship', {
+    headers: auth,
+    data: { orderIds: [ORD_S], method: 'PICKUP', addressId: 1 },
+  });
+  expect(ss.status()).toBe(200);
+  const ssBody = await ss.json();
+  expect(ssBody.summary.success).toBe(0);
+  expect(ssBody.results[0].ok).toBe(false);
+  const ssDetail = await page.request.get(`/api/orders/${ORD_S}`, { headers: auth });
+  expect((await ssDetail.json()).status).toBe('AWAITING_SHIPMENT');
+
   // Label resmi — 400 unsupported_platform (frontend fallback cetak lokal).
   const label = await page.request.get(`/api/orders/${ORD_S}/label`, { headers: auth });
   expect(label.status()).toBe(400);
@@ -156,7 +178,7 @@ test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan
   expect(ttPickupBody.results[0].error).toContain('Belum ada paket');
 });
 
-test('M8a/M8c UI: pickup diblokir utk Shopee; Cetak Label = label lokal (Shopee) / label resmi (TikTok)', async ({ page }) => {
+test('M8a/M8c UI: pickup Shopee buka ShopeeShipModal; Cetak Label = label lokal (Shopee) / label resmi (TikTok)', async ({ page }) => {
   await login(page);
   await page.goto('/orders');
 
@@ -169,15 +191,13 @@ test('M8a/M8c UI: pickup diblokir utk Shopee; Cetak Label = label lokal (Shopee)
   const card = cardOf(NO_S);
   await expect(card).toBeVisible({ timeout: 30_000 });
 
-  // Klik "Atur Pengiriman" di kartu Shopee → alert, modal TIDAK terbuka.
-  let dialogMsg = '';
-  page.once('dialog', async (d) => {
-    dialogMsg = d.message();
-    await d.accept();
-  });
+  // Klik "Atur Pengiriman" di kartu Shopee → ShopeeShipModal TERBUKA (bukan alert).
+  // Akun e2e tanpa token → opsi API gagal dimuat, modal menampilkan hint Seller Center.
   await card.getByRole('button', { name: 'Atur Pengiriman', exact: true }).click();
-  expect(dialogMsg).toContain('Seller Center');
-  await expect(page.locator('h2', { hasText: 'Atur Pengiriman' })).toHaveCount(0);
+  await expect(page.getByText('Atur Pengiriman Shopee (1)')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('bisa dikirim via Seller Center')).toBeVisible();
+  await page.getByRole('button', { name: 'Batal', exact: true }).click();
+  await expect(page.getByText('Atur Pengiriman Shopee (1)')).toHaveCount(0);
 
   // Pilih hanya order Shopee → menu Cetak menawarkan "Label" LOKAL (M8c),
   // tanpa opsi label resmi TikTok.

@@ -8,6 +8,7 @@ import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, printPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
 import { ordersToCsv, downloadCsv, type ExportOrderRow } from "./exportOrders";
 import RequestPickupModal, { type PickupShipResult, type RequestPickupOrder } from "./RequestPickupModal";
+import ShopeeShipModal from "./ShopeeShipModal";
 import PickupSuccessModal from "./PickupSuccessModal";
 import PrintMethodModal from "./PrintMethodModal";
 import { PackageCheck } from "lucide-react";
@@ -300,6 +301,22 @@ function toExportRow(o: Order): ExportOrderRow {
   };
 }
 
+/** Mapping Order → data modal "Atur Pengiriman" (dipakai alur TikTok & Shopee). */
+function toPickupOrder(o: Order): RequestPickupOrder {
+  return {
+    id: o.id,
+    orderNo: o.orderNo,
+    status: o.status,
+    platform: PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-",
+    storeName: o.account?.label ?? "-",
+    totalQty: o.items.reduce((acc, it) => acc + it.qty, 0),
+    totalPrice: formatPrice(o.amount),
+    buyerName: o.buyerName ?? "-",
+    courier: o.shipments?.[0]?.carrier ?? "-",
+    paymentMethod: o.currency ?? "IDR",
+  };
+}
+
 function buildQueryParams(input: {
   page: number;
   tab: { id: string; statuses: string[] | null };
@@ -387,6 +404,7 @@ export default function OrdersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [printingBulk, setPrintingBulk] = useState(false);
   const [pickupTargets, setPickupTargets] = useState<RequestPickupOrder[] | null>(null);
+  const [shopeeTargets, setShopeeTargets] = useState<RequestPickupOrder[] | null>(null);
   const [pickupResult, setPickupResult] = useState<PickupShipResult | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printOrderIds, setPrintOrderIds] = useState<string[]>([]);
@@ -783,33 +801,30 @@ export default function OrdersPage() {
     const readySelected = orders.filter(
       (o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT"
     );
-    // Guard platform: modal pickup bentuknya TikTok (slot handover/resi TikTok) —
-    // order Shopee tidak dibuka di sini; kirim via Seller Center Shopee.
-    const targets = readySelected
-      .filter((o) => o.account?.platform === "TIKTOK_SHOP")
-      .map((o) => ({
-        id: o.id,
-        orderNo: o.orderNo,
-        status: o.status,
-        platform: PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-",
-        storeName: o.account?.label ?? "-",
-        totalQty: o.items.reduce((acc, it) => acc + it.qty, 0),
-        totalPrice: formatPrice(o.amount),
-        buyerName: o.buyerName ?? "-",
-        courier: o.shipments?.[0]?.carrier ?? "-",
-        paymentMethod: o.currency ?? "IDR",
-      }));
-    if (targets.length === 0) {
-      if (readySelected.length > 0) {
-        alert("Atur Pengiriman hanya untuk order TikTok Shop. Order Shopee dikirim via Seller Center Shopee.");
-      }
+    // Pisahkan per platform: TikTok → modal slot handover, Shopee → ShopeeShipModal
+    // (booking via Shopee Open API). Campuran tidak diproses dalam satu aksi.
+    const tiktok = readySelected.filter((o) => o.account?.platform === "TIKTOK_SHOP");
+    const shopee = readySelected.filter((o) => o.account?.platform === "SHOPEE");
+    if (tiktok.length > 0 && shopee.length > 0) {
+      alert("Pilih order TikTok atau Shopee saja dalam satu kali Atur Pengiriman.");
       return;
     }
-    setPickupTargets(targets);
+    if (shopee.length > 0) {
+      setShopeeTargets(shopee.map(toPickupOrder));
+      return;
+    }
+    if (tiktok.length > 0) {
+      setPickupTargets(tiktok.map(toPickupOrder));
+      return;
+    }
+    if (readySelected.length > 0) {
+      alert("Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
+    }
   };
 
   const handlePickupConfirm = (result: PickupShipResult) => {
     setPickupTargets(null);
+    setShopeeTargets(null);
     setPickupResult(result);
   };
 
@@ -1185,25 +1200,18 @@ export default function OrdersPage() {
                 onSync={handleSync}
                 onPrint={(type) => printOrder(order, type)}
                 onPickup={() => {
-                  // Single-order pickup dari kartu — buka modal dengan order ini saja.
+                  // Single-order pickup dari kartu — buka modal sesuai platform.
                   const o = order;
-                  // Guard platform: modal pickup hanya untuk TikTok (lihat handlePickup).
-                  if (o.account?.platform !== "TIKTOK_SHOP") {
-                    alert("Atur Pengiriman hanya untuk order TikTok Shop. Order Shopee dikirim via Seller Center Shopee.");
+                  const target = toPickupOrder(o);
+                  if (o.account?.platform === "SHOPEE") {
+                    setShopeeTargets([target]);
                     return;
                   }
-                  setPickupTargets([{
-                    id: o.id,
-                    orderNo: o.orderNo,
-                    status: o.status,
-                    platform: PLATFORM[o.account?.platform ?? ""] ?? o.account?.platform ?? "-",
-                    storeName: o.account?.label ?? "-",
-                    totalQty: o.items.reduce((acc, it) => acc + it.qty, 0),
-                    totalPrice: formatPrice(o.amount),
-                    buyerName: o.buyerName ?? "-",
-                    courier: o.shipments?.[0]?.carrier ?? "-",
-                    paymentMethod: o.currency ?? "IDR",
-                  }]);
+                  if (o.account?.platform !== "TIKTOK_SHOP") {
+                    alert("Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
+                    return;
+                  }
+                  setPickupTargets([target]);
                 }}
                 shipping={false}
                 onDetail={() => handleOpenDetail(order)}
@@ -1218,6 +1226,14 @@ export default function OrdersPage() {
         <RequestPickupModal
           orders={pickupTargets}
           onClose={() => setPickupTargets(null)}
+          onConfirm={handlePickupConfirm}
+        />
+      )}
+
+      {shopeeTargets && (
+        <ShopeeShipModal
+          orders={shopeeTargets}
+          onClose={() => setShopeeTargets(null)}
           onConfirm={handlePickupConfirm}
         />
       )}

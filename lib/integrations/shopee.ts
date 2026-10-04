@@ -406,6 +406,151 @@ export async function getOrderDetail(
   return out;
 }
 
+function str(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+export type ShopeePickupTimeSlot = {
+  pickupTimeId: string;
+  date: number;
+  timeText: string | null;
+};
+
+export type ShopeePickupAddress = {
+  addressId: number;
+  label: string;
+  timeSlots: ShopeePickupTimeSlot[];
+};
+
+export type ShopeeShippingParameter = {
+  /** Field yang diminta Shopee per mode (info_needed.pickup/dropoff/non_integrated). */
+  infoNeeded: { pickup: string[]; dropoff: string[]; nonIntegrated: string[] };
+  pickup: ShopeePickupAddress[];
+  dropoffBranches: Array<{ branchId: number; label: string }>;
+  dropoffSlugs: Array<{ slug: string; name: string }>;
+};
+
+/**
+ * getShippingParameter — GET /api/v2/logistics/shipping_parameter.
+ * Wajib dipanggil SEBELUM ship_order: menentukan mode yang didukung
+ * (pickup/dropoff/non_integrated) + daftar alamat penjemputan, slot waktu,
+ * dan cabang drop-off untuk order tsb.
+ */
+export async function getShippingParameter(
+  accessToken: string,
+  shopId: string | number,
+  orderSn: string,
+  creds?: ShopeeCreds
+): Promise<ShopeeShippingParameter> {
+  const r = await getShopApi("/api/v2/logistics/shipping_parameter", accessToken, shopId, creds, {
+    order_sn: orderSn,
+  });
+  const info = (r.info_needed ?? {}) as Record<string, unknown>;
+  const arr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+  const pickupWrap = (r.pickup ?? null) as { address_list?: Array<Record<string, unknown>> } | null;
+  const pickup: ShopeePickupAddress[] = (pickupWrap?.address_list ?? []).flatMap((a) => {
+    const addressId = Number(a.address_id);
+    if (!Number.isFinite(addressId)) return [];
+    const parts = [a.address, a.district, a.town, a.city, a.state].filter(
+      (x): x is string => typeof x === "string" && x.trim().length > 0
+    );
+    const slots = Array.isArray(a.time_slot_list)
+      ? (a.time_slot_list as Array<Record<string, unknown>>)
+          .flatMap((t) => {
+            const pickupTimeId = str(t.pickup_time_id);
+            if (!pickupTimeId) return [];
+            return [{
+              pickupTimeId,
+              date: Number(t.date) || 0,
+              timeText: str(t.time_text) || null,
+            }];
+          })
+      : [];
+    return [{ addressId, label: parts.join(", ") || `Alamat ${addressId}`, timeSlots: slots }];
+  });
+
+  const dropoffWrap = (r.dropoff ?? null) as {
+    branch_list?: Array<Record<string, unknown>>;
+    slug_list?: Array<Record<string, unknown>>;
+  } | null;
+  const dropoffBranches = (dropoffWrap?.branch_list ?? []).flatMap((b) => {
+    const branchId = Number(b.branch_id);
+    if (!Number.isFinite(branchId)) return [];
+    const parts = [b.address, b.city, b.state].filter(
+      (x): x is string => typeof x === "string" && x.trim().length > 0
+    );
+    return [{ branchId, label: parts.join(", ") || `Cabang ${branchId}` }];
+  });
+  const dropoffSlugs = (dropoffWrap?.slug_list ?? []).flatMap((s) => {
+    const slug = str(s.slug);
+    if (!slug) return [];
+    return [{ slug, name: str(s.slug_name) || slug }];
+  });
+
+  return {
+    infoNeeded: {
+      pickup: arr(info.pickup),
+      dropoff: arr(info.dropoff),
+      nonIntegrated: arr(info.non_integrated),
+    },
+    pickup,
+    dropoffBranches,
+    dropoffSlugs,
+  };
+}
+
+export type ShopeeShipOrderBody = {
+  order_sn: string;
+  pickup?: { address_id: number; pickup_time_id?: string };
+  dropoff?: { branch_id?: number; slug?: string; sender_real_name?: string };
+};
+
+/**
+ * shipOrder — POST /api/v2/logistics/ship_order (atur pengiriman).
+ * Mode pickup: { order_sn, pickup: { address_id, pickup_time_id } }.
+ * Mode dropoff: { order_sn, dropoff: { branch_id?, slug? } }.
+ * Sukses = respons tanpa error (error "" = ok pada envelope Shopee).
+ */
+export async function shipOrder(
+  accessToken: string,
+  shopId: string | number,
+  body: ShopeeShipOrderBody,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  return postShopApi("/api/v2/logistics/ship_order", accessToken, shopId, body, creds);
+}
+
+export type ShopeeTrackingNumber = {
+  trackingNumber: string | null;
+  plpNumber: string | null;
+  hint: string | null;
+  pickupCode: string | null;
+};
+
+/**
+ * getTrackingNumber — GET /api/v2/logistics/get_tracking_number.
+ * Ditarik setelah ship_order: Shopee menerbitkan resi (booking) untuk order tsb.
+ * Best-effort — resi kadang belum siap langsung setelah arrange.
+ */
+export async function getTrackingNumber(
+  accessToken: string,
+  shopId: string | number,
+  orderSn: string,
+  creds?: ShopeeCreds
+): Promise<ShopeeTrackingNumber> {
+  const r = await getShopApi("/api/v2/logistics/get_tracking_number", accessToken, shopId, creds, {
+    order_sn: orderSn,
+  });
+  return {
+    trackingNumber: str(r.tracking_number) || null,
+    plpNumber: str(r.plp_number) || null,
+    hint: str(r.hint) || null,
+    pickupCode: str(r.pickup_code) || null,
+  };
+}
+
 export async function getItemList(
   accessToken: string,
   shopId: string | number,
