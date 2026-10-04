@@ -4,7 +4,7 @@ import { withAuth } from "@/lib/utils/api";
 import { maskName } from "@/lib/pii";
 
 const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 1000;
 
 const PLAIN_STATUSES = [
   "UNPAID",
@@ -23,9 +23,9 @@ export const GET = withAuth(async (req) => {
   const statusRaw = searchParams.get("status");
   const hasStatusFilter = statusRaw !== null;
   const statusParam = statusRaw?.trim();
-  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const page = Math.max(1, Math.floor(Number(searchParams.get("page"))) || 1);
   const pageSizeRaw = Number(searchParams.get("pageSize")) || DEFAULT_PAGE_SIZE;
-  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, pageSizeRaw));
+  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(pageSizeRaw)));
   const sortRaw = searchParams.get("sort")?.trim();
   const sortField = sortRaw === "amount" || sortRaw === "createTime" ? sortRaw : "createTime";
   const sortDirRaw = searchParams.get("dir")?.trim();

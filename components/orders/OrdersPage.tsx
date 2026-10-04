@@ -20,7 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 250, 500, 1000];
 
 const TABS: { id: string; label: string; statuses: string[] | null }[] = [
   { id: "all", label: "Semua Pesanan", statuses: null },
@@ -319,6 +319,7 @@ function toPickupOrder(o: Order): RequestPickupOrder {
 
 function buildQueryParams(input: {
   page: number;
+  pageSize: number;
   tab: { id: string; statuses: string[] | null };
   q: string;
   searchType: string;
@@ -328,7 +329,7 @@ function buildQueryParams(input: {
 }) {
   const params = new URLSearchParams();
   params.set("page", String(input.page));
-  params.set("pageSize", String(PAGE_SIZE));
+  params.set("pageSize", String(input.pageSize));
   const statuses = input.tab.statuses;
   if (statuses !== null) params.set("status", statuses.join(","));
   if (input.q.trim()) {
@@ -390,6 +391,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(1000);
   const [total, setTotal] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -420,7 +422,7 @@ export default function OrdersPage() {
       const effectiveTab = opts.subTab && opts.subTab.id !== "all"
         ? { id: opts.tab.id, label: opts.tab.label, statuses: opts.subTab.statuses }
         : opts.tab;
-      const query = buildQueryParams({ ...opts, tab: effectiveTab });
+      const query = buildQueryParams({ ...opts, pageSize, tab: effectiveTab });
       const res = await authFetch(`/api/orders?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -428,7 +430,7 @@ export default function OrdersPage() {
       const data = await res.json();
       return data;
     },
-    []
+    [pageSize]
   );
 
   useEffect(() => {
@@ -1085,8 +1087,8 @@ export default function OrdersPage() {
         </div>
 
         {/* Bulk Action & Pagination */}
-        <div className="px-4 py-3 bg-muted/50 flex items-center justify-between border-b border-border">
-          <div className="flex items-center gap-3">
+        <div className="px-4 py-3 bg-muted/50 flex flex-wrap items-center justify-between gap-3 border-b border-border">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1128,9 +1130,27 @@ export default function OrdersPage() {
               </>
             )}
           </div>
-          <div className="flex items-center gap-4 text-sm text-foreground">
-            <span className="font-semibold text-foreground">{total}</span>
-            <span>Total pesanan</span>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-foreground">
+            <label className="flex items-center gap-2">
+              Pesanan per halaman
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                  setSelected(new Set());
+                }}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>{size.toLocaleString("id-ID")}</option>
+                ))}
+              </select>
+            </label>
+            <span>
+              {total === 0 ? 0 : ((page - 1) * pageSize + 1).toLocaleString("id-ID")}
+              –{Math.min(page * pageSize, total).toLocaleString("id-ID")} dari {total.toLocaleString("id-ID")} pesanan
+            </span>
             {pageCount > 1 && (
               <div className="flex items-center gap-1">
                 <Button
@@ -1141,9 +1161,6 @@ export default function OrdersPage() {
                 >
                   Sebelumnya
                 </Button>
-                <span className="px-2 text-xs">
-                  Hal {page} / {pageCount}
-                </span>
                 <Button
                   variant="outline"
                   size="sm"
