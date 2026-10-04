@@ -75,9 +75,9 @@ const fmtDate = (iso: string | null | undefined) => {
 
 function statusBadge(row: GalleryRow) {
   if (row.totalImages === 0)
-    return { label: "Tidak Ada Gambar", cls: "bg-gray-100 text-gray-600" };
-  if (row.complete) return { label: "Lengkap", cls: "bg-gray-100 text-gray-900" };
-  return { label: "Belum Lengkap", cls: "bg-gray-100 text-gray-900" };
+    return { label: "Tidak Ada Gambar", cls: "bg-muted text-foreground" };
+  if (row.complete) return { label: "Lengkap", cls: "bg-muted text-foreground" };
+  return { label: "Belum Lengkap", cls: "bg-muted text-foreground" };
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -244,27 +244,27 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 backdrop-blur-sm p-4">
+      <div className="bg-card rounded-xl shadow-xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">{row.name}</h2>
-            <p className="text-xs text-gray-400">
+            <h2 className="text-lg font-bold text-foreground">{row.name}</h2>
+            <p className="text-xs text-muted-foreground">
               {row.totalImages} gambar · {row.variantCount} varian
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-6 overflow-y-auto flex flex-col gap-5">
           {/* Upload area */}
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col gap-3">
+          <div className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
+                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary"
               >
                 <Upload size={15} /> Pilih File
               </button>
@@ -282,18 +282,18 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                   value={pendingUrls}
                   onChange={(e) => setPendingUrls(e.target.value)}
                   placeholder="Atau tempel URL gambar (pisahkan dengan koma/baris baru)"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                 />
               </div>
             </div>
             {pendingFiles.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap text-xs text-gray-600">
+              <div className="flex items-center gap-2 flex-wrap text-xs text-foreground">
                 {pendingFiles.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-md">
+                  <span key={i} className="inline-flex items-center gap-1 bg-muted px-2 py-1 rounded-md">
                     {f.name}
                     <button
                       onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
-                      className="text-gray-400 hover:text-gray-900"
+                      className="text-muted-foreground hover:text-foreground"
                     >
                       <X size={12} />
                     </button>
@@ -302,7 +302,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                 <button
                   onClick={upload}
                   disabled={busy}
-                  className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
+                  className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   Unggah
@@ -312,27 +312,27 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
           </div>
 
           {error && (
-            <div className="bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl border border-gray-100">
+            <div className="bg-muted text-foreground text-xs px-4 py-3 rounded-xl border border-border">
               {error}
             </div>
           )}
 
           {/* Grid */}
           {loading ? (
-            <p className="text-sm text-gray-400">Memuat gambar...</p>
+            <p className="text-sm text-muted-foreground">Memuat gambar...</p>
           ) : images.length === 0 ? (
-            <div className="text-center text-gray-400 py-10">
+            <div className="text-center text-muted-foreground py-10">
               <Images size={32} className="mx-auto mb-2" />
               Belum ada gambar. Unggah gambar pertama produk ini.
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {images.map((img, i) => (
-                <div key={img.id} className="group relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                <div key={img.id} className="group relative rounded-xl border border-border overflow-hidden bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt={`Gambar ${i + 1}`} className="w-full aspect-square object-cover" />
                   {img.isCover && (
-                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 bg-gray-400 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
                       <Star size={11} /> Cover
                     </span>
                   )}
@@ -341,7 +341,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                       <button
                         onClick={() => setCover(img)}
                         title="Jadikan cover"
-                        className="bg-white/90 hover:bg-white shadow rounded-md p-1.5 text-gray-900"
+                        className="bg-card/90 hover:bg-card shadow rounded-md p-1.5 text-foreground"
                       >
                         <Star size={14} />
                       </button>
@@ -349,26 +349,26 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
                     <button
                       onClick={() => removeImage(img)}
                       title="Hapus"
-                      className="bg-white/90 hover:bg-white shadow rounded-md p-1.5 text-gray-900"
+                      className="bg-card/90 hover:bg-card shadow rounded-md p-1.5 text-foreground"
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
-                  <div className="px-2 py-1.5 flex items-center justify-between border-t border-gray-100 bg-white">
+                  <div className="px-2 py-1.5 flex items-center justify-between flex-wrap gap-3 border-t border-border bg-card">
                     <button
                       onClick={() => move(-1, img)}
                       disabled={i === 0}
                       title="Geser ke kiri"
-                      className="text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ArrowLeft size={14} />
                     </button>
-                    <span className="text-[10px] text-gray-400">#{i + 1}</span>
+                    <span className="text-[10px] text-muted-foreground">#{i + 1}</span>
                     <button
                       onClick={() => move(1, img)}
                       disabled={i === images.length - 1}
                       title="Geser ke kanan"
-                      className="text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <ArrowRight size={14} />
                     </button>
@@ -410,34 +410,34 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Riwayat Gambar</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 backdrop-blur-sm p-4">
+      <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <h2 className="text-lg font-bold text-foreground">Riwayat Gambar</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
             <X size={20} />
           </button>
         </div>
         <div className="p-6 overflow-y-auto">
-          {error && <div className="bg-gray-50 text-gray-900 text-xs px-4 py-3 rounded-xl">{error}</div>}
+          {error && <div className="bg-muted text-foreground text-xs px-4 py-3 rounded-xl">{error}</div>}
           {loading ? (
-            <p className="text-sm text-gray-400">Memuat riwayat...</p>
+            <p className="text-sm text-muted-foreground">Memuat riwayat...</p>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-gray-400">Belum ada aktivitas gambar.</p>
+            <p className="text-sm text-muted-foreground">Belum ada aktivitas gambar.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-border">
               {rows.map((r) => (
                 <li key={r.id} className="py-3 flex items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={r.url} alt="" className="w-10 h-10 rounded-md object-cover bg-gray-100 shrink-0" />
+                  <img src={r.url} alt="" className="w-10 h-10 rounded-md object-cover bg-muted shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-gray-800 truncate">{r.product.name}</div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-sm font-semibold text-foreground truncate">{r.product.name}</div>
+                    <div className="text-xs text-muted-foreground">
                       {r.isCover ? "Dijadikan cover" : "Gambar produk"} · update {fmtDate(r.updatedAt)}
                     </div>
                   </div>
                   {r.isCover && (
-                    <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-1 bg-muted text-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
                       <Star size={11} /> Cover
                     </span>
                   )}
@@ -590,21 +590,21 @@ export default function KelolaGambarPage() {
   }, [page, totalPages]);
 
   return (
-    <div className="p-8">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+    <div className="p-4 md:p-8">
+      <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-bold text-gray-900">Kelola Gambar</h1>
+        <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <h1 className="text-xl font-bold text-foreground">Kelola Gambar</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setHistoryOpen(true)}
-              className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               <History size={16} /> Riwayat
             </button>
             <button
               disabled
-              className="flex items-center gap-2 rounded-md bg-[#111827] px-4 py-2 text-sm font-medium text-white opacity-60 cursor-not-allowed"
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-60 cursor-not-allowed"
             >
               <Upload size={16} /> Unggah Massal
             </button>
@@ -612,16 +612,16 @@ export default function KelolaGambarPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           <div className="relative w-80">
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cari nama produk atau SKU"
-              className="border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
+              className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
             />
-            <Search size={16} className="text-gray-400 absolute right-3 top-2.5" />
+            <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
           </div>
 
           {/* Filter */}
@@ -634,29 +634,29 @@ export default function KelolaGambarPage() {
               }}
               className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] min-w-[120px] justify-between ${
                 filterOpen || filterActive
-                  ? "border-gray-500 bg-gray-50/70 text-gray-900"
-                  : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
+                  ? "border-ring bg-muted/70 text-foreground"
+                  : "border-border text-muted-foreground bg-card hover:bg-muted"
               }`}
             >
               <span>Filter</span>
               {filterActive && (
-                <span className="px-1.5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
+                <span className="px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
                   {(statusFilter !== "all" ? 1 : 0) + (categoryFilter ? 1 : 0)}
                 </span>
               )}
               <ChevronDown size={14} />
             </button>
             {filterOpen && (
-              <div className="absolute left-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-30 p-4 flex flex-col gap-4">
+              <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-80 bg-card border border-border rounded-xl shadow-xl z-30 p-4 flex flex-col gap-4">
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Kategori</p>
+                  <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">Kategori</p>
                   <input
                     type="text"
                     value={draftCategory}
                     onChange={(e) => setDraftCategory(e.target.value)}
                     placeholder="Mis. Makanan"
                     list="gallery-categories"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none"
+                    className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
                   />
                   <datalist id="gallery-categories">
                     {categories.map((c) => (
@@ -665,7 +665,7 @@ export default function KelolaGambarPage() {
                   </datalist>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Status Kelengkapan</p>
+                  <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">Status Kelengkapan</p>
                   <div className="flex flex-col gap-1">
                     {([
                       ["all", "Semua"],
@@ -673,7 +673,7 @@ export default function KelolaGambarPage() {
                       ["incomplete", "Belum Lengkap"],
                       ["none", "Tidak Ada Gambar"],
                     ] as const).map(([val, label]) => (
-                      <label key={val} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
+                      <label key={val} className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-muted rounded px-1 py-0.5">
                         <input
                           type="radio"
                           name="status"
@@ -687,10 +687,10 @@ export default function KelolaGambarPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <button onClick={resetFilter} className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md">
+                  <button onClick={resetFilter} className="px-3 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-md">
                     Reset
                   </button>
-                  <button onClick={applyFilter} className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-md hover:bg-gray-900">
+                  <button onClick={applyFilter} className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary">
                     Terapkan
                   </button>
                 </div>
@@ -699,9 +699,9 @@ export default function KelolaGambarPage() {
           </div>
 
           {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-gray-50 text-gray-900 text-xs font-semibold px-3 py-2 rounded-md">
+            <div className="flex items-center gap-2 ml-auto bg-muted text-foreground text-xs font-semibold px-3 py-2 rounded-md">
               {selected.size} produk dipilih
-              <button onClick={() => setSelected(new Set())} className="text-gray-500 hover:text-gray-900 underline">
+              <button onClick={() => setSelected(new Set())} className="text-muted-foreground hover:text-foreground underline">
                 Batal
               </button>
             </div>
@@ -711,10 +711,10 @@ export default function KelolaGambarPage() {
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-[#f8f9fa] border-b border-gray-200 text-gray-600 font-semibold">
+            <thead className="bg-muted border-b border-border text-foreground font-semibold">
               <tr>
                 <th className="px-5 py-3 w-10">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300" checked={allPageSelected} onChange={toggleAll} />
+                  <input type="checkbox" className="w-4 h-4 rounded border-border" checked={allPageSelected} onChange={toggleAll} />
                 </th>
                 <th className="px-5 py-3">Informasi Produk</th>
                 <th className="px-5 py-3">Kategori</th>
@@ -727,15 +727,15 @@ export default function KelolaGambarPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-500">Memuat galeri...</td>
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">Memuat galeri...</td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-900">{error}</td>
+                  <td colSpan={7} className="px-5 py-12 text-center text-foreground">{error}</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     <PackageOpen size={28} className="mx-auto mb-2" />
                     Tidak ada produk yang cocok dengan pencarian/filter.
                   </td>
@@ -744,11 +744,11 @@ export default function KelolaGambarPage() {
                 rows.map((row) => {
                   const badge = statusBadge(row);
                   return (
-                    <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
+                    <tr key={row.id} className="border-b border-border hover:bg-muted/50 align-top">
                       <td className="px-5 py-4 pt-5">
                         <input
                           type="checkbox"
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-border"
                           checked={selected.has(row.id)}
                           onChange={() =>
                             setSelected((prev) => {
@@ -765,39 +765,39 @@ export default function KelolaGambarPage() {
                         <div className="flex gap-3">
                           {row.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={row.imageUrl} alt={row.name} className="w-12 h-12 rounded object-cover bg-gray-100 shrink-0" />
+                            <img src={row.imageUrl} alt={row.name} className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
                           ) : (
-                            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+                            <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
                               <Images size={18} />
                             </div>
                           )}
                           <div className="max-w-[240px]">
-                            <div className="text-gray-900 font-bold leading-tight">{row.name}</div>
-                            <div className="text-xs text-gray-400 mt-0.5">{row.totalImages} gambar terunggah</div>
+                            <div className="text-foreground font-bold leading-tight">{row.name}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{row.totalImages} gambar terunggah</div>
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 text-gray-600">
+                      <td className="px-5 py-4 text-foreground">
                         {row.category ? (
-                          <span className="inline-block text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                          <span className="inline-block text-[10px] font-semibold bg-muted text-foreground px-2 py-0.5 rounded">
                             {row.category}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
 
-                      <td className="px-5 py-4 text-gray-700 font-semibold">{row.variantCount}</td>
+                      <td className="px-5 py-4 text-foreground font-semibold">{row.variantCount}</td>
 
-                      <td className="px-5 py-4 text-gray-700 font-semibold">{row.totalImages}</td>
+                      <td className="px-5 py-4 text-foreground font-semibold">{row.totalImages}</td>
 
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.cls}`}>
                           {badge.label}
                         </span>
                         {row.totalImages > 0 && (
-                          <div className="text-[11px] text-gray-400 mt-1">
+                          <div className="text-[11px] text-muted-foreground mt-1">
                             {Math.min(row.totalImages, row.required)}/{row.required} gambar
                           </div>
                         )}
@@ -806,7 +806,7 @@ export default function KelolaGambarPage() {
                       <td className="px-5 py-4 text-right">
                         <button
                           onClick={() => setDetailRow(row)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground bg-card hover:bg-muted"
                         >
                           <Images size={14} /> Lihat Gambar
                         </button>
@@ -820,18 +820,18 @@ export default function KelolaGambarPage() {
         </div>
 
         {/* Pagination */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">
+          <span className="text-sm text-muted-foreground">
             {total.toLocaleString("id-ID")} produk · halaman {page} dari {totalPages}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => {
                 setLoading(true);
                 setPage((p) => Math.max(1, p - 1));
               }}
               disabled={page <= 1}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft size={14} /> Sebelumnya
             </button>
@@ -844,8 +844,8 @@ export default function KelolaGambarPage() {
                 }}
                 className={`w-9 h-9 text-sm rounded-md ${
                   n === page
-                    ? "bg-[#111827] text-white font-semibold"
-                    : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "border border-border text-foreground hover:bg-muted"
                 }`}
               >
                 {n}
@@ -857,7 +857,7 @@ export default function KelolaGambarPage() {
                 setPage((p) => Math.min(totalPages, p + 1));
               }}
               disabled={page >= totalPages}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm border border-border rounded-md text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Selanjutnya <ChevronRight size={14} />
             </button>

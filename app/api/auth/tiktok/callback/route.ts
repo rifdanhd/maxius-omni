@@ -5,7 +5,7 @@ import {
   getAuthorizeCredential,
   resolveTiktokCreds,
 } from "@/lib/services/app-credential.service";
-import { TIKTOK_OAUTH_CRED_COOKIE } from "../authorize/route";
+import { TIKTOK_OAUTH_CRED_COOKIE } from "@/lib/utils/oauth-cookies";
 import { verifySessionCookie } from "@/lib/services/auth.service";
 import {
   DEFAULT_BUSINESS_ID,

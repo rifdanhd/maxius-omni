@@ -11,16 +11,16 @@ const PLATFORM: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  PENDING_SELLER: { label: "Menunggu Respons", className: "bg-gray-100 text-gray-900" },
-  APPROVED: { label: "Disetujui", className: "bg-gray-100 text-gray-900" },
-  REJECTED: { label: "Ditolak", className: "bg-gray-100 text-gray-900" },
-  PLATFORM_DECIDED: { label: "Diputuskan Platform", className: "bg-gray-100 text-gray-900" },
-  IN_TRANSIT: { label: "Barang Dikirim Balik", className: "bg-gray-100 text-gray-900" },
-  RECEIVED: { label: "Diterima Gudang", className: "bg-gray-100 text-gray-900" },
-  REFUNDED: { label: "Selesai Refund", className: "bg-gray-100 text-gray-900" },
-  DISPUTED: { label: "Sengketa", className: "bg-gray-100 text-gray-900" },
-  CANCELLED: { label: "Dibatalkan", className: "bg-gray-100 text-gray-600" },
-  UNKNOWN: { label: "Status Baru", className: "bg-gray-100 text-gray-600" },
+  PENDING_SELLER: { label: "Menunggu Respons", className: "bg-muted text-foreground" },
+  APPROVED: { label: "Disetujui", className: "bg-muted text-foreground" },
+  REJECTED: { label: "Ditolak", className: "bg-muted text-foreground" },
+  PLATFORM_DECIDED: { label: "Diputuskan Platform", className: "bg-muted text-foreground" },
+  IN_TRANSIT: { label: "Barang Dikirim Balik", className: "bg-muted text-foreground" },
+  RECEIVED: { label: "Diterima Gudang", className: "bg-muted text-foreground" },
+  REFUNDED: { label: "Selesai Refund", className: "bg-muted text-foreground" },
+  DISPUTED: { label: "Sengketa", className: "bg-muted text-foreground" },
+  CANCELLED: { label: "Dibatalkan", className: "bg-muted text-foreground" },
+  UNKNOWN: { label: "Status Baru", className: "bg-muted text-foreground" },
 };
 
 const TABS: { id: string; label: string }[] = [
@@ -84,10 +84,10 @@ function slaBadge(slaDueDate: string | null) {
   const diffMs = new Date(slaDueDate).getTime() - Date.now();
   const hours = diffMs / 3600000;
   if (diffMs < 0) {
-    return { label: "SLA terlewat", className: "bg-gray-900 text-white" };
+    return { label: "SLA terlewat", className: "bg-primary text-primary-foreground" };
   }
   if (hours <= 24) {
-    return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-gray-500 text-white" };
+    return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-muted-foreground text-primary-foreground" };
   }
   return null;
 }
@@ -200,8 +200,8 @@ export default function ReturnsPage() {
     <div className="p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Kelola Pengembalian</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Kelola Pengembalian</h1>
+          <p className="text-sm text-muted-foreground">
             Retur & refund Shopee dan TikTok Shop. Approve/reject dilakukan di Seller Center masing-masing
             (aksi API menyusul setelah scope aktif).
           </p>
@@ -209,7 +209,7 @@ export default function ReturnsPage() {
         <button
           onClick={sync}
           disabled={syncing}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Menyinkronkan..." : "Sinkron Retur"}
@@ -217,16 +217,16 @@ export default function ReturnsPage() {
       </div>
 
       {syncMessage && (
-        <div className="mb-4 rounded-lg bg-gray-50 px-4 py-2 text-sm text-gray-900">{syncMessage}</div>
+        <div className="mb-4 rounded-lg bg-muted px-4 py-2 text-sm text-foreground">{syncMessage}</div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-border pb-2">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => { setTab(t.id); setPage(1); }}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              tab === t.id ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+              tab === t.id ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
             }`}
           >
             {t.label}
@@ -236,33 +236,33 @@ export default function ReturnsPage() {
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             value={q}
             onChange={(e) => { setQ(e.target.value); setPage(1); }}
             placeholder="Cari no. retur / order / SKU..."
-            className="w-72 rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-gray-900"
+            className="w-72 rounded-lg border border-border py-2 pl-9 pr-3 text-sm outline-none focus:border-primary"
           />
         </div>
         <div className="relative">
-          <Store className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Store className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <select
             value={platform}
             onChange={(e) => { setPlatform(e.target.value); setPage(1); }}
-            className="rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-gray-900"
+            className="rounded-lg border border-border py-2 pl-9 pr-3 text-sm outline-none focus:border-primary"
           >
             <option value="">Semua Platform</option>
             <option value="TIKTOK_SHOP">TikTok Shop</option>
             <option value="SHOPEE">Shopee</option>
           </select>
         </div>
-        <Filter className="ml-auto h-4 w-4 text-gray-400" />
-        <span className="text-sm text-gray-500">{total} retur</span>
+        <Filter className="ml-auto h-4 w-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">{total} retur</span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Retur</th>
               <th className="px-4 py-3">Toko</th>
@@ -273,33 +273,33 @@ export default function ReturnsPage() {
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-border">
             {loading && rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Memuat...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Memuat...</td></tr>
             )}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Belum ada data retur. Tekan &quot;Sinkron Retur&quot; untuk menarik dari platform.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Belum ada data retur. Tekan &quot;Sinkron Retur&quot; untuk menarik dari platform.</td></tr>
             )}
             {rows.map((r) => {
               const badge = STATUS_LABEL[r.status] ?? STATUS_LABEL.UNKNOWN;
               const sla = slaBadge(r.slaDueDate);
               const first = r.items[0];
               return (
-                <tr key={r.id} className="hover:bg-gray-50">
+                <tr key={r.id} className="hover:bg-muted">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{r.externalReturnId}</div>
-                    <div className="text-xs text-gray-500">Order {r.externalOrderId ?? "-"}</div>
-                    <div className="text-xs text-gray-400">{formatDate(r.firstSeenAt)}</div>
+                    <div className="font-medium text-foreground">{r.externalReturnId}</div>
+                    <div className="text-xs text-muted-foreground">Order {r.externalOrderId ?? "-"}</div>
+                    <div className="text-xs text-muted-foreground">{formatDate(r.firstSeenAt)}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-gray-900">{r.account.label}</div>
-                    <div className="text-xs text-gray-500">{PLATFORM[r.account.platform] ?? r.account.platform}</div>
+                    <div className="text-foreground">{r.account.label}</div>
+                    <div className="text-xs text-muted-foreground">{PLATFORM[r.account.platform] ?? r.account.platform}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="max-w-52 truncate text-gray-900">
+                    <div className="max-w-52 truncate text-foreground">
                       {first?.variant?.masterProduct?.name ?? first?.productName ?? "-"}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {first ? `${first.channelSku} × ${first.qty}` : "-"}
                       {r.items.length > 1 ? ` +${r.items.length - 1} lainnya` : ""}
                     </div>
@@ -309,12 +309,12 @@ export default function ReturnsPage() {
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.className}`}>
                       {badge.label}
                     </span>
-                    <div className="mt-1 text-xs text-gray-400">{r.rawStatus}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{r.rawStatus}</div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
                       {r.isPlatformAutoApproved && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-900 px-2 py-0.5 text-xs font-medium text-white">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                           <CheckCircle2 className="h-3 w-3" /> Platform-approved
                         </span>
                       )}
@@ -324,14 +324,14 @@ export default function ReturnsPage() {
                         </span>
                       )}
                       {r.items.some((it) => !it.variantId) && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-900">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                           SKU belum ter-mapping
                         </span>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => setDetail(r)} className="text-sm font-medium text-gray-900 hover:underline">
+                    <button onClick={() => setDetail(r)} className="text-sm font-medium text-foreground hover:underline">
                       Detail
                     </button>
                   </td>
@@ -347,15 +347,15 @@ export default function ReturnsPage() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 disabled:opacity-40"
+            className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40"
           >
             Sebelumnya
           </button>
-          <span className="text-gray-500">Halaman {page} / {totalPages}</span>
+          <span className="text-muted-foreground">Halaman {page} / {totalPages}</span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 disabled:opacity-40"
+            className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40"
           >
             Berikutnya
           </button>
@@ -363,58 +363,58 @@ export default function ReturnsPage() {
       )}
 
       {detail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetail(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4" onClick={() => setDetail(null)}>
           <div
-            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Retur {detail.externalReturnId}</h2>
-                <p className="text-sm text-gray-500">
+                <h2 className="text-lg font-bold text-foreground">Retur {detail.externalReturnId}</h2>
+                <p className="text-sm text-muted-foreground">
                   {detail.account.label} · {PLATFORM[detail.account.platform] ?? detail.account.platform} · Order {detail.externalOrderId ?? "-"}
                 </p>
               </div>
-              <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setDetail(null)} className="text-muted-foreground hover:text-foreground">✕</button>
             </div>
 
             <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <div className="text-gray-500">Status</div>
+                <div className="text-muted-foreground">Status</div>
                 <div className="font-medium">{(STATUS_LABEL[detail.status] ?? STATUS_LABEL.UNKNOWN).label}</div>
-                <div className="text-xs text-gray-400">raw: {detail.rawStatus}</div>
+                <div className="text-xs text-muted-foreground">raw: {detail.rawStatus}</div>
               </div>
               <div>
-                <div className="text-gray-500">Tipe</div>
+                <div className="text-muted-foreground">Tipe</div>
                 <div className="font-medium">
                   {detail.type === "REFUND_ONLY" ? "Refund Only" : detail.type === "RETURN_REFUND" ? "Retur & Refund" : "-"}
                   {detail.requestType ? ` · ${detail.requestType}` : ""}
                 </div>
               </div>
               <div>
-                <div className="text-gray-500">Alasan</div>
+                <div className="text-muted-foreground">Alasan</div>
                 <div className="font-medium">{detail.reason ?? "-"}</div>
-                <div className="text-xs text-gray-400">{detail.reasonText ?? ""}</div>
+                <div className="text-xs text-muted-foreground">{detail.reasonText ?? ""}</div>
               </div>
               <div>
-                <div className="text-gray-500">Jumlah Refund</div>
+                <div className="text-muted-foreground">Jumlah Refund</div>
                 <div className="font-medium">{formatPrice(detail.refundAmount)} {detail.currency ?? ""}</div>
               </div>
               <div>
-                <div className="text-gray-500">SLA Respons</div>
+                <div className="text-muted-foreground">SLA Respons</div>
                 <div className="inline-flex items-center gap-1 font-medium">
-                  <Clock className="h-4 w-4 text-gray-400" /> {formatDate(detail.slaDueDate)}
+                  <Clock className="h-4 w-4 text-muted-foreground" /> {formatDate(detail.slaDueDate)}
                 </div>
               </div>
               <div>
-                <div className="text-gray-500">Terakhir Sinkron</div>
+                <div className="text-muted-foreground">Terakhir Sinkron</div>
                 <div className="font-medium">{formatDate(detail.lastSyncedAt)}</div>
               </div>
             </div>
 
             {evidenceImages(detail).length > 0 && (
               <div className="mb-4">
-                <div className="mb-2 text-sm font-medium text-gray-700">Bukti dari Pembeli</div>
+                <div className="mb-2 text-sm font-medium text-foreground">Bukti dari Pembeli</div>
                 <div className="flex flex-wrap gap-2">
                   {evidenceImages(detail).map((url) => (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -424,32 +424,32 @@ export default function ReturnsPage() {
               </div>
             )}
 
-            <div className="mb-2 text-sm font-medium text-gray-700">Item Retur</div>
-            <div className="divide-y divide-gray-100 rounded-xl border border-gray-200">
+            <div className="mb-2 text-sm font-medium text-foreground">Item Retur</div>
+            <div className="divide-y divide-border rounded-xl border border-border">
               {detail.items.map((it) => (
                 <div key={it.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <div className="truncate font-medium text-gray-900">
+                    <div className="truncate font-medium text-foreground">
                       {it.variant?.masterProduct?.name ?? it.productName ?? "-"}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {it.variant ? `${it.variant.sku} · varian ter-mapping` : `${it.channelSku} · SKU belum ter-mapping`} × {it.qty}
                     </div>
                   </div>
                   {it.restockedAt ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-900">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Stok ditambah {formatDate(it.restockedAt)}
                     </span>
                   ) : it.variantId ? (
                     <button
                       onClick={() => restock(it.id)}
                       disabled={restockingId === it.id}
-                      className="shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                      className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                     >
                       {restockingId === it.id ? "Memproses..." : "Terima & Tambah Stok"}
                     </button>
                   ) : (
-                    <span className="shrink-0 text-xs text-gray-400">Petakan SKU dulu di halaman Mapping</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">Petakan SKU dulu di halaman Mapping</span>
                   )}
                 </div>
               ))}

@@ -99,7 +99,7 @@ export default function StockReportPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-900">
+        <div className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground">
           {error}
         </div>
       )}

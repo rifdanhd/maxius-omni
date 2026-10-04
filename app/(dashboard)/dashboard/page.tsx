@@ -135,7 +135,7 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) {
-    return <div className="min-h-full flex items-center justify-center text-gray-500 text-sm py-20">Memuat...</div>;
+    return <div className="min-h-full flex items-center justify-center text-muted-foreground text-sm py-20">Memuat...</div>;
   }
 
   const m = analytics?.metrics;
@@ -165,18 +165,18 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm px-4 md:px-6 py-5">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+      <div className="mb-4 md:mb-6 bg-card rounded-xl border border-border shadow-sm px-4 md:px-6 py-5">
+        <h1 className="text-xl md:text-2xl font-bold text-foreground">
           {greet ? `${greet.salam}, ${greet.name ?? "Seller"}` : "Selamat datang"} 👋
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           {greet ? `${greet.date} · ` : ""}Berikut ringkasan toko Anda hari ini.
         </p>
       </div>
 
-      <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-800">Yang Perlu Dilakukan</h2>
+      <div className="mb-4 md:mb-6 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-4 border-b border-border">
+          <h2 className="text-lg font-bold text-foreground">Yang Perlu Dilakukan</h2>
         </div>
         <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ActionCard title="Pesanan Baru" value={summary.newOrders.toString()} />
@@ -186,10 +186,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="mb-4 md:mb-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-800">Kesehatan Operasional</h2>
-          <span className="text-xs text-gray-500">Stok central & sinkronisasi marketplace</span>
+      <div className="mb-4 md:mb-6 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+          <h2 className="text-lg font-bold text-foreground">Kesehatan Operasional</h2>
+          <span className="text-xs text-muted-foreground">Stok central & sinkronisasi marketplace</span>
         </div>
         <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ActionCard title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
@@ -199,11 +199,11 @@ export default function DashboardPage() {
         </div>
         {opsKpi && opsKpi.storeHealth.length > 0 && (
           <div className="px-4 md:px-6 pb-6">
-            <h3 className="text-sm font-bold text-gray-700 mb-2">Kesehatan Toko</h3>
+            <h3 className="text-sm font-bold text-foreground mb-2">Kesehatan Toko</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
-                  <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="py-2 pr-3">Toko</th>
                     <th className="px-3 py-2">Platform</th>
                     <th className="px-3 py-2 text-center">Token</th>
@@ -218,21 +218,21 @@ export default function DashboardPage() {
                     const lastActive = s.lastOrderAt ?? s.lastSyncAt;
                     const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0 || s.orphanSkus > 0;
                     return (
-                      <tr key={s.accountId} className="border-b border-gray-100 last:border-0">
-                        <td className="py-2 pr-3 font-medium text-gray-900">
-                          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-gray-500" : "bg-gray-500"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
+                      <tr key={s.accountId} className="border-b border-border last:border-0">
+                        <td className="py-2 pr-3 font-medium text-foreground">
+                          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-muted-foreground" : "bg-muted-foreground"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
                           {s.label}
                         </td>
-                        <td className="px-3 py-2 text-gray-600">{s.platform}</td>
+                        <td className="px-3 py-2 text-foreground">{s.platform}</td>
                         <td className="px-3 py-2 text-center">
-                          {s.hasToken ? <span className="text-gray-900 font-semibold">OK</span> : <span className="text-gray-900 font-semibold">Hilang</span>}
+                          {s.hasToken ? <span className="text-foreground font-semibold">OK</span> : <span className="text-foreground font-semibold">Hilang</span>}
                         </td>
-                        <td className="px-3 py-2 text-center text-gray-700">{s.errors7d}</td>
-                        <td className="px-3 py-2 text-center text-gray-700">{s.mismatch}</td>
+                        <td className="px-3 py-2 text-center text-foreground">{s.errors7d}</td>
+                        <td className="px-3 py-2 text-center text-foreground">{s.mismatch}</td>
                         <td className="px-3 py-2 text-center">
-                          {s.orphanSkus > 0 ? <a href="/products/mapping" className="font-semibold text-gray-900 hover:underline">{s.orphanSkus}</a> : <span className="text-gray-400">0</span>}
+                          {s.orphanSkus > 0 ? <a href="/products/mapping" className="font-semibold text-foreground hover:underline">{s.orphanSkus}</a> : <span className="text-muted-foreground">0</span>}
                         </td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">
+                        <td className="px-3 py-2 text-muted-foreground text-xs">
                           {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
                         </td>
                       </tr>
@@ -246,17 +246,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Section: Panduan Awal */}
-      <div className="mb-6 md:mb-8 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
+      <div className="mb-6 md:mb-8 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-muted" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Panduan Awal</h2>
-            <p className="text-sm text-gray-500 mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
+            <h2 className="text-lg font-bold text-foreground">Panduan Awal</h2>
+            <p className="text-sm text-muted-foreground mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
           </div>
-          {panduanAwalOpen ? <ChevronUp className="text-gray-400" /> : <ChevronDown className="text-gray-400" />}
+          {panduanAwalOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
         </div>
         {panduanAwalOpen && (
-          <div className="p-4 md:p-6 border-t border-gray-100">
-            <div className="bg-gray-50 text-gray-900 font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">
+          <div className="p-4 md:p-6 border-t border-border">
+            <div className="bg-muted text-foreground font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">
               {onboardingDone}/{onboardingSteps.length} Selesai
             </div>
             <div className="space-y-1">
@@ -264,25 +264,25 @@ export default function DashboardPage() {
                 <Link
                   key={s.label}
                   href={s.href}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-gray-50 group"
+                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-muted group"
                 >
                   <div className="flex items-center gap-3">
                     {s.done ? (
-                      <div className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center text-white">
+                      <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                         <Check size={12} />
                       </div>
                     ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-gray-300 border-dashed" />
+                      <div className="w-5 h-5 rounded-full border-2 border-border border-dashed" />
                     )}
-                    <span className={`text-sm ${s.done ? "text-gray-500" : "font-semibold text-gray-800"}`}>{s.label}</span>
+                    <span className={`text-sm ${s.done ? "text-muted-foreground" : "font-semibold text-foreground"}`}>{s.label}</span>
                   </div>
-                  <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-700" />
+                  <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground" />
                 </Link>
               ))}
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
+            <div className="mt-4 pt-4 border-t border-border text-sm text-foreground">
               Butuh bantuan langkah demi langkah?{" "}
-              <Link href="/education" className="font-semibold text-gray-900 hover:underline">
+              <Link href="/education" className="font-semibold text-foreground hover:underline">
                 Buka Panduan lengkap →
               </Link>
             </div>
@@ -293,33 +293,33 @@ export default function DashboardPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Analisis Bisnis</h2>
-            <p className="text-xs text-gray-500 mt-1">Pembaruan terakhir pada {new Date().toLocaleString()}</p>
+            <h2 className="text-lg font-bold text-foreground">Analisis Bisnis</h2>
+            <p className="text-xs text-muted-foreground mt-1">Pembaruan terakhir pada {new Date().toLocaleString()}</p>
           </div>
-          <button className="border border-gray-200 bg-white px-3 py-1.5 rounded-md text-sm text-gray-600 font-medium hover:bg-gray-50 flex items-center gap-2">
+          <button className="border border-border bg-card px-3 py-1.5 rounded-md text-sm text-foreground font-medium hover:bg-muted flex items-center gap-2">
             Waktu Pesanan Dibuat <ChevronDown size={14}/>
           </button>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-4 md:p-5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 text-lg font-bold text-gray-800">
-              Penjualan <Info size={14} className="text-gray-400" />
+        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          <div className="p-4 md:p-5 border-b border-border flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-lg font-bold text-foreground">
+              Penjualan <Info size={14} className="text-muted-foreground" />
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <select className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none bg-white font-medium">
+              <select className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground outline-none bg-card font-medium">
                 <option>Semua Marketplace</option>
               </select>
-              <select className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none bg-white font-medium">
+              <select className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground outline-none bg-card font-medium">
                 <option>{analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}</option>
               </select>
-              <div className="text-sm text-gray-600 font-medium flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100">
-                Perbandingan: <span className="text-gray-900">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span> <ChevronDown size={14}/>
+              <div className="text-sm text-foreground font-medium flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md border border-border">
+                Perbandingan: <span className="text-foreground">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span> <ChevronDown size={14}/>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-x divide-border">
             <MetricTab active={activeTab === 'potensi'} onClick={() => setActiveTab('potensi')} title="Potensi Penjualan" value={m ? formatRp(m.revenue.current) : "Rp0"} trend={m ? trendLabel(m.revenue.changePct) : undefined} trendUp={m ? trendUp(m.revenue.changePct) : false} subtext={`Total pesanan: ${potentialOrders}`} />
             <MetricTab active={activeTab === 'terjual'} onClick={() => setActiveTab('terjual')} title="Produk Terjual" value={m ? m.units.current.toString() : "0"} trend={m ? trendLabel(m.units.changePct) : undefined} trendUp={m ? trendUp(m.units.changePct) : false} subtext={`Rata-rata terjual harian: ${avgDailyUnits.toFixed(1)}`} />
             <MetricTab active={activeTab === 'penjualan'} onClick={() => setActiveTab('penjualan')} title="Penjualan Selesai" value={m ? formatRp(m.completedRevenue.current) : "Rp0"} trend={m ? trendLabel(m.completedRevenue.changePct) : undefined} trendUp={m ? trendUp(m.completedRevenue.changePct) : false} subtext={`Rata-rata penjualan: ${m ? formatRp(m.completedRevenue.current / 7) : "Rp0"}`} />
@@ -329,13 +329,13 @@ export default function DashboardPage() {
           <div className="p-4 md:p-6 h-[250px] md:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dx={-10} />
-                <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: 'var(--muted-foreground)', fontSize: 12}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--muted-foreground)', fontSize: 12}} dx={-10} />
+                <Tooltip labelStyle={{ color: "var(--popover-foreground)" }} itemStyle={{ color: "var(--popover-foreground)" }} contentStyle={{borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--popover)', color: 'var(--popover-foreground)', boxShadow: 'var(--chart-tooltip-shadow)'}} />
                 <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px', fontSize: '12px'}} />
-                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="#111827" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
-                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="#9ca3af" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
+                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="var(--chart-1)" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
+                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -343,25 +343,25 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-base font-bold text-gray-800 border-b border-gray-100 pb-4 mb-4">
-              Toko Teratas <Info size={14} className="text-gray-400" />
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-base font-bold text-foreground border-b border-border pb-4 mb-4">
+              Toko Teratas <Info size={14} className="text-muted-foreground" />
             </div>
             {(analytics?.topStores ?? []).length === 0 ? (
-              <p className="text-sm text-gray-500">Belum ada penjualan pada periode ini.</p>
+              <p className="text-sm text-muted-foreground">Belum ada penjualan pada periode ini.</p>
             ) : (analytics!.topStores.map((store) => (
-              <div key={store.id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3 mb-2 last:mb-0">
+              <div key={store.id} className="flex items-center justify-between border border-border rounded-lg p-3 mb-2 last:mb-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gray-100 text-gray-900 rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
-                    <span className="font-semibold text-sm text-gray-800">{store.label}</span>
+                    <div className="w-8 h-8 bg-muted text-foreground rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
+                    <span className="font-semibold text-sm text-foreground">{store.label}</span>
                   </div>
                   <div className="flex items-center gap-8">
                     <div>
-                      <p className="text-[10px] text-gray-400 mb-1">Potensi Penjualan</p>
+                      <p className="text-[10px] text-muted-foreground mb-1">Potensi Penjualan</p>
                       <p className="text-sm font-semibold">{formatRp(store.value)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-gray-400 mb-1">Produk Terjual</p>
+                      <p className="text-[10px] text-muted-foreground mb-1">Produk Terjual</p>
                       <p className="text-sm font-semibold">{store.units}</p>
                     </div>
                   </div>
@@ -369,23 +369,23 @@ export default function DashboardPage() {
             )))}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-base font-bold text-gray-800 border-b border-gray-100 pb-4 mb-4">
-              Produk Terjual Teratas <Info size={14} className="text-gray-400" />
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-base font-bold text-foreground border-b border-border pb-4 mb-4">
+              Produk Terjual Teratas <Info size={14} className="text-muted-foreground" />
             </div>
             {(analytics?.topProducts ?? []).length === 0 ? (
-              <p className="text-sm text-gray-500">Belum ada penjualan pada periode ini.</p>
+              <p className="text-sm text-muted-foreground">Belum ada penjualan pada periode ini.</p>
             ) : (analytics!.topProducts.slice(0, 3).map((product) => (
-              <div key={product.key} className="flex justify-between items-center border border-gray-100 rounded-lg p-3 mb-2 last:mb-0">
+              <div key={product.key} className="flex justify-between items-center border border-border rounded-lg p-3 mb-2 last:mb-0">
                   <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 bg-gray-200 rounded-md shrink-0"></div>
+                    <div className="w-12 h-12 bg-muted rounded-md shrink-0"></div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 leading-tight">{product.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
+                      <p className="text-sm font-semibold text-foreground leading-tight">{product.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] text-gray-400 mb-1">Kuantitas</p>
+                    <p className="text-[10px] text-muted-foreground mb-1">Kuantitas</p>
                     <p className="text-sm font-semibold">{product.qty} Pcs</p>
                   </div>
               </div>
@@ -397,19 +397,19 @@ export default function DashboardPage() {
 }
 
 function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
-  const cls = "border border-gray-200 rounded-lg p-4 bg-white flex flex-col justify-between h-[100px] hover:border-gray-500 transition-colors cursor-pointer";
+  const cls = "border border-border rounded-lg p-4 bg-card flex flex-col justify-between h-[100px] hover:border-ring transition-colors cursor-pointer";
   if (href) {
     return (
       <Link href={href} className={cls}>
-        <span className="text-sm font-semibold text-gray-800">{title}</span>
-        <span className="text-2xl font-bold text-gray-900">{value}</span>
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <span className="text-2xl font-bold text-foreground">{value}</span>
       </Link>
     );
   }
   return (
     <div className={cls}>
-      <span className="text-sm font-semibold text-gray-800">{title}</span>
-      <span className="text-2xl font-bold text-gray-900">{value}</span>
+      <span className="text-sm font-semibold text-foreground">{title}</span>
+      <span className="text-2xl font-bold text-foreground">{value}</span>
     </div>
   );
 }
@@ -426,27 +426,27 @@ function MetricTab({ active, onClick, title, value, trend, trendUp, badge, subte
 }) {
   return (
     <div 
-      className={`p-4 cursor-pointer relative ${active ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}`}
+      className={`p-4 cursor-pointer relative ${active ? 'bg-card' : 'bg-muted hover:bg-muted'}`}
       onClick={onClick}
     >
-      {active && <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-900"></div>}
-      <div className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-2">
-        {title} <Info size={12} className="text-gray-400" />
+      {active && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>}
+      <div className="flex items-center gap-1 text-sm font-semibold text-foreground mb-2">
+        {title} <Info size={12} className="text-muted-foreground" />
       </div>
       <div className="flex items-end gap-2 mb-2">
-        <span className={`text-xl font-bold ${active ? 'text-gray-900' : 'text-gray-900'}`}>{value}</span>
+        <span className={`text-xl font-bold ${active ? 'text-foreground' : 'text-foreground'}`}>{value}</span>
         {trend && (
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${trendUp ? 'bg-gray-100 text-gray-900' : 'bg-gray-100 text-gray-900'}`}>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${trendUp ? 'bg-muted text-foreground' : 'bg-muted text-foreground'}`}>
             {trend}
           </span>
         )}
         {badge && (
-          <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1">
+          <span className="text-[10px] font-bold bg-muted text-foreground px-1.5 py-0.5 rounded ml-1">
             {badge}
           </span>
         )}
       </div>
-      <p className="text-xs text-gray-500">{subtext}</p>
+      <p className="text-xs text-muted-foreground">{subtext}</p>
     </div>
   );
 }

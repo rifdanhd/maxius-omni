@@ -113,31 +113,31 @@ export default function OrderCard({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 font-sans relative">
+    <div className="bg-card rounded-xl border border-border shadow-sm mb-4 font-sans relative">
       {/* Header */}
-      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
-        <div className="flex items-center gap-4">
-          <div className="px-3 py-1 bg-gray-100 text-gray-900 text-xs font-bold rounded-md border border-gray-200">
+      <div className="px-5 py-3 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50 rounded-t-xl">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="px-3 py-1 bg-muted text-foreground text-xs font-bold rounded-md border border-border">
             {order.status}
           </div>
-          <div className="text-sm text-gray-600">
-            Nomor Pesanan: <a href="#" className="text-gray-900 font-semibold hover:underline">{order.orderId}</a>
+          <div className="text-sm text-foreground">
+            Nomor Pesanan: <a href="#" className="text-foreground font-semibold hover:underline">{order.orderId}</a>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Clock size={14} />
             {order.deadline}
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <button 
             onClick={onSync}
-            className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-foreground hover:text-foreground transition-colors"
           >
             <RefreshCw size={14} /> Sync dari Marketplace
           </button>
           
-          <div className="flex items-center gap-2 bg-black text-white px-2.5 py-1 rounded-md text-xs font-semibold shadow-xs">
+          <div className="flex items-center gap-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-xs">
              <TikTokLogo size={14} />
              <span>{order.storeName} | {order.platform}</span>
           </div>
@@ -151,100 +151,100 @@ export default function OrderCard({
             type="checkbox"
             checked={checked}
             onChange={onToggleChecked}
-            className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+            className="w-4 h-4 rounded border-border text-foreground focus:ring-ring"
           />
         </div>
         
-        <div className="grid grid-cols-12 gap-6 flex-1">
+        <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-6 flex-1">
           {/* Product details */}
-          <div className="col-span-4 flex gap-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg shrink-0 border border-gray-200 overflow-hidden">
+          <div className="col-span-1 sm:col-span-2 xl:col-span-4 min-w-0 flex gap-4">
+            <div className="w-16 h-16 bg-muted rounded-lg shrink-0 border border-border overflow-hidden">
                <img src={order.productImage || 'https://via.placeholder.com/64'} alt="product" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1">{order.productName}</h3>
-              <p className="text-xs text-gray-500 mb-2">{order.productVariant}</p>
-              <p className="text-xs font-medium text-gray-600">Qty: {order.qty} x {order.price}</p>
+              <h3 className="text-sm font-bold text-foreground leading-tight mb-1">{order.productName}</h3>
+              <p className="text-xs text-muted-foreground mb-2">{order.productVariant}</p>
+              <p className="text-xs font-medium text-foreground">Qty: {order.qty} x {order.price}</p>
             </div>
           </div>
           
           {/* Total Qty */}
-          <div className="col-span-1">
-            <p className="text-xs font-semibold text-gray-900 mb-1">Total Qty</p>
-            <p className="text-sm text-gray-700">{order.qty}</p>
+          <div className="col-span-1 min-w-0 break-words">
+            <p className="text-xs font-semibold text-foreground mb-1">Total Qty</p>
+            <p className="text-sm text-foreground">{order.qty}</p>
           </div>
           
           {/* Total Price */}
-          <div className="col-span-2">
-            <p className="text-xs font-semibold text-gray-900 mb-1">Total Harga</p>
-            <p className="text-sm font-bold text-gray-900">{order.totalPrice}</p>
-            <p className="text-[10px] text-gray-500 mt-1">{order.paymentMethod}</p>
+          <div className="col-span-1 xl:col-span-2 min-w-0 break-words">
+            <p className="text-xs font-semibold text-foreground mb-1">Total Harga</p>
+            <p className="text-sm font-bold text-foreground">{order.totalPrice}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{order.paymentMethod}</p>
           </div>
           
           {/* Address */}
-          <div className="col-span-2">
-            <p className="text-xs font-semibold text-gray-900 mb-1">Alamat</p>
-            <p className="text-xs text-gray-600 mb-1">{order.buyerName} ({order.buyerPhone})</p>
-            <p className="text-[10px] text-gray-500 line-clamp-3 leading-tight">{order.address}</p>
+          <div className="col-span-1 xl:col-span-2 min-w-0 break-words">
+            <p className="text-xs font-semibold text-foreground mb-1">Alamat</p>
+            <p className="text-xs text-foreground mb-1">{order.buyerName} ({order.buyerPhone})</p>
+            <p className="text-[10px] text-muted-foreground line-clamp-3 leading-tight">{order.address}</p>
           </div>
           
           {/* Date & Note */}
-          <div className="col-span-2">
+          <div className="col-span-1 xl:col-span-2 min-w-0 break-words">
             <div className="mb-3">
-               <p className="text-xs font-semibold text-gray-900 mb-1">Tanggal Pesanan</p>
-               <p className="text-xs text-gray-600">{order.orderDate}</p>
+               <p className="text-xs font-semibold text-foreground mb-1">Tanggal Pesanan</p>
+               <p className="text-xs text-foreground">{order.orderDate}</p>
             </div>
             <div>
-               <p className="text-xs font-semibold text-gray-900 mb-1">Catatan Penjual</p>
+               <p className="text-xs font-semibold text-foreground mb-1">Catatan Penjual</p>
                <div className="flex items-center gap-2 group cursor-pointer">
-                 <p className="text-xs text-gray-600">{order.sellerNote || '-'}</p>
-                 <Pencil size={12} className="text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                 <p className="text-xs text-foreground">{order.sellerNote || '-'}</p>
+                 <Pencil size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                </div>
             </div>
           </div>
           
           {/* Courier */}
-          <div className="col-span-1">
+          <div className="col-span-1 min-w-0 break-words">
             <div className="mb-3">
-               <p className="text-xs font-semibold text-gray-900 mb-1">Kurir</p>
-               <p className="text-xs text-gray-600">{order.courier}</p>
+               <p className="text-xs font-semibold text-foreground mb-1">Kurir</p>
+               <p className="text-xs text-foreground">{order.courier}</p>
             </div>
             <div>
-               <p className="text-xs font-semibold text-gray-900 mb-1">Nomor Resi</p>
-               <p className="text-xs text-gray-600">{order.trackingNumber}</p>
+               <p className="text-xs font-semibold text-foreground mb-1">Nomor Resi</p>
+               <p className="text-xs text-foreground">{order.trackingNumber}</p>
             </div>
           </div>
         </div>
       </div>
       
       {/* Footer Info */}
-      <div className="px-10 py-3 bg-gray-50/50 border-t border-gray-100 flex items-start gap-12">
+      <div className="px-5 sm:px-10 py-3 bg-muted/50 border-t border-border flex flex-wrap items-start gap-4 sm:gap-12">
          <div>
-            <p className="text-xs font-semibold text-gray-900 mb-1">Catatan Pembeli</p>
-            <p className="text-xs text-gray-600">{order.buyerNote || '-'}</p>
+            <p className="text-xs font-semibold text-foreground mb-1">Catatan Pembeli</p>
+            <p className="text-xs text-foreground">{order.buyerNote || '-'}</p>
          </div>
          <div>
-            <p className="text-xs font-semibold text-gray-900 mb-1">Lokasi Penjemputan</p>
-            <p className="text-xs text-gray-600">{order.pickupLocation || '-'}</p>
+            <p className="text-xs font-semibold text-foreground mb-1">Lokasi Penjemputan</p>
+            <p className="text-xs text-foreground">{order.pickupLocation || '-'}</p>
          </div>
       </div>
       
       {/* Action Bar */}
-      <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-xl flex-wrap gap-3">
+      <div className="px-5 py-3 border-t border-border flex items-center justify-between bg-card rounded-b-xl flex-wrap gap-3">
          {/* Sisi Kiri: Detail, Chat, Cetak, dan Progres Alur Kerja (seperti Desty) */}
          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={onDetail}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-md text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-md text-xs font-semibold text-foreground hover:bg-muted transition-colors"
             >
                <FileText size={14} /> Detail Pesanan
             </button>
             <button
               disabled
               title="Modul Chat belum tersedia"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 bg-gray-50/40 rounded-md text-xs font-semibold text-gray-900 cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-border bg-muted/40 rounded-md text-xs font-semibold text-foreground cursor-not-allowed"
             >
-               <MessageCircle size={14} className="text-gray-500" /> Chat Pembeli
+               <MessageCircle size={14} className="text-muted-foreground" /> Chat Pembeli
             </button>
             <PrintDropdown
                prefixIcon={<Printer size={14} />}
@@ -269,7 +269,7 @@ export default function OrderCard({
               <button
                 onClick={onShip}
                 disabled={shipping}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 rounded-md text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary rounded-md text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
               >
                 <PackageCheck size={14} />
                 {shipping ? "Mengirim..." : "Kirim Paket"}
@@ -280,7 +280,7 @@ export default function OrderCard({
               <button
                 onClick={onPickup}
                 disabled={shipping}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 rounded-md text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary rounded-md text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-xs"
               >
                 <PackageCheck size={14} />
                 {shipping ? "Memproses..." : "Atur Pengiriman"}
@@ -290,7 +290,7 @@ export default function OrderCard({
             <button
               type="button"
               onClick={handleOpenTracking}
-              className="px-5 py-1.5 bg-[#111827] hover:bg-[#000000] text-white rounded-md text-xs font-semibold transition-colors shadow-xs"
+              className="px-5 py-1.5 bg-primary hover:bg-primary text-primary-foreground rounded-md text-xs font-semibold transition-colors shadow-xs"
             >
               Lacak
             </button>
@@ -299,8 +299,8 @@ export default function OrderCard({
                <div
                   className={`px-3 py-1 text-xs font-bold rounded-md ${
                      sla.tone === "urgent"
-                        ? "bg-gray-900 text-white"
-                        : "bg-gray-400 text-gray-900"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-primary text-primary-foreground"
                   }`}
                >
                   {sla.label}

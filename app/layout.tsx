@@ -18,6 +18,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t="system";try{var s=localStorage.getItem("vite-ui-theme");if(s==="light"||s==="dark"||s==="system")t=s}catch(e){}var r=t==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):t;var h=document.documentElement;h.classList.remove("light","dark");h.classList.add(r);h.style.colorScheme=r})()`,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <ThemeProvider>
           {children}

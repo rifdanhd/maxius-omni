@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 
-export const BUNDLE_TYPE = "bundle" as const;
+const BUNDLE_TYPE = "bundle" as const;
 const SINGLE_TYPE = "single" as const;
 
 /**

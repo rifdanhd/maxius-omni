@@ -69,10 +69,10 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ];
 
 const TAB_BADGE: Record<TabId, string> = {
-  PENDING: "bg-gray-100 text-gray-900 border-gray-200",
-  IN_PROGRESS: "bg-gray-100 text-gray-900 border-gray-200",
-  COMPLETED: "bg-gray-100 text-gray-900 border-gray-200",
-  CANCELLED: "bg-gray-100 text-gray-500 border-gray-200",
+  PENDING: "bg-muted text-foreground border-border",
+  IN_PROGRESS: "bg-muted text-foreground border-border",
+  COMPLETED: "bg-muted text-foreground border-border",
+  CANCELLED: "bg-muted text-muted-foreground border-border",
 };
 
 const STATUS_BADGE: Record<string, string> = TAB_BADGE;
@@ -153,22 +153,22 @@ export default function StockOpnamePage() {
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stok Opname</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Stok Opname</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Hitung fisik ulang stok gudang & koreksi selisih dengan jejak yang jelas.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setReloadKey((k) => k + 1)}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Muat Ulang
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900"
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary"
           >
             <Plus className="h-4 w-4" />
             Buat Stok Opname
@@ -184,8 +184,8 @@ export default function StockOpnamePage() {
             onClick={() => setActiveTab(t.id)}
             className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${
               activeTab === t.id
-                ? "border-gray-300 bg-gray-50 text-gray-900"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                ? "border-border bg-muted text-foreground"
+                : "border-border bg-card text-foreground hover:bg-muted"
             }`}
           >
             {t.label}
@@ -199,25 +199,25 @@ export default function StockOpnamePage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+        <div className="mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
           {error}
         </div>
       )}
 
       {/* Daftar opname */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         {loading ? (
-          <div className="flex items-center justify-center p-10 text-gray-500">
+          <div className="flex items-center justify-center p-10 text-muted-foreground">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Memuat…
           </div>
         ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-500">
+          <div className="p-10 text-center text-sm text-muted-foreground">
             Belum ada stok opname berstatus &ldquo;{STATUS_LABEL[activeTab]}&rdquo;.
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-border bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3">Kode</th>
                 <th className="px-4 py-3">Produk</th>
                 <th className="px-4 py-3">Terhitung</th>
@@ -229,37 +229,37 @@ export default function StockOpnamePage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{r.code}</div>
+                    <div className="font-medium text-foreground">{r.code}</div>
                     {r.user?.username && (
-                      <div className="text-xs text-gray-500">oleh {r.user.username}</div>
+                      <div className="text-xs text-muted-foreground">oleh {r.user.username}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{fmt(r.totalItems)} produk</td>
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3 text-foreground">{fmt(r.totalItems)} produk</td>
+                  <td className="px-4 py-3 text-foreground">
                     {fmt(r.countedItems)}/{fmt(r.totalItems)}
                   </td>
                   <td className="px-4 py-3">
                     {r.diffItems > 0 ? (
-                      <span className="font-medium text-gray-900">{fmt(r.diffItems)} produk</span>
+                      <span className="font-medium text-foreground">{fmt(r.diffItems)} produk</span>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                        STATUS_BADGE[r.status] ?? "bg-gray-100 text-gray-500 border-gray-200"
+                        STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground border-border"
                       }`}
                     >
                       {STATUS_LABEL[r.status] ?? r.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{fmtDate(r.startedAt)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{fmtDate(r.startedAt)}</td>
                   <td className="px-4 py-3 text-right">
                     {r.status === "COMPLETED" || r.status === "CANCELLED" ? (
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-muted-foreground">
                         {r.status === "COMPLETED"
                           ? `Selesai ${fmtDate(r.finalizedAt)}`
                           : `Batal ${fmtDate(r.cancelledAt)}`}
@@ -267,7 +267,7 @@ export default function StockOpnamePage() {
                     ) : (
                       <button
                         onClick={() => setDetailId(r.id)}
-                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-900"
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary"
                       >
                         Input Hitung
                       </button>
@@ -359,11 +359,11 @@ function CreateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-gray-900">Buat Stok Opname</h2>
-          <p className="mt-0.5 text-sm text-gray-500">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="border-b border-border px-6 py-4">
+          <h2 className="text-lg font-bold text-foreground">Buat Stok Opname</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Stok sistem akan di-SNAPSHOT saat opname dibuat — selisih dihitung terhadap snapshot ini.
           </p>
         </div>
@@ -373,16 +373,16 @@ function CreateModal({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Cari produk / SKU…"
-            className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="mb-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-ring focus:outline-none"
           />
           {loading ? (
-            <div className="flex items-center justify-center p-6 text-gray-500">
+            <div className="flex items-center justify-center p-6 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat…
             </div>
           ) : variants.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-500">Tidak ada produk cocok.</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">Tidak ada produk cocok.</div>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-border">
               {variants.map((v) => {
                 const isSel = selected.has(v.id);
                 return (
@@ -392,17 +392,17 @@ function CreateModal({
                         type="checkbox"
                         checked={isSel}
                         onChange={() => toggle(v)}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-4 w-4 rounded border-border"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium text-gray-900">
+                        <div className="truncate font-medium text-foreground">
                           {v.masterProduct.name}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           {v.name || v.sku} · SKU {v.sku}
                         </div>
                       </div>
-                      <div className="text-sm text-gray-700">Stok: {fmt(v.stock)}</div>
+                      <div className="text-sm text-foreground">Stok: {fmt(v.stock)}</div>
                     </label>
                   </li>
                 );
@@ -411,37 +411,37 @@ function CreateModal({
           )}
 
           <label className="mt-4 block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
+            <span className="mb-1 block text-sm font-medium text-foreground">
               Catatan (opsional)
             </span>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Mis. hitung fisik gudang utama"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-ring focus:outline-none"
             />
           </label>
 
           {error && (
-            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900">
+            <div className="mt-3 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
               {error}
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
-          <span className="text-sm text-gray-600">{selected.size} produk dipilih</span>
+        <div className="flex items-center justify-between flex-wrap gap-3 border-t border-border px-6 py-4">
+          <span className="text-sm text-foreground">{selected.size} produk dipilih</span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               Batal
             </button>
             <button
               onClick={submit}
               disabled={submitting || selected.size === 0}
-              className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Buat Opname
@@ -571,22 +571,22 @@ function CountModal({
   const closed = opname?.status === "COMPLETED" || opname?.status === "CANCELLED";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="border-b border-gray-200 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-foreground">
                 Input Hitung Fisik — {opname?.code ?? "…"}
               </h2>
-              <p className="mt-0.5 text-sm text-gray-500">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 Isi kolom &ldquo;Hasil Hitung&rdquo; dengan angka hasil hitung fisik di gudang.
                 Selisih dihitung otomatis terhadap snapshot stok sistem.
               </p>
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <XCircle className="h-5 w-5" />
             </button>
@@ -595,8 +595,8 @@ function CountModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {result && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" />
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
               <div>
                 <div className="font-semibold">Opname selesai.</div>
                 <div>
@@ -609,20 +609,20 @@ function CountModal({
           )}
 
           {error && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-gray-900" />
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
               <div>{error}</div>
             </div>
           )}
 
           {!opname ? (
-            <div className="flex items-center justify-center p-10 text-gray-500">
+            <div className="flex items-center justify-center p-10 text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Memuat…
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="py-2 pr-3">Produk</th>
                   <th className="px-3 py-2 text-right">Stok Sistem</th>
                   <th className="px-3 py-2 text-right">Hasil Hitung</th>
@@ -635,19 +635,19 @@ function CountModal({
                   const n = raw === "" ? null : Number(raw);
                   const diff = n === null || Number.isNaN(n) ? null : n - i.systemStock;
                   return (
-                    <tr key={i.id} className="border-b border-gray-100 last:border-0">
+                    <tr key={i.id} className="border-b border-border last:border-0">
                       <td className="py-2.5 pr-3">
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-foreground">
                           {i.variant.name || i.variant.sku}
                         </div>
-                        <div className="text-xs text-gray-500">SKU {i.variant.sku}</div>
+                        <div className="text-xs text-muted-foreground">SKU {i.variant.sku}</div>
                       </td>
-                      <td className="px-3 py-2.5 text-right text-gray-700">
+                      <td className="px-3 py-2.5 text-right text-foreground">
                         {fmt(i.systemStock)}
                       </td>
                       <td className="px-3 py-2.5 text-right">
                         {closed ? (
-                          <span className="text-gray-700">{fmt(i.countedStock ?? 0)}</span>
+                          <span className="text-foreground">{fmt(i.countedStock ?? 0)}</span>
                         ) : (
                           <input
                             type="number"
@@ -655,19 +655,19 @@ function CountModal({
                             value={raw}
                             onChange={(e) => setCount(i.variantId, e.target.value)}
                             placeholder="—"
-                            className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm focus:border-gray-500 focus:outline-none"
+                            className="w-24 rounded-lg border border-border px-2 py-1.5 text-right text-sm focus:border-ring focus:outline-none"
                           />
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-right">
                         {diff === null ? (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-muted-foreground">—</span>
                         ) : diff === 0 ? (
-                          <span className="text-gray-900">Cocok</span>
+                          <span className="text-foreground">Cocok</span>
                         ) : diff > 0 ? (
-                          <span className="font-medium text-gray-900">+{fmt(diff)}</span>
+                          <span className="font-medium text-foreground">+{fmt(diff)}</span>
                         ) : (
-                          <span className="font-medium text-gray-900">−{fmt(-diff)}</span>
+                          <span className="font-medium text-foreground">−{fmt(-diff)}</span>
                         )}
                       </td>
                     </tr>
@@ -679,18 +679,18 @@ function CountModal({
         </div>
 
         {!closed && opname && (
-          <div className="border-t border-gray-200 px-6 py-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
+          <div className="border-t border-border px-6 py-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-foreground">
               <span>
                 Terhitung {fmt(stats.counted)}/{fmt(stats.total)} produk
                 {stats.diff > 0 && (
-                  <span className="ml-2 font-medium text-gray-900">
+                  <span className="ml-2 font-medium text-foreground">
                     · {fmt(stats.diff)} selisih
                   </span>
                 )}
               </span>
               {!allCounted && (
-                <span className="text-xs text-gray-900">
+                <span className="text-xs text-foreground">
                   Semua produk harus terhitung sebelum bisa difinalisasi.
                 </span>
               )}
@@ -699,7 +699,7 @@ function CountModal({
               <button
                 onClick={cancel}
                 disabled={cancelling || saving || finalizing}
-                className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
               >
                 {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                 Batalkan Opname
@@ -708,7 +708,7 @@ function CountModal({
                 <button
                   onClick={save}
                   disabled={saving || finalizing || counts.size === 0}
-                  className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
                   Simpan Hitungan
@@ -717,7 +717,7 @@ function CountModal({
                   onClick={finalize}
                   disabled={finalizing || saving || !allCounted}
                   title={allCounted ? "" : "Lengkapi semua hasil hitung dulu"}
-                  className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
                 >
                   {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
                   Finalisasi & Koreksi Stok

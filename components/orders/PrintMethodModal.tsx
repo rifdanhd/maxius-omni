@@ -70,22 +70,22 @@ export default function PrintMethodModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-card rounded-2xl max-w-lg w-full shadow-2xl border border-border overflow-y-auto flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gray-50 text-gray-900 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-muted text-foreground flex items-center justify-center">
               <Printer size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900 leading-tight">Metode Cetak</h2>
-              <p className="text-xs text-gray-500">{orderIds.length > 1 ? `${orderIds.length} paket siap dicetak` : "1 paket siap dicetak"}</p>
+              <h2 className="text-base font-bold text-foreground leading-tight">Metode Cetak</h2>
+              <p className="text-xs text-muted-foreground">{orderIds.length > 1 ? `${orderIds.length} paket siap dicetak` : "1 paket siap dicetak"}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X size={18} />
           </button>
@@ -95,8 +95,8 @@ export default function PrintMethodModal({
         <div className="p-6 overflow-y-auto space-y-5">
           {/* Opsi ukuran/kondisi print */}
           <div>
-            <p className="text-xs font-bold text-gray-900 mb-2">Ukuran Label Pengiriman</p>
-            <label className={`flex items-start gap-3 border rounded-xl p-4 cursor-pointer transition-colors ${method === "label" ? "border-gray-900 bg-gray-50/50 ring-2 ring-gray-500/15" : "border-gray-200 hover:bg-gray-50"}`}>
+            <p className="text-xs font-bold text-foreground mb-2">Ukuran Label Pengiriman</p>
+            <label className={`flex items-start gap-3 border rounded-xl p-4 cursor-pointer transition-colors ${method === "label" ? "border-primary bg-muted/50 ring-2 ring-ring/15" : "border-border hover:bg-muted"}`}>
               <input
                 type="radio"
                 checked={method === "label"}
@@ -105,10 +105,10 @@ export default function PrintMethodModal({
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <FileText size={15} className="text-gray-900" />
-                  <p className="text-sm font-semibold text-gray-900">1 Label (Ukuran A6)</p>
+                  <FileText size={15} className="text-foreground" />
+                  <p className="text-sm font-semibold text-foreground">1 Label (Ukuran A6)</p>
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
                   {isTikTok
                     ? "Label kurir resmi TikTok di bagian atas + tabel ringkasan produk (nama, varian, seller SKU, qty) yang dibuat dari data pesanan di bagian bawah."
                     : "Tabel ringkasan produk (nama, varian, seller SKU, qty) dari data pesanan. Label resmi TikTok tidak berlaku untuk order ini — cetak label via Seller Center."}
@@ -118,7 +118,7 @@ export default function PrintMethodModal({
           </div>
 
           {/* Opsi Picking List */}
-          <label className="flex items-start gap-3 border border-gray-200 rounded-xl p-4 cursor-pointer hover:bg-gray-50">
+          <label className="flex items-start gap-3 border border-border rounded-xl p-4 cursor-pointer hover:bg-muted">
             <input
               type="checkbox"
               checked={includePickingList}
@@ -127,17 +127,17 @@ export default function PrintMethodModal({
             />
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <Layers size={15} className="text-gray-500" />
-                <p className="text-sm font-semibold text-gray-800">Unduh dengan Picking List</p>
+                <Layers size={15} className="text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">Unduh dengan Picking List</p>
               </div>
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Sertakan halaman Picking List per pesanan (daftar barang untuk gudang, per SKU & qty).
               </p>
             </div>
           </label>
 
           {error && (
-            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-900 flex items-start gap-2">
+            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               {error}
             </div>
@@ -145,18 +145,18 @@ export default function PrintMethodModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+        <div className="px-6 py-3.5 bg-muted border-t border-border flex items-center justify-end gap-2.5">
           <button
             onClick={onClose}
             disabled={printing}
-            className="px-4 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
           >
             Batal
           </button>
           <button
             onClick={handlePrint}
             disabled={printing}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-xs"
           >
             {printing ? (
               <>

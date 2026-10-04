@@ -41,10 +41,10 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
 ];
 
 const STATUS_BADGE: Record<string, string> = {
-  FAILED: "bg-gray-100 text-gray-900 border-gray-200",
-  PENDING: "bg-gray-100 text-gray-900 border-gray-200",
-  PROCESSING: "bg-gray-100 text-gray-900 border-gray-200",
-  SUCCESS: "bg-gray-100 text-gray-900 border-gray-200",
+  FAILED: "bg-muted text-foreground border-border",
+  PENDING: "bg-muted text-foreground border-border",
+  PROCESSING: "bg-muted text-foreground border-border",
+  SUCCESS: "bg-muted text-foreground border-border",
 };
 
 const fmt = (n: number) => n.toLocaleString("id-ID");
@@ -168,15 +168,15 @@ export default function SyncMismatchPage() {
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stok Mismatch</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Stok Mismatch</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Push stok ke marketplace yang gagal (FAILED) atau sudah retry tapi masih pending.
             Stok central tidak pernah berubah karena kegagalan ini — yang perlu retry hanya baris di sini.
           </p>
         </div>
         <button
           onClick={() => setReloadKey((k) => k + 1)}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Muat Ulang
@@ -190,20 +190,20 @@ export default function SyncMismatchPage() {
             onClick={() => setFilter(f.id)}
             className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
               filter === f.id
-                ? "border-gray-300 bg-gray-50 text-gray-900"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                ? "border-border bg-muted text-foreground"
+                : "border-border bg-card text-foreground hover:bg-muted"
             }`}
           >
             {f.label}
           </button>
         ))}
         <div className="relative ml-auto w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}
             placeholder="Cari produk / SKU / channelSku…"
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none"
           />
         </div>
       </div>
@@ -212,8 +212,8 @@ export default function SyncMismatchPage() {
         <div
           className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
             notice.kind === "ok"
-              ? "border-gray-200 bg-gray-50 text-gray-900"
-              : "border-gray-200 bg-gray-50 text-gray-900"
+              ? "border-border bg-muted text-foreground"
+              : "border-border bg-muted text-foreground"
           }`}
         >
           {notice.text}
@@ -221,25 +221,25 @@ export default function SyncMismatchPage() {
       )}
 
       {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
         {loading ? (
-          <div className="flex items-center justify-center p-10 text-gray-500">
+          <div className="flex items-center justify-center p-10 text-muted-foreground">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Memuat…
           </div>
         ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-500">
+          <div className="p-10 text-center text-sm text-muted-foreground">
             Tidak ada job pada filter ini. {filter === "mismatch" && "Semua push stok tersalurkan — tidak ada mismatch."}
           </div>
         ) : (
           <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-border bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3">Produk / Varian</th>
                 <th className="px-4 py-3">Channel SKU</th>
                 <th className="px-4 py-3">Akun / Marketplace</th>
@@ -253,44 +253,44 @@ export default function SyncMismatchPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{r.variant.productName}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="font-medium text-foreground">{r.variant.productName}</div>
+                    <div className="text-xs text-muted-foreground">
                       {r.variant.name || r.variant.sku} · SKU {r.variant.sku}
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-700">{r.channelSku}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-foreground">{r.channelSku}</td>
                   <td className="px-4 py-3">
-                    <div className="text-gray-700">{r.account.label}</div>
-                    <div className="text-xs text-gray-500">{r.account.platform}</div>
+                    <div className="text-foreground">{r.account.label}</div>
+                    <div className="text-xs text-muted-foreground">{r.account.platform}</div>
                   </td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-900">
+                  <td className="px-4 py-3 text-right font-medium text-foreground">
                     {fmt(r.variant.centralStock)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="font-medium text-gray-900">{fmt(r.newSellable)}</span>
+                    <span className="font-medium text-foreground">{fmt(r.newSellable)}</span>
                     {r.diffVsCentral !== 0 && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         selisih {r.diffVsCentral > 0 ? "+" : "−"}{fmt(Math.abs(r.diffVsCentral))} vs central
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-700">
+                  <td className="px-4 py-3 text-center text-foreground">
                     {r.retryCount}/{r.maxRetries}
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
-                    <div className="truncate text-xs text-gray-900" title={r.lastError ?? ""}>
+                    <div className="truncate text-xs text-foreground" title={r.lastError ?? ""}>
                       {r.lastError ?? "—"}
                     </div>
                     {r.status === "PENDING" && r.nextRetryAt && (
-                      <div className="text-xs text-gray-500">retry otomatis {fmtDate(r.nextRetryAt)}</div>
+                      <div className="text-xs text-muted-foreground">retry otomatis {fmtDate(r.nextRetryAt)}</div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                     <span
                       className={`mb-1 inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                        STATUS_BADGE[r.status] ?? "bg-gray-100 text-gray-500 border-gray-200"
+                        STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground border-border"
                       }`}
                     >
                       {r.status}
@@ -302,12 +302,12 @@ export default function SyncMismatchPage() {
                       <button
                         onClick={() => retryJob(r.id)}
                         disabled={retrying.has(r.id)}
-                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
                       >
                         {retrying.has(r.id) ? "Retrying…" : "Retry"}
                       </button>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
                 </tr>
@@ -322,7 +322,7 @@ export default function SyncMismatchPage() {
           <button
             onClick={loadMore}
             disabled={loadingMore}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
             {loadingMore ? "Memuat…" : "Muat Lebih Banyak"}
           </button>

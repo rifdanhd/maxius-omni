@@ -124,26 +124,26 @@ export default function TrackingModal({
   const timeline = getTimeline();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-card rounded-2xl max-w-lg w-full shadow-2xl border border-border overflow-y-auto flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gray-50 text-gray-900 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-muted text-foreground flex items-center justify-center">
               <Truck size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900 leading-tight">
+              <h2 className="text-base font-bold text-foreground leading-tight">
                 Lacak Pengiriman
               </h2>
-              <p className="text-xs text-gray-500">
-                No. Pesanan: <span className="font-semibold text-gray-700">{order.orderId}</span>
+              <p className="text-xs text-muted-foreground">
+                No. Pesanan: <span className="font-semibold text-foreground">{order.orderId}</span>
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X size={18} />
           </button>
@@ -152,36 +152,36 @@ export default function TrackingModal({
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-5">
           {/* Tracking Info Card */}
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200/80">
+          <div className="bg-muted rounded-xl p-4 border border-border/80">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                   Kurir & Layanan
                 </p>
-                <p className="text-sm font-bold text-gray-900">
+                <p className="text-sm font-bold text-foreground">
                   {order.courier && order.courier !== "-" ? order.courier : "Kurir Belum Ditentukan"}
                 </p>
               </div>
 
               <div className="text-right">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                   Nomor Resi
                 </p>
                 {hasTracking ? (
                   <div className="flex items-center gap-1.5 justify-end">
-                    <span className="font-mono text-sm font-bold text-gray-900">
+                    <span className="font-mono text-sm font-bold text-foreground">
                       {order.trackingNumber}
                     </span>
                     <button
                       onClick={handleCopy}
                       title="Salin Resi"
-                      className="p-1 hover:bg-gray-50 rounded text-gray-500 hover:text-gray-900 transition-colors"
+                      className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      {copied ? <Check size={14} className="text-gray-900" /> : <Copy size={14} />}
+                      {copied ? <Check size={14} className="text-foreground" /> : <Copy size={14} />}
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-900 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded font-medium">
+                  <span className="text-xs text-foreground bg-muted border border-border px-2 py-0.5 rounded font-medium">
                     Belum Diterbitkan
                   </span>
                 )}
@@ -189,33 +189,33 @@ export default function TrackingModal({
             </div>
 
             {order.pickupLocation && (
-              <div className="mt-3 pt-3 border-t border-gray-200/60 flex items-center gap-1.5 text-xs text-gray-500">
-                <MapPin size={13} className="shrink-0 text-gray-400" />
-                <span>Lokasi Gudang: <span className="font-medium text-gray-700">{order.pickupLocation}</span></span>
+              <div className="mt-3 pt-3 border-t border-border/60 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin size={13} className="shrink-0 text-muted-foreground" />
+                <span>Lokasi Gudang: <span className="font-medium text-foreground">{order.pickupLocation}</span></span>
               </div>
             )}
           </div>
 
           {/* Timeline Tracking */}
           <div>
-            <p className="text-xs font-bold text-gray-900 mb-3 flex items-center gap-1.5">
-              <Clock size={14} className="text-gray-900" />
+            <p className="text-xs font-bold text-foreground mb-3 flex items-center gap-1.5">
+              <Clock size={14} className="text-foreground" />
               Status & Riwayat Pengiriman
             </p>
 
             {hasRealEvents ? (
-              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-muted">
                 {trackingEvents!.map((ev, idx) => {
                   const label = eventLabel(ev);
                   const translated = label !== ev.description;
                   return (
                     <div key={`${ev.eventTime}-${idx}`} className="relative">
-                      <div className="absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 bg-gray-500 border-white text-white shadow-xs">
+                      <div className="absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 bg-muted-foreground border-border text-primary-foreground shadow-xs">
                         <Check size={10} strokeWidth={3} />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-gray-900">{label}</p>
-                        <p className="text-[11px] leading-tight mt-0.5 text-gray-500">
+                        <p className="text-xs font-semibold text-foreground">{label}</p>
+                        <p className="text-[11px] leading-tight mt-0.5 text-muted-foreground">
                           {formatEventTime(ev.eventTime)}
                           {translated ? ` — ${ev.description}` : ""}
                           {ev.actionCode !== null ? ` · kode ${ev.actionCode}` : ""}
@@ -226,17 +226,17 @@ export default function TrackingModal({
                 })}
               </div>
             ) : (
-              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-muted">
                 {loading && (
-                  <p className="text-[11px] italic text-gray-400">Memuat riwayat tracking…</p>
+                  <p className="text-[11px] italic text-muted-foreground">Memuat riwayat tracking…</p>
                 )}
                 {timeline.map((step, idx) => (
                   <div key={idx} className="relative">
                     <div
                       className={`absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${
                         step.done
-                          ? "bg-gray-500 border-white text-white shadow-xs"
-                          : "bg-white border-gray-300 text-gray-400"
+                          ? "bg-muted-foreground border-border text-primary-foreground shadow-xs"
+                          : "bg-card border-border text-muted-foreground"
                       }`}
                     >
                       {step.done ? <Check size={10} strokeWidth={3} /> : idx + 1}
@@ -244,14 +244,14 @@ export default function TrackingModal({
                     <div>
                       <p
                         className={`text-xs font-semibold ${
-                          step.done ? "text-gray-900" : "text-gray-400"
+                          step.done ? "text-foreground" : "text-muted-foreground"
                         }`}
                       >
                         {step.title}
                       </p>
                       <p
                         className={`text-[11px] leading-tight mt-0.5 ${
-                          step.done ? "text-gray-500" : "text-gray-400"
+                          step.done ? "text-muted-foreground" : "text-muted-foreground"
                         }`}
                       >
                         {step.desc}
@@ -265,24 +265,24 @@ export default function TrackingModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-3.5 bg-muted border-t border-border flex items-center justify-between flex-wrap gap-3">
           {hasTracking ? (
             <a
               href={`https://cekresi.com/?noresi=${encodeURIComponent(order.trackingNumber)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-semibold text-gray-900 hover:text-gray-900 flex items-center gap-1.5 hover:underline"
+              className="text-xs font-semibold text-foreground hover:text-foreground flex items-center gap-1.5 hover:underline"
             >
               <span>Cek di Web Kurir</span>
               <ExternalLink size={13} />
             </a>
           ) : (
-            <span className="text-[11px] text-gray-400">Resi otomatis update saat paket di-ship</span>
+            <span className="text-[11px] text-muted-foreground">Resi otomatis update saat paket di-ship</span>
           )}
 
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            className="px-4 py-1.5 bg-card border border-border rounded-lg text-xs font-semibold text-foreground hover:bg-muted transition-colors"
           >
             Tutup
           </button>

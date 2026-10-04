@@ -18,10 +18,11 @@
 #   2 swap  (RAM 1.9GB — swap DIBUAT SEBELUM build agar build tidak OOM)
 #   3 fetch → tolak bila ada commit lokal belum di-push → pull --ff-only
 #   4 npm ci → 5 pg_dump backup DB → 6 prisma migrate deploy
-#   7 npm run build → 8 systemctl restart maxius-omni
+#   7 backup .next → build --webpack → 8 systemctl restart maxius-omni
 #   9 health check 127.0.0.1:3000 → 10 verifikasi log [SyncRetry]
 #
-# Rollback: git checkout <sha-lama> && ./deploy.sh   (lihat docs/RUNBOOK-DEPLOY.md)
+# Rollback build: hentikan service, pindahkan .next baru, salin .next.bak
+# ke .next, lalu hidupkan service. Tidak perlu menjalankan deploy/build lagi.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -202,10 +203,38 @@ fi
 
 # ── 7. Build ─────────────────────────────────────────────────────────────────
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
+  [ ! -L .next ] && [ ! -L .next.bak ] || die ".next/.next.bak tidak boleh berupa symlink"
+  build_backup_created=0
+  build_backup_tag="$(date +%Y%m%d-%H%M%S)-$$"
+  if [ -s .next/BUILD_ID ]; then
+    build_backup_tmp=".next.bak.tmp.${build_backup_tag}"
+    [ ! -e "$build_backup_tmp" ] || die "direktori backup sementara sudah ada"
+    log "salin build lama ke .next.bak sebelum build baru"
+    cp -a -- .next "$build_backup_tmp"
+    if [ -e .next.bak ]; then
+      [ ! -e ".next.bak.${build_backup_tag}" ] || die "arsip backup sudah ada"
+      mv -- .next.bak ".next.bak.${build_backup_tag}"
+    fi
+    mv -- "$build_backup_tmp" .next.bak
+    build_backup_created=1
+  else
+    log "Tidak ada build produksi lama (BUILD_ID); backup dilewati"
+  fi
   export NEXT_TELEMETRY_DISABLED=1
   export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
-  log "npm run build  (NODE_OPTIONS=${NODE_OPTIONS})"
-  npm run build
+  log "NEXT_PUBLIC_ENABLE_OFFICE=false npm run build -- --webpack  (NODE_OPTIONS=${NODE_OPTIONS})"
+  if NEXT_PUBLIC_ENABLE_OFFICE=false npm run build -- --webpack; then
+    :
+  else
+    if [ "$build_backup_created" = "1" ]; then
+      if [ -e .next ]; then
+        mv -- .next ".next.failed.${build_backup_tag}"
+      fi
+      cp -a -- .next.bak .next
+      log "Build gagal; .next lama dipulihkan, .next.bak tetap tersedia"
+    fi
+    die "build gagal — service tidak direstart"
+  fi
 else
   log "SKIP_BUILD=1 — build dilewati"
 fi

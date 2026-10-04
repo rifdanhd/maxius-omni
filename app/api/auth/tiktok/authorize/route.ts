@@ -7,6 +7,7 @@ import {
 import { verifySessionCookie } from "@/lib/services/auth.service";
 import { getUserBusinessIds } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
+import { TIKTOK_OAUTH_CRED_COOKIE } from "@/lib/utils/oauth-cookies";
 
 // Region ID (pasca-merger TikTok Shop–Tokopedia) memakai domain seller
 // Tokopedia — isi TIKTOK_AUTHORIZE_URL dengan "Copy authorization link"
@@ -14,8 +15,6 @@ import { appOrigin } from "@/lib/utils/request-origin";
 // Default: format resmi service_id (services.tiktokshop.com/open/authorize).
 // Fallback lama app_key+redirect_uri sudah tidak terdokumentasi → tidak dipakai.
 const TIKTOK_AUTHORIZE_DEFAULT = "https://services.tiktokshop.com/open/authorize";
-
-export const TIKTOK_OAUTH_CRED_COOKIE = "tiktok_oauth_cred";
 
 export async function GET(req: NextRequest) {
   // Sesi login wajib: brand yg diikatkan ke akun baru harus milik user yang

@@ -133,12 +133,12 @@ export default function StoreIntegration() {
 
   const statusMeta = (store: StoreItem) =>
     store.isFrozen
-      ? { dot: "bg-gray-400", text: "Dibekukan" }
+      ? { dot: "bg-muted-foreground", text: "Dibekukan" }
       : store.status === "connected"
-        ? { dot: "bg-gray-500", text: "Terhubung" }
+        ? { dot: "bg-muted-foreground", text: "Terhubung" }
         : store.status === "expired"
-          ? { dot: "bg-gray-500", text: "Token kedaluwarsa" }
-          : { dot: "bg-gray-500", text: "Terputus" };
+          ? { dot: "bg-muted-foreground", text: "Token kedaluwarsa" }
+          : { dot: "bg-muted-foreground", text: "Terputus" };
 
   const platformLabel = (platform?: string) =>
     platform === "SHOPEE" ? "Shopee" : platform === "TIKTOK_SHOP" ? "TikTok Shop" : (platform ?? "—");
@@ -148,36 +148,36 @@ export default function StoreIntegration() {
       {notice && (
         <div
           className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
-            notice.ok ? "bg-gray-50 text-gray-900 border border-gray-200" : "bg-gray-50 text-gray-900 border border-gray-200"
+            notice.ok ? "bg-muted text-foreground border border-border" : "bg-muted text-foreground border border-border"
           }`}
         >
           {notice.text}
         </div>
       )}
       {/* Header Section */}
-      <div className="flex items-start justify-between mb-8 p-6 bg-gray-50 border border-gray-100 rounded-xl">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-            <MonitorPlay className="text-gray-900" size={24} />
+      <div className="flex flex-col lg:flex-row items-start justify-between gap-4 mb-8 p-6 bg-muted border border-border rounded-xl">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center shrink-0">
+            <MonitorPlay className="text-foreground" size={24} />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Tambahkan Semua Toko Marketplace kamu</h2>
-            <p className="text-sm text-gray-500 mt-1">Setelah terhubung, semua produk kamu akan diunduh secara otomatis</p>
+            <h2 className="text-lg font-bold text-foreground">Tambahkan Semua Toko Marketplace kamu</h2>
+            <p className="text-sm text-muted-foreground mt-1">Setelah terhubung, semua produk kamu akan diunduh secara otomatis</p>
           </div>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-[#111827] hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
+          className="bg-primary hover:bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
         >
           Tambahkan Marketplace
         </button>
       </div>
 
       {/* Table Section */}
-      <div className="flex-1 overflow-x-auto border border-gray-200 rounded-xl">
+      <div className="flex-1 overflow-x-auto border border-border rounded-xl">
         <table className="w-full text-left min-w-[800px] border-collapse">
           <thead>
-              <tr className="bg-[#f3f4f6] text-gray-600 text-xs uppercase border-b border-gray-200">
+              <tr className="bg-muted text-foreground text-xs uppercase border-b border-border">
                 <th className="px-6 py-4 font-semibold w-[25%]">Nama Toko</th>
                 <th className="px-6 py-4 font-semibold w-[20%]">Platform</th>
                 <th className="px-6 py-4 font-semibold w-[20%]">Status</th>
@@ -188,31 +188,31 @@ export default function StoreIntegration() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">Memuat...</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">Memuat...</td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-900">{loadError}</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-foreground">{loadError}</td>
                 </tr>
               ) : stores.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">Belum ada toko terhubung.</td>
+                <td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">Belum ada toko terhubung.</td>
               </tr>
             ) : (
               stores.map((store) => (
-                <tr key={store.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <tr key={store.id} className="border-b border-border hover:bg-muted transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center text-gray-900 shrink-0">
+                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-foreground shrink-0">
                         <ShoppingBag size={16} />
                       </div>
-                      <span className="text-sm font-semibold text-gray-800">{store.name}</span>
+                      <span className="text-sm font-semibold text-foreground">{store.name}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">{store.platform ? platformLabel(store.platform) : "—"}</span>
+                    <span className="text-sm text-foreground">{store.platform ? platformLabel(store.platform) : "—"}</span>
                     {store.scope && (
-                      <div className="text-xs text-gray-400 truncate max-w-[200px]" title={store.scope}>
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={store.scope}>
                         {store.scope.split(",").length} scope
                       </div>
                     )}
@@ -220,16 +220,16 @@ export default function StoreIntegration() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
                       <div className={`w-2 h-2 rounded-full ${statusMeta(store).dot}`}></div>
-                      <span className="text-sm text-gray-600" title={store.isFrozen ? (store.frozenReason ?? "Dibekukan admin") : undefined}>
+                      <span className="text-sm text-foreground" title={store.isFrozen ? (store.frozenReason ?? "Dibekukan admin") : undefined}>
                         {statusMeta(store).text}
                       </span>
                     </div>
                     {store.businessName && (
-                      <div className="text-xs text-gray-400 mt-0.5">{store.businessName}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{store.businessName}</div>
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-foreground">
                       {store.lastSyncAt ? new Date(store.lastSyncAt).toLocaleString("id-ID") : "-"}
                     </span>
                   </td>
@@ -243,7 +243,7 @@ export default function StoreIntegration() {
                               `${store.authorizePath!}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
                             );
                           }}
-                          className="text-xs font-semibold text-white bg-[#111827] hover:bg-gray-900 px-3 py-1.5 rounded transition-colors"
+                          className="text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary px-3 py-1.5 rounded transition-colors"
                           title="Hubungkan ulang via OAuth"
                         >
                           Hubungkan ulang
@@ -251,14 +251,14 @@ export default function StoreIntegration() {
                       )}
                       <button 
                         onClick={() => handleSync(store.id)}
-                        className="text-[#111827] hover:bg-gray-50 p-1.5 rounded transition-colors"
+                        className="text-foreground hover:bg-muted p-1.5 rounded transition-colors"
                         title="Sync"
                       >
                         <RefreshCw size={16} />
                       </button>
                       <button 
                         onClick={() => handleDelete(store.id, store.name)}
-                        className="text-[#111827] hover:bg-gray-50 hover:text-gray-900 p-1.5 rounded transition-colors"
+                        className="text-foreground hover:bg-muted hover:text-foreground p-1.5 rounded transition-colors"
                         title="Hapus"
                       >
                         <Trash2 size={16} />
