@@ -737,7 +737,7 @@ export default function OrdersPage() {
     const targets = orders.filter((o) => selected.has(o.id));
     if (targets.length === 0) return;
     if (type === "Label") {
-      // Label resmi digabung jadi 1 PDF multi-halaman di server (sudah bertempel varian produk).
+      // Label asli digabung jadi 1 PDF multi-halaman di server.
       // Order non-TikTok dicetak label lokal dari data pesanan.
       const tt = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
       const local = targets.filter((o) => o.account?.platform !== "TIKTOK_SHOP");
@@ -750,7 +750,6 @@ export default function OrdersPage() {
 
   const printOrder = async (order: Order, type: PrintType) => {
     if (type === "Label") {
-      // Utamakan label RESMI TikTok ASLI (sudah ditambahkan tabel varian langsung di PDF resmi)
       if (order.account?.platform === "TIKTOK_SHOP") {
         const official = await fetchOfficialLabel(order.id);
         if (official?.pdfBase64) {
@@ -764,6 +763,8 @@ export default function OrdersPage() {
           printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
           return;
         }
+        alert("Label resmi TikTok Shop belum bisa diambil. Periksa paket pengiriman dan izin akun, lalu coba lagi.");
+        return;
       }
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {

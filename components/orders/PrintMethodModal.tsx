@@ -7,8 +7,7 @@ import { authFetch } from "@/lib/utils/api-client";
 
 /**
  * PrintMethodModal — "Metode Cetak" ala Desty setelah paket diatur.
- * Opsi cetak "1 Label": satu lembar berisi label resmi TikTok di atas dan
- * tabel ringkasan produk (dibuat lokal dari OrderItem/ProductVariant) di bawah.
+ * Opsi cetak "1 Label": dokumen asli TikTok tanpa perubahan isi.
  * Opsional: menambahkan halaman Picking List.
  */
 export default function PrintMethodModal({
@@ -110,7 +109,7 @@ export default function PrintMethodModal({
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
                   {isTikTok
-                    ? "Label kurir resmi TikTok di bagian atas + tabel ringkasan produk (nama, varian, seller SKU, qty) yang dibuat dari data pesanan di bagian bawah."
+                    ? "Label pengiriman asli dari TikTok Shop dalam ukuran A6."
                     : "Tabel ringkasan produk (nama, varian, seller SKU, qty) dari data pesanan. Label resmi TikTok tidak berlaku untuk order ini — cetak label via Seller Center."}
                 </p>
               </div>

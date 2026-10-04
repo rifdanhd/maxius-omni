@@ -8,14 +8,13 @@ import {
 import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
 
 /**
- * Cetak label gabungan + ringkasan produk lokal (Metode Cetak dari modal sukses).
+ * Cetak label asli gabungan (Metode Cetak dari modal sukses).
  * POST /api/orders/fulfillment/shipping-label
  *
  * Body: { orderIds: string[], includePickingList?: boolean }
  *
  * Per order:
  *   - halaman label RESMI TikTok (GetPackageShippingDocument),
- *   - halaman "Ringkasan Produk" dari OrderItem/ProductVariant lokal,
  *   - opsional halaman "Picking List".
  *
  * Per-item error handling — order tanpa label tidak membatalkan yang lain.

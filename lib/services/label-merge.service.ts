@@ -11,9 +11,8 @@ import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
  * order diambil SATU PER SATU (paralel utk kecepatan) lalu digabung jadi 1 PDF
  * di sini memakai pdf-lib.
  *
- * Per order: halaman label RESMI TikTok ditanam, lalu satu halaman A6 "Ringkasan
- * Produk" yang DIBUAT SENDIRI dari OrderItem/ProductVariant lokal (tabel: Produk,
- * Varian/SKU, Seller SKU, Qty). Opsional "Picking List" ikut ditambahkan.
+ * Per order: halaman label asli TikTok digabung tanpa perubahan isi.
+ * Opsional "Picking List" ditambahkan sebagai halaman terpisah.
  */
 
 const A6_PT = { width: 297.64, height: 419.53 }; // 105 x 148 mm @ 72dpi
@@ -424,18 +423,9 @@ export async function mergeShippingDocuments(
     try {
       const { bytes } = r.value;
       if (isPdf(bytes)) {
-        // Tempelkan varian langsung pada label resmi halaman 1
-        if (item.rows && item.rows.length > 0) {
-          const stamped = await stampProductVariantOnLabel(bytes, item.rows, item.orderNo);
-          await mergePdfs(merged, stamped);
-        } else {
-          await mergePdfs(merged, bytes);
-        }
+        await mergePdfs(merged, bytes);
       } else if (isPng(bytes) || isJpeg(bytes)) {
         await embedLabelImage(merged, bytes);
-        if (item.rows && item.rows.length > 0) {
-          addProductSummaryPage(merged, item.orderNo, item.rows, "PRODUK");
-        }
       } else {
         throw new Error("format dokumen tidak didukung");
       }

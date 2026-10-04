@@ -8,15 +8,13 @@ import {
 import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
 
 /**
- * Cetak label gabungan + ringkasan produk lokal ("Metode Cetak").
+ * Cetak label asli gabungan ("Metode Cetak").
  * POST /api/orders/label-pack
  *
  * Body: { orderIds: string[], includePickingList?: boolean }
  *
  * Hasil: 1 PDF multi-halaman. Per order:
  *   - halaman label RESMI TikTok (GetPackageShippingDocument),
- *   - halaman "Ringkasan Produk" yang DIBUAT SENDIRI dari OrderItem/ProductVariant
- *     (tabel Produk / Varian / Seller SKU / Qty) — bagian bawah lembar cetak,
  *   - opsional halaman "Picking List" bila includePickingList.
  *
  * Order tanpa label resmi (belum di-ship / tanpa paket) dilewati & dibawa ke

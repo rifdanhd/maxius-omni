@@ -4,19 +4,14 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
-import {
-  stampProductVariantOnLabel,
-  type LabelMergeProductRow,
-} from "@/lib/services/label-merge.service";
 
 /**
  * Label pengiriman RESMI dari TikTok (GetPackageShippingDocument).
  * Hanya tersedia untuk paket TikTok Shipping yang sudah di-ship:
- *   - order belum di-ship → 404 (frontend harus fallback ke render lokal)
+ *   - order belum di-ship → 404
  *   - order dikirim oleh seller (ship order AWB mandiri) → tidak tersedia
  *
- * Mengembalikan doc_url (PDF asli) + pdfBase64 (PDF resmi TikTok yang sudah
- * ditambahkan rincian varian produk di area bawah) + tracking_number paket.
+ * Mengembalikan doc_url + pdfBase64 dokumen asli + tracking_number paket.
  */
 export const GET = withAuth(
   async (req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
@@ -31,20 +26,6 @@ export const GET = withAuth(
         shipments: {
           select: { externalId: true, trackingNo: true, status: true },
         },
-        items: {
-          select: {
-            productName: true,
-            skuName: true,
-            channelSku: true,
-            qty: true,
-            variant: {
-              select: {
-                sku: true,
-                masterProduct: { select: { name: true } },
-              },
-            },
-          },
-        },
       },
     });
 
@@ -57,8 +38,6 @@ export const GET = withAuth(
       return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
     }
 
-    // Guard platform: label resmi hanya TikTok — response 400 (bukan 404) agar
-    // frontend membedakan "belum siap" vs "tidak berlaku", lalu fallback cetak lokal.
     if (order.account.platform !== "TIKTOK_SHOP") {
       return unsupportedPlatform(order.account.platform);
     }
@@ -94,18 +73,10 @@ export const GET = withAuth(
     try {
       const res = await fetch(docUrl, { headers: { "User-Agent": "maxius-platform/1.0.0" } });
       if (res.ok) {
-        const rawBytes = new Uint8Array(await res.arrayBuffer());
-        const rows: LabelMergeProductRow[] = order.items.map((it) => ({
-          productName: it.variant?.masterProduct?.name ?? it.productName ?? it.channelSku,
-          variant: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,
-          sellerSku: it.variant?.sku ?? it.channelSku,
-          qty: it.qty,
-        }));
-        const stamped = await stampProductVariantOnLabel(rawBytes, rows, order.orderNo);
-        pdfBase64 = Buffer.from(stamped).toString("base64");
+        pdfBase64 = Buffer.from(await res.arrayBuffer()).toString("base64");
       }
     } catch (e) {
-      console.error("[Label] Gagal menempelkan varian ke label resmi:", e);
+      console.error("[Label] Gagal mengunduh label resmi:", e);
     }
 
     return NextResponse.json({
