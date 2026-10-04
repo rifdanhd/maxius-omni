@@ -62,7 +62,7 @@ type TabId = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 /* ------------------------------ Constants ------------------------------ */
 
 const TABS: Array<{ id: TabId; label: string }> = [
-  { id: "PENDING", label: "Pending" },
+  { id: "PENDING", label: "Belum Dimulai (Pending)" },
   { id: "IN_PROGRESS", label: "Dalam Proses" },
   { id: "COMPLETED", label: "Selesai" },
   { id: "CANCELLED", label: "Dibatalkan" },
@@ -155,7 +155,7 @@ export default function StockOpnamePage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Stok Opname</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Hitung fisik ulang stok gudang & koreksi selisih dengan jejak yang jelas.
+            Hitung ulang barang di gudang dan koreksi selisihnya; mulai dengan Buat Stok Opname, pilih variasi, lalu masukkan hasil hitung fisik. Simpan Hitungan belum mengubah stok; Selesaikan & Koreksi Stok menerapkan perubahan.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export default function StockOpnamePage() {
           </div>
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
-            Belum ada stok opname berstatus &ldquo;{STATUS_LABEL[activeTab]}&rdquo;.
+            Belum ada penghitungan stok berstatus &ldquo;{STATUS_LABEL[activeTab]}&rdquo;. Mulai melalui Buat Stok Opname, atau pilih tab lain untuk melihat penghitungan yang sudah dibuat.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -364,7 +364,7 @@ function CreateModal({
         <div className="border-b border-border px-6 py-4">
           <h2 className="text-lg font-bold text-foreground">Buat Stok Opname</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Stok sistem akan di-SNAPSHOT saat opname dibuat — selisih dihitung terhadap snapshot ini.
+            Stok sistem akan dicatat sebagai stok awal (Snapshot) saat opname dibuat — selisih dihitung terhadap snapshot ini.
           </p>
         </div>
 
@@ -380,7 +380,7 @@ function CreateModal({
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat…
             </div>
           ) : variants.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Tidak ada produk cocok.</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">Tidak ada variasi yang cocok. Hapus pencarian atau tambahkan produk di Produk Master terlebih dahulu.</div>
           ) : (
             <ul className="divide-y divide-border">
               {variants.map((v) => {
@@ -691,7 +691,7 @@ function CountModal({
               </span>
               {!allCounted && (
                 <span className="text-xs text-foreground">
-                  Semua produk harus terhitung sebelum bisa difinalisasi.
+                  Isi hasil hitung semua variasi sebelum menerapkan koreksi stok.
                 </span>
               )}
             </div>
@@ -720,7 +720,7 @@ function CountModal({
                   className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
                 >
                   {finalizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
-                  Finalisasi & Koreksi Stok
+                  Selesaikan & Koreksi Stok (Finalisasi)
                 </button>
               </div>
             </div>
