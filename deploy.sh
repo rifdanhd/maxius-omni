@@ -90,9 +90,22 @@ for w in "${STALE_ENV_WARN[@]:-}"; do
   [ -n "$w" ] && log "PERINGATAN: $w"
 done
 
-# ── 1b. Bentrok pm2 — matikan dulu (systemd yang pegang port) ────────────────
+# ── 1b. Bentrok pm2 — hanya BERBAHAYA bila pm2 memegang port 3000 ────────────
+# (pm2 boleh tetap jalan utk app LAIN di port lain — mis. "lembur online" :3001;
+#  yang ditolak hanya bila salah satu proses pm2 memegang port 3000 = milik
+#  maxius-omni → restart systemd pasti bentrok.)
 if command -v pm2 >/dev/null 2>&1 && pm2 jlist 2>/dev/null | grep -q '"name"'; then
-  die "pm2 masih menjalankan proses — port akan bentrok. Matikan dulu:  pm2 kill"
+  pm2_pids="$(pm2 jlist 2>/dev/null | grep -oE '"pid":[0-9]+' | cut -d: -f2 | sort -u)"
+  port3000_pids="$(ss -ltnpH 'sport = :3000' 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)"
+  conflict_pid=""
+  for p in $port3000_pids; do
+    if printf '%s\n' "$pm2_pids" | grep -qx "$p"; then conflict_pid="$p"; fi
+  done
+  if [ -n "$conflict_pid" ]; then
+    die "pm2 memegang port 3000 (pid ${conflict_pid}) — bentrok dgn systemd maxius-omni.
+  Matikan app pm2 itu saja dulu (pm2 delete <nama>), atau matikan sepenuhnya:  pm2 kill"
+  fi
+  log "pm2 aktif tapi TIDAK memegang port 3000 — aman, diabaikan"
 fi
 
 # ── 1c. Preflight git: remote origin HARUS repo asal maxius-platform ─────────
