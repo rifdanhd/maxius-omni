@@ -24,7 +24,7 @@ export const GET = withAuth(
           variant: {
             select: {
               sku: true,
-              masterProduct: { select: { name: true } },
+              masterProduct: { select: { name: true, imageUrl: true } },
             },
           },
         },
@@ -102,7 +102,8 @@ export const GET = withAuth(
     },
     items: order.items.map((it) => ({
       id: it.id,
-      imageUrl: it.imageUrl,
+      // Order Shopee tidak punya gambar item dari API → fallback gambar produk master.
+      imageUrl: it.imageUrl ?? it.variant?.masterProduct?.imageUrl ?? null,
       productName:
         it.productName ?? it.variant?.masterProduct?.name ?? it.productId ?? "-",
       variantLabel: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,

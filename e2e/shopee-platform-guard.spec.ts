@@ -182,11 +182,12 @@ test('M8a/M8c UI: pickup Shopee buka ShopeeShipModal; Cetak Label = label lokal 
   await login(page);
   await page.goto('/orders');
 
-  // Kartu OrderCard = ancestor terdekat ber-class bg-white.rounded-xl dari link orderNo.
+  // Kartu OrderCard = ancestor ber-testid order-card dari link orderNo
+  // (testid — jangan pakai class styling yang bisa berubah).
   const cardOf = (orderNo: string) =>
     page
       .getByRole('link', { name: orderNo, exact: true })
-      .locator('xpath=ancestor::div[contains(@class,"bg-white") and contains(@class,"rounded-xl")][1]');
+      .locator('xpath=ancestor::div[@data-testid="order-card"][1]');
 
   const card = cardOf(NO_S);
   await expect(card).toBeVisible({ timeout: 30_000 });

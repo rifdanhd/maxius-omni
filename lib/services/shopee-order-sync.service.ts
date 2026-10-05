@@ -147,6 +147,22 @@ export async function createShopeeOrder(
     }
   }
 
+  // Backfill gambar item dari MasterProduct — item_list Shopee TIDAK memuat
+  // field gambar, jadi OrderItem.imageUrl dari API selalu kosong.
+  const needImage = lineItems.filter((i) => !i.imageUrl && i.variantId);
+  if (needImage.length > 0) {
+    const variants = await prisma.productVariant.findMany({
+      where: { id: { in: [...new Set(needImage.map((i) => i.variantId as string))] } },
+      select: { id: true, masterProduct: { select: { imageUrl: true } } },
+    });
+    const imgByVariant = new Map(
+      variants.map((v) => [v.id, v.masterProduct.imageUrl] as const)
+    );
+    for (const item of needImage) {
+      item.imageUrl = imgByVariant.get(item.variantId as string) ?? null;
+    }
+  }
+
   const amountFromItems = lineItems.reduce(
     (acc, it) => acc + (it.price ?? 0) * it.qty,
     0

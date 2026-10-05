@@ -118,7 +118,7 @@ export default function OrderCard({
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm mb-4 font-sans relative">
+    <div data-testid="order-card" className="bg-card rounded-xl border border-border shadow-sm mb-4 font-sans relative">
       {/* Header */}
       <div className="px-5 py-3 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50 rounded-t-xl">
         <div className="flex flex-wrap items-center gap-4">

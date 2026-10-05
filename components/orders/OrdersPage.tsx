@@ -69,7 +69,7 @@ type OrderItem = {
   price: number | null;
   variant?: {
     sku: string;
-    masterProduct: { name: string } | null;
+    masterProduct: { name: string; imageUrl?: string | null } | null;
   } | null;
 };
 
@@ -157,7 +157,8 @@ function toCardOrder(o: Order) {
     platform,
     productName,
     productVariant,
-    productImage: first?.imageUrl ?? null,
+    // Order Shopee tidak punya gambar item dari API → fallback gambar produk master.
+    productImage: first?.imageUrl ?? first?.variant?.masterProduct?.imageUrl ?? null,
     qty: totalQty,
     price,
     totalPrice: formatPrice(o.amount),
