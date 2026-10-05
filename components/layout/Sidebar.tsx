@@ -205,7 +205,7 @@ export default function Sidebar() {
           {isMobile && mobileOpen && <span className="font-bold text-foreground text-lg ml-2">Maxius.id</span>}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 hide-scrollbar">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 no-scrollbar">
           {MENU.map((item) => {
             const hasChildren = isMenuGroup(item);
             const active = isItemActive(item);
@@ -279,7 +279,9 @@ export default function Sidebar() {
                       return (
                         <Link key={child.key} href={child.href!} className={
                           "text-left px-3 py-2 rounded-lg text-sm transition-colors block " +
-                          (pathname === child.href ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")
+                          (pathname === child.href
+                            ? "bg-muted text-foreground font-semibold border-l-2 border-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted")
                         }>
                           {child.label}
                         </Link>
@@ -325,10 +327,6 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <style jsx>{`
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </>
   );
 }

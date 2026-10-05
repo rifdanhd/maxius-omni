@@ -88,9 +88,9 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <p className="text-sm font-bold text-foreground">Stok Menipis</p>
+            <p className="text-sm font-bold text-foreground">Notifikasi</p>
             <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-destructive-subtle text-destructive">
-              {alerts.length} varian
+              {alerts.length} peringatan stok
             </span>
           </div>
 
@@ -120,7 +120,7 @@ export default function NotificationBell() {
               alerts.map((a) => (
                 <a
                   key={a.variantId}
-                  href="/products"
+                  href="/inventory"
                   className="flex items-start gap-3 px-4 py-2.5 border-b border-border hover:bg-muted transition-colors"
                 >
                   <span
@@ -146,12 +146,12 @@ export default function NotificationBell() {
           </div>
 
           <a
-            href="/products"
+            href="/inventory"
             className="block px-4 py-2.5 text-xs font-semibold text-foreground bg-muted hover:bg-muted text-center border-t border-border"
           >
             {outCount > 0
-              ? `Lihat ${outCount} varian stok habis di Produk Master`
-              : "Lihat semua di Produk Master"}
+              ? `Lihat ${outCount} varian stok habis di Inventori`
+              : "Lihat semua di Inventori"}
           </a>
         </div>
       )}

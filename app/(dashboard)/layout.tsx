@@ -14,6 +14,44 @@ import NotificationBell from "@/components/layout/NotificationBell";
 // memenuhi kontrak useSyncExternalStore.
 const subscribeNoop = () => () => {};
 
+// Map pathname ke judul halaman yang readable
+const PAGE_TITLES: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/orders": "Kelola Pesanan",
+  "/orders/returns": "Kelola Pengembalian",
+  "/products": "Produk Master",
+  "/products/mapping": "Mapping Stok Terpusat",
+  "/products/prices": "Kelola Harga",
+  "/products/images": "Kelola Gambar",
+  "/products/copy": "Product Copy",
+  "/inventory": "Stok Varian",
+  "/inventory/mismatch": "Stok Mismatch",
+  "/inventory/settings": "Pengaturan Inventori",
+  "/inventory/opname": "Stok Opname",
+  "/inventory/history": "Riwayat Inventori",
+  "/promotions": "Promosi",
+  "/reports/sales": "Laporan Penjualan",
+  "/reports/stock": "Laporan Stok",
+  "/settings/accounts": "Pengaturan Toko",
+  "/education": "Panduan",
+  "/logs": "Log Sistem",
+  "/wms": "WMS",
+  "/customers": "Pelanggan",
+  "/chat": "Chat",
+  "/market": "Market",
+};
+
+function getPageTitle(pathname: string): string {
+  // Direct match
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  // Prefix match (e.g. /products/mapping/123)
+  const match = Object.keys(PAGE_TITLES)
+    .filter((k) => pathname.startsWith(k + "/"))
+    .sort((a, b) => b.length - a.length)[0];
+  if (match) return PAGE_TITLES[match];
+  return "Maxius";
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -37,23 +75,29 @@ export default function DashboardLayout({
 
   if (!hydrated || !accessToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
-        Memeriksa sesi...
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground text-sm">
+        <div className="w-6 h-6 rounded-full border-2 border-muted border-t-foreground animate-spin" />
+        <span>Memeriksa sesi...</span>
       </div>
     );
   }
+
+  const pageTitle = getPageTitle(pathname);
 
   return (
     <AuthenticatedLayout>
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <Header>
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex-1 flex items-center min-w-0">
+            <span className="text-sm font-semibold text-foreground truncate">{pageTitle}</span>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <NotificationBell />
             <Search />
             <ThemeSwitch />
           </div>
         </Header>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto">
           {children}
         </div>
       </div>

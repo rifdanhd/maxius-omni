@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, ChevronRight, Check, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight, Check, Info, TrendingUp, TrendingDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -135,7 +135,42 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) {
-    return <div className="min-h-full flex items-center justify-center text-muted-foreground text-sm py-20">Memuat...</div>;
+    return (
+      <div className="p-4 md:p-8 animate-pulse">
+        {/* Greeting skeleton */}
+        <div className="mb-6 bg-card rounded-xl border border-border px-6 py-5">
+          <div className="h-7 bg-muted rounded w-64 mb-2" />
+          <div className="h-4 bg-muted rounded w-48" />
+        </div>
+        {/* Action cards skeleton */}
+        <div className="mb-6 bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-6 py-4 border-b border-border">
+            <div className="h-5 bg-muted rounded w-48" />
+          </div>
+          <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="border border-border rounded-lg p-4 h-[100px] bg-muted/30" />
+            ))}
+          </div>
+        </div>
+        {/* Chart skeleton */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="p-5 border-b border-border">
+            <div className="h-5 bg-muted rounded w-32" />
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4">
+                <div className="h-3 bg-muted rounded w-28 mb-3" />
+                <div className="h-6 bg-muted rounded w-20 mb-2" />
+                <div className="h-3 bg-muted rounded w-36" />
+              </div>
+            ))}
+          </div>
+          <div className="p-6 h-[300px] bg-muted/20 rounded-b-xl" />
+        </div>
+      </div>
+    );
   }
 
   const m = analytics?.metrics;
@@ -220,12 +255,12 @@ export default function DashboardPage() {
                     return (
                       <tr key={s.accountId} className="border-b border-border last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">
-                          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${unhealthy ? "bg-muted-foreground" : "bg-muted-foreground"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
+                          <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${unhealthy ? "bg-destructive animate-pulse" : "bg-green-500"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
                           {s.label}
                         </td>
                         <td className="px-3 py-2 text-foreground">{s.platform}</td>
                         <td className="px-3 py-2 text-center">
-                          {s.hasToken ? <span className="text-foreground font-semibold">OK</span> : <span className="text-foreground font-semibold">Hilang</span>}
+                          {s.hasToken ? <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">OK</span> : <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-destructive-subtle text-destructive">Hilang</span>}
                         </td>
                         <td className="px-3 py-2 text-center text-foreground">{s.errors7d}</td>
                         <td className="px-3 py-2 text-center text-foreground">{s.mismatch}</td>
@@ -245,50 +280,52 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Section: Panduan Awal */}
-      <div className="mb-6 md:mb-8 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-muted" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Panduan Awal</h2>
-            <p className="text-sm text-muted-foreground mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
-          </div>
-          {panduanAwalOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
-        </div>
-        {panduanAwalOpen && (
-          <div className="p-4 md:p-6 border-t border-border">
-            <div className="bg-muted text-foreground font-semibold text-xs px-3 py-1 rounded-md inline-block mb-4">
-              {onboardingDone}/{onboardingSteps.length} Selesai
+      {/* Section: Panduan Awal — auto-hidden saat semua langkah selesai */}
+      {onboardingDone < onboardingSteps.length && (
+        <div className="mb-6 md:mb-8 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="px-4 md:px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-muted" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Panduan Awal</h2>
+              <p className="text-sm text-muted-foreground mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
             </div>
-            <div className="space-y-1">
-              {onboardingSteps.map((s) => (
-                <Link
-                  key={s.label}
-                  href={s.href}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-muted group"
-                >
-                  <div className="flex items-center gap-3">
-                    {s.done ? (
-                      <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-                        <Check size={12} />
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-border border-dashed" />
-                    )}
-                    <span className={`text-sm ${s.done ? "text-muted-foreground" : "font-semibold text-foreground"}`}>{s.label}</span>
-                  </div>
-                  <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground" />
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-muted text-foreground">{onboardingDone}/{onboardingSteps.length}</span>
+              {panduanAwalOpen ? <ChevronUp size={18} className="text-muted-foreground" /> : <ChevronDown size={18} className="text-muted-foreground" />}
+            </div>
+          </div>
+          {panduanAwalOpen && (
+            <div className="p-4 md:p-6 border-t border-border">
+              <div className="space-y-1">
+                {onboardingSteps.map((s) => (
+                  <Link
+                    key={s.label}
+                    href={s.href}
+                    className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-muted group"
+                  >
+                    <div className="flex items-center gap-3">
+                      {s.done ? (
+                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white shrink-0">
+                          <Check size={12} />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-border border-dashed shrink-0" />
+                      )}
+                      <span className={`text-sm ${s.done ? "text-muted-foreground line-through" : "font-semibold text-foreground"}`}>{s.label}</span>
+                    </div>
+                    <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground shrink-0" />
+                  </Link>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-border text-sm text-foreground">
+                Butuh bantuan langkah demi langkah?{" "}
+                <Link href="/education" className="font-semibold text-foreground hover:underline">
+                  Buka Panduan lengkap →
                 </Link>
-              ))}
+              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-border text-sm text-foreground">
-              Butuh bantuan langkah demi langkah?{" "}
-              <Link href="/education" className="font-semibold text-foreground hover:underline">
-                Buka Panduan lengkap →
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -307,14 +344,14 @@ export default function DashboardPage() {
               Penjualan <Info size={14} className="text-muted-foreground" />
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <select className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground outline-none bg-card font-medium">
-                <option>Semua Marketplace</option>
-              </select>
-              <select className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground outline-none bg-card font-medium">
-                <option>{analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}</option>
-              </select>
-              <div className="text-sm text-foreground font-medium flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md border border-border">
-                Perbandingan: <span className="text-foreground">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span> <ChevronDown size={14}/>
+              <div className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground bg-muted font-medium">
+                Semua Marketplace
+              </div>
+              <div className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground bg-card font-medium">
+                {analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}
+              </div>
+              <div className="text-sm text-muted-foreground font-medium flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md border border-border">
+                vs <span className="text-foreground">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span>
               </div>
             </div>
           </div>
@@ -348,7 +385,14 @@ export default function DashboardPage() {
               Toko Teratas <Info size={14} className="text-muted-foreground" />
             </div>
             {(analytics?.topStores ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">Belum ada penjualan pada periode ini.</p>
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                  <Info size={20} className="text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold text-foreground mb-1">Belum Ada Data Penjualan</p>
+                <p className="text-xs text-muted-foreground mb-3">Pesanan akan muncul setelah toko kamu terhubung dan menerima pesanan.</p>
+                <a href="/settings/accounts" className="text-xs font-semibold text-foreground underline hover:no-underline">Hubungkan Toko →</a>
+              </div>
             ) : (analytics!.topStores.map((store) => (
               <div key={store.id} className="flex items-center justify-between border border-border rounded-lg p-3 mb-2 last:mb-0">
                   <div className="flex items-center gap-3">
@@ -374,7 +418,14 @@ export default function DashboardPage() {
               Produk Terjual Teratas <Info size={14} className="text-muted-foreground" />
             </div>
             {(analytics?.topProducts ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">Belum ada penjualan pada periode ini.</p>
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                  <Info size={20} className="text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold text-foreground mb-1">Belum Ada Produk Terjual</p>
+                <p className="text-xs text-muted-foreground mb-3">Data produk terlaris akan muncul saat ada pesanan masuk dalam periode ini.</p>
+                <a href="/products" className="text-xs font-semibold text-foreground underline hover:no-underline">Lihat Produk Master →</a>
+              </div>
             ) : (analytics!.topProducts.slice(0, 3).map((product) => (
               <div key={product.key} className="flex justify-between items-center border border-border rounded-lg p-3 mb-2 last:mb-0">
                   <div className="flex items-start gap-3">
@@ -396,20 +447,28 @@ export default function DashboardPage() {
   );
 }
 
+const CRITICAL_TITLES = ["Oversell", "Stok Menipis", "Stok Kritis", "Stok Mismatch", "Sync Error (7 hari)"];
+
 function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
-  const cls = "border border-border rounded-lg p-4 bg-card flex flex-col justify-between h-[100px] hover:border-ring transition-colors cursor-pointer";
+  const isCritical = CRITICAL_TITLES.includes(title) && value !== "0" && value !== "…";
+  const cls = `border rounded-lg p-4 flex flex-col justify-between h-[100px] hover:shadow-md transition-all cursor-pointer ${
+    isCritical
+      ? "border-destructive/40 bg-destructive-subtle"
+      : "border-border bg-card hover:border-ring"
+  }`;
+  const valueColor = isCritical ? "text-destructive" : "text-foreground";
   if (href) {
     return (
       <Link href={href} className={cls}>
-        <span className="text-sm font-semibold text-foreground">{title}</span>
-        <span className="text-2xl font-bold text-foreground">{value}</span>
+        <span className={`text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{title}</span>
+        <span className={`text-2xl font-bold ${valueColor}`}>{value}</span>
       </Link>
     );
   }
   return (
     <div className={cls}>
-      <span className="text-sm font-semibold text-foreground">{title}</span>
-      <span className="text-2xl font-bold text-foreground">{value}</span>
+      <span className={`text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{title}</span>
+      <span className={`text-2xl font-bold ${valueColor}`}>{value}</span>
     </div>
   );
 }
@@ -426,17 +485,22 @@ function MetricTab({ active, onClick, title, value, trend, trendUp, badge, subte
 }) {
   return (
     <div 
-      className={`p-4 cursor-pointer relative ${active ? 'bg-card' : 'bg-muted hover:bg-muted'}`}
+      className={`p-4 cursor-pointer relative transition-colors ${active ? 'bg-card' : 'bg-muted/50 hover:bg-muted'}`}
       onClick={onClick}
     >
-      {active && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary"></div>}
+      {active && <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-full"></div>}
       <div className="flex items-center gap-1 text-sm font-semibold text-foreground mb-2">
         {title} <Info size={12} className="text-muted-foreground" />
       </div>
       <div className="flex items-end gap-2 mb-2">
-        <span className={`text-xl font-bold ${active ? 'text-foreground' : 'text-foreground'}`}>{value}</span>
+        <span className={`text-xl font-bold ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{value}</span>
         {trend && (
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${trendUp ? 'bg-muted text-foreground' : 'bg-muted text-foreground'}`}>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+            trendUp 
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+          }`}>
+            {trendUp ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
             {trend}
           </span>
         )}

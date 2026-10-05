@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import type { StockRow, StockTab } from "@/app/api/inventory/stock/route";
 import type { OversellEntry } from "@/app/api/inventory/oversells/route";
@@ -57,6 +57,13 @@ export default function InventoryStockPage() {
     Array<{ id: string; note: string | null; stockAfter: number; createdAt: string; user: { username: string } | null }>
   >([]);
   const [safetyLoading, setSafetyLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // Initial load & refetch (tab/q/reload): async fn di dalam effect + guard
   // cancelled, tanpa setState sinkron di body effect (aturan
@@ -166,6 +173,7 @@ export default function InventoryStockPage() {
         );
         setEditing(null);
         setReloadKey((k) => k + 1);
+        setToast({ type: "success", message: `Stok fisik berhasil diubah menjadi ${parsed} dan disinkronkan ke toko.` });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Gagal menyimpan stok.");
       } finally {
@@ -201,6 +209,13 @@ export default function InventoryStockPage() {
       );
       setEditing(null);
       setReloadKey((k) => k + 1);
+      setToast({
+        type: "success",
+        message:
+          editing.field === "safetyStock"
+            ? `Stok cadangan berhasil diubah menjadi ${parsed ?? 0}.`
+            : "Batas minimum stok berhasil diperbarui.",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menyimpan.");
     } finally {
@@ -244,6 +259,7 @@ export default function InventoryStockPage() {
         )
       );
       setCounts((prev) => ({ ...prev, oversells: Math.max(0, prev.oversells - 1) }));
+      setToast({ type: "success", message: "Catatan oversell berhasil ditandai sebagai sudah ditangani." });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menandai.");
     } finally {
@@ -255,7 +271,25 @@ export default function InventoryStockPage() {
     id === "all" ? counts.all : id === "empty" ? counts.empty : id === "low" ? counts.low : counts.oversells;
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 relative">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium animate-in slide-in-from-bottom-2 fade-in max-w-sm ${
+          toast.type === "success"
+            ? "bg-card border-border text-foreground"
+            : "bg-destructive text-destructive-foreground border-destructive"
+        }`}>
+          {toast.type === "success" ? (
+            <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+          ) : (
+            <AlertCircle size={16} className="shrink-0" />
+          )}
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-muted-foreground hover:text-foreground">
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-bold text-foreground">Stok Varian</h1>
@@ -298,8 +332,9 @@ export default function InventoryStockPage() {
       </div>
 
       {error && (
-        <div className="mb-4 bg-muted text-foreground text-sm px-4 py-3 rounded-xl border border-border">
-          {error}
+        <div className="mb-4 flex items-start gap-3 bg-destructive-subtle text-destructive text-sm px-4 py-3 rounded-xl border border-destructive/30">
+          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -321,23 +356,40 @@ export default function InventoryStockPage() {
           </div>
 
           {loading ? (
-            <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">Memuat…</p>
+            <div className="divide-y divide-border">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="px-4 py-3 flex items-center gap-3 animate-pulse">
+                  <div className="w-10 h-10 bg-muted rounded shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-muted rounded w-48" />
+                    <div className="h-2.5 bg-muted rounded w-32" />
+                  </div>
+                  <div className="h-3 bg-muted rounded w-12" />
+                  <div className="h-3 bg-muted rounded w-12" />
+                  <div className="h-3 bg-muted rounded w-12" />
+                  <div className="h-3 bg-muted rounded w-16" />
+                </div>
+              ))}
+            </div>
           ) : rows.length === 0 ? (
             <p className="p-4 md:p-8 text-center text-sm text-muted-foreground">{q.trim() || tab !== "all" ? <><span>Tidak ada variasi yang cocok dengan pencarian atau tab.</span><button className="block mx-auto mt-2 underline" onClick={() => { setQ(""); setTab("all"); }}>Hapus Pencarian dan Filter</button></> : <>Belum ada variasi stok pusat. <a href="/products" className="underline">Tambahkan produk di Produk Master</a>, lalu hubungkan produk toko melalui Mapping.</>}</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="px-4 py-2 border-b border-border text-xs text-muted-foreground flex items-center justify-between sm:hidden bg-muted/40">
+                <span>💡 Geser tabel ke kanan untuk melihat semua kolom</span>
+                <span>→</span>
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3 font-semibold">Produk / Varian</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Stok fisik yang dicatat di gudang. Klik pensil untuk mengoreksi jumlah total; pembaruan toko mengikuti pengaturan inventori.">Fisik</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Stok yang disisihkan dan tidak ditawarkan ke toko. Klik riwayat untuk memeriksa perubahan.">Cadangan</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Info saja: jumlah activity promosi AKTIF yang mencakup varian. Tidak mengurangi Tersedia (tidak ada konsep reserve di skema).">Promosi</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok (belum AWAITING_SHIPMENT) — demand yang akan datang">Pesanan</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Info saja: jumlah activity promosi AKTIF yang mencakup varian.">Promosi</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok — demand yang akan datang">Pesanan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Target stok jual: fisik dikurangi cadangan, minimal 0.">Tersedia</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Belum ada konsep restock terjadwal di skema — selalu 0 di iterasi ini">Stok Masuk Terjadwal (Belum Tersedia)</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Batas minimum per varian. Kosong = ikut threshold produk induk">Batas Min</th>
-                    <th className="px-4 py-3 font-semibold text-center" title="Toggle saja — belum ada provider email, belum ada pengiriman aktif">Email (Belum Tersedia)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -469,7 +521,6 @@ export default function InventoryStockPage() {
                       </td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(r.orderedQty)}</td>
                       <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(r.available)}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">0</td>
                       <td className="px-4 py-3 text-right">
                         {editing?.variantId === r.variantId && editing.field === "minStock" ? (
                           <span className="inline-flex items-center gap-1">
@@ -520,27 +571,11 @@ export default function InventoryStockPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          role="switch"
-                          disabled
-                          aria-checked={r.notifyEmail}
-                          title="Pengiriman notifikasi email belum tersedia."
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            r.notifyEmail ? "bg-muted-foreground" : "bg-muted"
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 rounded-full bg-card shadow transition-transform ${
-                              r.notifyEmail ? "translate-x-4" : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
 
@@ -608,11 +643,11 @@ export default function InventoryStockPage() {
                       <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(e.failedQty)}</td>
                       <td className="px-4 py-3">
                         {e.handledAt ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             Sudah ditangani
                           </span>
                         ) : (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-destructive-subtle text-destructive">
                             Belum ditangani
                           </span>
                         )}
