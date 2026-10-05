@@ -3,14 +3,6 @@ import { syncStockToMarketplaces, type SyncPushItemResult } from "@/lib/services
 import { isDeduplicationFailure } from "@/lib/services/stock-guard.policy";
 import { businessWhere } from "@/lib/services/business-scope.service";
 
-/** Error internal: hasil push aktual channel = gagal (bukan exception dispatch). */
-class SyncPushFailedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SyncPushFailedError";
-  }
-}
-
 /**
  * SyncJob — state machine push stok (PHASE A).
  *
@@ -51,6 +43,81 @@ export function syncJobBackoffMs(failedAttempt: number): number {
 }
 
 export type SyncJobTarget = { accountId: string; channelSku: string };
+
+/** Identitas baris — unique constraint DB bekerja di level (triple, status). */
+type JobIdentity = {
+  id: string;
+  variantId: string;
+  accountId: string;
+  channelSku: string;
+};
+
+/**
+ * applyStatusTransition — transisi status TANPA pelanggaran unique constraint
+ * (variantId, accountId, channelSku, status).
+ *
+ * Masalah yang diperbaiki: triple yang SUDAH pernah mencapai status tertentu
+ * tidak bisa kembali ke status itu (baris lama masih ada) → update melempar
+ * P2002, dan karena transisi terminal ada di dalam catch runPushAttempt, error
+ * ini tercatat sebagai "kegagalan push" lalu mematikan seluruh tick auto-retry
+ * (satu job gagal → job lain di tick yang sama tidak diproses).
+ *
+ * Aturan:
+ * - SUCCESS/FAILED (terminal): baris lama status sama utk triple yang sama =
+ *   sisa siklus sebelumnya → DIHAPUS dulu (riwayat tetap utuh di SyncLog yang
+ *   append-only). Siklus baru menang.
+ * - PENDING: bila PENDING baru sudah ada (dibuat enqueue selama baris ini
+ *   PROCESSING), baris ini sudah usang — nilai terbaru menang → buang diri
+ *   sendiri, baris baru itulah yang akan diproses.
+ */
+async function applyStatusTransition(
+  job: JobIdentity,
+  data: {
+    status: string;
+    retryCount?: number;
+    lastError?: string | null;
+    nextRetryAt?: Date | null;
+  }
+): Promise<"applied" | "superseded"> {
+  const triple = {
+    variantId: job.variantId,
+    accountId: job.accountId,
+    channelSku: job.channelSku,
+  };
+
+  if (data.status === SYNC_JOB_STATUSES.PENDING) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const newer = await prisma.syncJob.findFirst({
+        where: {
+          ...triple,
+          status: SYNC_JOB_STATUSES.PENDING,
+          id: { not: job.id },
+        },
+        select: { id: true },
+      });
+      if (newer) {
+        await prisma.syncJob.delete({ where: { id: job.id } }).catch(() => undefined);
+        return "superseded";
+      }
+      try {
+        await prisma.syncJob.update({ where: { id: job.id }, data });
+        return "applied";
+      } catch (err) {
+        if (!isDeduplicationFailure(err)) throw err;
+        // race: PENDING baru tercipta di antara findFirst & update → ulangi.
+      }
+    }
+    // Kalah race 3x berturut-turut — anggap baris sudah usang.
+    await prisma.syncJob.delete({ where: { id: job.id } }).catch(() => undefined);
+    return "superseded";
+  }
+
+  await prisma.syncJob.deleteMany({
+    where: { ...triple, status: data.status, id: { not: job.id } },
+  });
+  await prisma.syncJob.update({ where: { id: job.id }, data });
+  return "applied";
+}
 
 /**
  * enqueueSyncJobs — catat 1 job PENDING per target (coalesce ke nilai terbaru).
@@ -145,6 +212,7 @@ async function defaultPusher(job: {
 async function runPushAttempt(
   job: {
     id: string;
+    variantId: string;
     accountId: string;
     channelSku: string;
     newSellable: number;
@@ -153,47 +221,53 @@ async function runPushAttempt(
   pusher: SyncJobPusher,
   now: Date
 ): Promise<{ outcome: "succeeded" | "pendingRetry" | "failed" }> {
+  const identity: JobIdentity = {
+    id: job.id,
+    variantId: job.variantId,
+    accountId: job.accountId,
+    channelSku: job.channelSku,
+  };
+
+  // Push DIEKSEKUSI TERPISAH dari pencatatan status: error unique-constraint
+  // saat menulis status tidak boleh lagi tercatat sebagai "kegagalan push"
+  // (dulu: catch membaca error P2002 sbg push gagal → retryCount naik palsu +
+  // baris terminal selalu bentrok → tick crash berulang tiap ~5 menit).
+  let pushError: string | null = null;
   try {
-    // SUCCESS ditentukan dari HASIL AKTUAL channel (Temuan #1), bukan dari
-    // "dispatch tidak melempar": success:false → lempar ke jalur retry/
-    // FAILED yang sama dengan exception. Status tetap per
-    // (variantId, accountId, channelSku) — 1 job = 1 triple, tidak digabung.
     const out = await pusher(job);
     if (out && out.success === false) {
-      throw new SyncPushFailedError(out.error ?? "push stok ke channel gagal");
+      pushError = out.error ?? "push stok ke channel gagal";
     }
-    await prisma.syncJob.update({
-      where: { id: job.id },
-      data: { status: SYNC_JOB_STATUSES.SUCCESS, lastError: null },
+  } catch (err) {
+    pushError = err instanceof Error ? err.message : String(err);
+  }
+
+  if (pushError === null) {
+    await applyStatusTransition(identity, {
+      status: SYNC_JOB_STATUSES.SUCCESS,
+      lastError: null,
     });
     return { outcome: "succeeded" };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const retryCount = job.retryCount + 1;
-    if (retryCount >= SYNC_JOB_MAX_RETRIES) {
-      // Retry habis → FAILED permanen (mismatch marker, JANGAN dihapus).
-      // Central stock tetap benar; yang retry/mismatch adalah job ini.
-      await prisma.syncJob.update({
-        where: { id: job.id },
-        data: {
-          status: SYNC_JOB_STATUSES.FAILED,
-          retryCount,
-          lastError: msg,
-        },
-      });
-      return { outcome: "failed" };
-    }
-    await prisma.syncJob.update({
-      where: { id: job.id },
-      data: {
-        status: SYNC_JOB_STATUSES.PENDING,
-        retryCount,
-        lastError: msg,
-        nextRetryAt: new Date(now.getTime() + syncJobBackoffMs(retryCount)),
-      },
-    });
-    return { outcome: "pendingRetry" };
   }
+
+  const retryCount = job.retryCount + 1;
+  if (retryCount >= SYNC_JOB_MAX_RETRIES) {
+    // Retry habis → FAILED permanen (mismatch marker, JANGAN dihapus).
+    // Central stock tetap benar; yang retry/mismatch adalah job ini.
+    await applyStatusTransition(identity, {
+      status: SYNC_JOB_STATUSES.FAILED,
+      retryCount,
+      lastError: pushError,
+    });
+    return { outcome: "failed" };
+  }
+  await applyStatusTransition(identity, {
+    status: SYNC_JOB_STATUSES.PENDING,
+    retryCount,
+    lastError: pushError,
+    nextRetryAt: new Date(now.getTime() + syncJobBackoffMs(retryCount)),
+  });
+  return { outcome: "pendingRetry" };
 }
 /**
  * settleDispatchedSyncJobs — tandai job yang push-nya SUDAH dieksekusi langsung
@@ -214,12 +288,18 @@ export async function settleDispatchedSyncJobs(
 ): Promise<void> {
   const succeeded = results.filter((r) => r.success);
   if (succeeded.length === 0) return;
+  const triples = succeeded.map((r) => ({ accountId: r.accountId, channelSku: r.channelSku }));
+  // Buang baris SUCCESS lama utk triple tsb (sisa siklus sebelumnya) supaya
+  // transisi ini tidak melanggar unique constraint — riwayat tetap di SyncLog.
+  await prisma.syncJob.deleteMany({
+    where: { variantId, status: SYNC_JOB_STATUSES.SUCCESS, OR: triples },
+  });
   await prisma.syncJob.updateMany({
     where: {
       variantId,
       newSellable: dispatchedSellable,
       status: SYNC_JOB_STATUSES.PENDING,
-      OR: succeeded.map((r) => ({ accountId: r.accountId, channelSku: r.channelSku })),
+      OR: triples,
     },
     data: { status: SYNC_JOB_STATUSES.SUCCESS, lastError: null, nextRetryAt: null },
   });
@@ -236,20 +316,30 @@ export const SYNC_JOB_STALE_PROCESSING_MS = 5 * 60_000;
 
 async function requeueStaleProcessingJobs(now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - SYNC_JOB_STALE_PROCESSING_MS);
-  const stale = { status: SYNC_JOB_STATUSES.PROCESSING, updatedAt: { lt: cutoff } };
   const msg = "Proses terputus saat push berjalan (restart/crash) — diantre ulang.";
-  const [retriable, exhausted] = await Promise.all([
-    prisma.syncJob.updateMany({
-      where: { ...stale, retryCount: { lt: SYNC_JOB_MAX_RETRIES } },
-      data: { status: SYNC_JOB_STATUSES.PENDING, nextRetryAt: null, lastError: msg },
-    }),
-    // Retry sudah habis → penanda mismatch permanen, tetap bisa di-retry manual.
-    prisma.syncJob.updateMany({
-      where: { ...stale, retryCount: { gte: SYNC_JOB_MAX_RETRIES } },
-      data: { status: SYNC_JOB_STATUSES.FAILED, lastError: msg },
-    }),
-  ]);
-  return retriable.count + exhausted.count;
+  const stale = await prisma.syncJob.findMany({
+    where: { status: SYNC_JOB_STATUSES.PROCESSING, updatedAt: { lt: cutoff } },
+    select: { id: true, variantId: true, accountId: true, channelSku: true, retryCount: true },
+  });
+  let count = 0;
+  for (const job of stale) {
+    try {
+      const exhausted = job.retryCount >= SYNC_JOB_MAX_RETRIES;
+      // Retry habis → penanda mismatch permanen, tetap bisa di-retry manual.
+      // applyStatusTransition menangani bentrok unique + kasus baris sudah
+      // digantikan PENDING baru (nilai terbaru menang → baris lama dibuang).
+      await applyStatusTransition(
+        job,
+        exhausted
+          ? { status: SYNC_JOB_STATUSES.FAILED, lastError: msg }
+          : { status: SYNC_JOB_STATUSES.PENDING, nextRetryAt: null, lastError: msg }
+      );
+      count += 1;
+    } catch (err) {
+      console.error("[SyncJob] sweep PROCESSING gagal:", err instanceof Error ? err.message : err);
+    }
+  }
+  return count;
 }
 
 /**
@@ -291,18 +381,36 @@ export async function processDueSyncJobs(opts?: {
   });
 
   for (const job of due) {
-    const claimed = await prisma.syncJob.updateMany({
-      where: { id: job.id, status: job.status },
-      data: { status: SYNC_JOB_STATUSES.PROCESSING },
-    });
-    if (claimed.count === 0) continue; // direbut worker lain
-    result.processed += 1;
+    // Isolasi per-job: satu job gagal (P2002/dll) TIDAK boleh mematikan
+    // seluruh tick — job lain di daftar yang sama tetap harus diproses.
+    try {
+      let claimed: { count: number };
+      try {
+        claimed = await prisma.syncJob.updateMany({
+          where: { id: job.id, status: job.status },
+          data: { status: SYNC_JOB_STATUSES.PROCESSING },
+        });
+      } catch (err) {
+        // P2002: triple masih punya baris PROCESSING in-flight (enqueue membuat
+        // PENDING baru selama push lama berjalan) — bukan error, biarkan tick
+        // berikutnya setelah baris lama settle.
+        if (isDeduplicationFailure(err)) continue;
+        throw err;
+      }
+      if (claimed.count === 0) continue; // direbut worker lain / baris hilang
+      result.processed += 1;
 
-    // Satu-satunya jalur percobaan (shared dengan retry manual PHASE B.2).
-    const { outcome } = await runPushAttempt(job, pusher, now);
-    if (outcome === "succeeded") result.succeeded += 1;
-    else if (outcome === "pendingRetry") result.pendingRetry += 1;
-    else result.failed += 1;
+      // Satu-satunya jalur percobaan (shared dengan retry manual PHASE B.2).
+      const { outcome } = await runPushAttempt(job, pusher, now);
+      if (outcome === "succeeded") result.succeeded += 1;
+      else if (outcome === "pendingRetry") result.pendingRetry += 1;
+      else result.failed += 1;
+    } catch (err) {
+      console.error(
+        `[SyncRetry] job ${job.id} gagal diproses (tick tetap lanjut):`,
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   return result;
@@ -361,16 +469,34 @@ export async function retrySingleSyncJob(
     throw new SyncJobRetryError("NOT_ELIGIBLE", `Status ${job.status} tidak bisa di-retry.`);
   }
 
-  const claimed = await prisma.syncJob.updateMany({
-    where: { id: job.id, status: { in: [SYNC_JOB_STATUSES.FAILED, SYNC_JOB_STATUSES.PENDING] } },
-    data: { status: SYNC_JOB_STATUSES.PROCESSING },
-  });
+  let claimed: { count: number };
+  try {
+    claimed = await prisma.syncJob.updateMany({
+      where: { id: job.id, status: { in: [SYNC_JOB_STATUSES.FAILED, SYNC_JOB_STATUSES.PENDING] } },
+      data: { status: SYNC_JOB_STATUSES.PROCESSING },
+    });
+  } catch (err) {
+    // P2002: triple ini masih punya baris PROCESSING lain (in-flight) →
+    // bentrok unique, bukan keadaan yang bisa di-retry sekarang.
+    if (isDeduplicationFailure(err)) {
+      throw new SyncJobRetryError("CONFLICT", "Job sedang diproses — coba lagi sesaat.");
+    }
+    throw err;
+  }
   if (claimed.count === 0) {
     throw new SyncJobRetryError("CONFLICT", "Job sedang diproses — coba lagi sesaat.");
   }
 
   await runPushAttempt(job, pusher, now);
 
-  const fresh = await prisma.syncJob.findUniqueOrThrow({ where: { id: job.id } });
+  const fresh = await prisma.syncJob.findUnique({ where: { id: job.id } });
+  if (!fresh) {
+    // applyStatusTransition membuang baris ini karena PENDING baru (nilai
+    // terbaru) sudah menggantikannya — bukan hilang begitu saja.
+    throw new SyncJobRetryError(
+      "CONFLICT",
+      "Job sudah digantikan antrean dengan nilai lebih baru — muat ulang daftar."
+    );
+  }
   return { id: fresh.id, status: fresh.status, retryCount: fresh.retryCount, lastError: fresh.lastError };
 }
