@@ -360,9 +360,7 @@ export async function stampProductVariantOnLabel(
 }
 
 async function fetchDocumentBytes(docUrl: string): Promise<Uint8Array> {
-  const res = await fetch(docUrl, { headers: { "User-Agent": "maxius-platform/1.0.0" } });
-  if (!res.ok) throw new Error(`unduh label gagal (HTTP ${res.status})`);
-  return new Uint8Array(await res.arrayBuffer());
+  return new Uint8Array(await downloadValidatedPdf(docUrl));
 }
 
 /**
@@ -445,3 +443,4 @@ export async function mergeShippingDocuments(
   if (count === 0) return { pdf: null, count: 0, failed };
   return { pdf: await merged.save(), count, failed };
 }
+import { downloadValidatedPdf } from "@/lib/security/validate-upload";

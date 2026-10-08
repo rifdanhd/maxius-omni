@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readValidatedUpload } from "@/lib/security/validate-upload";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { prisma } from "@/lib/db/prisma";
 import { uploadProductImage } from "@/lib/integrations/tiktokShop";
@@ -23,14 +24,11 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
     return NextResponse.json({ error: "Tidak ada akun Tokopedia | Shop valid." }, { status: 400 });
   }
 
-  const fd = await req.formData().catch(() => null);
-  const file = fd?.get("file");
-  const useCase = (fd?.get("useCase") as string | undefined) ?? "MAIN_IMAGE";
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Field 'file' wajib diisi." }, { status: 400 });
+  const { file, buffer: buf, form } = await readValidatedUpload(req);
+  const useCase = String(form.get("useCase") ?? "MAIN_IMAGE");
+  if (!["MAIN_IMAGE", "DESCRIPTION_IMAGE", "SKU_IMAGE", "CERTIFICATION_IMAGE"].includes(useCase)) {
+    return NextResponse.json({ error: "Use case tidak valid." }, { status: 400 });
   }
-
-  const buf = Buffer.from(await file.arrayBuffer());
   try {
     const { uri, url } = await uploadProductImage(
       acc.accessToken,

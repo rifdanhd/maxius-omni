@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { validateFileBytes, readLimitedStream, readValidatedUpload, IMAGE_LIMIT } from "../lib/security/validate-upload";
+const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+assert.equal(validateFileBytes(png, "image/png"), "image/png");
+assert.throws(() => validateFileBytes(png, "image/jpeg"));
+assert.throws(() => validateFileBytes(new Uint8Array(), "image/png"));
+assert.throws(() => validateFileBytes(Buffer.from("<script>evil</script>"), "image/png"));
+assert.throws(() => validateFileBytes(new Uint8Array(IMAGE_LIMIT + 1), "image/png"));
+const stream = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(9)); c.close(); } });
+await assert.rejects(readLimitedStream(stream, 8));
+const form = new FormData(); form.set("file", new File([png], "x.png", { type: "image/png" }));
+assert.equal((await readValidatedUpload(new Request("http://localhost", { method: "POST", body: form }))).mime, "image/png");
+console.log("Upload security tests passed");

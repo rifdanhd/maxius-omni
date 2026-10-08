@@ -23,6 +23,7 @@ import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
  * `failed` — label yang berhasil tetap digabung (per-item, bukan all-or-nothing).
  */
 export const POST = withAuth(async (req) => {
+  if (!req.user.canViewFullPii) return NextResponse.json({ error: "Izin PII diperlukan untuk mencetak label." }, { status: 403 });
   const body = await req.json().catch(() => null);
   const orderIds: unknown = body?.orderIds;
   const includePickingList = Boolean(body?.includePickingList);
@@ -99,6 +100,7 @@ export const POST = withAuth(async (req) => {
   }
 
   const result = await mergeShippingDocuments(items);
+  await prisma.piiAccessLog.create({ data: { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, action: "READ_SHIPPING_LABEL_BATCH", detail: `orders=${orders.map(o => o.id).join(",")}` } });
 
   return NextResponse.json({
     ok: true,

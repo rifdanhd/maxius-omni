@@ -16,6 +16,7 @@ import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
  * pdfBase64 kosong bila tidak ada satu pun label yang berhasil.
  */
 export const POST = withAuth(async (req) => {
+  if (!req.user.canViewFullPii) return NextResponse.json({ error: "Izin PII diperlukan untuk mencetak label." }, { status: 403 });
   const body = await req.json().catch(() => null);
   const orderIds: unknown = body?.orderIds;
 

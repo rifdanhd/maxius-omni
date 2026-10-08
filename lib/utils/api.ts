@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/services/auth.service";
 import { prisma } from "@/lib/db/prisma";
+import { UploadValidationError } from "@/lib/security/validate-upload";
 import {
   BusinessScopeError,
   resolveRequestBusiness,
@@ -77,6 +78,7 @@ export function withAuth(
     try {
       return await handler(req as AuthenticatedRequest, ctx);
     } catch (e) {
+      if (e instanceof UploadValidationError) return Response.json({ error: e.message }, { status: e.status });
       console.error("[withAuth] handler error:", e);
       return Response.json({ error: "Terjadi kesalahan server." }, { status: 500 });
     }

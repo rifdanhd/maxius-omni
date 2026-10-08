@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
+import { downloadValidatedPdf } from "@/lib/security/validate-upload";
 
 /**
  * Label pengiriman RESMI dari TikTok (GetPackageShippingDocument).
@@ -16,6 +17,7 @@ import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 export const GET = withAuth(
   async (req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
     const { id } = (await ctx?.params) ?? {};
+    if (!req.user.canViewFullPii) return NextResponse.json({ error: "Izin PII diperlukan untuk mencetak label." }, { status: 403 });
 
     const order = await prisma.order.findUnique({
       where: { id },
@@ -74,17 +76,16 @@ export const GET = withAuth(
 
     let pdfBase64: string | null = null;
     try {
-      const res = await fetch(docUrl, { headers: { "User-Agent": "maxius-platform/1.0.0" } });
-      if (res.ok) {
-        const rawBytes = new Uint8Array(await res.arrayBuffer());
-        pdfBase64 = Buffer.from(rawBytes).toString("base64");
-      }
+      pdfBase64 = (await downloadValidatedPdf(docUrl)).toString("base64");
     } catch (e) {
       console.error("[Label] Gagal mengunduh label resmi:", e);
+      return NextResponse.json({ error: "Dokumen label tidak valid atau tidak tersedia." }, { status: 502 });
     }
 
+    await prisma.piiAccessLog.create({ data: { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, orderId: order.id, action: "READ_SHIPPING_LABEL" } });
+
     return NextResponse.json({
-      docUrl,
+      docUrl: null,
       pdfBase64,
       trackingNumber,
       packageId,

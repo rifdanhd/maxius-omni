@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readValidatedUpload } from "@/lib/security/validate-upload";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -26,15 +27,9 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
     return NextResponse.json({ error: "Tidak ada akun Tokopedia | Shop valid." }, { status: 400 });
   }
 
-  const fd = await req.formData().catch(() => null);
-  const file = fd?.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Field 'file' wajib diisi." }, { status: 400 });
-  }
-
-  const buf = Buffer.from(await file.arrayBuffer());
+  const { file, buffer: buf, mime } = await readValidatedUpload(req, true);
   const fileName = file.name || "certificate";
-  const isImage = file.type.startsWith("image/");
+  const isImage = mime.startsWith("image/");
   try {
     if (isImage) {
       const { uri } = await uploadProductImage(acc.accessToken, buf, "CERTIFICATION_IMAGE", fileName);

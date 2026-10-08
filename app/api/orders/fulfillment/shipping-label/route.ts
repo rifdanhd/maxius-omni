@@ -21,6 +21,7 @@ import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
  * Per-item error handling — order tanpa label tidak membatalkan yang lain.
  */
 export const POST = withAuth(async (req) => {
+  if (!req.user.canViewFullPii) return NextResponse.json({ error: "Izin PII diperlukan untuk mencetak label." }, { status: 403 });
   const body = await req.json().catch(() => null);
   const orderIds: unknown = body?.orderIds;
   const includePickingList = Boolean(body?.includePickingList);
