@@ -4,6 +4,8 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 
 ## Completed findings
 
+- 1.1 follow-up/3 review: API response guard strips secrets/raw provider payloads and masks buyer/recipient/return evidence/free-text for unauthorized users; authorized PII/PDF responses are audited before returning. Official label UI uses the validated PDF bytes rather than a provider URL. Response privacy test passed.
+
 - 3.2/3.4: bounded fail-closed login/user/API rate budgets; JSON bodies bounded before parsing and validated by zod quantity schemas, unsupported types rejected, internal 5xx messages sanitized. CSRF/role/rate regression tests passed.
 
 - 3.1/3.3: browser JWT storage removed; httpOnly cookie login/session/logout/business switch, CSRF Origin protection, route proxy, DB membership role enforcement, signed business scope, and role-change revocation. Existing default demo seed now restricted to local test DB and requires an explicit strong test password; production seed grants only bootstrap owner access.

@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { sanitizeApiPayload } from "../lib/security/response-policy";
+const input = { buyer: { email: "jane@gmail.com", phone: "12345" }, rawPayload: '{"address":"secret"}', accessToken: "secret-token", buyerEvidence: "address photo", nested: { clientSecret: "secret", docUrl: "https://label.example" } };
+const masked = sanitizeApiPayload(input, false);
+assert.deepEqual(masked.value, { buyer: { email: "j***@gmail.com", phone: "***" }, buyerEvidence: "***", nested: { docUrl: null } });
+assert.equal(masked.fullPii, false);
+const full = sanitizeApiPayload(input, true);
+assert.equal(full.fullPii, true);
+assert.equal("rawPayload" in (full.value as object), false);
+console.log("Response privacy and secret redaction tests passed");

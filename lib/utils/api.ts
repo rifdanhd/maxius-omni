@@ -7,6 +7,7 @@ import { UploadValidationError, readLimitedStream } from "@/lib/security/validat
 import { limiter, rateLimitedResponse } from "@/lib/security/rate-limit";
 import { InputError, validateApiJson } from "@/lib/security/input";
 import { ZodError } from "zod";
+import { sanitizeApiPayload } from "@/lib/security/response-policy";
 import {
   BusinessScopeError,
   resolveRequestBusiness,
@@ -111,6 +112,12 @@ export function withAuth(
       response.headers.set("Cache-Control", "private, no-store");
       if (response.status >= 500 && response.headers.get("content-type")?.includes("application/json")) {
         return Response.json({ error: "Operasi gagal. Coba lagi atau periksa log server." }, { status: response.status, headers: { "Cache-Control": "private, no-store" } });
+      }
+      if (response.ok && response.headers.get("content-type")?.includes("application/json")) {
+        const clean = sanitizeApiPayload(await response.json(), user.canViewFullPii);
+        if (clean.fullPii) await prisma.piiAccessLog.create({ data: { id: crypto.randomUUID(), userId: user.id, username: user.username, action: "READ_API_PII", detail: `${req.method} ${req.nextUrl.pathname}` } });
+        response.headers.delete("Content-Length");
+        return Response.json(clean.value, { status: response.status, headers: response.headers });
       }
       return response;
     } catch (e) {
