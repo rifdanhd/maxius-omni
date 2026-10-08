@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -182,4 +182,3 @@ export const ProductV202404ApiOperationNames = {
 export type ProductV202404ApiOperationTypes = {
     ImagesOptimizePost: ProductV202404Api['ImagesOptimizePost'];
 };
-

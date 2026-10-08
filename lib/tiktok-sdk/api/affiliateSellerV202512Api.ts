@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -214,4 +214,3 @@ export const AffiliateSellerV202512ApiOperationNames = {
 export type AffiliateSellerV202512ApiOperationTypes = {
     SampleApplicationsDeeplinkGet: AffiliateSellerV202512Api['SampleApplicationsDeeplinkGet'];
 };
-

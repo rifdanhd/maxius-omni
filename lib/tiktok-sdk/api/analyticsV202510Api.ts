@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -290,4 +290,3 @@ export const AnalyticsV202510ApiOperationNames = {
 export type AnalyticsV202510ApiOperationTypes = {
     ShopLivesLiveIdPerformancePerMinutesGet: AnalyticsV202510Api['ShopLivesLiveIdPerformancePerMinutesGet'];ShopPerformanceDatePerformancePerHourGet: AnalyticsV202510Api['ShopPerformanceDatePerformancePerHourGet'];
 };
-

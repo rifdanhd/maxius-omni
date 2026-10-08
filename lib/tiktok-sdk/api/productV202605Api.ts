@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -363,4 +363,3 @@ export const ProductV202605ApiOperationNames = {
 export type ProductV202605ApiOperationTypes = {
     SkppsProductIdGet: ProductV202605Api['SkppsProductIdGet'];SkppsSearchPost: ProductV202605Api['SkppsSearchPost'];SkppsSumGet: ProductV202605Api['SkppsSumGet'];
 };
-

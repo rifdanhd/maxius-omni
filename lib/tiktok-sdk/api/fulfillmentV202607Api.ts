@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -257,4 +257,3 @@ export const FulfillmentV202607ApiOperationNames = {
 export type FulfillmentV202607ApiOperationTypes = {
     OrdersCustomsInfoQueryPost: FulfillmentV202607Api['OrdersCustomsInfoQueryPost'];OrdersCustomsInfoSubmitPost: FulfillmentV202607Api['OrdersCustomsInfoSubmitPost'];
 };
-

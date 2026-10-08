@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -281,4 +281,3 @@ export const PromotionV202406ApiOperationNames = {
 export type PromotionV202406ApiOperationTypes = {
     CouponsCouponIdGet: PromotionV202406Api['CouponsCouponIdGet'];CouponsSearchPost: PromotionV202406Api['CouponsSearchPost'];
 };
-

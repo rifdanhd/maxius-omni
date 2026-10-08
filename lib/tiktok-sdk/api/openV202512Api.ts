@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -187,4 +187,3 @@ export const OpenV202512ApiOperationNames = {
 export type OpenV202512ApiOperationTypes = {
     FileInitPost: OpenV202512Api['FileInitPost'];
 };
-

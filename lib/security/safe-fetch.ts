@@ -73,7 +73,6 @@ export async function safeFetch(raw: string | URL, options: SafeFetchOptions = {
       const req = request(url, {
         agent: false,
         family: target.family,
-        autoSelectFamily: false,
         headers: { ...options.headers, "accept-encoding": "identity" },
         // Pin the validated address. TLS still validates the original hostname.
         lookup: (_host, _options, callback) => callback(null, target.address, target.family),

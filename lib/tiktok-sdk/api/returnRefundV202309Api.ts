@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -1237,4 +1237,3 @@ export const ReturnRefundV202309ApiOperationNames = {
 export type ReturnRefundV202309ApiOperationTypes = {
     CancellationsCancelIdApprovePost: ReturnRefundV202309Api['CancellationsCancelIdApprovePost'];CancellationsCancelIdRejectPost: ReturnRefundV202309Api['CancellationsCancelIdRejectPost'];CancellationsPost: ReturnRefundV202309Api['CancellationsPost'];CancellationsSearchPost: ReturnRefundV202309Api['CancellationsSearchPost'];OrdersOrderIdAftersaleEligibilityGet: ReturnRefundV202309Api['OrdersOrderIdAftersaleEligibilityGet'];RefundsCalculatePost: ReturnRefundV202309Api['RefundsCalculatePost'];RejectReasonsGet: ReturnRefundV202309Api['RejectReasonsGet'];ReturnsPost: ReturnRefundV202309Api['ReturnsPost'];ReturnsReturnIdApprovePost: ReturnRefundV202309Api['ReturnsReturnIdApprovePost'];ReturnsReturnIdRecordsGet: ReturnRefundV202309Api['ReturnsReturnIdRecordsGet'];ReturnsReturnIdRejectPost: ReturnRefundV202309Api['ReturnsReturnIdRejectPost'];ReturnsSearchPost: ReturnRefundV202309Api['ReturnsSearchPost'];
 };
-

@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -300,4 +300,3 @@ export const FinanceV202501ApiOperationNames = {
 export type FinanceV202501ApiOperationTypes = {
     OrdersOrderIdStatementTransactionsGet: FinanceV202501Api['OrdersOrderIdStatementTransactionsGet'];StatementsStatementIdStatementTransactionsGet: FinanceV202501Api['StatementsStatementIdStatementTransactionsGet'];
 };
-

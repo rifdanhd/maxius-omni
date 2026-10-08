@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -182,4 +182,3 @@ export const OrderV202511ApiOperationNames = {
 export type OrderV202511ApiOperationTypes = {
     OrdersBlindBoxResultCallbackPost: OrderV202511Api['OrdersBlindBoxResultCallbackPost'];
 };
-

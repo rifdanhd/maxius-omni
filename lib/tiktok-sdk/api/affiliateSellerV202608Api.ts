@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -808,4 +808,3 @@ export const AffiliateSellerV202608ApiOperationNames = {
 export type AffiliateSellerV202608ApiOperationTypes = {
     ConversationsConversationIdStatusPost: AffiliateSellerV202608Api['ConversationsConversationIdStatusPost'];ConversationsGroupCountsGet: AffiliateSellerV202608Api['ConversationsGroupCountsGet'];CreatorOutreachRecordsQueryPost: AffiliateSellerV202608Api['CreatorOutreachRecordsQueryPost'];MarketplaceCreatorsCreatorUserIdGet: AffiliateSellerV202608Api['MarketplaceCreatorsCreatorUserIdGet'];MarketplaceCreatorsSearchFilterPost: AffiliateSellerV202608Api['MarketplaceCreatorsSearchFilterPost'];MarketplaceCreatorsSearchPost: AffiliateSellerV202608Api['MarketplaceCreatorsSearchPost'];MediaUploadPost: AffiliateSellerV202608Api['MediaUploadPost'];TargetCollaborationsCreatorPromotionDetailsQueryPost: AffiliateSellerV202608Api['TargetCollaborationsCreatorPromotionDetailsQueryPost'];
 };
-

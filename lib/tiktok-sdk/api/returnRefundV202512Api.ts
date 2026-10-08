@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -196,4 +196,3 @@ export const ReturnRefundV202512ApiOperationNames = {
 export type ReturnRefundV202512ApiOperationTypes = {
     OrdersOrderIdAftersaleEligibilityGet: ReturnRefundV202512Api['OrdersOrderIdAftersaleEligibilityGet'];
 };
-

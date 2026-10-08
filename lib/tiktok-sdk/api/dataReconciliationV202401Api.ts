@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -182,4 +182,3 @@ export const DataReconciliationV202401ApiOperationNames = {
 export type DataReconciliationV202401ApiOperationTypes = {
     OrdersImportPost: DataReconciliationV202401Api['OrdersImportPost'];
 };
-

@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -179,4 +179,3 @@ export const AuthorizationV202401ApiOperationNames = {
 export type AuthorizationV202401ApiOperationTypes = {
     WidgetTokenGet: AuthorizationV202401Api['WidgetTokenGet'];
 };
-

@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -360,4 +360,3 @@ export const ProductV202507ApiOperationNames = {
 export type ProductV202507ApiOperationTypes = {
     GlobalListingRulesGet: ProductV202507Api['GlobalListingRulesGet'];ProductsProductIdGlobalReplicatePost: ProductV202507Api['ProductsProductIdGlobalReplicatePost'];ProductsProductIdReplicatedProductsGet: ProductV202507Api['ProductsProductIdReplicatedProductsGet'];
 };
-

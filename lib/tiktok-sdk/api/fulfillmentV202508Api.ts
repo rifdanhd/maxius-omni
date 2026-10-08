@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -189,4 +189,3 @@ export const FulfillmentV202508ApiOperationNames = {
 export type FulfillmentV202508ApiOperationTypes = {
     TtsTrackingValidationGet: FulfillmentV202508Api['TtsTrackingValidationGet'];
 };
-

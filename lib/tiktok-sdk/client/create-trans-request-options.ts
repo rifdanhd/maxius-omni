@@ -1,4 +1,4 @@
-import localVarRequest from "request";
+import localVarRequest from "@/lib/security/sdk-request";
 import { Interceptor } from "../model/models";
 import { generateSign } from "../utils/generate-sign";
 import { TikTokShopNodeApiClient } from "./client";

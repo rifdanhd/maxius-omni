@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -196,4 +196,3 @@ export const CustomerServiceV202601ApiOperationNames = {
 export type CustomerServiceV202601ApiOperationTypes = {
     ConversationsConversationIdGet: CustomerServiceV202601Api['ConversationsConversationIdGet'];
 };
-

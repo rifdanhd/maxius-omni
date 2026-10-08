@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -177,4 +177,3 @@ export const FulfillmentV202407ApiOperationNames = {
 export type FulfillmentV202407ApiOperationTypes = {
     BundlesPost: FulfillmentV202407Api['BundlesPost'];
 };
-

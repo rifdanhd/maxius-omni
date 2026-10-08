@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -349,4 +349,3 @@ export const EventV202309ApiOperationNames = {
 export type EventV202309ApiOperationTypes = {
     WebhooksDelete: EventV202309Api['WebhooksDelete'];WebhooksGet: EventV202309Api['WebhooksGet'];WebhooksPut: EventV202309Api['WebhooksPut'];
 };
-

@@ -59,7 +59,7 @@ export function withAuth(
     const user = {
       id: dbUser.id,
       username: dbUser.username,
-      canViewFullPii: mayViewPii(payload, dbUser),
+      canViewFullPii: mayViewPii({ canViewFullPii: payload.canViewFullPii }, dbUser),
     };
     (req as AuthenticatedRequest).user = user;
 

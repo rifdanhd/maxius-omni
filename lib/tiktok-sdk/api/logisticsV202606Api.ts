@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -204,4 +204,3 @@ export const LogisticsV202606ApiOperationNames = {
 export type LogisticsV202606ApiOperationTypes = {
     SellerTemplateTemplateExistGet: LogisticsV202606Api['SellerTemplateTemplateExistGet'];
 };
-

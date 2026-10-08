@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import localVarRequest from "request";
+import localVarRequest from "@/lib/security/sdk-request";
 const excludeKeys = ["access_token", "sign"] as const;
 export const generateSign = (
   requestOption: localVarRequest.Options,

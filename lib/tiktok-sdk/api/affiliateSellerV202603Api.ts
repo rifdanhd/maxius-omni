@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -363,4 +363,3 @@ export const AffiliateSellerV202603ApiOperationNames = {
 export type AffiliateSellerV202603ApiOperationTypes = {
     CompassOfflineTaskPost: AffiliateSellerV202603Api['CompassOfflineTaskPost'];CompassOfflineTasksGet: AffiliateSellerV202603Api['CompassOfflineTasksGet'];CompassOfflineTasksTaskIdFileGet: AffiliateSellerV202603Api['CompassOfflineTasksTaskIdFileGet'];
 };
-

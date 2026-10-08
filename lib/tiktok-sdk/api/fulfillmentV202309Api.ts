@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -2121,4 +2121,3 @@ export const FulfillmentV202309ApiOperationNames = {
 export type FulfillmentV202309ApiOperationTypes = {
     CombinablePackagesSearchGet: FulfillmentV202309Api['CombinablePackagesSearchGet'];FilesUploadPost: FulfillmentV202309Api['FilesUploadPost'];ImagesUploadPost: FulfillmentV202309Api['ImagesUploadPost'];OrdersOrderIdHandoverTimeSlotsGet: FulfillmentV202309Api['OrdersOrderIdHandoverTimeSlotsGet'];OrdersOrderIdPackagesPost: FulfillmentV202309Api['OrdersOrderIdPackagesPost'];OrdersOrderIdShippingInfoUpdatePost: FulfillmentV202309Api['OrdersOrderIdShippingInfoUpdatePost'];OrdersOrderIdShippingServicesQueryPost: FulfillmentV202309Api['OrdersOrderIdShippingServicesQueryPost'];OrdersOrderIdSplitPost: FulfillmentV202309Api['OrdersOrderIdSplitPost'];OrdersOrderIdTrackingGet: FulfillmentV202309Api['OrdersOrderIdTrackingGet'];OrdersSplitAttributesGet: FulfillmentV202309Api['OrdersSplitAttributesGet'];PackagesCombinePost: FulfillmentV202309Api['PackagesCombinePost'];PackagesDeliverPost: FulfillmentV202309Api['PackagesDeliverPost'];PackagesPackageIdGet: FulfillmentV202309Api['PackagesPackageIdGet'];PackagesPackageIdHandoverTimeSlotsGet: FulfillmentV202309Api['PackagesPackageIdHandoverTimeSlotsGet'];PackagesPackageIdShipPost: FulfillmentV202309Api['PackagesPackageIdShipPost'];PackagesPackageIdShippingDocumentsGet: FulfillmentV202309Api['PackagesPackageIdShippingDocumentsGet'];PackagesPackageIdShippingInfoUpdatePost: FulfillmentV202309Api['PackagesPackageIdShippingInfoUpdatePost'];PackagesPackageIdUncombinePost: FulfillmentV202309Api['PackagesPackageIdUncombinePost'];PackagesPost: FulfillmentV202309Api['PackagesPost'];PackagesSchedulePost: FulfillmentV202309Api['PackagesSchedulePost'];PackagesSearchPost: FulfillmentV202309Api['PackagesSearchPost'];PackagesShipPost: FulfillmentV202309Api['PackagesShipPost'];
 };
-

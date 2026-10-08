@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -3079,4 +3079,3 @@ export const ProductV202309ApiOperationNames = {
 export type ProductV202309ApiOperationTypes = {
     BrandsGet: ProductV202309Api['BrandsGet'];BrandsPost: ProductV202309Api['BrandsPost'];CategoriesCategoryIdAttributesGet: ProductV202309Api['CategoriesCategoryIdAttributesGet'];CategoriesCategoryIdGlobalAttributesGet: ProductV202309Api['CategoriesCategoryIdGlobalAttributesGet'];CategoriesCategoryIdGlobalRulesGet: ProductV202309Api['CategoriesCategoryIdGlobalRulesGet'];CategoriesCategoryIdRulesGet: ProductV202309Api['CategoriesCategoryIdRulesGet'];CategoriesGet: ProductV202309Api['CategoriesGet'];CategoriesRecommendPost: ProductV202309Api['CategoriesRecommendPost'];FilesUploadPost: ProductV202309Api['FilesUploadPost'];GlobalCategoriesGet: ProductV202309Api['GlobalCategoriesGet'];GlobalCategoriesRecommendPost: ProductV202309Api['GlobalCategoriesRecommendPost'];GlobalProductsDelete: ProductV202309Api['GlobalProductsDelete'];GlobalProductsGlobalProductIdGet: ProductV202309Api['GlobalProductsGlobalProductIdGet'];GlobalProductsGlobalProductIdInventoryUpdatePost: ProductV202309Api['GlobalProductsGlobalProductIdInventoryUpdatePost'];GlobalProductsGlobalProductIdPublishPost: ProductV202309Api['GlobalProductsGlobalProductIdPublishPost'];GlobalProductsGlobalProductIdPut: ProductV202309Api['GlobalProductsGlobalProductIdPut'];GlobalProductsPost: ProductV202309Api['GlobalProductsPost'];GlobalProductsSearchPost: ProductV202309Api['GlobalProductsSearchPost'];ImagesUploadPost: ProductV202309Api['ImagesUploadPost'];InventorySearchPost: ProductV202309Api['InventorySearchPost'];PrerequisitesGet: ProductV202309Api['PrerequisitesGet'];ProductsActivatePost: ProductV202309Api['ProductsActivatePost'];ProductsDeactivatePost: ProductV202309Api['ProductsDeactivatePost'];ProductsDelete: ProductV202309Api['ProductsDelete'];ProductsListingCheckPost: ProductV202309Api['ProductsListingCheckPost'];ProductsPost: ProductV202309Api['ProductsPost'];ProductsProductIdGet: ProductV202309Api['ProductsProductIdGet'];ProductsProductIdInventoryUpdatePost: ProductV202309Api['ProductsProductIdInventoryUpdatePost'];ProductsProductIdPartialEditPost: ProductV202309Api['ProductsProductIdPartialEditPost'];ProductsProductIdPricesUpdatePost: ProductV202309Api['ProductsProductIdPricesUpdatePost'];ProductsProductIdPut: ProductV202309Api['ProductsProductIdPut'];ProductsRecoverPost: ProductV202309Api['ProductsRecoverPost'];ProductsSearchPost: ProductV202309Api['ProductsSearchPost'];
 };
-

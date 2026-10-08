@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -187,4 +187,3 @@ export const ReturnRefundV202604ApiOperationNames = {
 export type ReturnRefundV202604ApiOperationTypes = {
     RmaSearchPost: ReturnRefundV202604Api['RmaSearchPost'];
 };
-

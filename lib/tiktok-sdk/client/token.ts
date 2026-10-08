@@ -1,5 +1,5 @@
 import { ClientConfiguration } from "./config";
-import localVarRequest from "request";
+import localVarRequest from "@/lib/security/sdk-request";
 
 const auth_host = "https://auth.tiktok-shops.com";
 

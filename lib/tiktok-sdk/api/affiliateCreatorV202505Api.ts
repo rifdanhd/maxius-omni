@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -272,4 +272,3 @@ export const AffiliateCreatorV202505ApiOperationNames = {
 export type AffiliateCreatorV202505ApiOperationTypes = {
     AffiliateSharingLinksGeneralPublishersGenerateBatchPost: AffiliateCreatorV202505Api['AffiliateSharingLinksGeneralPublishersGenerateBatchPost'];OrdersTraceSearchPost: AffiliateCreatorV202505Api['OrdersTraceSearchPost'];
 };
-

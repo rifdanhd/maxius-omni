@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -396,4 +396,3 @@ export const AffiliateSellerV202505ApiOperationNames = {
 export type AffiliateSellerV202505ApiOperationTypes = {
     ConversationsGet: AffiliateSellerV202505Api['ConversationsGet'];MarketplaceCreatorsCreatorUserIdGet: AffiliateSellerV202505Api['MarketplaceCreatorsCreatorUserIdGet'];MarketplaceCreatorsSearchPost: AffiliateSellerV202505Api['MarketplaceCreatorsSearchPost'];
 };
-

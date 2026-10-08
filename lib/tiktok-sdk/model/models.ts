@@ -1,4 +1,4 @@
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 
 export * from './affiliateCreator/V202407/GenerateAffiliateSharingLinkRequestBody';
 export * from './affiliateCreator/V202407/GenerateAffiliateSharingLinkRequestBodyMaterial';

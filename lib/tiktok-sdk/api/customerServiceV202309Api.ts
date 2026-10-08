@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -864,4 +864,3 @@ export const CustomerServiceV202309ApiOperationNames = {
 export type CustomerServiceV202309ApiOperationTypes = {
     AgentsSettingsGet: CustomerServiceV202309Api['AgentsSettingsGet'];AgentsSettingsPut: CustomerServiceV202309Api['AgentsSettingsPut'];ConversationsConversationIdMessagesGet: CustomerServiceV202309Api['ConversationsConversationIdMessagesGet'];ConversationsConversationIdMessagesPost: CustomerServiceV202309Api['ConversationsConversationIdMessagesPost'];ConversationsConversationIdMessagesReadPost: CustomerServiceV202309Api['ConversationsConversationIdMessagesReadPost'];ConversationsGet: CustomerServiceV202309Api['ConversationsGet'];ConversationsPost: CustomerServiceV202309Api['ConversationsPost'];ImagesUploadPost: CustomerServiceV202309Api['ImagesUploadPost'];
 };
-

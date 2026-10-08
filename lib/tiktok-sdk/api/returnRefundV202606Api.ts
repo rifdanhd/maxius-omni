@@ -11,7 +11,7 @@
  */
 
 
-import localVarRequest from 'request';
+import localVarRequest from "@/lib/security/sdk-request";
 import http from 'http';
 
 /* tslint:disable:no-unused-locals */
@@ -391,4 +391,3 @@ export const ReturnRefundV202606ApiOperationNames = {
 export type ReturnRefundV202606ApiOperationTypes = {
     AftersalesReviewPost: ReturnRefundV202606Api['AftersalesReviewPost'];ReturnsReturnIdRejectPost: ReturnRefundV202606Api['ReturnsReturnIdRejectPost'];ReviewDecisionGet: ReturnRefundV202606Api['ReviewDecisionGet'];
 };
-
