@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { verifyToken } from "@/lib/services/auth.service";
-import { prisma } from "@/lib/db/prisma";
+import { verifyToken, verifiedTokenUser } from "@/lib/services/auth.service";
+import { mayViewPii } from "@/lib/security/auth-policy";
 import { UploadValidationError } from "@/lib/security/validate-upload";
 import {
   BusinessScopeError,
@@ -54,14 +54,12 @@ export function withAuth(
       );
     }
 
-    const dbUser = typeof payload.sub === "string"
-      ? await prisma.user.findUnique({ where: { id: payload.sub } })
-      : null;
+    const dbUser = await verifiedTokenUser(payload);
     if (!dbUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const user = {
       id: dbUser.id,
       username: dbUser.username,
-      canViewFullPii: payload.canViewFullPii === true && dbUser.canViewFullPii === true,
+      canViewFullPii: mayViewPii(payload, dbUser),
     };
     (req as AuthenticatedRequest).user = user;
 

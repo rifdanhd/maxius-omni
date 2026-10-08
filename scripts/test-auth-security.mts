@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { tokenMatchesUser, mayViewPii } from "../lib/security/auth-policy";
+const user = { id: "u", tokenVersion: 2, canViewFullPii: true };
+assert.equal(tokenMatchesUser({ sub: "u", tokenVersion: 2 }, user), true);
+assert.equal(tokenMatchesUser({ sub: "u", tokenVersion: 1 }, user), false);
+assert.equal(tokenMatchesUser({ sub: "u" }, user), false);
+assert.equal(tokenMatchesUser({ sub: "u", tokenVersion: 2 }, null), false);
+assert.equal(mayViewPii({}, user), false);
+assert.equal(mayViewPii({ canViewFullPii: true }, { canViewFullPii: false }), false);
+console.log("Auth revocation and permission tests passed");

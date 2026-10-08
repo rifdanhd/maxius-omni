@@ -74,7 +74,7 @@ async function handleCallback(req: NextRequest) {
 
   // Sesi login wajib + brand harus milik user yang login (cookie brand bisa
   // dipalsukan sendiri → cek keanggotaan, bukan sekadar keberadaan id).
-  const session = verifySessionCookie(req);
+  const session = await verifySessionCookie(req);
   if (!session) {
     return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
   }

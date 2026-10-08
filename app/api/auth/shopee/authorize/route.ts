@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   }
   // Sesi login wajib: brand yg diikatkan ke akun baru harus milik user yang
   // login (cookie brand bisa dipalsukan sendiri → wajib divalidasi keanggotaan).
-  const session = verifySessionCookie(req);
+  const session = await verifySessionCookie(req);
   if (!session) {
     return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
   }

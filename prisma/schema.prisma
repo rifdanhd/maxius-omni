@@ -585,7 +585,8 @@ model User {
   // Email undangan utk Google login (invite-only) — null = belum bisa Google.
   email          String?        @unique
   passwordHash   String
-  canViewFullPii Boolean        @default(true)
+  canViewFullPii Boolean        @default(false)
+  tokenVersion  Int            @default(0)
   stockLedger    StockLedger[]
   stockOpname    StockOpname[]
   userBusiness   UserBusiness[]
