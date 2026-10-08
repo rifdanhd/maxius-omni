@@ -4,6 +4,8 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 
 ## Completed findings
 
+- 2.3: mapping creation now commits product/variant/image/INIT ledger/mapping/backfill in one transaction. Orphan-to-new-master backfill moved into its transaction. Added read-only orphan detector; PostgreSQL rollback test scheduled for stage 5.
+
 - 2.2: zod rejects fractional/string/negative/out-of-range quantities; strict stock-in, adjustment and opname schemas; recursive quantity checks on JSON APIs; service guards prevent rounding in manual sales, orphan mapping and copied drafts. Integer-input tests passed.
 
 - 1.1: centralized email/free-text masking; short phones and short addresses no longer reveal raw values. Order lists always masked; detail permission rechecked in DB and full access logged. PII regression test passed.

@@ -19,6 +19,7 @@
  *    0 / yang diminta user) — audit trail tetap utuh, tidak ada UPDATE diam.
  */
 import { stockQuantity } from "@/lib/security/input";
+import type { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
@@ -110,8 +111,8 @@ export async function findOrphanSkus(businessId: string): Promise<OrphanSku[]> {
 }
 
 /** Backfill OrderItem historis yang masih orphan untuk (accountId, channelSku). */
-export async function backfillOrderItems(accountId: string, channelSku: string, variantId: string) {
-  const res = await prisma.orderItem.updateMany({
+export async function backfillOrderItems(accountId: string, channelSku: string, variantId: string, tx: Prisma.TransactionClient = prisma) {
+  const res = await tx.orderItem.updateMany({
     where: { channelSku, variantId: null, order: { accountId } },
     data: { variantId },
   });
@@ -198,7 +199,7 @@ export async function mapOrphanToNewMaster(params: {
     );
   }
 
-  const { masterId, variantId, mappingId } = await prisma.$transaction(async (tx) => {
+  const { masterId, variantId, mappingId, backfilled } = await prisma.$transaction(async (tx) => {
     const product = await tx.masterProduct.create({
       data: {
         name: params.newProductName?.trim() || params.channelSku,
@@ -237,9 +238,8 @@ export async function mapOrphanToNewMaster(params: {
       },
     });
 
-    return { masterId: product.id, variantId: variant.id, mappingId: mapping.id };
+    const backfilled = await backfillOrderItems(params.accountId, params.channelSku, variant.id, tx);
+    return { masterId: product.id, variantId: variant.id, mappingId: mapping.id, backfilled };
   });
-
-  const backfilled = await backfillOrderItems(params.accountId, params.channelSku, variantId);
   return { masterProductId: masterId, variantId, mappingId, backfilled };
 }

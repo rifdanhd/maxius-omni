@@ -79,10 +79,13 @@ export const POST = withAuth(async (req) => {
     ? body.imageUrl.trim()
     : null;
 
+  const settings = await getCachedInventorySettings(req.businessId);
+  try {
+  return await prisma.$transaction(async (tx) => {
   let variantId = body.variantId;
 
   if (variantId) {
-    const variant = await prisma.productVariant.findUnique({
+    const variant = await tx.productVariant.findUnique({
       where: { id: variantId },
       include: { masterProduct: { select: { businessId: true } } },
     });
@@ -96,7 +99,7 @@ export const POST = withAuth(async (req) => {
     }
   } else if (body.masterProductId?.trim()) {
     // Varian baru di bawah master existing.
-    const master = await prisma.masterProduct.findUnique({
+    const master = await tx.masterProduct.findUnique({
       where: { id: body.masterProductId.trim() },
     });
     if (!master) {
@@ -107,7 +110,7 @@ export const POST = withAuth(async (req) => {
     } catch {
       return NextResponse.json({ error: "Produk master tidak ditemukan." }, { status: 400 });
     }
-    const created = await prisma.productVariant.create({
+    const created = await tx.productVariant.create({
       data: {
         sku: body.sku?.trim() || channelSku,
         stock: newStock,
@@ -118,7 +121,7 @@ export const POST = withAuth(async (req) => {
     });
     variantId = created.id;
 
-    await prisma.stockLedger.create({
+    await tx.stockLedger.create({
       data: {
         id: crypto.randomUUID(),
         variantId,
@@ -132,8 +135,7 @@ export const POST = withAuth(async (req) => {
     // Buat produk + varian baru sekaligus, lalu mapping di bawah.
     // Ambang awal produk baru = setting Pengaturan Inventori brand aktif
     // (produk existing tetap pakai threshold per-produk masing-masing).
-    const settings = await getCachedInventorySettings(req.businessId);
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await (async () => {
       const product = await tx.masterProduct.create({
         data: {
           name: body.newProductName?.trim() || channelSku,
@@ -157,11 +159,11 @@ export const POST = withAuth(async (req) => {
         });
       }
       return variant;
-    });
+    })();
     variantId = created.id;
 
     // Catat stok awal sebagai titik nol audit.
-    await prisma.stockLedger.create({
+    await tx.stockLedger.create({
       data: {
         id: crypto.randomUUID(),
         variantId,
@@ -173,15 +175,15 @@ export const POST = withAuth(async (req) => {
     });
   }
 
-  try {
-    const mapping = await prisma.productMapping.create({
+    const mapping = await tx.productMapping.create({
       data: { id: crypto.randomUUID(), accountId, channelSku, variantId, updatedAt: new Date() },
       include: mappingInclude,
     });
     // Backfill OrderItem historis yang masih orphan utk SKU ini — analytics
     // (topProducts) langsung menampilkan produk master, bukan SKU mentah.
-    const backfilled = await backfillOrderItems(accountId, channelSku, variantId);
+    const backfilled = await backfillOrderItems(accountId, channelSku, variantId, tx);
     return NextResponse.json({ ok: true, mapping, backfilled }, { status: 201 });
+  });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(
