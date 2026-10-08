@@ -132,8 +132,7 @@ function isExtreme(value: number): boolean {
 }
 
 const authHeaders = (): HeadersInit => {
-  const token = localStorage.getItem("token");
-  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  return { "Content-Type": "application/json" };
 };
 
 /**

@@ -89,12 +89,11 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("token");
   const res = await authFetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      
       ...(init?.headers ?? {}),
     },
   });

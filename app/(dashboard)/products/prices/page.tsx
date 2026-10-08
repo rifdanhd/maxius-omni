@@ -268,10 +268,9 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     setErr(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/products/pricing/bulk-upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv: csvText.text }),
       });
       const data = await res.json().catch(() => null);
@@ -459,11 +458,10 @@ export default function KelolaHargaPage() {
   useEffect(() => {
     async function loadMeta() {
       try {
-        const token = localStorage.getItem("token");
         const [accRes, catRes] = await Promise.all([
-          authFetch("/api/accounts", { headers: { Authorization: `Bearer ${token}` } }),
+          authFetch("/api/accounts", { headers: { } }),
           authFetch("/api/products/pricing?pageSize=1000", {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { },
           }),
         ]);
         if (accRes.ok) {
@@ -486,7 +484,6 @@ export default function KelolaHargaPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const sp = new URLSearchParams({
       page: String(page),
       pageSize: String(PAGE_SIZE),
@@ -502,7 +499,7 @@ export default function KelolaHargaPage() {
     async function run() {
       try {
         const res = await authFetch(`/api/products/pricing?${sp.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) {
@@ -592,10 +589,9 @@ export default function KelolaHargaPage() {
   }
 
   async function saveDefaultPrice(row: PricingRow, price: number) {
-    const token = localStorage.getItem("token");
     const res = await authFetch(`/api/products/pricing/${row.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ price }),
     });
     if (!res.ok) {
@@ -619,12 +615,11 @@ export default function KelolaHargaPage() {
   }
 
   async function saveOverridePrice(row: PricingRow, market: Market, price: number) {
-    const token = localStorage.getItem("token");
     const res = await authFetch(
       `/api/products/pricing/${row.id}/marketplace/${market.id}`,
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ price }),
       }
     );
@@ -649,12 +644,11 @@ export default function KelolaHargaPage() {
   }
 
   async function clearOverridePrice(row: PricingRow, market: Market) {
-    const token = localStorage.getItem("token");
     const res = await authFetch(
       `/api/products/pricing/${row.id}/marketplace/${market.id}`,
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ price: null }),
       }
     );

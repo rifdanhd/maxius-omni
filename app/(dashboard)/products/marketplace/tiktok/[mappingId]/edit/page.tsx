@@ -271,7 +271,7 @@ export default function TikTokEditPage() {
     (async () => {
       try {
         const res = await authFetch(`/api/marketplace/tiktok/products/${mappingId}/edit`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
+          headers: { },
         });
         const json = (await res.json()) as LoadResponse;
         if (!json.ok || !json.data) throw new Error(json.error ?? "Gagal memuat data.");
@@ -404,7 +404,7 @@ export default function TikTokEditPage() {
       try {
         const res = await authFetch(
           `/api/marketplace/tiktok/categories?keyword=${encodeURIComponent(q)}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` } }
+          { headers: { } }
         );
         const json = await res.json();
         if (json.ok) setCatResults(json.categories as typeof catResults);
@@ -430,7 +430,7 @@ export default function TikTokEditPage() {
     try {
       const res = await authFetch(
         `/api/marketplace/tiktok/categories/${encodeURIComponent(categoryId)}/attributes?accountId=`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` } }
+        { headers: { } }
       );
       const json = await res.json();
       if (!json.ok) return;
@@ -710,7 +710,7 @@ export default function TikTokEditPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+          
         },
         body: JSON.stringify(payload),
       });

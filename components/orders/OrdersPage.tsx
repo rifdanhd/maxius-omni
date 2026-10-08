@@ -208,9 +208,8 @@ function toPrintable(o: Order): PrintableOrder {
 
 async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
   try {
-    const token = localStorage.getItem("token");
     const res = await authFetch(`/api/orders/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { },
     });
     if (!res.ok) return null;
     return await res.json();
@@ -228,15 +227,14 @@ async function fetchOfficialLabel(
   id: string
 ): Promise<{ docUrl: string; pdfBase64?: string; trackingNumber: string | null } | null> {
   try {
-    const token = localStorage.getItem("token");
     const res = await authFetch(`/api/orders/${id}/label`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { },
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.docUrl
+    return data?.pdfBase64
       ? {
-          docUrl: data.docUrl,
+          docUrl: "",
           pdfBase64: data.pdfBase64 ?? undefined,
           trackingNumber: data.trackingNumber ?? null,
         }
@@ -411,14 +409,13 @@ export default function OrdersPage() {
 
   const fetchOrders = useCallback(
     async (opts: { page: number; tab: typeof currentTab; subTab: typeof currentSubTab; q: string; searchType: string; sort: typeof sort; from: string; to: string }) => {
-      const token = localStorage.getItem("token");
       // Gunakan statuses dari sub-tab jika ada & bukan tab 'all'; jika sub-tab memiliki statuses kosong, kembalikan kosong
       const effectiveTab = opts.subTab && opts.subTab.id !== "all"
         ? { id: opts.tab.id, label: opts.tab.label, statuses: opts.subTab.statuses }
         : opts.tab;
       const query = buildQueryParams({ ...opts, pageSize, tab: effectiveTab });
       const res = await authFetch(`/api/orders?${query}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       if (!res.ok) throw new Error(`Terjadi kesalahan saat memuat pesanan (${res.status})`);
       const data = await res.json();
@@ -517,9 +514,8 @@ export default function OrdersPage() {
   /** Poll status background run (SyncRun): progres live + alert penutup. */
   const refreshRunStatus = async () => {
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/sync/status", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       if (!res.ok) return;
       const data = (await res.json()) as {
@@ -580,10 +576,9 @@ export default function OrdersPage() {
     setSyncing(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/sync", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       const data = await res.json();
       if (!res.ok) {
@@ -616,10 +611,9 @@ export default function OrdersPage() {
     setReconciling(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/fulfillment/reconcile", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       const data = await res.json();
       if (!res.ok) {
@@ -667,10 +661,9 @@ export default function OrdersPage() {
     if (printingBulk) return;
     setPrintingBulk(true);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/bulk-label", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderIds: targets.map((o) => o.id) }),
       });
       const data = await res.json();

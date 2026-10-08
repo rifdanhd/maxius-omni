@@ -12,7 +12,7 @@ type AuthenticatedLayoutProps = {
 }
 
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
-  const defaultOpen = localStorage.getItem('sidebar_state') !== 'false'
+  const defaultOpen = typeof window === 'undefined' || localStorage.getItem('sidebar_state') !== 'false'
   return (
     <SearchProvider>
       <LayoutProvider>

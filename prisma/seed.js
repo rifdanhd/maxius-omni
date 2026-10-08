@@ -9,7 +9,11 @@ async function main() {
   console.log("Mulai proses seeding database...");
 
   // 1. Buat User Admin
-  const passwordHash = bcrypt.hashSync("admin123", 10);
+  const seedUrl = new URL(process.env.POSTGRES_URL || "");
+  if (!["localhost", "127.0.0.1"].includes(seedUrl.hostname) || !seedUrl.pathname.startsWith("/maxius_test_")) throw new Error("Demo seed hanya boleh memakai database test lokal.");
+  const password = process.env.TEST_ADMIN_PASSWORD;
+  if (!password || password.length < 12) throw new Error("TEST_ADMIN_PASSWORD minimal 12 karakter wajib diisi.");
+  const passwordHash = bcrypt.hashSync(password, 12);
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {},
@@ -20,6 +24,7 @@ async function main() {
       id: crypto.randomUUID(),
       username: "admin",
       passwordHash,
+      canViewFullPii: true,
     },
   });
   console.log("✅ User 'admin' dibuat/diperbarui.");
@@ -36,7 +41,7 @@ async function main() {
     await prisma.userBusiness.upsert({
       where: { userId_businessId: { userId: admin.id, businessId: b.id } },
       update: {},
-      create: { userId: admin.id, businessId: b.id },
+      create: { userId: admin.id, businessId: b.id, role: "owner" },
     });
   }
   console.log(`✅ Admin di-link ke ${allBusinesses.length} brand.`);

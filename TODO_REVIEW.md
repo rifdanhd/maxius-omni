@@ -4,6 +4,10 @@ Every unresolved item must include evidence, attempts where applicable, and an a
 
 ## Decisions
 
+- Session tokens stay in httpOnly cookies; API Bearer remains supported for non-browser tooling but tokens are not returned by browser login. Cookie mutations require exact trusted Origin. Business selection reissues a server-signed cookie after membership validation; query parameters no longer control data scope.
+- Roles are per UserBusiness: existing bootstrap username admin becomes owner; other memberships default staff. Staff can perform operational stock/fulfillment actions; store configuration, inventory settings, price/promotion writes and OAuth require owner/admin. Review existing membership assignments before deploying.
+- Rate limiter is bounded, fail-closed in-memory (no Redis present); login has global and per-username budgets, sensitive routes per-user budgets. Multi-process/replica deployments must add a shared Redis/WAF limiter before scaling. Forwarded IP headers are intentionally not trusted.
+
 - APP_ORIGIN is the trusted public origin; production fallback is https://maxius.id. Proxy headers are never trusted. OAuth cookies use Secure in production and permit local HTTP in development only.
 - Product copy retains public-domain compatibility instead of a marketplace-only allowlist. All DNS answers must be public and the connection is pinned; private/transition/documentation networks and nonstandard ports are rejected.
 

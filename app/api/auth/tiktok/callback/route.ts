@@ -75,7 +75,7 @@ async function handleCallback(req: NextRequest) {
   // Sesi login wajib + brand harus milik user yang login (cookie brand bisa
   // dipalsukan sendiri → cek keanggotaan, bukan sekadar keberadaan id).
   const session = await verifySessionCookie(req);
-  if (!session) {
+  if (!session || !["owner", "admin"].includes(session.role)) {
     return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
   }
   const ownedBusinessIds = await getUserBusinessIds(String(session.sub));

@@ -130,8 +130,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadAll() {
       try {
-        const token = localStorage.getItem("token");
-        const headers = { Authorization: `Bearer ${token}` };
+        const headers = { };
         const [summaryRes, analyticsRes, kpiRes, ordersRes] = await Promise.all([
           authFetch("/api/summary", { headers }),
           authFetch("/api/analytics", { headers }),

@@ -61,9 +61,8 @@ export default function ShopeeShipModal({
     let cancelled = false;
     (async () => {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch(`/api/orders/${representativeId}/shipping-parameter`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         const d: ShippingParameter = await res.json();
         if (cancelled) return;
@@ -115,10 +114,9 @@ export default function ShopeeShipModal({
     setBusy(true);
     setActionError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/fulfillment/shopee-ship", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderIds: orders.map((o) => o.id),
           method: mode,

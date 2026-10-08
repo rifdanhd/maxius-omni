@@ -101,9 +101,8 @@ export default function OrderCard({
     setTrackingError(null);
     setTrackingLoading(true);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/orders/${order.id}/tracking`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       const data = await res.json();
       if (res.ok && data?.ok && Array.isArray(data.trackingEvents)) {

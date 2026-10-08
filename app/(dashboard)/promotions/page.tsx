@@ -243,12 +243,11 @@ export default function PromotionsPage() {
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     let cancelled = false;
     async function run() {
       try {
         const res = await authFetch("/api/marketplace/tiktok/promotions/alerts", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as { alerts?: PromotionAlertLite[] };
@@ -314,14 +313,13 @@ export default function PromotionsPage() {
   }, [searchInput]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     let cancelled = false;
 
     async function run() {
       setLoading(true);
       try {
         const res = await authFetch("/api/marketplace/tiktok/promotions?take=100", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) {

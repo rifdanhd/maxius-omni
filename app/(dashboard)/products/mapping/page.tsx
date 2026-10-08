@@ -38,11 +38,10 @@ const effectiveStock = (v: Variant | null) =>
   v ? Math.max(0, v.stock - v.safetyStock) : 0;
 
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("token");
   const res = await authFetch(path, {
     ...opts,
     headers: {
-      Authorization: `Bearer ${token}`,
+      
       "Content-Type": "application/json",
       ...(opts.headers ?? {}),
     },

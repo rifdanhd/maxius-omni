@@ -6,8 +6,7 @@ const SESSION_EXPIRED_PATH = "/login?reason=session_expired";
 let redirecting = false;
 
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
+  return null;
 }
 
 export const DEFAULT_BUSINESS_ID = "business-default";
@@ -18,8 +17,10 @@ export function getActiveBusinessId(): string {
   return localStorage.getItem("activeBusinessId") ?? DEFAULT_BUSINESS_ID;
 }
 
-export function setActiveBusinessId(id: string): void {
+export async function setActiveBusinessId(id: string): Promise<void> {
   if (typeof window === "undefined") return;
+  const res = await authFetch("/api/auth/business", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: id }) });
+  if (!res.ok) throw new Error("Gagal mengganti brand.");
   localStorage.setItem("activeBusinessId", id);
 }
 
@@ -45,16 +46,14 @@ export function handleUnauthorized(): void {
 }
 
 export function authHeaders(init?: HeadersInit): HeadersInit {
-  const token = getAuthToken();
   const base: Record<string, string> = {};
   if (init) {
     new Headers(init).forEach((v, k) => {
       base[k] = v;
     });
   }
-  if (token && !base["authorization"] && !base["Authorization"]) {
-    base["Authorization"] = `Bearer ${token}`;
-  }
+  delete base.authorization;
+  delete base.Authorization;
   return base;
 }
 
@@ -63,19 +62,9 @@ export async function authFetch(
   init?: RequestInit
 ): Promise<Response> {
   const headers = authHeaders(init?.headers);
-  // Scoping brand otomatis: semua /api/* (kecuali auth & businesses)
-  // membawa ?businessId= brand aktif — server memvalidasi keanggotaan.
-  if (typeof input === "string" && input.startsWith("/api/")) {
-    const skip = input.startsWith("/api/auth/") || input.startsWith("/api/businesses");
-    if (!skip) {
-      const sep = input.includes("?") ? "&" : "?";
-      const m = input.match(/([?&])businessId=/);
-      if (!m) input = `${input}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`;
-    }
-  }
   let res: Response;
   try {
-    res = await fetch(input, { ...init, headers });
+    res = await fetch(input, { ...init, headers, credentials: "same-origin" });
   } catch (e) {
     throw e;
   }

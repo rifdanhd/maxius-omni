@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // Sesi login wajib: brand yg diikatkan ke akun baru harus milik user yang
   // login (cookie brand bisa dipalsukan sendiri → wajib divalidasi keanggotaan).
   const session = await verifySessionCookie(req);
-  if (!session) {
+  if (!session || !["owner", "admin"].includes(session.role)) {
     return NextResponse.redirect(new URL("/login?reason=session_expired", appOrigin(req)));
   }
   const { searchParams } = new URL(req.url);
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
       maxAge: 600,
     });
   }
-  const businessId = searchParams.get("businessId")?.trim();
+  const businessId = String(session.businessId);
   if (businessId) {
     const owned = await getUserBusinessIds(String(session.sub));
     if (!owned.includes(businessId)) {

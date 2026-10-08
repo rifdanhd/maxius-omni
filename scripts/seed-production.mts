@@ -76,9 +76,9 @@ async function main() {
   }
   console.log(`✅ AppCredential: Legacy ENV (Shopee + TikTok)`);
 
-  // Fase 1: semua user akses semua brand.
+  // Bootstrap owner only; never grant every existing user all businesses.
   const [users, businesses] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, username: true } }),
+    prisma.user.findMany({ where: { id: admin.id }, select: { id: true, username: true } }),
     prisma.business.findMany({ select: { id: true } }),
   ]);
   for (const u of users) {
@@ -86,7 +86,7 @@ async function main() {
       await prisma.userBusiness.upsert({
         where: { userId_businessId: { userId: u.id, businessId: b.id } },
         update: {},
-        create: { userId: u.id, businessId: b.id },
+        create: { userId: u.id, businessId: b.id, role: "owner" },
       });
     }
   }

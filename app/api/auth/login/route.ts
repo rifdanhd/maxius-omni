@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { login, SESSION_COOKIE, SESSION_MAX_AGE_S } from "@/lib/services/auth.service";
+import { isSameOriginRequest } from "@/lib/security/session";
+import { z } from "zod";
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginRequest(req)) return NextResponse.json({ error: "Origin tidak valid." }, { status: 403 });
   try {
-    const body = await req.json();
+    const body = z.object({ username: z.string().trim().min(1).max(100), password: z.string().min(1).max(128) }).parse(await req.json());
     const { username, password } = body;
 
     if (!username || !password) {
@@ -14,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await login(username, password);
-    const res = NextResponse.json(result);
+    const res = NextResponse.json({ user: result.user });
     // Cookie sesi httpOnly — dipakai proteksi OAuth authorize/callback yang
     // dijangkau lewat navigasi browser (tidak bisa bawa header Bearer).
     res.cookies.set(SESSION_COOKIE, result.token, {
@@ -26,7 +29,7 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Login gagal.";
-    return NextResponse.json({ error: message }, { status: 401 });
+    console.error("[Login] failed", err instanceof Error ? err.name : "unknown");
+    return NextResponse.json({ error: "Username atau password salah." }, { status: 401 });
   }
 }

@@ -129,9 +129,8 @@ export default function Sidebar() {
     let cancelled = false;
     (async () => {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch("/api/accounts/connected", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (!res.ok) return;
         const d = (await res.json()) as { platforms?: ConnectedPlatform[] };

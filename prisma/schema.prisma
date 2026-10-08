@@ -600,6 +600,7 @@ model User {
 model UserBusiness {
   userId     String
   businessId String
+  role       String   @default("staff")
   createdAt  DateTime @default(now())
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)

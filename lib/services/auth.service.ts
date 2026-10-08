@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/db/prisma";
 import { tokenMatchesUser } from "@/lib/security/auth-policy";
+import { DEFAULT_BUSINESS_ID, getUserBusinessIds } from "@/lib/services/business-scope.service";
 
 const rawJwtSecret = process.env.JWT_SECRET;
 
@@ -34,11 +35,10 @@ export async function login(
     throw new Error("Username atau password salah.");
   }
 
-  const token = jwt.sign(
-    { sub: user.id, username: user.username, canViewFullPii: user.canViewFullPii, tokenVersion: user.tokenVersion },
-    JWT_SECRET,
-    { expiresIn: "8h" }
-  );
+  const ids = await getUserBusinessIds(user.id);
+  const businessId = ids.includes(DEFAULT_BUSINESS_ID) ? DEFAULT_BUSINESS_ID : ids[0];
+  if (!businessId) throw new Error("User tidak punya akses brand.");
+  const token = createSessionToken(user, businessId);
 
   return {
     token,
@@ -48,6 +48,10 @@ export async function login(
       canViewFullPii: user.canViewFullPii,
     },
   };
+}
+
+export function createSessionToken(user: { id: string; username: string; canViewFullPii: boolean; tokenVersion: number }, businessId: string): string {
+  return jwt.sign({ sub: user.id, username: user.username, canViewFullPii: user.canViewFullPii, tokenVersion: user.tokenVersion, businessId }, JWT_SECRET, { expiresIn: "8h", algorithm: "HS256" });
 }
 
 /**
@@ -84,7 +88,9 @@ export async function verifySessionCookie(req: {
   if (!token) return null;
   try {
     const payload = verifyToken(token);
-    return await verifiedTokenUser(payload) ? payload : null;
+    if (!await verifiedTokenUser(payload) || typeof payload.businessId !== "string" || typeof payload.sub !== "string") return null;
+    const membership = await prisma.userBusiness.findUnique({ where: { userId_businessId: { userId: payload.sub, businessId: payload.businessId } } });
+    return membership ? { ...payload, role: membership.role } : null;
   } catch {
     return null;
   }

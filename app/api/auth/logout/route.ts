@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/services/auth.service";
+import { withAuth } from "@/lib/utils/api";
+import { prisma } from "@/lib/db/prisma";
 
-export async function POST() {
+export const POST = withAuth(async req => {
+  await prisma.user.update({ where: { id: req.user.id }, data: { tokenVersion: { increment: 1 } } });
   // Auth utama berbasis JWT stateless di localStorage (client-side); token
   // dihapus oleh tombol logout di Sidebar. Cookie sesi httpOnly (utk proteksi
   // OAuth) ikut dihapus di sini.
@@ -14,4 +17,4 @@ export async function POST() {
     maxAge: 0,
   });
   return res;
-}
+});

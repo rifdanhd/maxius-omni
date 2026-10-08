@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
-import { verifyToken, verifiedTokenUser } from "@/lib/services/auth.service";
+import { verifyToken, verifiedTokenUser, SESSION_COOKIE } from "@/lib/services/auth.service";
+import { prisma } from "@/lib/db/prisma";
+import { allowedRole, isSameOriginRequest } from "@/lib/security/session";
 import { mayViewPii } from "@/lib/security/auth-policy";
 import { UploadValidationError } from "@/lib/security/validate-upload";
 import { InputError, validateApiJson } from "@/lib/security/input";
@@ -10,7 +12,7 @@ import {
 } from "@/lib/services/business-scope.service";
 
 export interface AuthenticatedRequest extends NextRequest {
-  user: { id: string; username: string; canViewFullPii: boolean };
+  user: { id: string; username: string; canViewFullPii: boolean; role: string };
   // Brand aktif yg sudah tervalidasi keanggotaannya (fase multi-brand).
   // Route yg menampilkan data brand WAJIB filter dgn ini.
   businessId: string;
@@ -38,9 +40,14 @@ export function withAuth(
     ctx: { params: Promise<Record<string, string | undefined>> }
   ): Promise<Response> => {
     const authHeader = req.headers.get("authorization");
-    const token = authHeader?.startsWith("Bearer ")
+    const cookieToken = req.cookies.get(SESSION_COOKIE)?.value;
+    const token = cookieToken ?? (authHeader?.startsWith("Bearer ")
       ? authHeader.slice(7)
-      : null;
+      : null);
+
+    if (cookieToken && !["GET", "HEAD"].includes(req.method) && !isSameOriginRequest(req)) {
+      return Response.json({ error: "Origin tidak valid." }, { status: 403 });
+    }
 
     if (!token) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -56,17 +63,24 @@ export function withAuth(
       );
     }
 
-    const dbUser = await verifiedTokenUser(payload);
+    let dbUser;
+    try { dbUser = await verifiedTokenUser(payload); }
+    catch (error) { console.error("[withAuth] session lookup failed", error); return Response.json({ error: "Terjadi kesalahan server." }, { status: 503 }); }
     if (!dbUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const user = {
       id: dbUser.id,
       username: dbUser.username,
       canViewFullPii: mayViewPii({ canViewFullPii: payload.canViewFullPii }, dbUser),
+      role: "staff",
     };
     (req as AuthenticatedRequest).user = user;
 
     try {
-      (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id);
+      if (typeof payload.businessId !== "string") return Response.json({ error: "Sesi perlu diperbarui." }, { status: 401 });
+      (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id, payload.businessId);
+      const member = await prisma.userBusiness.findUnique({ where: { userId_businessId: { userId: user.id, businessId: payload.businessId } } });
+      if (!member || !allowedRole(member.role, req.method, req.nextUrl.pathname)) return Response.json({ error: "Akses ditolak." }, { status: 403 });
+      user.role = member.role;
     } catch (e) {
       if (e instanceof BusinessScopeError) {
         return Response.json({ error: e.message }, { status: 403 });
@@ -80,7 +94,12 @@ export function withAuth(
         const value = await req.clone().json().catch(() => { throw new InputError("JSON tidak valid."); });
         validateApiJson(value);
       }
-      return await handler(req as AuthenticatedRequest, ctx);
+      const response = await handler(req as AuthenticatedRequest, ctx);
+      response.headers.set("Cache-Control", "private, no-store");
+      if (response.status >= 500 && response.headers.get("content-type")?.includes("application/json")) {
+        return Response.json({ error: "Operasi gagal. Coba lagi atau periksa log server." }, { status: response.status, headers: { "Cache-Control": "private, no-store" } });
+      }
+      return response;
     } catch (e) {
       if (e instanceof InputError || e instanceof ZodError) return Response.json({ error: e instanceof InputError ? e.message : "Input tidak valid." }, { status: 400 });
       if (e instanceof UploadValidationError) return Response.json({ error: e.message }, { status: e.status });

@@ -4,6 +4,8 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 
 ## Completed findings
 
+- 3.1/3.3: browser JWT storage removed; httpOnly cookie login/session/logout/business switch, CSRF Origin protection, route proxy, DB membership role enforcement, signed business scope, and role-change revocation. Existing default demo seed now restricted to local test DB and requires an explicit strong test password; production seed grants only bootstrap owner access.
+
 - 2.5: ledger-triggered transactional stock outbox added for the critical webhook/order/restock/opname paths. Worker atomically claims outbox events with SKIP LOCKED and creates durable SyncJobs; external absolute-set pushes retry outside the transaction and read live stock. Fulfillment command-outbox follow-up is explicitly recorded.
 
 - 2.4: additive business foreign keys created as NOT VALID; migration validates automatically when no orphan exists and otherwise preserves all data. Read-only detector reports any legacy orphan IDs.
@@ -23,5 +25,6 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 ## Stage verification
 
 - Stage 1: lint passes (25 existing warnings); Next 16.4 Webpack build passes; new security unit tests pass; production audit zero.
+- Stage 2: schema/generate, lint and Webpack build pass; integer and stock-lock tests pass.
 
 ## Final verification

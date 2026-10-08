@@ -35,10 +35,9 @@ export default function PrintMethodModal({
     setPrinting(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/label-pack", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderIds, includePickingList }),
       });
       const data = await res.json();

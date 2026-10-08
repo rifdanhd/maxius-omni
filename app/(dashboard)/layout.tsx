@@ -2,7 +2,6 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
 import { Header } from "@/components/layout/header";
 import { useAuthStore } from "@/stores/auth-store";
@@ -59,7 +58,8 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const accessToken = useAuthStore((state) => state.auth.accessToken);
+  const authenticated = useAuthStore((state) => state.auth.authenticated);
+  const checked = useAuthStore((state) => state.auth.checked);
   // Token berasal dari localStorage: server & render pertama client SAMA-SAMA
   // kosong. Tanpa gate ini cabangnya beda saat hydration → React gagal
   // (Recoverable Error) dan dev overlay menutupi halaman (E2E tidak bisa klik).
@@ -68,12 +68,13 @@ export default function DashboardLayout({
   const hydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!checked) { void useAuthStore.getState().auth.loadSession(); return; }
+    if (!authenticated) {
       router.replace("/login");
     }
-  }, [accessToken, router]);
+  }, [authenticated, checked, router]);
 
-  if (!hydrated || !accessToken) {
+  if (!hydrated || !checked || !authenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground text-sm">
         <div className="w-6 h-6 rounded-full border-2 border-muted border-t-foreground animate-spin" />

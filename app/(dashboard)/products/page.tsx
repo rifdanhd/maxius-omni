@@ -118,9 +118,8 @@ export default function MasterProductsPage() {
     let cancelled = false;
     async function load() {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch(productsUrl(showInactive), {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) {
@@ -144,9 +143,8 @@ export default function MasterProductsPage() {
   }, [showInactive]);
 
   async function refreshProducts() {
-    const token = localStorage.getItem("token");
     const res = await authFetch(productsUrl(showInactive), {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { },
     });
     if (!res.ok) throw new Error(`Gagal memperbarui daftar produk (${res.status}).`);
     const data = await res.json();
@@ -157,10 +155,9 @@ export default function MasterProductsPage() {
   async function setProductActive(product: Product, active: boolean) {
     setTogglingActive(true);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${product.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: active }),
       });
       const data = await res.json().catch(() => null);
@@ -182,10 +179,9 @@ export default function MasterProductsPage() {
     const imageUrl = url.trim();
 
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${product.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: imageUrl || null }),
       });
       const data = await res.json().catch(() => null);
@@ -998,9 +994,8 @@ function BundleModal({
     let cancelled = false;
     async function run() {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch("/api/products", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error ?? "Gagal memuat varian.");
@@ -1077,10 +1072,9 @@ function BundleModal({
     setSaving(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/products/bundle", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           ...(category.trim() ? { category: category.trim() } : {}),

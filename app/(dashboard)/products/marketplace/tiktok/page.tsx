@@ -235,7 +235,6 @@ export default function TikTokMarketplacePage() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) sp.set("search", q);
     sp.set("sort", sort);
@@ -247,7 +246,7 @@ export default function TikTokMarketplacePage() {
       setLoading(true);
       try {
         const res = await authFetch(`/api/marketplace/tiktok/products?${sp.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) {
@@ -335,10 +334,9 @@ export default function TikTokMarketplacePage() {
     setSyncingAll(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/marketplace/tiktok/products/sync", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Sync gagal.");
@@ -371,9 +369,8 @@ export default function TikTokMarketplacePage() {
   async function loadUnmapped() {
     setUnmappedLoading(true);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/marketplace/tiktok/products/unmapped", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Gagal memuat produk belum ter-mapping.");
@@ -424,10 +421,9 @@ export default function TikTokMarketplacePage() {
     const mappingId = row.variants[0].mappingId;
     setSyncingRows((prev) => new Set(prev).add(String(mappingId)));
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/marketplace/tiktok/products/${mappingId}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Refresh gagal.");
@@ -454,10 +450,9 @@ export default function TikTokMarketplacePage() {
     setToggleOverrides((prev) => new Map(prev).set(String(mappingId), nextOn));
     setToggling((prev) => new Set(prev).add(String(mappingId)));
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/marketplace/tiktok/products/${mappingId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: nextOn }),
       });
       const data = await res.json().catch(() => null);
@@ -923,9 +918,8 @@ function MapUnmappedModal({
     let cancelled = false;
     async function run() {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch("/api/products", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error ?? "Gagal memuat produk master.");
@@ -951,7 +945,6 @@ function MapUnmappedModal({
       if (!channelSku.trim()) {
         throw new Error("SKU TikTok ini tidak memiliki ID/Seller SKU sehingga tidak bisa di-mapping.");
       }
-      const token = localStorage.getItem("token");
       const body: Record<string, unknown> = { accountId: target.accountId, channelSku };
       if (mode === "existing") {
         if (!variantId) throw new Error("Pilih varian tujuan dulu.");
@@ -978,7 +971,7 @@ function MapUnmappedModal({
       }
       const res = await authFetch("/api/inventory/mappings", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => null);

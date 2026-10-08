@@ -50,12 +50,11 @@ function useFetchSlots(orderId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    const token = localStorage.getItem("token");
 
     const loadDetail = async () => {
       try {
         const res = await authFetch(`/api/orders/${orderId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (!res.ok || cancelled) return;
         const d = await res.json();
@@ -72,7 +71,7 @@ function useFetchSlots(orderId: string) {
     const loadSlots = async () => {
       try {
         const res = await authFetch(`/api/orders/${orderId}/handover-slots`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         const d = await res.json();
@@ -138,10 +137,9 @@ export default function RequestPickupModal({
     setActionError(null);
     try {
       const slot = !flexible && pickedSlot !== null ? slots[pickedSlot] : null;
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/orders/fulfillment/pickup", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderIds: orders.map((o) => o.id),
           handover_method: mode,

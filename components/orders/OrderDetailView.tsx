@@ -109,9 +109,8 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/orders/${orderId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       if (!res.ok) throw new Error(`Terjadi kesalahan saat memuat detail (${res.status})`);
       setDetail((await res.json()) as DetailData);

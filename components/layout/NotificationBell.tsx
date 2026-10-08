@@ -17,9 +17,8 @@ export default function NotificationBell() {
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      const token = localStorage.getItem("token");
       authFetch("/api/stock-alerts", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       })
         .then((res) => (res.ok ? res.json() : Promise.resolve(null)))
         .then((data: StockAlertsResponse | null) => {

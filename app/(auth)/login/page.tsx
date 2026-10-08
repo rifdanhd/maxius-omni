@@ -4,7 +4,6 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
-import { authFetch, setActiveBusinessId, DEFAULT_BUSINESS_ID } from "@/lib/utils/api-client";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -60,29 +59,13 @@ function LoginForm() {
 
       const data = await res.json();
 
-      if (!data.token) {
-        throw new Error("Server tidak mengembalikan token.");
-      }
-
-      localStorage.setItem("token", data.token);
       localStorage.setItem("username", data.user.username);
-      useAuthStore.getState().auth.setAccessToken(data.token);
+      await useAuthStore.getState().auth.loadSession();
 
       // Init brand aktif SEBELUM navigasi — localStorage tidak pernah kosong,
       // sehingga connect OAuth selalu membawa brand yang benar. Pilihan =
       // paritas dgn resolveRequestBusiness: brand default bila user anggota,
       // selain itu brand pertama (daftar urut nama).
-      try {
-        const bizRes = await authFetch("/api/businesses");
-        if (bizRes.ok) {
-          const biz = (await bizRes.json()) as { businesses?: { id: string }[] };
-          const ids = (biz.businesses ?? []).map((b) => b.id);
-          const preferred = ids.includes(DEFAULT_BUSINESS_ID) ? DEFAULT_BUSINESS_ID : ids[0];
-          if (preferred) setActiveBusinessId(preferred);
-        }
-      } catch {
-        // Gagal → biarkan fallback business-default; BrandSwitcher mengoreksi nanti.
-      }
 
       // Redirect hanya setelah token tersimpan
       router.push("/dashboard");

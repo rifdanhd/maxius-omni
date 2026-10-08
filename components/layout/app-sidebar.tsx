@@ -18,9 +18,9 @@ import { sidebarData } from "./data/sidebar-data";
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout();
-  const accessToken = useAuthStore((state) => state.auth.accessToken);
+  const authenticated = useAuthStore((state) => state.auth.authenticated);
   const authUser = useAuthStore((state) => state.auth.user);
-  const displayName = authUser?.accountNo ?? (accessToken ? "User" : "Masuk");
+  const displayName = authUser?.accountNo ?? (authenticated ? "User" : "Masuk");
   const userEmail = authUser?.email ?? "";
 
   const user = {

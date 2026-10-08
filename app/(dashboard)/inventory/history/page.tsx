@@ -66,9 +66,8 @@ const fmtDate = (iso: string) =>
 const DEFAULT_FROM = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
 
 async function api<T>(path: string): Promise<T> {
-  const token = localStorage.getItem("token");
   const res = await authFetch(path, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {},
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);

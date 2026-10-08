@@ -30,7 +30,7 @@ export default function BrandSwitcher() {
         // Koreksi pilihan tersimpan bila brand-nya tak lagi tersedia.
         if (d.businesses.length > 0 && !d.businesses.some((b) => b.id === getActiveBusinessId())) {
           const first = d.businesses[0].id;
-          setActiveBusinessId(first);
+          await setActiveBusinessId(first);
           setActiveId(first);
         }
       } catch {
@@ -44,12 +44,12 @@ export default function BrandSwitcher() {
 
   const active = businesses.find((b) => b.id === activeId);
 
-  function pick(id: string) {
+  async function pick(id: string) {
     if (id === activeId) {
       setOpen(false);
       return;
     }
-    setActiveBusinessId(id);
+    try { await setActiveBusinessId(id); } catch { return; }
     setActiveId(id);
     setOpen(false);
     window.location.reload();

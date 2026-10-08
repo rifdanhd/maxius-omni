@@ -12,7 +12,8 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
   const pathname = usePathname()
   const { auth } = useAuthStore()
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
     auth.reset()
     const currentPath = pathname
     router.replace('/login?redirect=' + encodeURIComponent(currentPath))

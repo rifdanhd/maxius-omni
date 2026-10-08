@@ -20,15 +20,14 @@ export async function getUserBusinessIds(userId: string): Promise<string[]> {
 // Melempar BusinessScopeError (→ 403) bila meminta brand yg bukan haknya.
 export async function resolveRequestBusiness(
   req: Request,
-  userId: string
+  userId: string,
+  signedBusinessId?: string
 ): Promise<string> {
   const ids = await getUserBusinessIds(userId);
   if (ids.length === 0) {
     throw new BusinessScopeError("User tidak punya akses ke brand mana pun.");
   }
-  const url = new URL(req.url);
-  const requested =
-    url.searchParams.get("businessId") ?? url.searchParams.get("business_id");
+  const requested = signedBusinessId;
   if (requested) {
     if (!ids.includes(requested)) {
       throw new BusinessScopeError("Tidak punya akses ke brand tersebut.");

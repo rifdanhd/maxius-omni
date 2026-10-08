@@ -134,10 +134,9 @@ export default function ProductCopyPage() {
     setBusy(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/product-copy/parse", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: target }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -224,11 +223,10 @@ export default function ProductCopyPage() {
     setSaving(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const images = selected.size > 0 ? [...selected] : [];
       const res = await authFetch("/api/product-copy/save", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           description: form.description.trim(),

@@ -153,7 +153,6 @@ export default function ShopeeMarketplacePage() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) sp.set("search", q);
     sp.set("sort", sort);
@@ -164,7 +163,7 @@ export default function ShopeeMarketplacePage() {
       setLoading(true);
       try {
         const res = await authFetch(`/api/marketplace/shopee/products?${sp.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) { const data = await res.json().catch(() => null); setError(data?.error ?? `Gagal memuat data (${res.status}).`); return; }
@@ -210,8 +209,7 @@ export default function ShopeeMarketplacePage() {
     setSyncingAll(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
-      const res = await authFetch("/api/marketplace/shopee/products/sync", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const res = await authFetch("/api/marketplace/shopee/products/sync", { method: "POST", headers: { } });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Sync gagal.");
       const results = (data?.accounts ?? []) as SyncAccountResult[];
@@ -240,10 +238,9 @@ export default function ShopeeMarketplacePage() {
     setImporting(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch("/api/marketplace/shopee/products/import", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accountIds: importAccounts,
           limit: importLimit,

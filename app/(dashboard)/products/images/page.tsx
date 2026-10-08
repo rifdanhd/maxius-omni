@@ -103,9 +103,8 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
   async function loadImages() {
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${row.id}/images`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       if (!res.ok) throw new Error(`Gagal memuat gambar (${res.status})`);
       const data = await res.json();
@@ -121,9 +120,8 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch(`/api/products/${row.id}/images`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) throw new Error(`Gagal memuat gambar (${res.status})`);
@@ -161,10 +159,9 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setBusy(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${row.id}/images`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: urls.map((url) => ({ url })) }),
       });
       const data = await res.json().catch(() => null);
@@ -185,10 +182,9 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setBusy(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${row.id}/images/${img.id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { },
       });
       if (!res.ok) throw new Error("Gagal menghapus gambar.");
       await loadImages();
@@ -203,10 +199,9 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setBusy(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${row.id}/images/${img.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isCover: true }),
       });
       if (!res.ok) throw new Error("Gagal mengatur Foto Utama (Cover).");
@@ -228,10 +223,9 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
     setBusy(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
       const res = await authFetch(`/api/products/${row.id}/images/${img.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderedIds: next.map((i) => i.id) }),
       });
       if (!res.ok) throw new Error("Gagal mengubah urutan.");
@@ -393,9 +387,8 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     async function load() {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch("/api/products/gallery/history", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (!res.ok) throw new Error(`Gagal memuat riwayat (${res.status})`);
         const data = await res.json();
@@ -482,7 +475,6 @@ export default function KelolaGambarPage() {
     statusFilter !== "all" || categoryFilter !== "";
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const sp = new URLSearchParams({
       page: String(page),
       pageSize: String(PAGE_SIZE),
@@ -495,7 +487,7 @@ export default function KelolaGambarPage() {
     async function run() {
       try {
         const res = await authFetch(`/api/products/gallery?${sp.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (cancelled) return;
         if (!res.ok) {
@@ -532,9 +524,8 @@ export default function KelolaGambarPage() {
   useEffect(() => {
     async function loadCategories() {
       try {
-        const token = localStorage.getItem("token");
         const res = await authFetch("/api/products/gallery?pageSize=1000", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { },
         });
         if (!res.ok) return;
         const data: GalleryResponse = await res.json();
