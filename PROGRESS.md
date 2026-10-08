@@ -32,3 +32,14 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 - Stage 2: schema/generate, lint and Webpack build pass; integer and stock-lock tests pass.
 
 ## Final verification
+
+## Paused by user
+
+User requested pause before leaving for work. No further implementation until resumed.
+
+- Stages 1 and 2 implemented and committed; stage builds/lint passed. Real PostgreSQL integration tests remain pending.
+- Stage 3 cookie/session/RBAC/rate/input/privacy changes committed; latest completed stage-3 build and lint passed with existing warnings. Final warning cleanup and route-by-route review remain pending.
+- Stage 4 working changes applied to sibling backend/frontend (outside this Git repository): explicit disabled startup, signed/replay-checked legacy webhooks, strong secrets/seed credentials, atomic legacy stock deduction, deprecated READMEs. Legacy guard regression test and JS syntax checks passed. These sibling changes are not yet archived/committed; preserve them.
+- Stage 4 lint/build verification was interrupted or allowed to finish on pause; do not assume a final stage-4 build result.
+- Stage 5 remains pending. Existing test DB/E2E helpers contain DROP cleanup and read application DB settings; they must be made explicitly local-test-only and non-destructive BEFORE running tests.
+- Fulfillment command outbox and unpatched dev-only braces audit findings are recorded in TODO_REVIEW.md.
