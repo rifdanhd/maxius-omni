@@ -3,7 +3,8 @@ import { verifyToken, verifiedTokenUser, SESSION_COOKIE } from "@/lib/services/a
 import { prisma } from "@/lib/db/prisma";
 import { allowedRole, isSameOriginRequest } from "@/lib/security/session";
 import { mayViewPii } from "@/lib/security/auth-policy";
-import { UploadValidationError } from "@/lib/security/validate-upload";
+import { UploadValidationError, readLimitedStream } from "@/lib/security/validate-upload";
+import { limiter, rateLimitedResponse } from "@/lib/security/rate-limit";
 import { InputError, validateApiJson } from "@/lib/security/input";
 import { ZodError } from "zod";
 import {
@@ -52,6 +53,7 @@ export function withAuth(
     if (!token) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!limiter.allow("api:global", 3000, 60_000)) return rateLimitedResponse();
 
     let payload;
     try {
@@ -81,6 +83,8 @@ export function withAuth(
       const member = await prisma.userBusiness.findUnique({ where: { userId_businessId: { userId: user.id, businessId: payload.businessId } } });
       if (!member || !allowedRole(member.role, req.method, req.nextUrl.pathname)) return Response.json({ error: "Akses ditolak." }, { status: 403 });
       user.role = member.role;
+      const sensitive = /(?:upload|product-copy|label|promotions\/create)/.test(req.nextUrl.pathname);
+      if (!limiter.allow(`${user.id}:${sensitive ? req.nextUrl.pathname : req.method}`, sensitive ? 15 : (req.method === "GET" ? 600 : 120), 60_000)) return rateLimitedResponse();
     } catch (e) {
       if (e instanceof BusinessScopeError) {
         return Response.json({ error: e.message }, { status: 403 });
@@ -90,9 +94,18 @@ export function withAuth(
     }
 
     try {
+      if (!["GET", "HEAD"].includes(req.method) && req.body &&
+          !req.headers.get("content-type")?.includes("application/json") &&
+          !req.headers.get("content-type")?.startsWith("multipart/form-data;")) {
+        return Response.json({ error: "Content-Type tidak didukung." }, { status: 415 });
+      }
       if (!["GET", "HEAD"].includes(req.method) && req.headers.get("content-type")?.includes("application/json")) {
-        const value = await req.clone().json().catch(() => { throw new InputError("JSON tidak valid."); });
+        if (Number(req.headers.get("content-length")) > 1024 * 1024) return Response.json({ error: "Body terlalu besar." }, { status: 413 });
+        const bytes = await readLimitedStream(req.body, 1024 * 1024);
+        let value: unknown;
+        try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); } catch { throw new InputError("JSON tidak valid."); }
         validateApiJson(value);
+        req.json = async () => value;
       }
       const response = await handler(req as AuthenticatedRequest, ctx);
       response.headers.set("Cache-Control", "private, no-store");

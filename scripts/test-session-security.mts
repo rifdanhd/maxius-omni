@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { NextRequest } from "next/server";
+import { isSameOriginRequest, allowedRole } from "../lib/security/session";
+import { RateLimiter } from "../lib/security/rate-limit";
+assert.equal(isSameOriginRequest(new NextRequest("http://localhost:3000/api", { headers: { origin: "https://evil.example" } })), false);
+assert.equal(isSameOriginRequest(new NextRequest("http://localhost:3000/api", { headers: { origin: "http://localhost:3000" } })), true);
+assert.equal(allowedRole("staff", "PUT", "/api/inventory/settings"), false);
+assert.equal(allowedRole("admin", "PUT", "/api/inventory/settings"), true);
+assert.equal(allowedRole("unknown", "GET", "/api/orders"), false);
+const limit = new RateLimiter(1);
+assert.equal(limit.allow("a", 1, 1000, 0), true);
+assert.equal(limit.allow("a", 1, 1000, 1), false);
+assert.equal(limit.allow("b", 1, 1000, 1), false);
+assert.equal(limit.allow("a", 1, 1000, 1001), true);
+console.log("Cookie CSRF, server role, and bounded rate limit tests passed");
