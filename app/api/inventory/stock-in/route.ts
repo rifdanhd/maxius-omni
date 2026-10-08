@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
+import { stockInSchema } from "@/lib/security/input";
 import {
   adjustStockManually,
   STOCK_REASONS,
@@ -17,15 +18,12 @@ import {
 // Setelah commit, stok baru di-push ke semua listing + SyncJob dicatat
 // (via pushVariantStockToOthers — fire-and-forget, tidak memblokir respons).
 export const POST = withAuth(async (req) => {
-  const body = await req.json().catch(() => null);
-  const variantId = typeof body?.variantId === "string" ? body.variantId : "";
-  const qty = Number(body?.qty);
-  const note = typeof body?.note === "string" ? body.note : "";
+  const { variantId, qty, note = "" } = stockInSchema.parse(await req.json());
 
   if (!variantId) {
     return NextResponse.json({ error: "variantId wajib diisi." }, { status: 400 });
   }
-  if (!Number.isFinite(qty) || Math.floor(qty) <= 0) {
+  if (!Number.isInteger(qty) || qty <= 0) {
     return NextResponse.json(
       { error: "qty harus bilangan bulat > 0 (jumlah barang masuk)." },
       { status: 400 }
@@ -49,8 +47,8 @@ export const POST = withAuth(async (req) => {
 
   const result = await adjustStockManually({
     variantId: variant.id,
-    increment: Math.floor(qty),
-    note: note || `Barang masuk +${Math.floor(qty)} pcs (${variant.sku})`,
+    increment: qty,
+    note: note || `Barang masuk +${qty} pcs (${variant.sku})`,
     adjustedByUserId: req.user.id,
     reason: STOCK_REASONS.STOCK_IN,
   });

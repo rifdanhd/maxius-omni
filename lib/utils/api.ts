@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { verifyToken, verifiedTokenUser } from "@/lib/services/auth.service";
 import { mayViewPii } from "@/lib/security/auth-policy";
 import { UploadValidationError } from "@/lib/security/validate-upload";
+import { InputError, validateApiJson } from "@/lib/security/input";
+import { ZodError } from "zod";
 import {
   BusinessScopeError,
   resolveRequestBusiness,
@@ -74,8 +76,13 @@ export function withAuth(
     }
 
     try {
+      if (!["GET", "HEAD"].includes(req.method) && req.headers.get("content-type")?.includes("application/json")) {
+        const value = await req.clone().json().catch(() => { throw new InputError("JSON tidak valid."); });
+        validateApiJson(value);
+      }
       return await handler(req as AuthenticatedRequest, ctx);
     } catch (e) {
+      if (e instanceof InputError || e instanceof ZodError) return Response.json({ error: e instanceof InputError ? e.message : "Input tidak valid." }, { status: 400 });
       if (e instanceof UploadValidationError) return Response.json({ error: e.message }, { status: e.status });
       console.error("[withAuth] handler error:", e);
       return Response.json({ error: "Terjadi kesalahan server." }, { status: 500 });

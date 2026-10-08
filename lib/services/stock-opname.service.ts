@@ -7,6 +7,7 @@ import {
   pushVariantStockToOthers,
 } from "@/lib/services/central-stock.service";
 import { isDeduplicationFailure } from "@/lib/services/stock-guard.policy";
+import { opnameCountsSchema } from "@/lib/security/input";
 
 /**
  * Stok Opname (FITUR 1) — hitung fisik ulang stok gudang & koreksi selisih
@@ -127,9 +128,7 @@ export async function recordOpnameCounts(params: {
   counts: Array<{ variantId: string; countedStock: number }>;
   businessId?: string;
 }): Promise<{ ok: boolean; reason?: string; opname?: unknown }> {
-  const counts = (params.counts ?? []).filter(
-    (c) => typeof c?.variantId === "string" && Number.isFinite(Number(c?.countedStock))
-  );
+  const { counts } = opnameCountsSchema.parse(params);
   if (counts.length === 0) {
     return { ok: false, reason: "Tidak ada hasil hitung yang valid." };
   }
@@ -147,8 +146,11 @@ export async function recordOpnameCounts(params: {
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "StockOpname" WHERE "id" = ${params.opnameId} FOR UPDATE`;
+    const locked = await tx.stockOpname.findUniqueOrThrow({ where: { id: params.opnameId } });
+    if (locked.status === OPNAME_STATUSES.COMPLETED || locked.status === OPNAME_STATUSES.CANCELLED) throw new Error("Opname sudah ditutup.");
     for (const c of counts) {
-      const counted = Math.floor(Number(c.countedStock));
+      const counted = c.countedStock;
       if (counted < 0) {
         throw new Error("Hasil hitung tidak boleh negatif.");
       }
@@ -192,10 +194,11 @@ export async function cancelStockOpname(params: {
     return { ok: false, reason: "Opname sudah dibatalkan." };
   }
 
-  const fresh = await prisma.stockOpname.update({
-    where: { id: params.opnameId },
-    data: { status: OPNAME_STATUSES.CANCELLED, cancelledAt: new Date() },
-    include: opnameInclude,
+  const fresh = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "StockOpname" WHERE "id" = ${params.opnameId} FOR UPDATE`;
+    const locked = await tx.stockOpname.findUniqueOrThrow({ where: { id: params.opnameId } });
+    if (locked.status === OPNAME_STATUSES.COMPLETED) throw new Error("Opname sudah difinalisasi.");
+    return tx.stockOpname.update({ where: { id: params.opnameId }, data: { status: OPNAME_STATUSES.CANCELLED, cancelledAt: new Date() }, include: opnameInclude });
   });
   return { ok: true, opname: fresh };
 }

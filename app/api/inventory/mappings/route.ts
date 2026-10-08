@@ -6,6 +6,7 @@ import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
+import { stockQuantity } from "@/lib/security/input";
 
 const mappingInclude = {
   account: { select: { id: true, platform: true, label: true } },
@@ -69,10 +70,8 @@ export const POST = withAuth(async (req) => {
     return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 400 });
   }
 
-  const newStock = Number.isFinite(Number(body.stock)) ? Math.max(0, Number(body.stock)) : 0;
-  const safetyStock = Number.isFinite(Number(body.safetyStock))
-    ? Math.max(0, Number(body.safetyStock))
-    : 0;
+  const newStock = stockQuantity.parse(body.stock ?? 0);
+  const safetyStock = stockQuantity.parse(body.safetyStock ?? 0);
   const newPrice = Number.isFinite(Number(body.price)) && Number(body.price) >= 0
     ? Number(body.price)
     : null;

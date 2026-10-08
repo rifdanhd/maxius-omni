@@ -4,6 +4,8 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 
 ## Completed findings
 
+- 2.2: zod rejects fractional/string/negative/out-of-range quantities; strict stock-in, adjustment and opname schemas; recursive quantity checks on JSON APIs; service guards prevent rounding in manual sales, orphan mapping and copied drafts. Integer-input tests passed.
+
 - 1.1: centralized email/free-text masking; short phones and short addresses no longer reveal raw values. Order lists always masked; detail permission rechecked in DB and full access logged. PII regression test passed.
 - 1.2: OAuth state is mandatory, timing-safe compared, and cookies cleared on every success/failure. Ten-minute cookies; fixed trusted app origin; TikTok authorize domain allowlist; cross-business shop takeover rejected. OAuth regression test passed.
 - 1.3: safe-fetch resolves and rejects non-public addresses, pins validated DNS answers during connection, revalidates all redirects (max 3), and enforces byte/time limits. Product HTML and robots downloads use it; SSRF regression tests passed.
@@ -13,5 +15,7 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 - 2.1: absolute stock adjustments read under SELECT FOR UPDATE. Opname finalization locks its record and applies snapshot differences to locked live stock, preserving intervening orders/restocks. Concurrent lock/ledger and snapshot regression test passed; real PostgreSQL concurrency verification scheduled for stage 5.
 
 ## Stage verification
+
+- Stage 1: lint passes (25 existing warnings); Next 16.4 Webpack build passes; new security unit tests pass; production audit zero.
 
 ## Final verification

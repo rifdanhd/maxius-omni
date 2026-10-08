@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { adjustStockManually } from "@/lib/services/central-stock.service";
+import { stockAdjustSchema } from "@/lib/security/input";
 
 // Sesuaikan Stok manual: tetapkan angka mutlak (newStock >= 0) utk satu varian
 // sku_master. Dicatat di StockLedger reason MANUAL_ADJUSTMENT beserta user yang
@@ -13,9 +14,7 @@ export const POST = withAuth(async (req, ctx) => {
     return NextResponse.json({ error: "Variant id hilang." }, { status: 400 });
   }
 
-  const body = await req.json().catch(() => null);
-  const newStock = Number(body?.newStock);
-  const note = typeof body?.note === "string" ? body.note : "";
+  const { newStock, note = "" } = stockAdjustSchema.parse(await req.json());
 
   if (!Number.isFinite(newStock) || newStock < 0) {
     return NextResponse.json(
@@ -39,7 +38,7 @@ export const POST = withAuth(async (req, ctx) => {
 
   const result = await adjustStockManually({
     variantId,
-    newStock: Math.floor(newStock),
+    newStock,
     note: note || null,
     adjustedByUserId: req.user.id,
   });

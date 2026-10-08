@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { positiveQuantity } from "@/lib/security/input";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS, pushVariantStockToOthers } from "@/lib/services/central-stock.service";
@@ -22,7 +22,7 @@ export async function recordSale({
   channelSku: string;
   qty: number | string;
 }) {
-  const quantity = Number(qty);
+  const quantity = positiveQuantity.parse(qty);
 
   if (!channelSku) throw new Error("SKU wajib diisi.");
   if (!quantity || quantity <= 0) throw new Error("Jumlah tidak valid.");

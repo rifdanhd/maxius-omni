@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import { prisma } from "@/lib/db/prisma";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { safeFetch, validateFetchUrl } from "@/lib/security/safe-fetch";
+import { stockQuantity } from "@/lib/security/input";
 
 /* ------------------------------------------------------------------ *
  * Product Copy (MVP)
@@ -791,10 +792,7 @@ function buildVariantSkus(
       typeof v.price === "number" && Number.isFinite(v.price) && v.price > 0
         ? Math.round(v.price)
         : null;
-    const stock =
-      typeof v.stock === "number" && Number.isFinite(v.stock) && Math.round(v.stock) >= 0
-        ? Math.round(v.stock)
-        : 0;
+    const stock = stockQuantity.parse(v.stock ?? 0);
     let sku = cleanSku(v.sku);
     if (!sku) {
       sku = `DRAFT-${slugBase(`${title} ${name}`)}`;

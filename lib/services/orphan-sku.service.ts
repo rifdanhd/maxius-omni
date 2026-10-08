@@ -18,7 +18,7 @@
  *  - Semua pembuatan varian baru mencatat StockLedger reason INIT (stok awal
  *    0 / yang diminta user) — audit trail tetap utuh, tidak ada UPDATE diam.
  */
-import { Prisma } from "@prisma/client";
+import { stockQuantity } from "@/lib/security/input";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
@@ -183,8 +183,8 @@ export async function mapOrphanToNewMaster(params: {
   safetyStock?: number;
   platformTitle?: string;
 }): Promise<MapToNewMasterResult> {
-  const stock = Math.max(0, Math.floor(params.stock ?? 0));
-  const safetyStock = Math.max(0, Math.floor(params.safetyStock ?? 0));
+  const stock = stockQuantity.parse(params.stock ?? 0);
+  const safetyStock = stockQuantity.parse(params.safetyStock ?? 0);
   const sku = params.sku?.trim() || params.channelSku;
   const settings = await getCachedInventorySettings(params.businessId);
 

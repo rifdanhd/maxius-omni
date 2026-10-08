@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/utils/api";
+import { opnameCountsSchema } from "@/lib/security/input";
 import {
   cancelStockOpname,
   finalizeStockOpname,
@@ -12,10 +13,10 @@ export const PATCH = withAuth(async (req, ctx) => {
   const id = ctx?.params ? (await ctx.params).id : null;
   if (!id) return NextResponse.json({ error: "Id hilang." }, { status: 400 });
 
-  const body = await req.json().catch(() => null);
+  const body = opnameCountsSchema.parse(await req.json());
   const result = await recordOpnameCounts({
     opnameId: id,
-    counts: Array.isArray(body?.counts) ? body.counts : [],
+    counts: body.counts,
     businessId: req.businessId,
   });
   if (!result.ok) {
