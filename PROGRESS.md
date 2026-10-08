@@ -4,6 +4,8 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 
 ## Completed findings
 
+- 2.5: ledger-triggered transactional stock outbox added for the critical webhook/order/restock/opname paths. Worker atomically claims outbox events with SKIP LOCKED and creates durable SyncJobs; external absolute-set pushes retry outside the transaction and read live stock. Fulfillment command-outbox follow-up is explicitly recorded.
+
 - 2.4: additive business foreign keys created as NOT VALID; migration validates automatically when no orphan exists and otherwise preserves all data. Read-only detector reports any legacy orphan IDs.
 
 - 2.3: mapping creation now commits product/variant/image/INIT ledger/mapping/backfill in one transaction. Orphan-to-new-master backfill moved into its transaction. Added read-only orphan detector; PostgreSQL rollback test scheduled for stage 5.

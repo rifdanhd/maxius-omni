@@ -45,6 +45,7 @@ model Business {
   userBusiness    UserBusiness[]
   inventorySetting InventorySetting?
   syncRuns         SyncRun[]
+  stockOutbox      StockOutbox[]
 
   @@index([id])
 }
@@ -604,4 +605,17 @@ model UserBusiness {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, businessId])
+}
+
+model StockOutbox {
+  id          String   @id
+  eventKey    String   @unique
+  variantId   String
+  businessId  String
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  handledAt   DateTime?
+  business    Business @relation(fields: [businessId], references: [id])
+
+  @@index([status, createdAt])
 }

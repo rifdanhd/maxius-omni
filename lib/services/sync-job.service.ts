@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { syncStockToMarketplaces, type SyncPushItemResult } from "@/lib/services/sync.service";
 import { isDeduplicationFailure } from "@/lib/services/stock-guard.policy";
 import { businessWhere } from "@/lib/services/business-scope.service";
+import { effectiveStock } from "@/lib/services/stock-level.policy";
 
 /**
  * SyncJob — state machine push stok (PHASE A).
@@ -190,9 +191,11 @@ async function defaultPusher(job: {
   channelSku: string;
   newSellable: number;
 }): Promise<SyncJobPushResult> {
+  const variant = await prisma.productVariant.findFirst({ where: { productMapping: { some: { accountId: job.accountId, channelSku: job.channelSku } } }, select: { stock: true, safetyStock: true } });
+  if (!variant) return { success: false, error: "Mapping tidak tersedia." };
   const results = await syncStockToMarketplaces(
     [{ accountId: job.accountId, channelSku: job.channelSku }],
-    job.newSellable
+    Math.max(0, effectiveStock(variant.stock, variant.safetyStock))
   );
   const r = results[0];
   return { success: r.success, error: r.error };
