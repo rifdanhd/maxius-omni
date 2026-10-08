@@ -4,6 +4,8 @@ Branch: `fix/overnight-security-20261008`. Scope: the five requested remediation
 
 ## Completed findings
 
+- 2.4: additive business foreign keys created as NOT VALID; migration validates automatically when no orphan exists and otherwise preserves all data. Read-only detector reports any legacy orphan IDs.
+
 - 2.3: mapping creation now commits product/variant/image/INIT ledger/mapping/backfill in one transaction. Orphan-to-new-master backfill moved into its transaction. Added read-only orphan detector; PostgreSQL rollback test scheduled for stage 5.
 
 - 2.2: zod rejects fractional/string/negative/out-of-range quantities; strict stock-in, adjustment and opname schemas; recursive quantity checks on JSON APIs; service guards prevent rounding in manual sales, orphan mapping and copied drafts. Integer-input tests passed.

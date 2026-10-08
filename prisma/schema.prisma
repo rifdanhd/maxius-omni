@@ -43,6 +43,8 @@ model Business {
   masterProduct   MasterProduct[]
   account         PlatformAccount[]
   userBusiness    UserBusiness[]
+  inventorySetting InventorySetting?
+  syncRuns         SyncRun[]
 
   @@index([id])
 }
@@ -58,6 +60,7 @@ model InventorySetting {
   syncPushTiktok           Boolean  @default(true)
   opnameReminderFrequency  String   @default("monthly")
   updatedAt                DateTime @updatedAt
+  business                 Business @relation(fields: [businessId], references: [id])
 }
 
 model MasterProduct {
@@ -574,6 +577,7 @@ model SyncRun {
   updatedAt  DateTime  @updatedAt
   finishedAt DateTime?
   account    PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  business   Business @relation(fields: [businessId], references: [id])
 
   @@index([businessId, status])
   @@index([status, updatedAt])
