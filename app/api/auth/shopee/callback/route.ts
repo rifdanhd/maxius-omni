@@ -13,10 +13,20 @@ import {
   getUserBusinessIds,
 } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
+import { clearOAuthCookies, validOAuthState } from "@/lib/security/oauth";
 
 const PLATFORM = "SHOPEE";
 
 export async function GET(req: NextRequest) {
+  try {
+    return clearOAuthCookies(await handleCallback(req), "shopee");
+  } catch (error) {
+    console.error("[Shopee OAuth] callback failed", error);
+    return clearOAuthCookies(NextResponse.redirect(new URL("/settings/accounts?error=callback_failed", appOrigin(req))), "shopee");
+  }
+}
+
+async function handleCallback(req: NextRequest) {
   if (!isShopeeAuthorizeEnabled()) {
     return NextResponse.redirect(
       new URL("/settings/accounts?error=shopee_authorize_disabled", appOrigin(req))
@@ -39,7 +49,7 @@ export async function GET(req: NextRequest) {
   // Validasi state anti-CSRF (di-set oleh /api/auth/shopee/authorize).
   const expectedState = req.cookies.get("shopee_oauth_state")?.value;
   const gotState = searchParams.get("state");
-  if (expectedState && gotState !== expectedState) {
+  if (!validOAuthState(expectedState, gotState)) {
     return NextResponse.redirect(
       new URL("/settings/accounts?error=invalid_state", appOrigin(req)),
     );
@@ -106,8 +116,11 @@ export async function GET(req: NextRequest) {
         // Proteksi: akun dibekukan tidak boleh di-authorize ulang.
         const existing = await prisma.platformAccount.findUnique({
           where: { platform_externalShopId: { platform: PLATFORM, externalShopId: sid } },
-          select: { id: true, isFrozen: true, frozenReason: true },
+          select: { id: true, isFrozen: true, frozenReason: true, businessId: true },
         });
+        if (existing && existing.businessId !== businessId) {
+          return NextResponse.redirect(new URL("/settings/accounts?error=brand_forbidden", appOrigin(req)));
+        }
         if (existing?.isFrozen) {
           console.warn(
             `[Shopee OAuth] authorize ditolak utk shop ${sid}: akun dibekukan (${existing.frozenReason ?? "tanpa alasan"}).`

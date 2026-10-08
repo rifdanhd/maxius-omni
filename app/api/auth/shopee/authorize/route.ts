@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 1800,
+      maxAge: 600,
     });
     // Bawa credential yg dipakai authorize ke callback (token exchange
     // WAJIB memakai partner key yg sama).
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
-        maxAge: 1800,
+        maxAge: 600,
       });
     }
     // Bawa brand aktif ke callback (akun baru dibuat di brand ini) — hanya
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
-        maxAge: 1800,
+        maxAge: 600,
       });
     }
     return res;

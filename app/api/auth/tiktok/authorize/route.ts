@@ -68,6 +68,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  if (url.protocol !== "https:" || !["services.tiktokshop.com", "services.tiktokshop.com.cn", "seller-id.tokopedia.com"].includes(url.hostname)) {
+    return NextResponse.redirect(new URL("/settings/accounts?error=invalid_auth_url", appOrigin(req)));
+  }
   // Anti-CSRF: state acak disimpan di cookie httpOnly, diverifikasi di callback.
   const state = crypto.randomBytes(16).toString("hex");
   url.searchParams.set("state", state);
@@ -77,7 +80,7 @@ export async function GET(req: NextRequest) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 1800,
+    maxAge: 600,
   });
   if (credential) {
     res.cookies.set(TIKTOK_OAUTH_CRED_COOKIE, credential.id, {
@@ -85,7 +88,7 @@ export async function GET(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 1800,
+      maxAge: 600,
     });
   }
   const businessId = searchParams.get("businessId")?.trim();
@@ -101,7 +104,7 @@ export async function GET(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 1800,
+      maxAge: 600,
     });
   }
   return res;

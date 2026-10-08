@@ -12,11 +12,21 @@ import {
   getUserBusinessIds,
 } from "@/lib/services/business-scope.service";
 import { appOrigin } from "@/lib/utils/request-origin";
+import { clearOAuthCookies, validOAuthState } from "@/lib/security/oauth";
 
 const TIKTOK_TOKEN_URL = "https://auth.tiktok-shops.com/api/v2/token/get";
 const PLATFORM = "TIKTOK_SHOP";
 
 export async function GET(req: NextRequest) {
+  try {
+    return clearOAuthCookies(await handleCallback(req), "tiktok");
+  } catch (error) {
+    console.error("[TikTok OAuth] callback failed", error);
+    return clearOAuthCookies(NextResponse.redirect(new URL("/settings/accounts?error=callback_failed", appOrigin(req))), "tiktok");
+  }
+}
+
+async function handleCallback(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
@@ -33,7 +43,7 @@ export async function GET(req: NextRequest) {
   // Validasi state anti-CSRF (di-set oleh /api/auth/tiktok/authorize).
   const expectedState = req.cookies.get("tiktok_oauth_state")?.value;
   const gotState = searchParams.get("state");
-  if (expectedState && gotState !== expectedState) {
+  if (!validOAuthState(expectedState, gotState)) {
     return NextResponse.redirect(
       new URL("/settings/accounts?error=invalid_state", appOrigin(req)),
     );
@@ -208,8 +218,11 @@ export async function GET(req: NextRequest) {
         where: {
           platform_externalShopId: { platform: PLATFORM, externalShopId: shop.id },
         },
-        select: { id: true, isFrozen: true, frozenReason: true },
+        select: { id: true, isFrozen: true, frozenReason: true, businessId: true },
       });
+      if (existing && existing.businessId !== businessId) {
+        return NextResponse.redirect(new URL("/settings/accounts?error=brand_forbidden", appOrigin(req)));
+      }
       if (existing?.isFrozen) {
         console.warn(
           `[TikTok OAuth] authorize ditolak utk shop ${shop.id}: akun dibekukan (${existing.frozenReason ?? "tanpa alasan"}).`

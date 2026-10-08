@@ -4,8 +4,9 @@ Every unresolved item must include evidence, attempts where applicable, and an a
 
 ## Decisions
 
+- APP_ORIGIN is the trusted public origin; production fallback is https://maxius.id. Proxy headers are never trusted. OAuth cookies use Secure in production and permit local HTTP in development only.
+
 - Preserve masked order lists even for privileged users. Full PII is available only in audited detail/document flows.
 - Database migrations are additive and are tested only against a dedicated local test database.
 
 ## Remaining items
-
