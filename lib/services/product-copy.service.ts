@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { prisma } from "@/lib/db/prisma";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { safeFetch, validateFetchUrl } from "@/lib/security/safe-fetch";
 
 /* ------------------------------------------------------------------ *
  * Product Copy (MVP)
@@ -73,16 +74,13 @@ async function fetchRobots(origin: string): Promise<RobotsRule[]> {
 
   const rules: RobotsRule[] = [];
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), ROBOTS_TIMEOUT_MS);
-    const res = await fetch(`${origin}/robots.txt`, {
-      signal: ctrl.signal,
+    const res = await safeFetch(`${origin}/robots.txt`, {
+      timeoutMs: ROBOTS_TIMEOUT_MS,
+      maxBytes: 256 * 1024,
       headers: { "user-agent": USER_AGENT },
-      redirect: "follow",
     });
-    clearTimeout(t);
     if (res.ok) {
-      const text = await res.text();
+      const text = res.body.toString("utf8");
       let current: RobotsRule | null = null;
       for (const rawLine of text.split(/\r?\n/)) {
         const line = rawLine.trim();
@@ -102,6 +100,7 @@ async function fetchRobots(origin: string): Promise<RobotsRule[]> {
   } catch {
     // Gagal baca robots.txt → anggap diizinkan.
   }
+  if (robotsCache.size >= 200) robotsCache.delete(robotsCache.keys().next().value!);
   robotsCache.set(origin, { rules, fetchedAt: Date.now() });
   return rules;
 }
@@ -119,9 +118,9 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      redirect: "follow",
+    const res = await safeFetch(url, {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      maxBytes: MAX_HTML_BYTES,
       headers: {
         "user-agent": USER_AGENT,
         accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -131,14 +130,14 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
     if (!res.ok) {
       throw new CopyError(
         "FETCH_FAILED",
-        `Situs target merespons dengan status ${res.status} (${res.statusText}).`
+        `Situs target merespons dengan status ${res.status}.`
       );
     }
     const contentType = res.headers.get("content-type") ?? "";
     if (contentType && !/html|text|json/i.test(contentType)) {
       throw new CopyError("FETCH_FAILED", "Situs target tidak mengembalikan halaman HTML.");
     }
-    const html = await res.text();
+    const html = res.body.toString("utf8");
     if (html.length > MAX_HTML_BYTES) {
       throw new CopyError("FETCH_FAILED", "Halaman target terlalu besar untuk diproses.");
     }
@@ -708,7 +707,7 @@ export function parseProductHtml(html: string, finalUrl: string): CopyParseResul
 export async function parseProductFromUrl(rawUrl: string): Promise<CopyParseResult> {
   let url: URL;
   try {
-    url = new URL(rawUrl.trim());
+    url = validateFetchUrl(rawUrl.trim());
   } catch {
     throw new CopyError("INVALID_URL", "URL tidak valid. Masukkan URL lengkap (http/https).");
   }
