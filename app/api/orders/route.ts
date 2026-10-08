@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
-import { maskName } from "@/lib/pii";
+import { maskName, maskEmail } from "@/lib/pii";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 1000;
@@ -142,7 +142,7 @@ export const GET = withAuth(async (req) => {
     orderNo: o.orderNo,
     status: o.status,
     buyerName: maskName(o.buyerName),
-    buyerEmail: o.buyerEmail,
+    buyerEmail: maskEmail(o.buyerEmail),
     amount: o.amount,
     currency: o.currency,
     createTime: o.createTime,

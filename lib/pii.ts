@@ -4,12 +4,8 @@
  * masking di sini untuk response "default" (semua role/flag).
  */
 
-function maskEmail(email: string): string {
-  const [local, domain] = email.split("@");
-  if (!domain) return maskGeneric(email);
-  const localMasked = local.length > 0 ? `${local.slice(0, 1)}***` : "***";
-  return `${localMasked}@${domain}`;
-}
+import { maskEmail, maskPii } from "@/lib/utils/pii";
+export { maskEmail, maskPii } from "@/lib/utils/pii";
 
 function maskGeneric(value: string): string {
   const t = value.trim();
@@ -30,8 +26,8 @@ export function maskName(value: string | null | undefined): string | null {
 export function maskPhone(value: string | null | undefined): string | null {
   if (!value) return null;
   const t = value.trim().replace(/[^0-9+]/g, "");
-  if (t.length <= 4) return t;
-  return `${t.slice(0, 4)}${"*".repeat(4)}${t.slice(-4)}`;
+  if (t.length <= 8) return "***";
+  return `${t.slice(0, 2)}****${t.slice(-2)}`;
 }
 
 /**
@@ -46,7 +42,7 @@ export function maskAddress(value: string | null | undefined): string | null {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (parts.length < 2) return `*** ${parts[0] ?? ""}`.trim();
+  if (parts.length < 3) return maskPii(value);
   const kept = parts.slice(-2).join(", ");
   const maskedHead = parts.slice(0, -2).map(() => "***").join(", ");
   return maskedHead ? `${maskedHead}, ${kept}` : kept;

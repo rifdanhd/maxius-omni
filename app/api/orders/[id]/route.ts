@@ -1,11 +1,10 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { decryptPii } from "@/lib/services/crypto.service";
 import { getProductCategory } from "@/lib/integrations/tiktokShop";
-import { maskName, maskPhone, maskAddress } from "@/lib/pii";
+import { maskName, maskPhone, maskAddress, maskEmail, maskPii } from "@/lib/pii";
 
 /**
  * Get order detail untuk modal. Struktur finansial & item disajikan utuh,
@@ -89,13 +88,13 @@ export const GET = withAuth(
     paymentMethodName: order.paymentMethodName,
     isCod: order.isCod,
     currency: order.currency,
-    buyerNote: order.buyerNote,
-    sellerNote: order.sellerNote,
+    buyerNote: allowFull ? order.buyerNote : maskPii(order.buyerNote),
+    sellerNote: allowFull ? order.sellerNote : maskPii(order.sellerNote),
     amount: order.amount,
     canViewFullPii: allowFull,
     buyer: {
       name: allowFull ? order.recipientName : maskName(order.recipientName ?? order.buyerName),
-      email: order.buyerEmail,
+      email: allowFull ? order.buyerEmail : maskEmail(order.buyerEmail),
       phone: allowFull ? rawPhone : maskPhone(rawPhone),
       address: allowFull ? rawAddress : maskAddress(rawAddress),
       nameMasked: !allowFull,
@@ -121,7 +120,7 @@ export const GET = withAuth(
       status: s.status,
       shippedAt: s.shippedAt,
     })),
-    payment: order.paymentJson ? safeParsePayment(order.paymentJson) : null,
+    payment: allowFull && order.paymentJson ? safeParsePayment(order.paymentJson) : null,
   };
 
   if (allowFull) {
@@ -133,7 +132,7 @@ export const GET = withAuth(
         orderId: order.id,
         orderNo: order.orderNo,
         action: "READ_ORDER_DETAIL",
-        detail: "PII pembeli (nama/HP/alamat) ditampilkan penuh pada modal detail.",
+        detail: "PII pembeli (nama/email/HP/alamat/catatan/pembayaran) ditampilkan penuh pada modal detail.",
       },
     });
   }

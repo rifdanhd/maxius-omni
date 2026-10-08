@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/services/auth.service";
+import { prisma } from "@/lib/db/prisma";
 import {
   BusinessScopeError,
   resolveRequestBusiness,
@@ -52,12 +53,14 @@ export function withAuth(
       );
     }
 
-    // Inject user ke request object. Legacy token (sebelum fitur PII) tidak punya
-    // canViewFullPii → default true (perilaku lama = akses penuh, user admin).
+    const dbUser = typeof payload.sub === "string"
+      ? await prisma.user.findUnique({ where: { id: payload.sub } })
+      : null;
+    if (!dbUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const user = {
-      id: payload.sub as string,
-      username: payload.username as string,
-      canViewFullPii: payload.canViewFullPii !== false,
+      id: dbUser.id,
+      username: dbUser.username,
+      canViewFullPii: payload.canViewFullPii === true && dbUser.canViewFullPii === true,
     };
     (req as AuthenticatedRequest).user = user;
 
