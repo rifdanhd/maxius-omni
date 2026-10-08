@@ -257,7 +257,11 @@ export async function finalizeStockOpname(params: {
   let already = false;
   try {
     await prisma.$transaction(async (tx) => {
-      for (const item of opname.items) {
+      await tx.$queryRaw`SELECT "id" FROM "StockOpname" WHERE "id" = ${params.opnameId} FOR UPDATE`;
+      const locked = await tx.stockOpname.findUniqueOrThrow({ where: { id: params.opnameId }, include: { items: { orderBy: { variantId: "asc" } } } });
+      if ([OPNAME_STATUSES.COMPLETED, OPNAME_STATUSES.CANCELLED].includes(locked.status as "COMPLETED" | "CANCELLED")) throw new Error("Opname sudah ditutup.");
+      if (locked.items.some(i => i.countedStock === null)) throw new Error("Ada item belum dihitung.");
+      for (const item of locked.items) {
         const counted = item.countedStock as number;
         // Selisih dihitung terhadap SNAPSHOT systemStock (bukan stok live).
         const diff = counted - item.systemStock;
@@ -268,6 +272,7 @@ export async function finalizeStockOpname(params: {
         const result = await adjustStockAbsoluteInTx(tx, {
           variantId: item.variantId,
           newStock: counted,
+          snapshotStock: item.systemStock,
           reason: STOCK_REASONS.STOCK_OPNAME,
           referenceId: opname.id,
           note: `Stok opname ${opname.code}: sistem ${item.systemStock} → fisik ${counted}`,

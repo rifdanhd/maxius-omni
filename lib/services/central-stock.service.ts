@@ -422,22 +422,29 @@ export async function adjustStockAbsoluteInTx(
   params: {
     variantId: string;
     newStock: number;
+    snapshotStock?: number;
     reason: StockReason;
     referenceId?: string | null;
     note?: string | null;
     userId?: string | null;
   }
 ): Promise<{ ok: boolean; reason?: string; changeQty?: number; stockAfter?: number }> {
-  const newStock = Math.floor(params.newStock);
-  if (!Number.isFinite(newStock) || newStock < 0) {
+  let newStock = params.newStock;
+  if (!Number.isInteger(newStock) || newStock < 0) {
     return { ok: false, reason: "newStock harus angka bulat >= 0" };
   }
 
-  const variant = await tx.productVariant.findUnique({
-    where: { id: params.variantId },
-    select: { id: true, stock: true, sku: true },
-  });
+  const [variant] = await tx.$queryRaw<{ id: string; stock: number; sku: string }[]>`
+    SELECT "id", "stock", "sku" FROM "ProductVariant"
+    WHERE "id" = ${params.variantId} FOR UPDATE
+  `;
   if (!variant) return { ok: false, reason: "variant not found" };
+
+  if (params.snapshotStock !== undefined) {
+    if (!Number.isInteger(params.snapshotStock) || params.snapshotStock < 0) return { ok: false, reason: "invalid snapshot" };
+    newStock = variant.stock + params.newStock - params.snapshotStock;
+    if (newStock < 0) return { ok: false, reason: "Pergerakan stok setelah snapshot membuat koreksi negatif; hitung ulang." };
+  }
 
   const changeQty = newStock - variant.stock;
   if (changeQty === 0) {
@@ -551,8 +558,8 @@ async function adjustStockIncrement(
   },
   ledgerReason: StockReason
 ): Promise<{ ok: boolean; reason?: string; changeQty?: number; stockAfter?: number }> {
-  const qty = Math.floor(params.increment);
-  if (!Number.isFinite(qty) || qty <= 0) {
+  const qty = params.increment;
+  if (!Number.isInteger(qty) || qty <= 0) {
     return { ok: false, reason: "increment harus bilangan bulat > 0 (jumlah barang masuk)" };
   }
 
