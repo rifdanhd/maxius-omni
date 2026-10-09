@@ -57,6 +57,7 @@ export type StockReason = (typeof STOCK_REASONS)[keyof typeof STOCK_REASONS];
  * me-restore stok, padahal barang tidak jadi terjual).
  */
 export const CANCEL_STATUSES = new Set<string>(["CANCELLED", "REFUNDED"]);
+export const ACTIVE_ORDER_STOCK_STATUSES = ["AWAITING_SHIPMENT", "AWAITING_COLLECTION", "PARTIALLY_SHIPPING", "IN_TRANSIT"];
 
 /**
  * cancelReasonForStatus — status order batal/refund → reason ledger restore
@@ -172,14 +173,6 @@ export async function deductStockForOrder(orderId: string): Promise<{
   });
   if (!order) return { ok: false, reason: "order not found" };
 
-  // Fast-path idempotensi (read-only) — kasus umum retry webhook terdeteksi
-  // tanpa transaksi. Race window tetap ditutup unique index di bawah.
-  const already = await prisma.stockLedger.findFirst({
-    where: { reason: STOCK_REASONS.ORDER, referenceId: order.id },
-    select: { id: true },
-  });
-  if (already) return { ok: true, already: true };
-
   if (order.items.length === 0) {
     // Tidak ada item ter-mapping → tidak ada yang dipotong; bukan error.
     return { ok: true, already: true, reason: "no mapped items" };
@@ -197,7 +190,22 @@ export async function deductStockForOrder(orderId: string): Promise<{
 
   try {
     await prisma.$transaction(async (tx) => {
-      for (const entry of plan) {
+      // Satu kunci order untuk deduct dan restore, termasuk mapping terlambat.
+      const locked = await tx.$queryRaw<{ status: string }[]>`
+        SELECT "status" FROM "Order" WHERE "id" = ${order.id} FOR UPDATE
+      `;
+      if (!locked.length || CANCEL_STATUSES.has(locked[0].status)) return;
+      const restored = await tx.stockLedger.findFirst({
+        where: { referenceId: order.id, reason: { in: [STOCK_REASONS.ORDER_CANCELLED, STOCK_REASONS.ORDER_REFUNDED] } },
+        select: { id: true },
+      });
+      if (restored) return;
+      const recorded = await tx.stockLedger.findMany({
+        where: { reason: STOCK_REASONS.ORDER, referenceId: order.id },
+        select: { variantId: true },
+      });
+      const deducted = new Set(recorded.map((entry) => entry.variantId));
+      for (const entry of plan.filter((entry) => !deducted.has(entry.variantId))) {
         const result = await atomicDeduct(tx, entry, order.id);
         if (!result) {
           // Count 0 = stok tidak cukup → lempar supaya SEMUA varian order ini
@@ -244,7 +252,7 @@ export async function deductStockForOrder(orderId: string): Promise<{
     );
   }
 
-  return { ok: true, already: false, deductions };
+  return { ok: true, already: deductions.length === 0, deductions };
 }
 
 /** Error internal: stok tidak cukup — memicu rollback penuh transaksi. */
@@ -332,32 +340,24 @@ export async function restoreStockForCanceledOrder(
   });
   if (!order) return { ok: false, reason: "order not found" };
 
-  // Idempotensi: satu order hanya boleh di-restore SEKALI.
-  const already = await prisma.stockLedger.findFirst({
-    where: {
-      reason: { in: [STOCK_REASONS.ORDER_CANCELLED, STOCK_REASONS.ORDER_REFUNDED] },
-      referenceId: order.id,
-    },
-    select: { id: true },
-  });
-  if (already) return { ok: true, already: true };
-
-  // Perhatikan: ada calon mismatch — varian bisa saja di-unmapping setelah
-  // pemotongan. Ambil entry pemotongan sebagai sumber jumlah yang sah.
-  const deductions = await prisma.stockLedger.findMany({
-    where: { reason: STOCK_REASONS.ORDER, referenceId: order.id },
-    select: { id: true, variantId: true, changeQty: true },
-    orderBy: { createdAt: "asc" },
-  });
-  if (deductions.length === 0) {
-    // Tidak pernah memotong stok → tidak perlu direstore (bukan error).
-    return { ok: true, already: true, reason: "no deduction" };
-  }
-
   const restores: Array<{ variantId: string; changeQty: number; stockAfter: number }> = [];
 
   try {
     await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${order.id} FOR UPDATE`;
+      const already = await tx.stockLedger.findFirst({
+        where: {
+          reason: { in: [STOCK_REASONS.ORDER_CANCELLED, STOCK_REASONS.ORDER_REFUNDED] },
+          referenceId: order.id,
+        },
+        select: { id: true },
+      });
+      if (already) return;
+      const deductions = await tx.stockLedger.findMany({
+        where: { reason: STOCK_REASONS.ORDER, referenceId: order.id },
+        select: { id: true, variantId: true, changeQty: true },
+        orderBy: { variantId: "asc" },
+      });
       for (const d of deductions) {
         const variant = await tx.productVariant.findUnique({
           where: { id: d.variantId },
@@ -400,7 +400,7 @@ export async function restoreStockForCanceledOrder(
     );
   }
 
-  return { ok: true, already: false, restores };
+  return { ok: true, already: restores.length === 0, restores };
 }
 
 /**

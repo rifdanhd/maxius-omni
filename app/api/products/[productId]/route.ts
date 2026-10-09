@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
+import { setMasterProductImage } from "@/lib/services/gallery.service";
 
 // PATCH /api/products/[productId] — edit sebagian produk master.
 // Body (minimal satu field):
@@ -56,10 +57,17 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
     return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
   }
 
-  const updated = await prisma.masterProduct.update({
-    where: { id: productId },
-    data,
-    select: { id: true, imageUrl: true, isActive: true },
+  const updated = await prisma.$transaction(async (tx) => {
+    if (data.imageUrl !== undefined) {
+      await setMasterProductImage(tx, productId, data.imageUrl);
+    }
+    if (data.isActive !== undefined) {
+      await tx.masterProduct.update({ where: { id: productId }, data: { isActive: data.isActive } });
+    }
+    return tx.masterProduct.findUniqueOrThrow({
+      where: { id: productId },
+      select: { id: true, imageUrl: true, isActive: true },
+    });
   });
 
   return NextResponse.json({ ok: true, ...updated });

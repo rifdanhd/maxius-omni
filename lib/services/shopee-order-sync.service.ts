@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/shopee-order-status.service";
 import { resolveVariantId } from "@/lib/services/order-sync.service";
 import { logOrphanSku } from "@/lib/services/sync-log.util";
+import { ACTIVE_ORDER_STOCK_STATUSES } from "@/lib/services/central-stock.service";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -355,18 +356,18 @@ export async function ingestShopeeOrderSummaries(
       continue;
     }
     result.skipped += 1;
-    if (!rawStatus || rawStatus === existing.rawStatus) continue;
+    if (!rawStatus) continue;
 
     const canonical = canonicalShopeeStatus(rawStatus);
     try {
-      await prisma.$transaction([
+      if (rawStatus !== existing.rawStatus) await prisma.$transaction([
         prisma.order.update({ where: { id: existing.orderId }, data: { status: canonical } }),
         prisma.platformOrderMapping.update({
           where: { id: existing.id },
           data: { rawStatus },
         }),
       ]);
-      if (canonical !== existing.order.status) {
+      if (canonical !== existing.order.status || ACTIVE_ORDER_STOCK_STATUSES.includes(canonical)) {
         // Transisi status → efek stok (A1, idempoten).
         const eff = await applyShopeeStockEffectsForStatus(existing.orderId, canonical);
         if (eff.effect !== "none" && eff.ok === false && eff.note) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 
 const BUNDLE_TYPE = "bundle" as const;
 const SINGLE_TYPE = "single" as const;
@@ -100,14 +101,17 @@ export const POST = withAuth(async (req) => {
     );
   }
 
+  const settings = await getCachedInventorySettings(req.businessId);
   const created = await prisma.$transaction(async (tx) => {
     const product = await tx.masterProduct.create({
       data: {
         name,
         businessId: req.businessId,
+        threshold: settings.lowStockDefaultThreshold,
         ...(category ? { category } : {}),
         ...(imageUrl ? { imageUrl } : {}),
         type: BUNDLE_TYPE,
+        ...(imageUrl ? { productImage: { create: { id: crypto.randomUUID(), url: imageUrl, isCover: true, order: 0 } } } : {}),
       },
     });
     for (const it of items) {
@@ -125,6 +129,7 @@ export const POST = withAuth(async (req) => {
                 id: true,
                 sku: true,
                 stock: true,
+                safetyStock: true,
                 masterProduct: { select: { id: true, name: true } },
               },
             },

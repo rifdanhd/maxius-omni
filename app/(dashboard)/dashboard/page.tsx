@@ -138,7 +138,7 @@ export default function DashboardPage() {
       <div className="p-4 md:p-8 animate-pulse">
         {/* Greeting skeleton */}
         <div className="mb-6 bg-card rounded-xl border border-border px-6 py-5">
-          <div className="h-7 bg-muted rounded w-64 mb-2" />
+          <div className="h-7 bg-muted rounded w-64 max-w-full mb-2" />
           <div className="h-4 bg-muted rounded w-48" />
         </div>
         {/* Action cards skeleton */}
@@ -157,7 +157,7 @@ export default function DashboardPage() {
           <div className="p-5 border-b border-border">
             <div className="h-5 bg-muted rounded w-32" />
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-x divide-border">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="p-4">
                 <div className="h-3 bg-muted rounded w-28 mb-3" />
@@ -212,7 +212,7 @@ export default function DashboardPage() {
         <div className="px-4 md:px-6 py-4 border-b border-border">
           <h2 className="text-lg font-bold text-foreground">Yang Perlu Dilakukan</h2>
         </div>
-        <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 md:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <ActionCard title="Pesanan Baru" value={summary.newOrders.toString()} />
           <ActionCard title="Siap Dikirim" value={summary.readyToShip.toString()} />
           <ActionCard title="Stok Menipis" value={summary.criticalStock.toString()} />
@@ -225,7 +225,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-bold text-foreground">Kesehatan Operasional</h2>
           <span className="text-xs text-muted-foreground">Stok central & sinkronisasi marketplace</span>
         </div>
-        <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 md:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <ActionCard title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
           <ActionCard title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} />
           <ActionCard title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} href="/inventory/mismatch" />
@@ -282,12 +282,12 @@ export default function DashboardPage() {
       {/* Section: Panduan Awal — auto-hidden saat semua langkah selesai */}
       {onboardingDone < onboardingSteps.length && (
         <div className="mb-6 md:mb-8 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="px-4 md:px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-muted" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
-            <div>
+          <div className="px-4 md:px-6 py-4 flex items-start justify-between gap-3 cursor-pointer hover:bg-muted" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
+            <div className="min-w-0">
               <h2 className="text-lg font-bold text-foreground">Panduan Awal</h2>
               <p className="text-sm text-muted-foreground mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-muted text-foreground">{onboardingDone}/{onboardingSteps.length}</span>
               {panduanAwalOpen ? <ChevronUp size={18} className="text-muted-foreground" /> : <ChevronDown size={18} className="text-muted-foreground" />}
             </div>
@@ -364,7 +364,7 @@ export default function DashboardPage() {
 
           <div className="p-4 md:p-6 h-[250px] md:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <LineChart data={chartData} margin={{ top: 5, right: 8, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: 'var(--muted-foreground)', fontSize: 12}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--muted-foreground)', fontSize: 12}} dx={-10} />
@@ -393,13 +393,13 @@ export default function DashboardPage() {
                 <a href="/settings/accounts" className="text-xs font-semibold text-foreground underline hover:no-underline">Hubungkan Toko →</a>
               </div>
             ) : (analytics!.topStores.map((store) => (
-              <div key={store.id} className="flex items-center justify-between border border-border rounded-lg p-3 mb-2 last:mb-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-muted text-foreground rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
-                    <span className="font-semibold text-sm text-foreground">{store.label}</span>
+              <div key={store.id} className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border border-border rounded-lg p-3 mb-2 last:mb-0">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="w-8 h-8 shrink-0 bg-muted text-foreground rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
+                    <span className="min-w-0 break-words font-semibold text-sm text-foreground">{store.label}</span>
                   </div>
-                  <div className="flex items-center gap-8">
-                    <div>
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-8">
+                    <div className="min-w-0 break-words">
                       <p className="text-[10px] text-muted-foreground mb-1">Potensi Penjualan</p>
                       <p className="text-sm font-semibold">{formatRp(store.value)}</p>
                     </div>
@@ -426,15 +426,15 @@ export default function DashboardPage() {
                 <a href="/products" className="text-xs font-semibold text-foreground underline hover:no-underline">Lihat Produk Master →</a>
               </div>
             ) : (analytics!.topProducts.slice(0, 3).map((product) => (
-              <div key={product.key} className="flex justify-between items-center border border-border rounded-lg p-3 mb-2 last:mb-0">
-                  <div className="flex items-start gap-3">
+              <div key={product.key} className="flex justify-between items-start gap-3 border border-border rounded-lg p-3 mb-2 last:mb-0">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="w-12 h-12 bg-muted rounded-md shrink-0"></div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground leading-tight">{product.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold text-foreground leading-tight">{product.name}</p>
+                      <p className="break-all text-xs text-muted-foreground mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     <p className="text-[10px] text-muted-foreground mb-1">Kuantitas</p>
                     <p className="text-sm font-semibold">{product.qty} Pcs</p>
                   </div>
@@ -450,7 +450,7 @@ const CRITICAL_TITLES = ["Oversell", "Stok Menipis", "Stok Kritis", "Stok Mismat
 
 function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
   const isCritical = CRITICAL_TITLES.includes(title) && value !== "0" && value !== "…";
-  const cls = `border rounded-lg p-4 flex flex-col justify-between h-[100px] hover:shadow-md transition-all cursor-pointer ${
+  const cls = `min-w-0 border rounded-lg p-3 sm:p-4 flex flex-col gap-2 justify-between min-h-[100px] hover:shadow-md transition-all cursor-pointer ${
     isCritical
       ? "border-destructive/40 bg-destructive-subtle"
       : "border-border bg-card hover:border-ring"
@@ -491,8 +491,8 @@ function MetricTab({ active, onClick, title, value, trend, trendUp, badge, subte
       <div className="flex items-center gap-1 text-sm font-semibold text-foreground mb-2">
         {title} <Info size={12} className="text-muted-foreground" />
       </div>
-      <div className="flex items-end gap-2 mb-2">
-        <span className={`text-xl font-bold ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{value}</span>
+      <div className="flex flex-wrap items-end gap-2 mb-2">
+        <span className={`break-all text-xl font-bold ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{value}</span>
         {trend && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
             trendUp 

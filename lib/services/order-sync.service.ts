@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma as defaultPrisma } from "@/lib/db/prisma";
 import { getOrders } from "@/lib/integrations/tiktokShop";
@@ -7,6 +6,7 @@ import { ingestTrackingForAccount } from "@/lib/services/shipment-tracking.servi
 import { encryptPii } from "@/lib/services/crypto.service";
 import {
   deductStockForOrder,
+  ACTIVE_ORDER_STOCK_STATUSES,
   cancelReasonForStatus,
   CANCEL_STATUSES,
   restoreStockForCanceledOrder,
@@ -84,9 +84,20 @@ function toDate(epochSec: number | undefined): Date | null {
 export async function resolveVariantId(
   prisma: PrismaLike,
   accountId: string,
-  channelSku: string
+  channelSku: string,
+  aliases: string[] = []
 ): Promise<string | null> {
   if (!channelSku) return null;
+  const keys = [...new Set([channelSku, ...aliases].filter(Boolean))];
+  if (keys.length > 1) {
+    const matches = await prisma.productMapping.findMany({
+      where: { accountId, channelSku: { in: keys }, variantId: { not: null } },
+      select: { variantId: true },
+    });
+    const variants = [...new Set(matches.map((m) => m.variantId).filter((id): id is string => id !== null))];
+    if (variants.length > 1) throw new Error(`Mapping SKU "${channelSku}" bertentangan dengan Seller SKU. Periksa mapping toko ini.`);
+    return variants[0] ?? null;
+  }
   const mapping = await prisma.productMapping.findUnique({
     where: { accountId_channelSku: { accountId, channelSku } },
     select: { variantId: true },
@@ -175,7 +186,7 @@ export type TikTokOrderSyncResult = {
  * Dedupe by (accountId, externalOrderId) via PlatformOrderMapping; order yang
  * sudah ada di-skip (tidak duplikat). Disimpan per-order + per-line-item,
  * line item memakai identifier eksternal (product_id / sku_id) langsung.
- * opts.since → watermark update_time_ge (auto-sync); tanpa itu = semua order.
+ * opts.since → watermark update_time_ge (auto-sync); tanpa itu = 30 hari terakhir.
  */
 export async function syncOrdersTikTok(
   accountId: string,
@@ -201,15 +212,18 @@ async function syncOrdersTikTokInner(
   // Tarik halaman orders/search. Default API hanya 20 order/panggilan dan
   // tanpa loop, order baru di halaman berikutnya tidak pernah ketarik
   // (insiden: "0 baru, 20 sudah ada" padahal webhook menerima order baru).
-  // opts.since → watermark update_time_ge (overlap 10 menit); tanpa itu = semua.
+  // opts.since → watermark update_time_ge (overlap 10 menit); awal = 30 hari.
   const sinceSec = opts?.since ? Math.floor(opts.since.getTime() / 1000) - 600 : null;
+  const nowSec = Math.floor(Date.now() / 1000);
   const orders: OrderRaw[] = [];
   const MAX_ORDER_PAGES = 50;
   let pageToken: string | undefined;
   for (let page = 0; page < MAX_ORDER_PAGES; page++) {
     const res = await getOrders(account.accessToken, account.shopCipher, {
       pageToken,
-      ...(sinceSec !== null ? { updateTimeGe: sinceSec } : {}),
+      ...(sinceSec !== null
+        ? { updateTimeGe: sinceSec }
+        : { createTimeGe: nowSec - 30 * 86400, createTimeLt: nowSec }),
     });
     orders.push(...(res.orders as OrderRaw[]));
     if (res.orders.length === 0 || !res.nextPageToken) break;
@@ -278,11 +292,33 @@ export async function ingestTikTokOrdersPage(
           },
         });
         await syncShipments(prisma, existing.orderId, accountId, raw.packages);
+        for (const li of raw.line_items ?? []) {
+          const keys = [li.sku_id, li.seller_sku].filter((key): key is string => Boolean(key));
+          const channelSku = keys[0] || li.product_id || "";
+          if (!channelSku) continue;
+          const variantId = await resolveVariantId(prisma, accountId, channelSku, keys.slice(1));
+          const items = await prisma.orderItem.findMany({
+            where: { orderId: existing.orderId, channelSku: { in: keys.length ? keys : [channelSku] } },
+            select: { id: true, variantId: true },
+          });
+          for (const item of items) {
+            await prisma.orderItem.update({
+              where: { id: item.id },
+              data: {
+                productName: li.product_name ?? null,
+                skuName: li.sku_name ?? null,
+                price: toNumber(li.sale_price),
+                ...(!item.variantId && variantId ? { variantId } : {}),
+              },
+            });
+          }
+        }
         // Central stock: order yang "lahir" atau refresh ke AWAITING_SHIPMENT
         // ikut memotong stok gudang. Idempoten via StockLedger (reason ORDER).
-        if (raw.status === "AWAITING_SHIPMENT") {
+        if (raw.status && ACTIVE_ORDER_STOCK_STATUSES.includes(raw.status)) {
           try {
-            await deductStockForOrder(existing.orderId);
+            const effect = await deductStockForOrder(existing.orderId);
+            if (!effect.ok) result.errors.push(`${externalOrderId}: ${effect.reason ?? "potong stok gagal"}`);
           } catch (e) {
             result.errors.push(
               `${externalOrderId}: potong stok gagal (${e instanceof Error ? e.message : String(e)})`
@@ -302,24 +338,6 @@ export async function ingestTikTokOrdersPage(
               );
             }
           }
-        }
-        // Backfill nama produk/variasi di item yang sudah ada.
-        for (const li of raw.line_items ?? []) {
-          if (!li.sku_id && !li.seller_sku && !li.product_id) continue;
-          const channelSku = li.sku_id || li.seller_sku || li.product_id || "";
-          const item = await prisma.orderItem.findFirst({
-            where: { orderId: existing.orderId, channelSku },
-            select: { id: true },
-          });
-          if (!item) continue;
-          await prisma.orderItem.update({
-            where: { id: item.id },
-            data: {
-              productName: li.product_name ?? null,
-              skuName: li.sku_name ?? null,
-              price: toNumber(li.sale_price),
-            },
-          });
         }
       } catch (e) {
         result.errors.push(`${externalOrderId}: refresh gagal (${e instanceof Error ? e.message : String(e)})`);
@@ -342,9 +360,10 @@ export async function ingestTikTokOrdersPage(
     }));
 
     // Resolusi variantId per line item (idempotent lookup).
-    for (const item of lineItems) {
+    for (const [index, item] of lineItems.entries()) {
       if (!item.channelSku) continue;
-      item.variantId = await resolveVariantId(prisma, accountId, item.channelSku);
+      const sellerSku = raw.line_items?.[index]?.seller_sku;
+      item.variantId = await resolveVariantId(prisma, accountId, item.channelSku, sellerSku ? [sellerSku] : []);
       if (!item.variantId) {
         orphanQty.set(item.channelSku, (orphanQty.get(item.channelSku) ?? 0) + item.qty);
       }
@@ -429,7 +448,8 @@ export async function ingestTikTokOrdersPage(
       // memotong stok gudang bersama. Idempoten via StockLedger.
       if (createdOrderId && (raw.status ?? "") === "AWAITING_SHIPMENT") {
         try {
-          await deductStockForOrder(createdOrderId);
+          const effect = await deductStockForOrder(createdOrderId);
+          if (!effect.ok) result.errors.push(`${externalOrderId}: ${effect.reason ?? "potong stok gagal"}`);
         } catch (e) {
           result.errors.push(
             `${externalOrderId}: potong stok gagal (${e instanceof Error ? e.message : String(e)})`

@@ -56,6 +56,28 @@ export interface ImageRow {
 /** Target minimal gambar agar produk dianggap lengkap = sejumlah variannya. */
 const requiredImages = (variantCount: number) => Math.max(1, variantCount);
 
+async function lockProduct(tx: Prisma.TransactionClient, productId: string) {
+  await tx.$queryRaw`SELECT id FROM "MasterProduct" WHERE id = ${productId} FOR UPDATE`;
+}
+
+export async function setMasterProductImage(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  imageUrl: string | null
+) {
+  await lockProduct(tx, productId);
+  if (imageUrl === null) {
+    await tx.productImage.updateMany({ where: { masterProductId: productId, isCover: true }, data: { isCover: false } });
+    await tx.masterProduct.update({ where: { id: productId }, data: { imageUrl: null } });
+    return;
+  }
+  let image = await tx.productImage.findFirst({ where: { masterProductId: productId, url: imageUrl }, select: { id: true } });
+  if (!image) {
+    image = await tx.productImage.create({ data: { id: crypto.randomUUID(), masterProductId: productId, url: imageUrl, order: 0 }, select: { id: true } });
+  }
+  await promoteCover(tx, productId, image.id);
+}
+
 /**
  * applyMarketplaceCover — terapkan gambar listing marketplace ke produk:
  * - isi MasterProduct.imageUrl hanya jika masih kosong;
@@ -63,19 +85,17 @@ const requiredImages = (variantCount: number) => Math.max(1, variantCount);
  * Tidak pernah menimpa pilihan gambar manual di Kelola Gambar.
  */
 export async function applyMarketplaceCover(masterProductId: string, url: string): Promise<void> {
-  const p = await prisma.masterProduct.findUnique({
-    where: { id: masterProductId },
-    select: { imageUrl: true, _count: { select: { productImage: true } } },
-  });
-  if (!p) return;
-  if (!p.imageUrl) {
-    await prisma.masterProduct.update({ where: { id: masterProductId }, data: { imageUrl: url } });
-  }
-  if (p._count.productImage === 0) {
-    await prisma.productImage.create({
-      data: { id: crypto.randomUUID(), masterProductId, url, isCover: true, order: 0 },
+  await prisma.$transaction(async (tx) => {
+    await lockProduct(tx, masterProductId);
+    const p = await tx.masterProduct.findUnique({
+      where: { id: masterProductId },
+      select: { imageUrl: true, _count: { select: { productImage: true } } },
     });
-  }
+    if (!p) return;
+    if (p._count.productImage === 0) {
+      await setMasterProductImage(tx, masterProductId, p.imageUrl || url);
+    }
+  });
 }
 
 export async function listGallery(
@@ -162,23 +182,26 @@ export async function listProductImages(
     select: { businessId: true },
   });
   if (!productBrand || productBrand.businessId !== businessId) return [];
-  const existing = await prisma.productImage.findMany({
-    where: { masterProductId: productId },
-    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-  });
-  if (existing.length > 0) return existing;
+  return prisma.$transaction(async (tx) => {
+    await lockProduct(tx, productId);
+    const existing = await tx.productImage.findMany({
+      where: { masterProductId: productId },
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    });
+    if (existing.length > 0) return existing;
 
-  const product = await prisma.masterProduct.findUnique({
-    where: { id: productId },
-    select: { imageUrl: true },
+    const product = await tx.masterProduct.findUnique({
+      where: { id: productId },
+      select: { imageUrl: true },
+    });
+    if (product?.imageUrl) {
+      const created = await tx.productImage.create({
+        data: { id: crypto.randomUUID(), masterProductId: productId, url: product.imageUrl, isCover: true, order: 0 },
+      });
+      return [created];
+    }
+    return [];
   });
-  if (product?.imageUrl) {
-     const created = await prisma.productImage.create({
-       data: { id: crypto.randomUUID(), updatedAt: new Date(), masterProductId: productId, url: product.imageUrl, isCover: true, order: 0 },
-     });
-    return [created];
-  }
-  return [];
 }
 
 export interface AddImagesResult {
@@ -222,61 +245,55 @@ export async function addImages(
     return { ok: false, added: 0, reasons: [{ index: 0, reason: "Produk tidak ditemukan." }] };
   }
 
-  const nextOrder = await prisma.productImage.aggregate({
-    where: { masterProductId: productId },
-    _max: { order: true },
-  });
-  let base = (nextOrder._max.order ?? -1) + 1;
+  return prisma.$transaction(async (tx) => {
+    await lockProduct(tx, productId);
+    const nextOrder = await tx.productImage.aggregate({
+      where: { masterProductId: productId },
+      _max: { order: true },
+    });
+    let base = (nextOrder._max.order ?? -1) + 1;
 
-  const result: AddImagesResult = { ok: true, added: 0, reasons: [] };
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    if (e.url === "") {
-      result.reasons.push({ index: i, reason: "Tidak ada URL valid pada entri ini." });
-      continue;
+    const result: AddImagesResult = { ok: true, added: 0, reasons: [] };
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (e.url === "") {
+        result.reasons.push({ index: i, reason: "Tidak ada URL valid pada entri ini." });
+        continue;
+      }
+      const created = await tx.productImage.create({
+        data: { id: crypto.randomUUID(), masterProductId: productId, url: e.url, order: base++ },
+      });
+      if (created.order === 0) {
+        await promoteCover(tx, productId, created.id);
+      }
+      result.added += 1;
     }
-     const created = await prisma.productImage.create({
-       data: { id: crypto.randomUUID(), updatedAt: new Date(), masterProductId: productId, url: e.url, order: base++ },
-     });
-    // Gambar pertama otomatis jadi cover & disinkronkan ke MasterProduct.imageUrl.
-    if (created.order === 0) {
-      await promoteCover(productId, created.id);
-    }
-    result.added += 1;
-  }
-  return result;
+    return result;
+  });
 }
 
 /**
  * promoteCover — set satu gambar sebagai cover: nonaktifkan cover lain,
  * `order`-nya dipaksa terdepan (0), lalu sinkronkan MasterProduct.imageUrl.
  */
-async function promoteCover(productId: string, imageId: string) {
-  await prisma.$transaction(async (tx) => {
-    await tx.productImage.updateMany({
-      where: { masterProductId: productId, isCover: true },
-      data: { isCover: false },
-    });
-    const img = await tx.productImage.update({
-      where: { id: imageId },
-      data: { isCover: true, order: 0 },
-    });
-    // Normalisasi urutan agar tidak ada dua gambar order=0 (cover di depan).
-    const others = await tx.productImage.findMany({
-      where: { masterProductId: productId, id: { not: imageId } },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      select: { id: true, order: true },
-    });
-    await Promise.all(
-      others.map((o, i) =>
-        tx.productImage.update({ where: { id: o.id }, data: { order: i + 1 } })
-      )
-    );
-    await tx.masterProduct.update({
-      where: { id: productId },
-      data: { imageUrl: img.url },
-    });
+async function promoteCover(tx: Prisma.TransactionClient, productId: string, imageId: string) {
+  await tx.productImage.updateMany({
+    where: { masterProductId: productId, isCover: true },
+    data: { isCover: false },
   });
+  const img = await tx.productImage.update({
+    where: { id: imageId },
+    data: { isCover: true, order: 0 },
+  });
+  const others = await tx.productImage.findMany({
+    where: { masterProductId: productId, id: { not: imageId } },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+  await Promise.all(
+    others.map((o, i) => tx.productImage.update({ where: { id: o.id }, data: { order: i + 1 } }))
+  );
+  await tx.masterProduct.update({ where: { id: productId }, data: { imageUrl: img.url } });
 }
 
 export async function deleteImage(
@@ -294,15 +311,18 @@ export async function deleteImage(
   if (!img) return { ok: false, reason: "Gambar tidak ditemukan pada produk ini." };
 
   await prisma.$transaction(async (tx) => {
+    await lockProduct(tx, productId);
+    const current = await tx.productImage.findUnique({ where: { id: imageId } });
+    if (!current) return;
     await tx.productImage.delete({ where: { id: imageId } });
-    if (img.isCover) {
+    if (current.isCover) {
       const next = await tx.productImage.findFirst({
         where: { masterProductId: productId },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
         select: { id: true },
       });
       if (next) {
-        await promoteCover(productId, next.id);
+        await promoteCover(tx, productId, next.id);
       } else {
         await tx.masterProduct.update({
           where: { id: productId },
@@ -368,7 +388,10 @@ export async function updateImage(
   }
 
   if (action.isCover) {
-    await promoteCover(productId, imageId);
+    await prisma.$transaction(async (tx) => {
+      await lockProduct(tx, productId);
+      await promoteCover(tx, productId, imageId);
+    });
     return { ok: true };
   }
 

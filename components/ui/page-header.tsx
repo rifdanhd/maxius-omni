@@ -24,13 +24,13 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-xl font-bold text-foreground truncate">{title}</h1>
+        <h1 className="text-xl font-bold text-foreground break-words">{title}</h1>
         {description && (
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         )}
       </div>
       {action && (
-        <div className="max-w-full flex-shrink-0 [&>div]:flex-wrap">{action}</div>
+        <div className="min-w-0 max-w-full flex-shrink-0 [&>div]:flex-wrap [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-9">{action}</div>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import RequestPickupModal, { type PickupShipResult, type RequestPickupOrder } fr
 import ShopeeShipModal from "./ShopeeShipModal";
 import PickupSuccessModal from "./PickupSuccessModal";
 import PrintMethodModal from "./PrintMethodModal";
+import OrderHistoryDialog, { type OrderHistoryRange } from "./OrderHistoryDialog";
 import { PackageCheck } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import { PageHeader } from "@/components/ui/page-header";
@@ -388,6 +389,7 @@ export default function OrdersPage() {
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Background run (SyncRun): progres live + tombol terkunci saat aktif. */
@@ -572,36 +574,43 @@ export default function OrdersPage() {
     return () => clearInterval(t);
   }, [bgActive]);
 
-  const handleSync = async () => {
+  const handleSync = async (history?: OrderHistoryRange): Promise<boolean> => {
     setSyncing(true);
     setError(null);
     try {
       const res = await authFetch("/api/orders/sync", {
         method: "POST",
-        headers: { },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(history ? { history } : {}),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? `Gagal sync (${res.status})`);
-        return;
+        return false;
       }
       const guardErrors = (data.errors as string[] | undefined) ?? [];
       const started = Number(data.started ?? 0);
       const stillRunning = Number(data.stillRunning ?? 0);
+      if (started === 0 && stillRunning === 0) {
+        setError(guardErrors.join("\n") || "Belum ada toko terhubung yang dapat disinkronkan.");
+        return false;
+      }
       if (started > 0 || stillRunning > 0) {
         bgWasActive.current = true; // alert penutup muncul saat run selesai
         setBgActive(true);
         void refreshRunStatus();
       }
       alert(
-        `Sync pesanan berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
+        `${history ? "Pengambilan riwayat" : "Sync pesanan"} berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
           `Anda bisa berpindah menu; progres tampil di halaman ini.` +
           (stillRunning > 0 ? `\n\n${stillRunning} akun masih berjalan dari sync sebelumnya.` : "") +
           (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : "")
       );
+      return true;
     } catch (e) {
       console.error(e);
       setError("Terjadi kesalahan saat sync.");
+      return false;
     } finally {
       setSyncing(false);
     }
@@ -842,7 +851,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="p-6 font-sans h-full flex flex-col">
+    <div className="p-3 sm:p-6 font-sans min-h-full min-w-0 flex flex-col md:h-full">
       {/* Page Header */}
       <PageHeader
         title="Kelola Pesanan"
@@ -856,12 +865,15 @@ export default function OrdersPage() {
               <Mail size={18} />
             </Button>
             <Button
-              onClick={handleSync}
+              onClick={() => void handleSync()}
               disabled={syncing || bgActive}
               className="gap-2"
             >
               <RefreshCw size={16} className={syncing || bgActive ? "animate-spin" : ""} />
               {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Perbarui Pesanan (Sync)"}
+            </Button>
+            <Button variant="outline" onClick={() => setHistoryOpen(true)} disabled={syncing || bgActive} className="gap-2">
+              <Calendar size={16} /> Ambil Riwayat
             </Button>
             <Button
               variant="outline"
@@ -878,6 +890,8 @@ export default function OrdersPage() {
           </div>
         }
       />
+
+      <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={syncing || bgActive} onSubmit={handleSync} />
 
       {/* Progres background run (SyncRun) */}
       {bgActive && (
@@ -909,8 +923,9 @@ export default function OrdersPage() {
           </AlertTitle>
           <AlertDescription className="text-warning">
             <p>
-              Pembaruan data berjalan bertahap di latar belakang. Anda dapat berpindah menu; jika pembaruan gagal, pesan akan menjelaskan langkah berikutnya.
+              Sinkronisasi pertama mengambil 30 hari terakhir. Pembaruan berikutnya mengambil pesanan baru atau yang berubah sejak sinkronisasi terakhir. Gunakan Ambil Riwayat untuk tanggal yang lebih lama.
             </p>
+            <p>Pembaruan berjalan di latar belakang. Anda dapat berpindah menu selama proses berlangsung.</p>
             <p>Untuk pekerjaan harian, gunakan rentang tanggal dan tab Perlu Diproses. Pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
             <p>Dokumen invoice dan daftar isi paket dibuat oleh Maxius. Label TikTok berasal dari marketplace; untuk resi Shopee resmi, gunakan Seller Center.</p>
           </AlertDescription>
@@ -919,8 +934,8 @@ export default function OrdersPage() {
 
       {/* Main Card */}
       <DataCard
-        className="flex-1 flex flex-col overflow-hidden min-h-0"
-        contentClassName="flex-1 flex flex-col overflow-hidden p-0"
+        className="flex-1 min-w-0 flex flex-col overflow-hidden min-h-0"
+        contentClassName="flex-1 min-w-0 flex flex-col overflow-hidden p-0"
       >
         {/* Tabs */}
         <div className="flex items-center overflow-x-auto border-b border-border px-4 bg-card">
@@ -949,7 +964,7 @@ export default function OrdersPage() {
 
         {/* Sub-Tabs (hanya untuk tab tertentu) */}
         {currentSubTabs && (
-          <div className="flex items-center gap-0 border-b border-border px-4 bg-muted/50">
+          <div className="flex items-center gap-0 overflow-x-auto border-b border-border px-4 bg-muted/50">
             {currentSubTabs.map((sub) => {
               const subCount = sub.id === "all"
                 ? (currentTab.statuses ?? []).reduce((acc, s) => acc + (counts[s] ?? 0), 0)
@@ -1075,7 +1090,7 @@ export default function OrdersPage() {
 
         {/* Bulk Action & Pagination */}
         <div className="px-4 py-3 bg-muted/50 flex flex-wrap gap-3 items-center justify-between border-b border-border">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1126,7 +1141,7 @@ export default function OrdersPage() {
             <span className="font-semibold text-foreground">{total}</span>
             <span>Total pesanan</span>
             {pageCount > 1 && (
-              <div className="flex items-center gap-1">
+              <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1152,7 +1167,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Orders List */}
-        <div className="flex-1 overflow-y-auto p-4 bg-muted">
+        <div className="flex-1 p-3 sm:p-4 bg-muted md:overflow-y-auto">
           {loading ? (
             <div className="space-y-3" aria-busy="true">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -1180,7 +1195,7 @@ export default function OrdersPage() {
               title="Tidak ada pesanan"
               description="Belum ada pesanan pada filter ini. Coba ganti tab/status, ubah kata kunci, atau jalankan Sync Pesanan."
               action={
-                <Button variant="outline" onClick={handleSync} disabled={syncing} className="gap-2">
+                <Button variant="outline" onClick={() => void handleSync()} disabled={syncing || bgActive} className="gap-2">
                   <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Sync Pesanan
                 </Button>
               }

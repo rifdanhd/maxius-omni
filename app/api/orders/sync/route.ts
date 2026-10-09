@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/utils/api";
 import { enqueueOrderRuns } from "@/lib/services/order-run.service";
+import { z } from "zod";
+
+const syncRequestSchema = z.object({
+  full: z.boolean().optional(),
+  history: z.object({
+    from: z.iso.datetime(),
+    to: z.iso.datetime(),
+  }).optional(),
+}).strict();
 
 /**
  * POST /api/orders/sync — enqueue background run per akun (SyncRun).
@@ -10,10 +19,18 @@ import { enqueueOrderRuns } from "@/lib/services/order-run.service";
  */
 export const POST = withAuth(async (req) => {
   try {
-    // {"full": true} = backfill jendela penuh (abaikan watermark) — default
-    // tetap delta: hanya order baru/berubah sejak tarikan terakhir.
-    const body = (await req.json().catch(() => ({}))) as { full?: unknown };
-    const results = await enqueueOrderRuns(req.businessId, { full: Boolean(body.full) });
+    const parsed = syncRequestSchema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Rentang sinkronisasi tidak valid." }, { status: 400 });
+    }
+    const body = parsed.data;
+    const history = body.history
+      ? { from: new Date(body.history.from), to: new Date(body.history.to) }
+      : undefined;
+    if (history && (history.from.getTime() < 0 || history.from >= history.to || history.to.getTime() > Date.now())) {
+      return NextResponse.json({ error: "Pilih rentang tanggal yang berurutan dan tidak melebihi hari ini." }, { status: 400 });
+    }
+    const results = await enqueueOrderRuns(req.businessId, { full: body.full, history });
     const errors = results.filter((r) => r.error).map((r) => `${r.label}: ${r.error}`);
     const started = results.filter((r) => r.runId && !r.skipped).length;
     const stillRunning = results.filter((r) => r.skipped).length;

@@ -33,6 +33,7 @@ export const GET = withAuth(async (req) => {
               id: true,
               sku: true,
               stock: true,
+              safetyStock: true,
               masterProduct: { select: { id: true, name: true } },
             },
           },
@@ -52,7 +53,7 @@ export const GET = withAuth(async (req) => {
       mappings: productMapping,
     })),
     bundleItems: bundleItem,
-    type: bundleItem.length > 0 ? "bundle" : "single",
+    type: product.type === "bundle" || bundleItem.length > 0 ? "bundle" : "single",
   }));
   return NextResponse.json({ products: payload });
 });

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
-import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
+import { backfillOrderItems, reconcileMappedOrders } from "@/lib/services/orphan-sku.service";
 
 /**
  * PATCH /api/inventory/mappings/:id  — "repoint" mapping ke varian
@@ -13,9 +15,8 @@ import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
 export const PATCH = withAuth(
   async (req: AuthenticatedRequest, ctx?: { params: Promise<{ id?: string }> }) => {
     const { id } = (await ctx?.params) ?? {};
-    const body = (await req.json().catch(() => ({}))) as { variantId?: string };
-
-    const variantId = body.variantId?.trim();
+    const parsed = z.object({ variantId: z.string().trim().min(1).max(200) }).safeParse(await req.json().catch(() => ({})));
+    const variantId = parsed.success ? parsed.data.variantId : undefined;
     if (!id || !variantId) {
       return NextResponse.json({ error: "Varian target wajib diisi." }, { status: 400 });
     }
@@ -46,7 +47,9 @@ export const PATCH = withAuth(
       return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
     }
 
-    const updated = await prisma.productMapping.update({
+    try {
+    const { updated, backfilled } = await prisma.$transaction(async (tx) => {
+    const updated = await tx.productMapping.update({
       where: { id },
       data: { variantId },
       include: {
@@ -65,9 +68,18 @@ export const PATCH = withAuth(
 
     // Repoint = keputusan "SKU ini sebenarnya milik varian X" — backfill juga
     // OrderItem historis yang masih orphan utk pasangan (akun, SKU) ini.
-    const backfilled = await backfillOrderItems(mapping.accountId, mapping.channelSku, variantId);
+    const backfilled = await backfillOrderItems(mapping.accountId, mapping.channelSku, variantId, tx);
+    return { updated, backfilled };
+    });
+    const stockWarnings = await reconcileMappedOrders(mapping.accountId, variantId);
 
-    return NextResponse.json({ ok: true, mapping: updated, backfilled });
+    return NextResponse.json({ ok: true, mapping: updated, backfilled, stockWarnings });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return NextResponse.json({ error: "Varian ini sudah terhubung ke SKU lain di toko yang sama." }, { status: 409 });
+      }
+      throw error;
+    }
   }
 );
 

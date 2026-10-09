@@ -16,7 +16,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   return (
     <SearchProvider>
       <LayoutProvider>
-        <SidebarProvider defaultOpen={defaultOpen}>
+        <SidebarProvider defaultOpen={defaultOpen} className='h-dvh min-h-0'>
           <SkipToMain />
           <AppSidebar />
           <SidebarInset

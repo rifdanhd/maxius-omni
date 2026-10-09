@@ -74,7 +74,8 @@ globalThis.fetch = (async (input: unknown, init?: unknown) => {
     const raw = JSON.stringify({
       response: {
         order_list: fixture.summaries,
-        has_more: fixture.hasMore,
+        more: fixture.hasMore,
+        next_cursor: fixture.hasMore ? String(fixture.listCalls) : "",
         total_count: fixture.summaries.length,
       },
     });
@@ -82,10 +83,8 @@ globalThis.fetch = (async (input: unknown, init?: unknown) => {
   }
   if (pathname === "/api/v2/order/get_order_detail") {
     fixture.detailCalls += 1;
-    const body = JSON.parse(String((init as { body?: string })?.body ?? "{}")) as {
-      order_sn_list?: string[];
-    };
-    const list = (body.order_sn_list ?? [])
+    const sns = (new URL(url).searchParams.get("order_sn_list") ?? "").split(",").filter(Boolean);
+    const list = sns
       .map((sn) => fixture.details[sn])
       .filter((d): d is Record<string, unknown> => Boolean(d));
     const raw = JSON.stringify({ response: { order_list: list } });

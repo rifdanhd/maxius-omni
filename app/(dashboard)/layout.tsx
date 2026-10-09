@@ -87,18 +87,18 @@ export default function DashboardLayout({
 
   return (
     <AuthenticatedLayout>
-      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden min-w-0">
         <Header>
           <div className="flex-1 flex items-center min-w-0">
             <span className="text-sm font-semibold text-foreground truncate">{pageTitle}</span>
           </div>
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
             <NotificationBell />
             <Search />
             <ThemeSwitch />
           </div>
         </Header>
-        <div className="flex-1 overflow-y-auto">
+        <div id="content" tabIndex={-1} className="flex-1 min-h-0 min-w-0 overflow-auto overscroll-y-contain">
           {children}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/utils/api-client";
 import { stockLevel, effectiveStock } from "@/lib/services/stock-level.policy";
+import { productStockSummary } from "@/lib/services/product-stock.policy";
 import {
   ChevronDown,
   ChevronRight,
@@ -39,6 +40,7 @@ type Variant = {
 type Product = {
   id: string;
   name: string;
+  description?: string | null;
   threshold: number;
   imageUrl: string | null;
   status?: string;
@@ -46,6 +48,11 @@ type Product = {
   importedFrom?: string | null;
   variants: Variant[];
   type?: "single" | "bundle";
+  bundleItems?: Array<{
+    id: string;
+    qty: number;
+    variant: { id: string; sku: string; stock: number; safetyStock: number; masterProduct: { id: string; name: string } };
+  }>;
 };
 
 type StockLevel = "ok" | "low" | "out";
@@ -251,17 +258,13 @@ export default function MasterProductsPage() {
       });
     }
     if (filterLevel === "low") {
-      list = list.filter((p) =>
-        p.variants.some((v) => level(v, p.threshold) !== "ok")
-      );
+      list = list.filter((p) => productStockSummary(p).level !== "ok");
     } else if (filterLevel === "out") {
-      list = list.filter((p) =>
-        p.variants.some((v) => level(v, p.threshold) === "out")
-      );
+      list = list.filter((p) => productStockSummary(p).level === "out");
     }
     list = [...list].sort((a, b) => {
-      const stockA = a.variants.reduce((s, v) => s + v.stock, 0);
-      const stockB = b.variants.reduce((s, v) => s + v.stock, 0);
+      const stockA = productStockSummary(a).stock;
+      const stockB = productStockSummary(b).stock;
       const linksA = a.variants.reduce((s, v) => s + v.mappings.length, 0);
       const linksB = b.variants.reduce((s, v) => s + v.mappings.length, 0);
       switch (sort.id) {
@@ -329,22 +332,11 @@ export default function MasterProductsPage() {
   const totalLinks = (p: Product) =>
     p.variants.reduce((s, v) => s + v.mappings.length, 0);
 
-  const worstLevel = (p: Product): StockLevel =>
-    p.variants.reduce<StockLevel>(
-      (acc, v) => {
-        const l = level(v, p.threshold);
-        if (l === "out" || acc === "out") return "out";
-        if (l === "low" || acc === "low") return "low";
-        return acc;
-      },
-      "ok"
-    );
-
   return (
     <div className="p-4 md:p-8">
       <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header Title */}
-        <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
+        <div className="px-4 sm:px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold text-foreground">Produk Master</h1>
             <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
@@ -457,7 +449,7 @@ export default function MasterProductsPage() {
         {/* Filter Bar */}
         <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
           {/* Search */}
-          <div className="relative w-80">
+          <div className="relative min-w-0 w-full sm:w-80">
             <input
               type="text"
               value={searchInput}
@@ -639,7 +631,8 @@ export default function MasterProductsPage() {
                 filtered.map((product) => {
                   const isExpanded = expanded.has(product.id);
                   const isSelected = selected.has(product.id);
-                  const meta = stockMeta[worstLevel(product)];
+                  const stockSummary = productStockSummary(product);
+                  const meta = stockMeta[stockSummary.level];
                   const storeN = storeCount(product);
                   return (
                     <Fragment key={product.id}>
@@ -702,8 +695,13 @@ export default function MasterProductsPage() {
                                 className="mt-1 flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
                               >
                                 {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                                Lihat {product.variants.length} varian produk
+                                {isBundle(product) ? `Lihat ${product.bundleItems?.length ?? 0} komponen bundle` : `Lihat ${product.variants.length} varian produk`}
                               </button>
+                              {product.description && (
+                                <p className="mt-1 text-xs text-muted-foreground line-clamp-2 whitespace-pre-line" title={product.description}>
+                                  {product.description}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -718,8 +716,11 @@ export default function MasterProductsPage() {
 
                         <td className="px-5 py-4 align-top pt-5">
                           <div className="text-foreground font-semibold">
-                            {product.variants.reduce((s, v) => s + v.stock, 0)}
+                            {stockSummary.stock}
                           </div>
+                          {isBundle(product) && (
+                            <p className="text-xs text-muted-foreground">Tersedia {stockSummary.availableStock} bundle</p>
+                          )}
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${meta.cls}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
                             {meta.label}
@@ -764,7 +765,7 @@ export default function MasterProductsPage() {
                                   }}
                                   className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
                                 >
-                                  <Eye size={14} /> Lihat varian
+                                  <Eye size={14} /> {isBundle(product) ? "Lihat komponen" : "Lihat varian"}
                                 </button>
                                 <button
                                   onClick={() => updateImage(product)}
@@ -813,7 +814,7 @@ export default function MasterProductsPage() {
                               {/* Sub-header */}
                               <div className="px-4 py-2.5 bg-muted/80 border-b border-border flex items-center justify-between flex-wrap gap-3">
                                 <span className="text-xs font-bold text-foreground">
-                                  Varian {product.name}
+                                  {isBundle(product) ? "Komponen" : "Varian"} {product.name}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <button
@@ -826,6 +827,30 @@ export default function MasterProductsPage() {
                                 </div>
                               </div>
 
+                              {isBundle(product) ? (
+                                <table className="w-full text-sm text-left">
+                                  <thead className="bg-muted border-b border-border text-muted-foreground font-semibold text-xs">
+                                    <tr>
+                                      <th className="px-4 py-2">Komponen</th>
+                                      <th className="px-4 py-2">SKU</th>
+                                      <th className="px-4 py-2">Qty per bundle</th>
+                                      <th className="px-4 py-2">Stok tersedia</th>
+                                      <th className="px-4 py-2">Cukup untuk</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {product.bundleItems?.map(({ id, qty, variant }) => (
+                                      <tr key={id} className="border-b border-border last:border-0">
+                                        <td className="px-4 py-2.5">{variant.masterProduct.name}</td>
+                                        <td className="px-4 py-2.5">{variant.sku}</td>
+                                        <td className="px-4 py-2.5">{qty}</td>
+                                        <td className="px-4 py-2.5">{effectiveStock(variant.stock, variant.safetyStock)}</td>
+                                        <td className="px-4 py-2.5">{qty > 0 ? Math.floor(effectiveStock(variant.stock, variant.safetyStock) / qty) : 0} bundle</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              ) : (
                               <table className="w-full text-sm text-left">
                                 <thead className="bg-muted border-b border-border text-muted-foreground font-semibold text-xs">
                                   <tr>
@@ -880,6 +905,7 @@ export default function MasterProductsPage() {
                                   })}
                                 </tbody>
                               </table>
+                              )}
                             </div>
                           </td>
                         </tr>

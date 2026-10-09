@@ -63,6 +63,12 @@ type OrphanSku = {
   existingMappingId: string | null;
 };
 
+const orphanKey = (orphan: OrphanSku) => JSON.stringify([orphan.accountId, orphan.channelSku]);
+type MappingResult = { stockWarnings?: string[] };
+const showStockWarnings = (result: MappingResult) => {
+  if (result.stockWarnings?.length) alert(`Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${result.stockWarnings.slice(0, 10).join("\n")}`);
+};
+
 const emptyForm = {
   accountId: "",
   channelSku: "",
@@ -148,7 +154,7 @@ export default function ProductMappingPage() {
     }
     setSaving(true);
     try {
-      await api("/api/inventory/mappings", {
+      const result = await api<MappingResult>("/api/inventory/mappings", {
         method: "POST",
         body: JSON.stringify({
           accountId: form.accountId,
@@ -160,6 +166,7 @@ export default function ProductMappingPage() {
           safetyStock: form.useNewVariant ? Number(form.safetyStock) || 0 : undefined,
         }),
       });
+      showStockWarnings(result);
       setForm(emptyForm);
       await loadAll();
       await loadLedger();
@@ -174,10 +181,11 @@ export default function ProductMappingPage() {
     setRepointSaving(id);
     setError(null);
     try {
-      await api(`/api/inventory/mappings/${id}`, {
+      const result = await api<MappingResult>(`/api/inventory/mappings/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ variantId }),
       });
+      showStockWarnings(result);
       setRepoint((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -203,29 +211,31 @@ export default function ProductMappingPage() {
   }
 
   async function handleMapOrphan(o: OrphanSku) {
-    const mode = mapMode[o.channelSku] ?? "existing";
+    const key = orphanKey(o);
+    const mode = mapMode[key] ?? "existing";
     setError(null);
-    if (mode === "existing" && !mapTarget[o.channelSku]) {
+    if (mode === "existing" && !mapTarget[key]) {
       setError("Pilih varian target dulu untuk SKU ini.");
       return;
     }
-    if (mode === "new" && !newName[o.channelSku]?.trim()) {
+    if (mode === "new" && !newName[key]?.trim()) {
       setError("Isi nama produk master baru untuk SKU ini.");
       return;
     }
-    setMapSaving(o.channelSku);
+    setMapSaving(key);
     try {
-      await api(`/api/inventory/orphan-skus/map`, {
+      const result = await api<MappingResult>(`/api/inventory/orphan-skus/map`, {
         method: "POST",
         body: JSON.stringify(
           mode === "existing"
-            ? { accountId: o.accountId, channelSku: o.channelSku, mode, variantId: mapTarget[o.channelSku] }
-            : { accountId: o.accountId, channelSku: o.channelSku, mode, newProductName: newName[o.channelSku].trim(), platformTitle: o.sampleProductName ?? undefined }
+            ? { accountId: o.accountId, channelSku: o.channelSku, mode, variantId: mapTarget[key] }
+            : { accountId: o.accountId, channelSku: o.channelSku, mode, newProductName: newName[key].trim(), platformTitle: o.sampleProductName ?? undefined }
         ),
       });
-      setMapMode((p) => { const n = { ...p }; delete n[o.channelSku]; return n; });
-      setMapTarget((p) => { const n = { ...p }; delete n[o.channelSku]; return n; });
-      setNewName((p) => { const n = { ...p }; delete n[o.channelSku]; return n; });
+      showStockWarnings(result);
+      setMapMode((p) => { const n = { ...p }; delete n[key]; return n; });
+      setMapTarget((p) => { const n = { ...p }; delete n[key]; return n; });
+      setNewName((p) => { const n = { ...p }; delete n[key]; return n; });
       await Promise.all([loadAll(), loadOrphans(), loadLedger()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal mapping SKU.");
@@ -298,8 +308,8 @@ export default function ProductMappingPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground">Hubungkan Produk &amp; Stok (Mapping Stok Terpusat)</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Hubungkan produk di tiap toko ke satu variasi stok pusat (sku_master). Produk yang belum
@@ -307,7 +317,7 @@ export default function ProductMappingPage() {
             stok total − stok cadangan (Stok Aman).
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             onClick={() => { setTab("riwayat"); loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat.")); }}
             className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
@@ -368,7 +378,7 @@ export default function ProductMappingPage() {
           <Plus size={16} className="text-foreground" />
           <h2 className="font-semibold text-foreground">Hubungkan Produk (Tambah Mapping)</h2>
         </div>
-        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 [&>div]:min-w-0">
           <div>
             <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Toko</label>
             <select
@@ -493,7 +503,8 @@ export default function ProductMappingPage() {
           </div>
           <div className="divide-y divide-border">
             {orphans.map((o) => {
-              const mode = mapMode[o.channelSku] ?? "existing";
+              const key = orphanKey(o);
+              const mode = mapMode[key] ?? "existing";
               return (
                 <div key={`${o.accountId}|${o.channelSku}`} className="p-4" data-testid={`orphan-row-${o.channelSku}`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -508,17 +519,17 @@ export default function ProductMappingPage() {
                         {o.existingMappingId ? " · hubungan sudah ada — gunakan Ganti Varian/aksi di bawah untuk melengkapi data pesanan lama (Backfill)" : ""}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => setMapMode((p) => ({ ...p, [o.channelSku]: "existing" }))}
+                        onClick={() => setMapMode((p) => ({ ...p, [key]: "existing" }))}
                         className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "existing" ? "border-primary bg-card text-foreground" : "border-border bg-card text-foreground"}`}
                       >
                         <LinkIcon size={13} /> Ke varian ada
                       </button>
                       <button
                         onClick={() => {
-                          setMapMode((p) => ({ ...p, [o.channelSku]: "new" }));
-                          setNewName((p) => ({ ...p, [o.channelSku]: p[o.channelSku] ?? o.sampleProductName ?? "" }));
+                          setMapMode((p) => ({ ...p, [key]: "new" }));
+                          setNewName((p) => ({ ...p, [key]: p[key] ?? o.sampleProductName ?? "" }));
                         }}
                         className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "new" ? "border-primary bg-card text-foreground" : "border-border bg-card text-foreground"}`}
                       >
@@ -530,9 +541,9 @@ export default function ProductMappingPage() {
                   {mode === "existing" ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <select
-                        value={mapTarget[o.channelSku] ?? ""}
-                        onChange={(e) => setMapTarget((p) => ({ ...p, [o.channelSku]: e.target.value }))}
-                        className="border border-border rounded-md px-3 py-1.5 text-sm outline-none max-w-[320px]"
+                        value={mapTarget[key] ?? ""}
+                        onChange={(e) => setMapTarget((p) => ({ ...p, [key]: e.target.value }))}
+                        className="min-w-0 w-full border border-border rounded-md px-3 py-1.5 text-sm outline-none sm:max-w-[320px]"
                       >
                         <option value="">— pilih varian —</option>
                         {variants.map((v) => (
@@ -543,27 +554,27 @@ export default function ProductMappingPage() {
                       </select>
                       <button
                         onClick={() => handleMapOrphan(o)}
-                        disabled={mapSaving === o.channelSku || !mapTarget[o.channelSku]}
+                        disabled={mapSaving !== null || !mapTarget[key]}
                         className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                       >
-                        {mapSaving === o.channelSku ? "Menyimpan..." : "Hubungkan & Lengkapi Pesanan Lama (Mapping + Backfill)"}
+                        {mapSaving === key ? "Menyimpan..." : "Hubungkan & Lengkapi Pesanan Lama (Mapping + Backfill)"}
                       </button>
                     </div>
                   ) : (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <input
                         type="text"
-                        value={newName[o.channelSku] ?? ""}
-                        onChange={(e) => setNewName((p) => ({ ...p, [o.channelSku]: e.target.value }))}
+                        value={newName[key] ?? ""}
+                        onChange={(e) => setNewName((p) => ({ ...p, [key]: e.target.value }))}
                         placeholder="Nama produk master baru"
-                        className="border border-border rounded-md px-3 py-1.5 text-sm outline-none max-w-[360px]"
+                        className="min-w-0 w-full border border-border rounded-md px-3 py-1.5 text-sm outline-none sm:max-w-[360px]"
                       />
                       <button
                         onClick={() => handleMapOrphan(o)}
-                        disabled={mapSaving === o.channelSku || !newName[o.channelSku]?.trim()}
+                        disabled={mapSaving !== null || !newName[key]?.trim()}
                         className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
                       >
-                        {mapSaving === o.channelSku ? "Menyimpan..." : "Buat Produk Pusat & Hubungkan (Master + Mapping)"}
+                        {mapSaving === key ? "Menyimpan..." : "Buat Produk Pusat & Hubungkan (Master + Mapping)"}
                       </button>
                       <span className="text-xs text-muted-foreground">Stok awal 0 — isi lewat “Sesuaikan Stok” setelah ini.</span>
                     </div>

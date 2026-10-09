@@ -408,7 +408,7 @@ export default function TikTokMarketplacePage() {
                   .map((p) =>
                     p.platformProductId !== platformProductId
                       ? p
-                      : { ...p, skus: p.skus.filter((s) => (s.sellerSku ?? s.skuId) !== channelSku) }
+                      : { ...p, skus: p.skus.filter((s) => (s.skuId || s.sellerSku) !== channelSku) }
                   )
                   .filter((p) => p.skus.length > 0),
               }
@@ -620,7 +620,7 @@ export default function TikTokMarketplacePage() {
                         </div>
                         <div className="mt-2 flex flex-col gap-1">
                           {p.skus.map((s) => {
-                            const channelSku = s.sellerSku ?? s.skuId;
+                            const channelSku = s.skuId || s.sellerSku || "";
                             return (
                               <div key={s.skuId || channelSku} className="flex items-center justify-between gap-2 text-xs bg-muted rounded-md px-2 py-1.5 flex-wrap">
                                 <span className="text-foreground">
@@ -900,7 +900,7 @@ function MapUnmappedModal({
   onClose: () => void;
   onMapped: (accountId: string, platformProductId: string, channelSku: string, detail: string) => void;
 }) {
-  const channelSku = target.sku.sellerSku ?? target.sku.skuId;
+  const channelSku = target.sku.skuId || target.sku.sellerSku || "";
   const [masters, setMasters] = useState<MasterOption[]>([]);
   const [loadingMasters, setLoadingMasters] = useState(true);
   const [mode, setMode] = useState<"existing" | "new-master" | "new-variant">("existing");
@@ -945,7 +945,11 @@ function MapUnmappedModal({
       if (!channelSku.trim()) {
         throw new Error("SKU TikTok ini tidak memiliki ID/Seller SKU sehingga tidak bisa di-mapping.");
       }
-      const body: Record<string, unknown> = { accountId: target.accountId, channelSku };
+      const body: Record<string, unknown> = {
+        accountId: target.accountId,
+        channelSku,
+        channelSkuAliases: target.sku.sellerSku ? [target.sku.sellerSku] : [],
+      };
       if (mode === "existing") {
         if (!variantId) throw new Error("Pilih varian tujuan dulu.");
         body.variantId = variantId;
@@ -976,6 +980,7 @@ function MapUnmappedModal({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Gagal menyimpan mapping.");
+      if (data?.stockWarnings?.length) alert(`Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${data.stockWarnings.slice(0, 10).join("\n")}`);
       onMapped(target.accountId, target.product.platformProductId, channelSku, `"${channelSku}" → ${sku.trim() || variantId}`);
       onClose();
     } catch (e) {

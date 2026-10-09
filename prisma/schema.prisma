@@ -67,6 +67,7 @@ model InventorySetting {
 model MasterProduct {
   id             String           @id @default(cuid())
   name           String
+  description    String?
   category       String?
   imageUrl       String?
   type           String           @default("single")

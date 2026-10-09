@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
-import { backfillOrderItems } from "@/lib/services/orphan-sku.service";
+import { backfillOrderItems, reconcileMappedOrders } from "@/lib/services/orphan-sku.service";
 import { stockQuantity } from "@/lib/security/input";
+
+const mappingSchema = z.object({
+  accountId: z.string().trim().min(1).max(200),
+  channelSku: z.string().trim().min(1).max(200),
+  channelSkuAliases: z.array(z.string().trim().min(1).max(200)).max(2).default([]),
+  variantId: z.string().trim().min(1).max(200).optional(),
+  masterProductId: z.string().trim().min(1).max(200).optional(),
+  newProductName: z.string().max(2000).optional(),
+  sku: z.string().max(200).optional(),
+  stock: stockQuantity.optional(),
+  safetyStock: stockQuantity.optional(),
+  price: z.number().nonnegative().optional(),
+  imageUrl: z.string().max(2000).optional(),
+});
 
 const mappingInclude = {
   account: { select: { id: true, platform: true, label: true } },
@@ -40,18 +55,9 @@ export const GET = withAuth(async (req) => {
  *   (nama produk & sku bisa disediakan; fallback pakai channelSku).
  */
 export const POST = withAuth(async (req) => {
-  const body = (await req.json().catch(() => ({}))) as {
-    accountId?: string;
-    channelSku?: string;
-    variantId?: string;
-    masterProductId?: string;
-    newProductName?: string;
-    sku?: string;
-    stock?: number;
-    safetyStock?: number;
-    price?: number;
-    imageUrl?: string;
-  };
+  const parsed = mappingSchema.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) return NextResponse.json({ error: "Data mapping tidak valid. Pilih toko, SKU, dan varian yang benar." }, { status: 400 });
+  const body = parsed.data;
 
   const accountId = body.accountId?.trim();
   const channelSku = body.channelSku?.trim();
@@ -81,8 +87,18 @@ export const POST = withAuth(async (req) => {
 
   const settings = await getCachedInventorySettings(req.businessId);
   try {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
   let variantId = body.variantId;
+  const existingForChannel = await tx.productMapping.findUnique({ where: { accountId_channelSku: { accountId, channelSku } } });
+  if (existingForChannel?.variantId && existingForChannel.variantId !== variantId) {
+    return NextResponse.json({ error: "SKU ini sudah terhubung ke varian lain di toko yang sama. Gunakan Ganti Varian pada mapping yang ada." }, { status: 409 });
+  }
+  const aliasMapping = await tx.productMapping.findFirst({
+    where: { accountId, channelSku: { in: body.channelSkuAliases }, variantId: { not: null } },
+  });
+  if (aliasMapping && aliasMapping.variantId !== variantId) {
+    return NextResponse.json({ error: "Seller SKU sudah terhubung ke varian lain di toko ini. Periksa mapping yang ada." }, { status: 409 });
+  }
 
   if (variantId) {
     const variant = await tx.productVariant.findUnique({
@@ -175,15 +191,21 @@ export const POST = withAuth(async (req) => {
     });
   }
 
-    const mapping = await tx.productMapping.create({
+    const existingMapping = existingForChannel ?? aliasMapping;
+    const mapping = existingMapping
+      ? await tx.productMapping.update({ where: { id: existingMapping.id }, data: { channelSku, variantId }, include: mappingInclude })
+      : await tx.productMapping.create({
       data: { id: crypto.randomUUID(), accountId, channelSku, variantId, updatedAt: new Date() },
       include: mappingInclude,
     });
     // Backfill OrderItem historis yang masih orphan utk SKU ini — analytics
     // (topProducts) langsung menampilkan produk master, bukan SKU mentah.
-    const backfilled = await backfillOrderItems(accountId, channelSku, variantId, tx);
-    return NextResponse.json({ ok: true, mapping, backfilled }, { status: 201 });
+    const backfilled = await backfillOrderItems(accountId, channelSku, variantId, tx, body.channelSkuAliases);
+    return { mapping, backfilled, variantId };
   });
+  if (result instanceof Response) return result;
+  const stockWarnings = await reconcileMappedOrders(accountId, result.variantId);
+  return NextResponse.json({ ok: true, mapping: result.mapping, backfilled: result.backfilled, stockWarnings }, { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(

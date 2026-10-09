@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
@@ -94,6 +95,9 @@ export const POST = withAuth(async (req) => {
     }
     return NextResponse.json({ mode: "existing", ...result });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "SKU atau varian ini sudah memiliki mapping di toko yang sama. Muat ulang daftar mapping." }, { status: 409 });
+    }
     console.error("Error mapping orphan SKU:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Gagal mapping orphan SKU." },

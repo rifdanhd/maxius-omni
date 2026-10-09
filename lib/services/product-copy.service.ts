@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import * as cheerio from "cheerio";
 import { prisma } from "@/lib/db/prisma";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
@@ -817,11 +818,13 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
   const name = String(input.name ?? "").trim();
   if (!name) throw new CopyError("NOT_PARSEABLE", "Nama produk wajib diisi.");
 
-  const images = (input.images ?? [])
+  const selectedImages = (input.images ?? [])
     .map((i) => String(i).trim())
     .filter((i) => /^https?:\/\//i.test(i))
     .slice(0, MAX_IMAGES);
-  const imageUrl = String(input.imageUrl ?? "").trim() || images[0] || null;
+  const requestedCover = String(input.imageUrl ?? "").trim();
+  const imageUrl = /^https?:\/\//i.test(requestedCover) ? requestedCover : selectedImages[0] || null;
+  const images = [...new Set([...(imageUrl ? [imageUrl] : []), ...selectedImages])].slice(0, MAX_IMAGES);
 
   const variants = Array.isArray(input.variants) ? buildVariantSkus(name, input.variants) : null;
   const variantsForCreate =
@@ -843,12 +846,12 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
           },
         ];
 
+  const settings = await getCachedInventorySettings(input.businessId);
   return await prisma.$transaction(async (tx) => {
-    // Ambang awal produk baru = setting Pengaturan Inventori brand produk.
-    const settings = await getCachedInventorySettings(input.businessId);
     const product = await tx.masterProduct.create({
       data: {
         name,
+        description: input.description?.trim() || null,
         businessId: input.businessId,
         threshold: settings.lowStockDefaultThreshold,
         category: input.category ? String(input.category).trim() : null,
@@ -866,7 +869,18 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
           })),
         },
       },
-      select: { id: true },
+      select: { id: true, productVariant: { select: { id: true, sku: true, stock: true } } },
+    });
+    await tx.stockLedger.createMany({
+      data: product.productVariant.map((variant) => ({
+        id: crypto.randomUUID(),
+        variantId: variant.id,
+        changeQty: variant.stock,
+        stockAfter: variant.stock,
+        reason: "INIT",
+        referenceId: product.id,
+        note: `Stok awal varian ${variant.sku} (Product Copy)`,
+      })),
     });
     return { id: product.id };
   });

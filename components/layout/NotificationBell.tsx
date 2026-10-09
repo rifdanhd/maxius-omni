@@ -74,7 +74,7 @@ export default function NotificationBell() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Notifikasi"
-        className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted border border-border relative"
+        className="size-11 sm:size-8 shrink-0 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted border border-border relative"
       >
         <Bell size={16} />
         {hasAlert && (
@@ -85,8 +85,8 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div className="fixed inset-x-3 top-16 flex max-h-[calc(100dvh-5rem)] flex-col bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-[calc(100dvh-6rem)]">
+          <div className="px-4 py-3 border-b border-border flex shrink-0 items-center justify-between gap-2">
             <p className="text-sm font-bold text-foreground">Notifikasi</p>
             <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-destructive-subtle text-destructive">
               {alerts.length} peringatan stok
@@ -110,7 +110,7 @@ export default function NotificationBell() {
             </a>
           )}
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="min-h-0 max-h-80 overflow-y-auto overscroll-contain">
             {alerts.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Semua stok aman.
@@ -146,7 +146,7 @@ export default function NotificationBell() {
 
           <a
             href="/inventory"
-            className="block px-4 py-2.5 text-xs font-semibold text-foreground bg-muted hover:bg-muted text-center border-t border-border"
+            className="block shrink-0 px-4 py-2.5 text-xs font-semibold text-foreground bg-muted hover:bg-muted text-center border-t border-border"
           >
             {outCount > 0
               ? `Lihat ${outCount} varian stok habis di Inventori`

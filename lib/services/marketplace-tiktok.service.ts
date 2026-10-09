@@ -171,7 +171,7 @@ function applyProduct(
   const skus = (product.skus as Array<Record<string, unknown>>) ?? [];
   const matchingSku =
     skus.find((s) => s.id === mapping.channelSku || s.seller_sku === mapping.channelSku) ??
-    (mapping.channelSku === productId ? skus[0] : undefined);
+    (mapping.channelSku === productId && skus.length === 1 ? skus[0] : undefined);
 
   const stock = matchingSku
     ? productSkuStock(matchingSku)
@@ -295,23 +295,25 @@ function isUnmappedVisible(p: Record<string, unknown>): boolean {
 
 /**
  * findUnmappedProducts — produk TikTok yang tidak match mapping lokal mana pun.
- * Produk dianggap termapping bila MINIMAL satu kunci (sku.id / seller_sku /
- * product.id) cocok dengan channelSku sebuah mapping. Murni discovery (tanpa
+ * Setiap SKU diperiksa terpisah melalui sku.id / seller_sku. Murni discovery (tanpa
  * tulis DB) — mapping baru hanya boleh dibuat lewat aksi eksplisit user.
  */
 function findUnmappedProducts(
   products: Map<string, Record<string, unknown>>,
   channelSkus: string[]
 ): TikTokUnmappedProduct[] {
-  const skuKeys = buildSkuKeyMap(products);
-  const matchedProductIds = new Set<string>();
-  for (const channelSku of channelSkus) {
-    const product = skuKeys.get(channelSku);
-    if (product) matchedProductIds.add(String(product.id ?? ""));
-  }
+  const mapped = new Set(channelSkus);
   return [...products.values()]
-    .filter((p) => !matchedProductIds.has(String(p.id ?? "")) && isUnmappedVisible(p))
-    .map(toUnmappedProduct);
+    .filter(isUnmappedVisible)
+    .map(toUnmappedProduct)
+    .map((product) => ({
+      ...product,
+      skus: product.skus.filter((sku) =>
+        !mapped.has(sku.skuId) && !(sku.sellerSku && mapped.has(sku.sellerSku)) &&
+        !(product.skus.length === 1 && mapped.has(product.platformProductId))
+      ),
+    }))
+    .filter((product) => product.skus.length > 0);
 }
 
 type SyncAccountResult = {
@@ -362,14 +364,12 @@ include: {
      try {
      const products = await enumerateAccountProducts(account);
      const skuKeys = buildSkuKeyMap(products);
-     const matchedProductIds = new Set<string>();
      let synced = 0;
      let notFound = 0;
      let deleted = 0;
 
      for (const m of account.productMapping) {
       const product = skuKeys.get(m.channelSku) ?? null;
-      if (product) matchedProductIds.add(String(product.id ?? ""));
       if (!product) {
         // Mapping ada tapi tidak ditemukan di akun TikTok → tandai UNMATCHED agar
         // terlihat di tab "Perlu Tindakan".
@@ -404,9 +404,7 @@ include: {
         accountId: account.id,
       },
     });
-    const unmapped = [...products.values()]
-      .filter((p) => !matchedProductIds.has(String(p.id ?? "")) && isUnmappedVisible(p))
-      .map(toUnmappedProduct);
+    const unmapped = findUnmappedProducts(products, account.productMapping.filter((mapping) => mapping.variantId !== null).map((mapping) => mapping.channelSku));
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
     } catch (e) {
       results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
@@ -427,7 +425,7 @@ export async function getTikTokUnmapped(
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: "TIKTOK_SHOP", businessId, ...(accountId ? { id: accountId } : {}) },
 include: {
-       productMapping: { select: { channelSku: true } },
+       productMapping: { where: { variantId: { not: null } }, select: { channelSku: true } },
      },
    });
    const out: Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }> = [];

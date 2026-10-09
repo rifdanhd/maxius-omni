@@ -22,9 +22,8 @@ import { stockQuantity } from "@/lib/security/input";
 import type { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
-import { STOCK_REASONS } from "@/lib/services/central-stock.service";
+import { STOCK_REASONS, ACTIVE_ORDER_STOCK_STATUSES, deductStockForOrder } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
-import { businessWhere } from "@/lib/services/business-scope.service";
 
 export type OrphanSku = {
   channelSku: string;
@@ -49,78 +48,109 @@ export type OrphanSku = {
  * mapping (analytics juga mengecualikan CANCELLED).
  */
 export async function findOrphanSkus(businessId: string): Promise<OrphanSku[]> {
-  const rows = await prisma.orderItem.groupBy({
-    by: ["channelSku"],
-    where: {
-      variantId: null,
-      channelSku: { not: "" },
-      order: { status: { not: "CANCELLED" }, ...businessWhere.order(businessId) },
-    },
-    _sum: { qty: true },
-    _count: { orderId: true },
-    _min: { id: true },
+  const accounts = await prisma.platformAccount.findMany({
+    where: { businessId },
+    select: { id: true, label: true, platform: true },
   });
+  const perAccount = await Promise.all(accounts.map(async (account) => {
+    const rows = await prisma.orderItem.groupBy({
+      by: ["channelSku", "orderId"],
+      where: {
+        variantId: null,
+        channelSku: { not: "" },
+        order: { accountId: account.id, status: { not: "CANCELLED" } },
+      },
+      _sum: { qty: true },
+    });
 
-  if (rows.length === 0) return [];
+    if (rows.length === 0) return [];
 
-  // groupBy tidak bisa mengambil kolom relasi (productName/order) → ambil
-  // sample + waktu via query kecil per grup (jumlah grup kecil: SKU unik orphan).
-  const results = await Promise.all(
-    rows.map(async (r) => {
-      const sample = await prisma.orderItem.findFirst({
-        where: {
-          channelSku: r.channelSku,
-          variantId: null,
-          order: { status: { not: "CANCELLED" }, ...businessWhere.order(businessId) },
-        },
-        orderBy: [{ order: { createTime: "desc" } }, { id: "desc" }],
-        select: {
-          productName: true,
-          order: {
-            select: {
-              accountId: true,
-              createTime: true,
-              account: { select: { label: true, platform: true } },
+    const groups = new Map<string, { channelSku: string; qty: number; orderCount: number }>();
+    for (const row of rows) {
+      const group = groups.get(row.channelSku) ?? { channelSku: row.channelSku, qty: 0, orderCount: 0 };
+      group.qty += row._sum.qty ?? 0;
+      group.orderCount += 1;
+      groups.set(row.channelSku, group);
+    }
+    const results = await Promise.all(
+      [...groups.values()].map(async (r) => {
+        const sample = await prisma.orderItem.findFirst({
+          where: {
+            channelSku: r.channelSku,
+            variantId: null,
+            order: { accountId: account.id, status: { not: "CANCELLED" } },
+          },
+          orderBy: [{ order: { createTime: "desc" } }, { id: "desc" }],
+          select: {
+            productName: true,
+            order: {
+              select: {
+                accountId: true,
+                createTime: true,
+                account: { select: { label: true, platform: true } },
+              },
             },
           },
-        },
-      });
-      const accountId = sample?.order.accountId ?? "";
-      const existing = accountId
-        ? await prisma.productMapping.findUnique({
-            where: { accountId_channelSku: { accountId, channelSku: r.channelSku } },
-            select: { id: true },
-          })
-        : null;
-      return {
-        channelSku: r.channelSku,
-        accountId: sample?.order.accountId ?? "",
-        accountLabel: sample?.order.account?.label ?? null,
-        platform: sample?.order.account?.platform ?? null,
-        qty: r._sum.qty ?? 0,
-        orderCount: r._count.orderId,
-        sampleProductName: sample?.productName ?? null,
-        firstSeenAt: null,
-        lastSeenAt: sample?.order.createTime ?? null,
-        existingMappingId: existing?.id ?? null,
-      } satisfies OrphanSku;
-    })
-  );
+        });
+        const accountId = account.id;
+        const existing = accountId
+          ? await prisma.productMapping.findUnique({
+              where: { accountId_channelSku: { accountId, channelSku: r.channelSku } },
+              select: { id: true },
+            })
+          : null;
+        return {
+          channelSku: r.channelSku,
+          accountId,
+          accountLabel: account.label,
+          platform: account.platform,
+          qty: r.qty,
+          orderCount: r.orderCount,
+          sampleProductName: sample?.productName ?? null,
+          firstSeenAt: null,
+          lastSeenAt: sample?.order.createTime ?? null,
+          existingMappingId: existing?.id ?? null,
+        } satisfies OrphanSku;
+      })
+    );
 
-  return results.sort((a, b) => b.qty - a.qty);
+    return results;
+  }));
+  return perAccount.flat().sort((a, b) => b.qty - a.qty);
 }
 
 /** Backfill OrderItem historis yang masih orphan untuk (accountId, channelSku). */
-export async function backfillOrderItems(accountId: string, channelSku: string, variantId: string, tx: Prisma.TransactionClient = prisma) {
+export async function backfillOrderItems(accountId: string, channelSku: string, variantId: string, tx: Prisma.TransactionClient = prisma, aliases: string[] = []) {
   const res = await tx.orderItem.updateMany({
-    where: { channelSku, variantId: null, order: { accountId } },
+    where: { channelSku: { in: [...new Set([channelSku, ...aliases])] }, variantId: null, order: { accountId } },
     data: { variantId },
   });
   return res.count;
 }
 
+export async function reconcileMappedOrders(accountId: string, variantId: string): Promise<string[]> {
+  const orders = await prisma.order.findMany({
+    where: {
+      accountId,
+      status: { in: ACTIVE_ORDER_STOCK_STATUSES },
+      items: { some: { variantId } },
+    },
+    select: { id: true, orderNo: true },
+  });
+  const warnings: string[] = [];
+  for (const order of orders) {
+    try {
+      const effect = await deductStockForOrder(order.id);
+      if (!effect.ok) warnings.push(`${order.orderNo}: ${effect.reason ?? "stok belum terpotong"}`);
+    } catch (error) {
+      warnings.push(`${order.orderNo}: ${error instanceof Error ? error.message : "rekonsiliasi stok gagal"}`);
+    }
+  }
+  return warnings;
+}
+
 export type MapToVariantResult =
-  | { ok: true; mappingId: string; backfilled: number }
+  | { ok: true; mappingId: string; backfilled: number; stockWarnings: string[] }
   | { ok: false; reason: "variant_already_mapped"; message: string };
 
 /**
@@ -150,14 +180,18 @@ export async function mapOrphanToVariant(params: {
     };
   }
 
-  const mapping = await prisma.productMapping.upsert({
-    where: { accountId_channelSku: { accountId: params.accountId, channelSku: params.channelSku } },
-    create: { id: crypto.randomUUID(), accountId: params.accountId, channelSku: params.channelSku, variantId: params.variantId, updatedAt: new Date() },
-    update: { variantId: params.variantId },
-    select: { id: true },
+  const { mapping, backfilled } = await prisma.$transaction(async (tx) => {
+    const mapping = await tx.productMapping.upsert({
+      where: { accountId_channelSku: { accountId: params.accountId, channelSku: params.channelSku } },
+      create: { id: crypto.randomUUID(), accountId: params.accountId, channelSku: params.channelSku, variantId: params.variantId, updatedAt: new Date() },
+      update: { variantId: params.variantId },
+      select: { id: true },
+    });
+    const backfilled = await backfillOrderItems(params.accountId, params.channelSku, params.variantId, tx);
+    return { mapping, backfilled };
   });
-  const backfilled = await backfillOrderItems(params.accountId, params.channelSku, params.variantId);
-  return { ok: true, mappingId: mapping.id, backfilled };
+  const stockWarnings = await reconcileMappedOrders(params.accountId, params.variantId);
+  return { ok: true, mappingId: mapping.id, backfilled, stockWarnings };
 }
 
 export type MapToNewMasterResult = {
@@ -165,6 +199,7 @@ export type MapToNewMasterResult = {
   variantId: string;
   mappingId: string;
   backfilled: number;
+  stockWarnings: string[];
 };
 
 /**
@@ -241,5 +276,6 @@ export async function mapOrphanToNewMaster(params: {
     const backfilled = await backfillOrderItems(params.accountId, params.channelSku, variant.id, tx);
     return { masterId: product.id, variantId: variant.id, mappingId: mapping.id, backfilled };
   });
-  return { masterProductId: masterId, variantId, mappingId, backfilled };
+  const stockWarnings = await reconcileMappedOrders(params.accountId, variantId);
+  return { masterProductId: masterId, variantId, mappingId, backfilled, stockWarnings };
 }

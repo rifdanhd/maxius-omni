@@ -396,18 +396,23 @@ export async function getOrders(
     pageToken?: string;
     /** Watermark auto-sync: order dengan update_time ≥ detik epoch ini. */
     updateTimeGe?: number;
+    createTimeGe?: number;
+    createTimeLt?: number;
   } = {}
 ) {
-  const { pageSize = 20, orderStatus, pageToken, updateTimeGe } = opts;
+  const { pageSize = 20, orderStatus, pageToken, updateTimeGe, createTimeGe, createTimeLt } = opts;
   // Catatan penting (106001/sign invalid): bila body kosong `{}`, generateSign melewati
   // body TAPI fetch mengirim `"{}"` -> signature mismatch -> HTTP 401.
   // Karena itu kirim body null (tanpa body) saat tidak ada filter, dan hanya sertakan
   // filter non-kosong agar request body selaras dengan signature.
-  const hasFilter = Boolean(orderStatus) || updateTimeGe !== undefined;
+  const hasFilter = Boolean(orderStatus) || updateTimeGe !== undefined ||
+    createTimeGe !== undefined || createTimeLt !== undefined;
   const body: Record<string, unknown> | null = hasFilter
     ? {
         ...(orderStatus ? { order_status: orderStatus } : {}),
         ...(updateTimeGe !== undefined ? { update_time_ge: updateTimeGe } : {}),
+        ...(createTimeGe !== undefined ? { create_time_ge: createTimeGe } : {}),
+        ...(createTimeLt !== undefined ? { create_time_lt: createTimeLt } : {}),
       }
     : null;
   const result = await callApi(
