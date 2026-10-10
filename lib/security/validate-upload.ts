@@ -6,8 +6,11 @@ export class UploadValidationError extends Error {
 export const IMAGE_LIMIT = 5 * 1024 * 1024;
 export const DOCUMENT_LIMIT = 10 * 1024 * 1024;
 
-export async function readLimitedStream(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
-  if (!stream) throw new UploadValidationError("File kosong.");
+export async function readLimitedStream(stream: ReadableStream<Uint8Array> | null, limit: number, options: { allowEmpty?: boolean } = {}): Promise<Uint8Array> {
+  if (!stream) {
+    if (options.allowEmpty) return new Uint8Array(0);
+    throw new UploadValidationError("File kosong.");
+  }
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -23,7 +26,7 @@ export async function readLimitedStream(stream: ReadableStream<Uint8Array> | nul
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }
-  if (!total) throw new UploadValidationError("File kosong.");
+  if (!total && !options.allowEmpty) throw new UploadValidationError("File kosong.");
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }

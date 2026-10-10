@@ -8,6 +8,9 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { expect, type Page } from '@playwright/test';
+import { TEST_ADMIN_PASSWORD } from '../scripts/lib/e2e-credentials';
+
+export { TEST_ADMIN_PASSWORD };
 
 const ROOT = path.resolve(__dirname, '..');
 const MARKER = path.join(ROOT, '.e2e-db.json');
@@ -43,23 +46,13 @@ export function sql(query: string): string {
 }
 
 /** Login UI lengkap sampai dashboard siap. */
-export async function login(page: Page, username = 'admin', password = 'admin123'): Promise<void> {
+export async function login(page: Page, username = 'admin', password = TEST_ADMIN_PASSWORD): Promise<void> {
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill(username);
   await page.getByPlaceholder('••••••••').fill(password);
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
-  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+  await page.waitForURL('/dashboard', { timeout: 90_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
-}
-
-/** Ambil JWT valid (untuk assertion level API dari test). */
-export async function apiToken(page: Page): Promise<string> {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin', password: 'admin123' },
-  });
-  expect(res.ok()).toBeTruthy();
-  const body = (await res.json()) as { token: string };
-  return body.token;
 }
 
 export const SHOT = (name: string) =>

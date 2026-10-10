@@ -98,7 +98,8 @@ export function withAuth(
       if (!["GET", "HEAD"].includes(req.method) && req.body &&
           !req.headers.get("content-type")?.includes("application/json") &&
           !req.headers.get("content-type")?.startsWith("multipart/form-data;")) {
-        return Response.json({ error: "Content-Type tidak didukung." }, { status: 415 });
+        const bytes = await readLimitedStream(req.body, 1024 * 1024, { allowEmpty: true });
+        if (bytes.byteLength > 0) return Response.json({ error: "Content-Type tidak didukung." }, { status: 415 });
       }
       if (!["GET", "HEAD"].includes(req.method) && req.headers.get("content-type")?.includes("application/json")) {
         if (Number(req.headers.get("content-length")) > 1024 * 1024) return Response.json({ error: "Body terlalu besar." }, { status: 413 });

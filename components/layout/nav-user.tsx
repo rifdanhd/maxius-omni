@@ -32,7 +32,7 @@ type NavUserProps = {
 }
 
 export function NavUser({ user }: NavUserProps) {
-  const { isMobile } = useSidebar()
+  const { isMobile, setOpenMobile } = useSidebar()
   const [open, setOpen] = useDialogState()
 
   return (
@@ -77,9 +77,9 @@ export function NavUser({ user }: NavUserProps) {
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem asChild>
-                  <Link href='/settings/account'>
+                  <Link href='/settings/account' onClick={() => setOpenMobile(false)}>
                     <BadgeCheck />
-                    Account
+                    Akun saya
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
@@ -89,7 +89,7 @@ export function NavUser({ user }: NavUserProps) {
                 onClick={() => setOpen(true)}
               >
                 <LogOut />
-                Sign out
+                Keluar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

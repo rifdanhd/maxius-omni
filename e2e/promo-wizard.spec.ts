@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { sql } from './helpers';
+import { sql, TEST_ADMIN_PASSWORD } from './helpers';
 
 const SHOT = (n: string) =>
   `/Users/udan/Downloads/maxius-project/maxius-platform/e2e/screenshots/promo-${n}.png`;
@@ -61,7 +61,7 @@ test('A: wizard campaign promosi TikTok end-to-end', async ({ page }) => {
   // 1. Login.
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill('admin');
-  await page.getByPlaceholder('••••••••').fill('admin123');
+  await page.getByPlaceholder('••••••••').fill(TEST_ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
   await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });

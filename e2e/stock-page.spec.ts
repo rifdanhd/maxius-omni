@@ -1,6 +1,5 @@
-import { test, expect, request as baseRequest } from '@playwright/test';
-import type { Page } from '@playwright/test';
-import { sql, baseUrl } from './helpers';
+import { test, expect } from '@playwright/test';
+import { sql, login } from './helpers';
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/stock-${n}.png`;
@@ -8,25 +7,6 @@ const SEED_ID = 'e2e-seed-oversell-001';
 const ACCT_ID = 'e2e-stockpage-acct';
 const MP_ID = 'e2e-stockpage-mp';
 const VAR_ID = 'e2e-stockpage-var';
-
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.getByPlaceholder('Masukkan username').fill('admin');
-  await page.getByPlaceholder('••••••••').fill('admin123');
-  await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
-  await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-  await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });
-}
-
-async function apiToken(): Promise<string> {
-  const ctx = await baseRequest.newContext({ baseURL: baseUrl() });
-  const res = await ctx.post('/api/auth/login', {
-    data: { username: 'admin', password: 'admin123' },
-  });
-  const body = await res.json();
-  await ctx.dispose();
-  return body.token as string;
-}
 
 test.beforeAll(() => {
   sql(
@@ -64,10 +44,8 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   await login(page);
 
   // 1. Badge vs API langsung.
-  const token = await apiToken();
-  const apiRes = await fetch(`${baseUrl()}/api/inventory/stock?tab=all&limit=1`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const apiRes = await page.request.get('/api/inventory/stock?tab=all&limit=1');
+  expect(apiRes.ok()).toBeTruthy();
   const apiCounts = ((await apiRes.json()) as { counts: Record<string, number> }).counts;
 
   await page.goto('/inventory');

@@ -16,6 +16,7 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
+import { ZodError } from "zod";
 import { setupTestDb } from "@/scripts/lib/test-db";
 
 const db = setupTestDb("test-opname");
@@ -197,6 +198,12 @@ await ok("finalisasi GANDA bersamaan → idempoten, stok tidak terkoreksi 2×", 
   ]);
   const fulfilled = [r1, r2].filter((x) => x.status === "fulfilled" && (x.value as { ok: boolean }).ok);
   assert.equal(fulfilled.length, 2, "keduanya boleh 'ok' (satu asli, satu already)");
+  const responses = [r1, r2].flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+  assert.equal(responses.filter((result) => result.already).length, 1);
+  const retry = await finalizeStockOpname({ opnameId: oid, userId: user.id });
+  assert.equal(retry.ok, true);
+  assert.equal(retry.already, true);
+  assert.equal(retry.adjusted, 0);
   const ledgerCount = await prisma.stockLedger.count({
     where: { reason: STOCK_REASONS.STOCK_OPNAME, referenceId: oid },
   });
@@ -205,17 +212,18 @@ await ok("finalisasi GANDA bersamaan → idempoten, stok tidak terkoreksi 2×", 
   assert.equal(v.stock, 15, "terkoreksi tepat sekali");
 });
 
-await rejects("countedStock negatif ditolak", () =>
-  createStockOpname({ businessId: "business-default",  variantIds: [vA.id] }).then(async (r) => {
-    const oid = (r.opname as { id: string }).id;
-    const rr = await recordOpnameCounts({
-      opnameId: oid,
-      counts: [{ variantId: vA.id, countedStock: -3 }],
-    });
-    if (!rr.ok) throw new Error(rr.reason ?? "");
-  }),
-  "negatif"
-);
+await ok("countedStock negatif ditolak", async () => {
+  const r = await createStockOpname({ businessId: "business-default", variantIds: [vA.id] });
+  const oid = (r.opname as { id: string }).id;
+  await assert.rejects(
+    recordOpnameCounts({ opnameId: oid, counts: [{ variantId: vA.id, countedStock: -3 }] }),
+    (error: unknown) => error instanceof ZodError && error.issues.some((issue) =>
+      issue.code === "too_small" && issue.path.join(".") === "counts.0.countedStock"
+    )
+  );
+  const unchanged = await prisma.stockOpnameItem.findFirstOrThrow({ where: { opnameId: oid } });
+  assert.equal(unchanged.countedStock, null);
+});
 
 /* ─────────────────────────── FITUR 2 ─────────────────────────── */
 console.log("=== FITUR 2: Riwayat Inventori ===");

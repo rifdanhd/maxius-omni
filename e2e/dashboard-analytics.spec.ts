@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { TEST_ADMIN_PASSWORD } from './helpers';
 
 /**
  * [E2E] Dashboard analytics — guard untuk bug duplicate React key "unknown".
@@ -21,7 +22,7 @@ const SHOT = (n: string) =>
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill('admin');
-  await page.getByPlaceholder('••••••••').fill('admin123');
+  await page.getByPlaceholder('••••••••').fill(TEST_ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
   await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });

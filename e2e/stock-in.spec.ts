@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { sql } from './helpers';
+import { sql, TEST_ADMIN_PASSWORD } from './helpers';
 
 /**
  * [E2E] Form "Barang Masuk" (stock-in) di halaman Mapping — Daftar Varian.
@@ -20,7 +20,7 @@ const SKU = 'E2E-STOCKIN-SKU';
 async function login(page: Page) {
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill('admin');
-  await page.getByPlaceholder('••••••••').fill('admin123');
+  await page.getByPlaceholder('••••••••').fill(TEST_ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
   await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 60_000 });

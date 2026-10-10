@@ -8,6 +8,10 @@ assert.throws(() => validateFileBytes(Buffer.from("<script>evil</script>"), "ima
 assert.throws(() => validateFileBytes(new Uint8Array(IMAGE_LIMIT + 1), "image/png"));
 const stream = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(9)); c.close(); } });
 await assert.rejects(readLimitedStream(stream, 8));
+await assert.rejects(readLimitedStream(new Response("").body, 8));
+assert.equal((await readLimitedStream(new Response("").body, 8, { allowEmpty: true })).byteLength, 0);
+const oversizedOptional = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array(9)); c.close(); } });
+await assert.rejects(readLimitedStream(oversizedOptional, 8, { allowEmpty: true }));
 const form = new FormData(); form.set("file", new File([png], "x.png", { type: "image/png" }));
 assert.equal((await readValidatedUpload(new Request("http://localhost", { method: "POST", body: form }))).mime, "image/png");
 console.log("Upload security tests passed");

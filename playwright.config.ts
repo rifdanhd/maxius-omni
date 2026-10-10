@@ -64,6 +64,7 @@ export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
   use: {
     baseURL: `http://localhost:${PORT}`,
+    extraHTTPHeaders: { Origin: `http://localhost:${PORT}` },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

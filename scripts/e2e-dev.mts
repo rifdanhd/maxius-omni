@@ -7,7 +7,7 @@
  * Playwright memakai DB `maxius_test_e2e_*` sendiri:
  *
  *   1. setupTestDb()  → CREATE DATABASE + `prisma migrate deploy`
- *   2. node prisma/seed.js → admin/admin123 + 5 brand + data seed
+ *   2. node prisma/seed.js → admin tes + 5 brand + data seed
  *   3. tulis marker `.e2e-db.json` (dibaca spec & global setup/teardown)
  *   4. `next dev -p 3100` dengan POSTGRES_URL DB tsb
  *
@@ -18,10 +18,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setupTestDb } from "./lib/test-db";
+import { TEST_ADMIN_PASSWORD } from "./lib/e2e-credentials";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const MARKER = path.join(ROOT, ".e2e-db.json");
 const PORT = "3100";
+process.env.TEST_ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
+process.env.APP_ORIGIN = `http://localhost:${PORT}`;
+process.env.AUTO_SYNC_DISABLED = "true";
+process.env.SYNC_RETRY_DISABLED = "true";
 
 const db = setupTestDb("e2e");
 console.log(`[e2e-dev] database terisolasi: ${db.name}`);
@@ -35,7 +40,7 @@ execSync("node prisma/seed.js", {
 
 fs.writeFileSync(MARKER, JSON.stringify({ name: db.name, url: db.url, port: PORT }) + "\n");
 
-const child = spawn("npx", ["next", "dev", "-p", PORT], {
+const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--webpack", "-p", PORT], {
   cwd: ROOT,
   stdio: "inherit",
   // MAXIUS_E2E=1 → next.config.ts memakai distDir ".next-e2e" supaya lockfile

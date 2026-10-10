@@ -58,7 +58,7 @@ test('produk baru: buat via form mapping → muncul di /products → tetap ada s
   await numberInputs.nth(1).fill('2'); // Stok Aman
   await page.screenshot({ path: SHOT('form') });
 
-  await page.getByRole('button', { name: 'Simpan Mapping' }).click();
+  await page.getByRole('button', { name: 'Simpan Hubungan (Mapping)' }).click();
 
   // 2. Sukses: mapping masuk ke daftar, form dikosongkan, tidak ada error.
   // pakai cell exact — channel SKU juga muncul di option select varian target.
@@ -122,7 +122,7 @@ test('validasi form mapping: toko & channel SKU wajib diisi', async ({ page }: {
     }
     return route.continue();
   });
-  await page.getByRole('button', { name: 'Simpan Mapping' }).click();
+  await page.getByRole('button', { name: 'Simpan Hubungan (Mapping)' }).click();
   await expect(page.getByText('Pilih toko dan isi channel SKU.')).toBeVisible();
   expect(requested).toBe(false);
   await page.screenshot({ path: SHOT('validation') });

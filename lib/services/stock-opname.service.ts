@@ -237,7 +237,11 @@ export async function finalizeStockOpname(params: {
     return { ok: false, reason: "Opname tidak ditemukan." };
   }
   if (opname.status === OPNAME_STATUSES.COMPLETED) {
-    return { ok: false, reason: "Opname sudah difinalisasi." };
+    const fresh = await prisma.stockOpname.findUnique({
+      where: { id: params.opnameId },
+      include: opnameInclude,
+    });
+    return { ok: true, already: true, opname: fresh, adjusted: 0, skipped: 0 };
   }
   if (opname.status === OPNAME_STATUSES.CANCELLED) {
     return { ok: false, reason: "Opname sudah dibatalkan." };
@@ -262,7 +266,11 @@ export async function finalizeStockOpname(params: {
     await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "StockOpname" WHERE "id" = ${params.opnameId} FOR UPDATE`;
       const locked = await tx.stockOpname.findUniqueOrThrow({ where: { id: params.opnameId }, include: { items: { orderBy: { variantId: "asc" } } } });
-      if ([OPNAME_STATUSES.COMPLETED, OPNAME_STATUSES.CANCELLED].includes(locked.status as "COMPLETED" | "CANCELLED")) throw new Error("Opname sudah ditutup.");
+      if (locked.status === OPNAME_STATUSES.COMPLETED) {
+        already = true;
+        return;
+      }
+      if (locked.status === OPNAME_STATUSES.CANCELLED) throw new Error("Opname sudah dibatalkan.");
       if (locked.items.some(i => i.countedStock === null)) throw new Error("Ada item belum dihitung.");
       for (const item of locked.items) {
         const counted = item.countedStock as number;

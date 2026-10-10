@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { sql, login, apiToken } from './helpers';
+import { sql, login } from './helpers';
 
 const SHOT = (n: string) =>
   `/Users/udan/Downloads/maxius-project/maxius-platform/e2e/screenshots/business-${n}.png`;
@@ -28,19 +28,18 @@ test.afterAll(() => {
   sql(`DELETE FROM "PlatformAccount" WHERE id IN ('${ACCT_DEFAULT}','${ACCT_RAXEN}');`);
 });
 
-/** Cara BrandSwitcher mengganti brand: simpan lalu reload (tanpa switcher UI). */
 async function switchBrand(page: Page, businessId: string): Promise<void> {
-  await page.evaluate((id) => localStorage.setItem('activeBusinessId', id), businessId);
+  const response = await page.request.post('/api/auth/business', {
+    headers: { Origin: new URL(page.url()).origin },
+    data: { businessId },
+  });
+  expect(response.ok()).toBeTruthy();
   await page.reload();
 }
 
 test('admin mengakses 5 brand (sumber data brand switcher)', async ({ page }) => {
   await login(page);
-  // page.request TIDAK membawa token dari localStorage → kirim Bearer manual.
-  const token = await apiToken(page);
-  const res = await page.request.get('/api/businesses', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await page.request.get('/api/businesses');
   expect(res.ok()).toBeTruthy();
   const body = (await res.json()) as { businesses: { id: string; name: string }[] };
   expect(body.businesses).toHaveLength(5);
@@ -81,7 +80,7 @@ test('UI bersih: tanpa dropdown brand, menu placeholder tersembunyi, lonceng not
   await page.goto('/dashboard');
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 30_000 });
   // Dropdown brand (Maxius/Raxen/dll) sengaja dihapus dari header — semua toko
-  // tampil dalam satu dashboard; brand aktif tetap bisa di-set via localStorage.
+  // tampil dalam satu dashboard; brand aktif ditetapkan lewat sesi server.
   await expect(page.getByTitle('Ganti brand')).toHaveCount(0);
 
   // Sidebar: panduan tampil, menu placeholder (Chat/Pelanggan/Market/Log) tersembunyi.
@@ -119,12 +118,9 @@ test.afterAll(() => {
 
 test('daftar produk ter-scoping brand aktif', async ({ page }) => {
   await login(page);
-  const token = await apiToken(page);
-
   // Brand Raxen: produknya sendiri tampil, produk brand default tidak.
-  const raxen = await page.request.get('/api/products?businessId=business-raxen', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  await switchBrand(page, 'business-raxen');
+  const raxen = await page.request.get('/api/products');
   expect(raxen.ok()).toBeTruthy();
   const raxenBody = (await raxen.json()) as { products: { id: string; businessId: string }[] };
   expect(raxenBody.products.length).toBeGreaterThan(0);
@@ -133,9 +129,8 @@ test('daftar produk ter-scoping brand aktif', async ({ page }) => {
   expect(raxenBody.products.map((p) => p.id)).not.toContain(PROD_DEFAULT);
 
   // Brand default: sebaliknya.
-  const def = await page.request.get('/api/products?businessId=business-default', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  await switchBrand(page, 'business-default');
+  const def = await page.request.get('/api/products');
   expect(def.ok()).toBeTruthy();
   const defBody = (await def.json()) as { products: { id: string; businessId: string }[] };
   expect(defBody.products.every((p) => p.businessId === 'business-default')).toBeTruthy();

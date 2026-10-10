@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { sql } from './helpers';
+import { sql, TEST_ADMIN_PASSWORD } from './helpers';
 
 const ROOT = '/Users/udan/Downloads/maxius-project/maxius-platform';
 const SHOT = (n: string) => `${ROOT}/e2e/screenshots/bundle-${n}.png`;
@@ -43,7 +43,7 @@ test.afterAll(() => {
 async function login(page: Page) {
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill('admin');
-  await page.getByPlaceholder('••••••••').fill('admin123');
+  await page.getByPlaceholder('••••••••').fill(TEST_ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Masuk Sekarang' }).click();
   await page.waitForURL('/dashboard', { timeout: 30_000, waitUntil: 'commit' });
 }

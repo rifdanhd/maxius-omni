@@ -32,6 +32,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/reports/sales": "Laporan Penjualan",
   "/reports/stock": "Laporan Stok",
   "/settings/accounts": "Pengaturan Toko",
+  "/settings/account": "Akun Saya",
   "/education": "Panduan",
   "/logs": "Log Sistem",
   "/wms": "WMS",

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, apiToken, sql } from './helpers';
+import { login, sql } from './helpers';
 
 /**
  * M8a — guard platform: order Shopee TIDAK BOLEH menyentuh API TikTok.
@@ -52,8 +52,7 @@ test.afterAll(() => {
 
 test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan TikTok', async ({ page }) => {
   await login(page);
-  const token = await apiToken(page);
-  const auth = { Authorization: `Bearer ${token}` };
+  const auth = { Origin: new URL(page.url()).origin };
 
   // Detail order — 200 + platform SHOPEE (kategori TikTok tidak dipanggil utk Shopee).
   const detail = await page.request.get(`/api/orders/${ORD_S}`, { headers: auth });

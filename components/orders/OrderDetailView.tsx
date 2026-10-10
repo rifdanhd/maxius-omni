@@ -81,21 +81,21 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 function Card({ title, note, children }: { title: React.ReactNode; note?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm">
-      <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
+    <div className="min-w-0 bg-card rounded-xl border border-border shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4 pb-3 border-b border-border">
         <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">{title}</h2>
         {note}
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div className="min-w-0 px-5 py-4 [overflow-wrap:anywhere]">{children}</div>
     </div>
   );
 }
 
 function InfoRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`text-foreground font-medium ${muted ? "text-muted-foreground" : ""}`}>{value}</span>
+    <div className="flex min-w-0 items-center justify-between gap-3 py-1.5 text-sm">
+      <span className="min-w-0 text-muted-foreground">{label}</span>
+      <span className={`min-w-0 text-right text-foreground font-medium ${muted ? "text-muted-foreground" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -133,22 +133,22 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
     <div className="min-h-screen bg-muted font-sans">
       {/* Topbar */}
       <header className="sticky top-0 z-20 bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-2 min-h-14 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/orders"
-              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors"
+              className="size-11 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors"
             >
               <ArrowLeft size={18} />
             </Link>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-sm font-bold text-foreground leading-tight">Detail Pesanan</h1>
-              <p className="text-xs text-muted-foreground leading-tight">No. Pesanan: {detail?.orderNo ?? "..."}</p>
+              <p className="break-all text-xs text-muted-foreground leading-tight">No. Pesanan: {detail?.orderNo ?? "..."}</p>
             </div>
           </div>
           {detail && (
             <span
-              className={`px-3 py-1 rounded-md border text-xs font-bold ${
+              className={`max-w-[45%] shrink-0 break-words px-3 py-1 rounded-md border text-xs font-bold ${
                 detail.status === "AWAITING_SHIPMENT"
                   ? "bg-muted text-foreground border-border"
                   : "bg-muted text-foreground border-border"
@@ -176,9 +176,9 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
         )}
 
         {!loading && detail && (
-          <div className="grid lg:grid-cols-3 gap-6 items-start">
+          <div className="grid min-w-0 grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Kolom kiri */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="min-w-0 lg:col-span-2 space-y-6">
               {/* Badges + Ringkasan pesanan */}
               <Card title="Ringkasan Pesanan">
                 <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -212,7 +212,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
 
               {/* Catatan pembeli */}
               {detail.buyerNote && (
-                <div className="bg-muted border border-border rounded-xl px-5 py-4">
+                <div className="bg-muted border border-border rounded-xl px-5 py-4 [overflow-wrap:anywhere]">
                   <p className="text-xs font-semibold text-foreground mb-1">Catatan Pembeli</p>
                   <p className="text-sm text-foreground italic">“{detail.buyerNote}”</p>
                 </div>
@@ -300,7 +300,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
             </div>
 
             {/* Kolom kanan */}
-            <div className="space-y-6 lg:sticky lg:top-20">
+            <div className="min-w-0 space-y-6 lg:sticky lg:top-20">
               {/* Pembayaran pembeli */}
               <Card title="Pembayaran Pembeli">
                 {!p ? (
