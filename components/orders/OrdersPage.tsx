@@ -851,7 +851,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="p-3 sm:p-6 font-sans min-h-full min-w-0 flex flex-col md:h-full">
+    <div className="p-3 sm:p-6 font-sans min-h-full min-w-0 flex flex-col">
       {/* Page Header */}
       <PageHeader
         title="Kelola Pesanan"
@@ -934,8 +934,8 @@ export default function OrdersPage() {
 
       {/* Main Card */}
       <DataCard
-        className="flex-1 min-w-0 flex flex-col overflow-hidden min-h-0"
-        contentClassName="flex-1 min-w-0 flex flex-col overflow-hidden p-0"
+        className="min-w-0 shrink-0 overflow-hidden"
+        contentClassName="min-w-0 p-0"
       >
         {/* Tabs */}
         <div className="flex items-center overflow-x-auto border-b border-border px-4 bg-card">
@@ -1166,8 +1166,10 @@ export default function OrdersPage() {
           </div>
         </div>
 
+      </DataCard>
+
         {/* Orders List */}
-        <div className="flex-1 p-3 sm:p-4 bg-muted md:overflow-y-auto">
+        <div className="mt-4 min-w-0">
           {loading ? (
             <div className="space-y-3" aria-busy="true">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -1229,7 +1231,6 @@ export default function OrdersPage() {
             ))
           )}
         </div>
-      </DataCard>
 
       {/* Modal Alur Pengiriman */}
       {pickupTargets && (
