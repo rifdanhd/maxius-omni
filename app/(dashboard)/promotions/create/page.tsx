@@ -20,6 +20,8 @@
  *   (unlimited), tervalidasi sandbox.
  * - Server TETAP re-validasi semuanya (G1–G4); validasi di UI hanya UX.
  */
+import { FormError, ErrorFeedback, TechnicalDetails } from "@/components/ui/feedback";
+import { friendlyError } from "@/lib/ui/feedback";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -495,8 +497,8 @@ export default function PromotionCreatePage() {
     return (
       <div className="p-4 md:p-8 max-w-3xl mx-auto">
         {createResult.ok && createResult.resultStatus === "SUCCESS" ? (
-          <div className="bg-card border border-border rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-foreground">
+          <div role="status" className="bg-success-subtle border border-success/30 rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-success">
               <CheckCircle2 size={28} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-bold text-lg">Promosi berhasil dibuat & terverifikasi.</p>
@@ -513,14 +515,14 @@ export default function PromotionCreatePage() {
         ) : createResult.ok ? (
           /* UNVERIFIED / PARTIAL — warning BESAR: activity ada di TikTok tapi
              produk belum pasti ter-attach → wajib cek manual. */
-          <div className="bg-card border-2 border-ring rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-foreground">
-              <AlertTriangle size={32} className="mt-0.5 shrink-0 text-muted-foreground" />
+          <div role="status" className="bg-warning-subtle border border-warning/30 rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-warning">
+              <AlertTriangle size={32} className="mt-0.5 shrink-0" aria-hidden="true" />
               <div>
                 <p className="font-bold text-lg">
                   {createResult.resultStatus === "PARTIAL"
-                    ? "Promosi TERPASANG SEBAGIAN — perlu pengecekan manual"
-                    : "Promosi dibuat di TikTok, tapi produk BELUM PASTI ter-attach — perlu pengecekan manual"}
+                    ? "Sebagian produk belum masuk promosi"
+                    : "Produk promosi perlu diperiksa"}
                 </p>
                 <p className="text-sm mt-2">
                   {createResult.attachedCount ?? 0} produk terpasang · ID activity: {createResult.externalActivityId ?? "-"}
@@ -530,27 +532,22 @@ export default function PromotionCreatePage() {
                   nonaktifkan di sana agar pembeli tidak terkena diskon yang tidak diinginkan.
                 </p>
                 {createResult.unverifiedReason && (
-                  <p className="text-xs text-foreground mt-2">Penyebab: {createResult.unverifiedReason}</p>
+                  <TechnicalDetails value={createResult.unverifiedReason} />
                 )}
                 {(createResult.failedBatches?.length ?? 0) > 0 && (
-                  <ul className="text-xs mt-2 space-y-1 text-foreground">
-                    {createResult.failedBatches!.map((b) => (
-                      <li key={b.batchIndex}>
-                        Batch {b.batchIndex} gagal: {b.error}
-                      </li>
-                    ))}
-                  </ul>
+                  <TechnicalDetails value={createResult.failedBatches!.map((b) => `Kelompok ${b.batchIndex}: ${b.error}`).join("\n")} />
                 )}
               </div>
             </div>
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-xl shadow-sm p-6">
-            <div className="flex items-start gap-3 text-foreground">
+          <div role="alert" className="bg-destructive-subtle border border-destructive/30 rounded-xl shadow-sm p-6">
+            <div className="flex items-start gap-3 text-destructive">
               <AlertCircle size={28} className="mt-0.5 shrink-0" />
               <div>
-                <p className="font-bold text-lg">Promosi TIDAK jadi dibuat.</p>
-                <p className="text-sm mt-1">{createResult.error}</p>
+                <p className="font-bold text-lg">Promosi belum berhasil dibuat</p>
+                <p className="text-sm mt-1">{friendlyError(createResult.error, "Periksa pengaturan promosi, lalu coba buat lagi.")}</p>
+                <TechnicalDetails value={createResult.error} />
                 {(createResult.itemErrors?.length ?? 0) > 1 && (
                   <p className="text-xs text-muted-foreground mt-2">
                     {createResult.itemErrors!.length} produk bermasalah — perbaiki lalu coba buat lagi secara manual.
@@ -667,11 +664,7 @@ export default function PromotionCreatePage() {
               </div>
             ) : (
               <>
-                {loadError && (
-                  <p className="mx-4 mt-3 text-xs text-foreground bg-muted border border-border rounded-md px-3 py-2">
-                    {loadError}
-                  </p>
-                )}
+                {loadError && <FormError>{loadError}</FormError>}
                 {priceError && (
                   <p className="mx-4 mt-3 text-xs text-foreground bg-muted border border-border rounded-md px-3 py-2">{priceError}</p>
                 )}
@@ -905,10 +898,7 @@ export default function PromotionCreatePage() {
           </button>
 
           {preview && !preview.ok && (
-            <div className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground flex items-start gap-2">
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
-              <span>{preview.error}</span>
-            </div>
+            <ErrorFeedback title="Harga promosi belum dapat diperiksa" error={preview.error} />
           )}
 
           {preview?.ok && (

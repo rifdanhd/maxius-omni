@@ -1,5 +1,8 @@
 "use client";
 
+import { FormError } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
+import { confirmAction } from "@/components/ui/confirm-action";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import Link from "next/link";
@@ -259,7 +262,7 @@ export default function TikTokEditPage() {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [showOptional, setShowOptional] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const descRef = useRef<HTMLDivElement>(null);
@@ -374,10 +377,7 @@ export default function TikTokEditPage() {
   const requiredAttrs = useMemo(() => attrs.filter((a) => a.required), [attrs]);
   const optionalAttrs = useMemo(() => attrs.filter((a) => !a.required), [attrs]);
 
-  function showToast(type: "success" | "error", msg: string) {
-    setToast({ type, msg });
-    window.setTimeout(() => setToast(null), 6000);
-  }
+
 
   function setAttrsUpdated(next: AttrRow[]) {
     setAttrs(next);
@@ -467,12 +467,10 @@ export default function TikTokEditPage() {
     setRows(buildRowsFromDims(baseRows, nextDims));
   }
 
-  function removeDim(id: string) {
+  async function removeDim(id: string) {
     const d = dims.find((x) => x.id === id);
     if (d && (d.values.length > 0 || d.name.trim())) {
-      const ok = window.confirm(
-        "Mohon berhati-hati hapus opsi varian berdampak terhadap produk master terkait. Lanjutkan?"
-      );
+      const ok = await confirmAction("Mohon berhati-hati hapus opsi varian berdampak terhadap produk master terkait. Lanjutkan?");
       if (!ok) return;
     }
     const nextDims = dims.filter((x) => x.id !== id);
@@ -480,10 +478,8 @@ export default function TikTokEditPage() {
     setRows(buildRowsFromDims(baseRows, nextDims));
   }
 
-  function removeDimValue(dimId: string, valId: string) {
-    const ok = window.confirm(
-      "Mohon berhati-hati hapus opsi varian berdampak terhadap produk master terkait. Lanjutkan?"
-    );
+  async function removeDimValue(dimId: string, valId: string) {
+    const ok = await confirmAction("Mohon berhati-hati hapus opsi varian berdampak terhadap produk master terkait. Lanjutkan?");
     if (!ok) return;
     const nextDims = dims.map((d) =>
       d.id === dimId ? { ...d, values: d.values.filter((v) => v.id !== valId) } : d
@@ -646,7 +642,7 @@ export default function TikTokEditPage() {
 
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
-      showToast("error", "Periksa kembali field yang wajib diisi.");
+      notify("error", "Lengkapi kolom yang wajib diisi, lalu coba lagi.");
       setTimeout(() => focusFirstInvalidField(errors), 0);
       return;
     }
@@ -710,16 +706,16 @@ export default function TikTokEditPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          
+
         },
         body: JSON.stringify(payload),
       });
       const json = (await res.json()) as PutResponse;
       if (!json.ok || !res.ok) throw new Error(json.error ?? "Publish gagal.");
-      showToast("success", json.message ?? "Produk berhasil diperbarui.");
+      notify("success", json.message ?? "Produk berhasil diperbarui.");
       window.setTimeout(() => router.push("/products/marketplace/tiktok"), 1500);
     } catch (e) {
-      showToast("error", e instanceof Error ? e.message : "Publish gagal.");
+      notify("error", e instanceof Error ? e.message : "Produk belum berhasil diterbitkan. Silakan coba lagi.");
     } finally {
       setSaving(false);
     }
@@ -751,16 +747,7 @@ export default function TikTokEditPage() {
 
   return (
     <div className="p-4 md:p-8">
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm font-medium flex items-center gap-2 ${
-            toast.type === "success" ? "bg-primary text-primary-foreground" : "bg-primary text-primary-foreground"
-          }`}
-        >
-          {toast.type === "success" ? <Check size={16} /> : <AlertTriangle size={16} />}
-          {toast.msg}
-        </div>
-      )}
+
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
@@ -786,6 +773,9 @@ export default function TikTokEditPage() {
       <Section title="A. Informasi Produk" icon={Layers} index={1}>
         <Field label="Nama Produk" required error={fieldErrors.title} fieldKey="title">
           <input
+            id="tiktok-title"
+            aria-invalid={Boolean(fieldErrors.title)}
+            aria-describedby={fieldErrors.title ? "tiktok-title-error" : undefined}
             type="text"
             value={title}
             maxLength={255}
@@ -805,6 +795,8 @@ export default function TikTokEditPage() {
           <div className="relative">
             <button
               type="button"
+              id="tiktok-category"
+              aria-describedby={fieldErrors.category ? "tiktok-category-error" : undefined}
               onClick={() => setCatOpen((v) => !v)}
               className={`w-full px-3 py-2 border rounded-md text-sm text-left flex items-center justify-between ${
                 fieldErrors.category ? "border-ring" : "border-border"
@@ -900,6 +892,12 @@ export default function TikTokEditPage() {
             </div>
             <div
               ref={descRef}
+              id="tiktok-description"
+              role="textbox"
+              aria-label="Deskripsi Produk"
+              aria-multiline="true"
+              aria-invalid={Boolean(fieldErrors.description)}
+              aria-describedby={fieldErrors.description ? "tiktok-description-error" : undefined}
               contentEditable
               suppressContentEditableWarning
               onInput={(e) => setDescHtml(e.currentTarget.innerHTML)}
@@ -1205,6 +1203,9 @@ export default function TikTokEditPage() {
           <Field label="Berat Produk" required error={fieldErrors.weight} fieldKey="weight">
             <div className="flex gap-2">
               <input
+                id="tiktok-weight"
+                aria-invalid={Boolean(fieldErrors.weight)}
+                aria-describedby={fieldErrors.weight ? "tiktok-weight-error" : undefined}
                 type="number"
                 min={0}
                 step="any"
@@ -1217,6 +1218,7 @@ export default function TikTokEditPage() {
                 className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.weight ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
               />
               <select
+                aria-label="Satuan berat produk"
                 value={weight.unit}
                 onChange={(e) => setWeight((w) => ({ ...w, unit: e.target.value as "KG" | "G" }))}
                 className="px-3 py-2 border border-border rounded-md text-sm bg-card"
@@ -1225,7 +1227,6 @@ export default function TikTokEditPage() {
                 <option value="G">g</option>
               </select>
             </div>
-            {fieldErrors.weight && <span className="text-[11px] text-muted-foreground block mt-1">{fieldErrors.weight}</span>}
           </Field>
         </div>
 
@@ -1233,8 +1234,11 @@ export default function TikTokEditPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {(["length", "width", "height"] as const).map((k) => (
               <div key={k}>
-                <label className="text-[11px] text-muted-foreground mb-1 block capitalize">{k === "length" ? "Panjang" : k === "width" ? "Lebar" : "Tinggi"} (cm)</label>
+                <label htmlFor={`tiktok-${k}`} className="text-[11px] text-muted-foreground mb-1 block capitalize">{k === "length" ? "Panjang" : k === "width" ? "Lebar" : "Tinggi"} (cm)</label>
                 <input
+                  id={`tiktok-${k}`}
+                  aria-invalid={Boolean(fieldErrors[k])}
+                  aria-describedby={fieldErrors[k] ? `tiktok-${k}-error` : undefined}
                   type="number"
                   min={1}
                   max={1000}
@@ -1247,7 +1251,7 @@ export default function TikTokEditPage() {
                   placeholder="1 - 1.000"
                   className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors[k] ? "border-ring" : "border-border"} focus:outline-none focus:ring-2 focus:ring-ring/30`}
                 />
-                {fieldErrors[k] && <span className="text-[11px] text-muted-foreground block mt-1">{fieldErrors[k]}</span>}
+                {fieldErrors[k] && <FormError id={`tiktok-${k}-error`}>{fieldErrors[k]}</FormError>}
               </div>
             ))}
           </div>
@@ -1277,6 +1281,8 @@ export default function TikTokEditPage() {
             >
               <input
                 type="checkbox"
+                aria-invalid={Boolean(fieldErrors.platforms)}
+                aria-describedby={fieldErrors.platforms ? "tiktok-platforms-error" : undefined}
                 checked={platforms.includes(p.key)}
                 onChange={(e) => {
                   setPlatforms((prev) =>
@@ -1291,7 +1297,6 @@ export default function TikTokEditPage() {
             </label>
           ))}
         </div>
-        {fieldErrors.platforms && <span className="text-[11px] text-muted-foreground block mt-1">{fieldErrors.platforms}</span>}
         <p className="text-[11px] text-muted-foreground mt-2">
           Melepas centang platform yang sedang tayang akan menyembunyikan produk dari storefront tersebut saat Publish.
         </p>
@@ -1370,8 +1375,8 @@ function Section({
         <h2 className="text-base font-bold text-foreground">{title}</h2>
       </div>
       {hint && <p className="text-[11px] text-muted-foreground mb-3 -mt-2">{hint}</p>}
-      {error && <p className="text-xs text-muted-foreground mb-2">{error}</p>}
       <div className="bg-card border border-border rounded-lg p-5">{children}</div>
+      {error && <FormError id={fieldKey ? `tiktok-${fieldKey}-error` : undefined}>{error}</FormError>}
     </section>
   );
 }
@@ -1392,14 +1397,14 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 last:mb-0" data-field-key={fieldKey}>
-      <label className="font-semibold text-foreground text-sm flex items-center gap-1 mb-1.5">
+    <div className="mb-4 last:mb-0" data-field-key={fieldKey} role="group" aria-label={label} aria-describedby={error && fieldKey ? `tiktok-${fieldKey}-error` : undefined}>
+      <label htmlFor={fieldKey ? `tiktok-${fieldKey}` : undefined} className="font-semibold text-foreground text-sm flex items-center gap-1 mb-1.5">
         {label}
         {required && <span className="text-muted-foreground">*</span>}
       </label>
       {hint && <p className="text-[11px] text-muted-foreground mb-1">{hint}</p>}
       {children}
-      {error && <span className="text-[11px] text-muted-foreground block mt-1">{error}</span>}
+      {error && <FormError id={fieldKey ? `tiktok-${fieldKey}-error` : undefined}>{error}</FormError>}
     </div>
   );
 }
@@ -1499,7 +1504,7 @@ function AttributeField({
         />
       )}
       {attr.required && attr.selected.length === 0 && !attr.customInput.trim() && error && (
-        <span className="text-[11px] text-muted-foreground block mt-1">{error}</span>
+        <FormError>{error}</FormError>
       )}
     </div>
   );

@@ -1,5 +1,8 @@
 "use client";
+import { StatusBadge } from "@/components/ui/status-badge";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
+import { confirmAction } from "@/components/ui/confirm-action";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import {
@@ -178,7 +181,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
   }
 
   async function removeImage(img: ImageRow) {
-    if (!window.confirm("Hapus gambar ini? Aksi ini tidak bisa dibatalkan.")) return;
+    if (!await confirmAction("Hapus gambar ini? Aksi ini tidak bisa dibatalkan.")) return;
     setBusy(true);
     setError(null);
     try {
@@ -305,11 +308,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
             )}
           </div>
 
-          {error && (
-            <div className="bg-muted text-foreground text-xs px-4 py-3 rounded-xl border border-border">
-              {error}
-            </div>
-          )}
+          {error && <ErrorFeedback error={error} className="mb-4" />}
 
           {/* Grid */}
           {loading ? (
@@ -412,7 +411,7 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="p-6 overflow-y-auto">
-          {error && <div className="bg-muted text-foreground text-xs px-4 py-3 rounded-xl">{error}</div>}
+          {error && <ErrorFeedback error={error} className="mb-4" />}
           {loading ? (
             <p className="text-sm text-muted-foreground">Memuat riwayat...</p>
           ) : rows.length === 0 ? (
@@ -467,6 +466,7 @@ export default function KelolaGambarPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailRow, setDetailRow] = useState<GalleryRow | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -511,7 +511,7 @@ export default function KelolaGambarPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, q, categoryFilter, statusFilter]);
+  }, [page, q, categoryFilter, statusFilter, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -727,7 +727,7 @@ export default function KelolaGambarPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-foreground">{error}</td>
+                  <td colSpan={7} className="px-5 py-12"><ErrorFeedback title="Galeri belum dapat dimuat" error={error} action={<button className="underline" onClick={() => setRefreshKey((key) => key + 1)}>Coba lagi</button>} /></td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
@@ -809,9 +809,7 @@ export default function KelolaGambarPage() {
                       <td className="px-5 py-4 text-foreground font-semibold">{row.totalImages}</td>
 
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.cls}`}>
-                          {badge.label}
-                        </span>
+                        <StatusBadge status={row.complete ? "success" : "warning"} label={badge.label} />
                         {row.totalImages > 0 && (
                           <div className="text-[11px] text-muted-foreground mt-1">
                             {Math.min(row.totalImages, row.required)}/{row.required} gambar

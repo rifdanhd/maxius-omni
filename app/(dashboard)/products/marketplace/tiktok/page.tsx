@@ -1,22 +1,12 @@
 "use client";
 
+import { FormError, ErrorFeedback } from "@/components/ui/feedback";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/notify";
 import { useEffect, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import Link from "next/link";
-import {
-  Search,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-  Loader2,
-  ChevronUp,
-  ExternalLink,
-  Filter,
-  PackageOpen,
-  Radio,
-  MoreVertical,
-} from "lucide-react";
+import { Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Loader2, ChevronUp, ExternalLink, Filter, PackageOpen, MoreVertical } from "lucide-react";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -151,31 +141,7 @@ function isDeletedStatus(s: string | null | undefined) {
 
 /* ------------------------------ Toast ------------------------------ */
 
-function Toast({
-  toast,
-  onClose,
-}: {
-  toast: { type: "success" | "error"; message: string } | null;
-  onClose: () => void;
-}) {
-  if (!toast) return null;
-  return (
-    <div className="fixed bottom-6 right-6 z-[60] max-w-sm">
-      <div
-        className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
-          toast.type === "success"
-            ? "bg-muted border-border text-foreground"
-            : "bg-muted border-border text-foreground"
-        }`}
-      >
-        <span className="flex-1">{toast.message}</span>
-        <button onClick={onClose} className="underline text-xs opacity-70">
-          Tutup
-        </button>
-      </div>
-    </div>
-  );
-}
+
 
 /* ------------------------------ Main Page ------------------------------ */
 
@@ -221,7 +187,7 @@ export default function TikTokMarketplacePage() {
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [syncingRows, setSyncingRows] = useState<Set<string>>(new Set());
   const [toggleOverrides, setToggleOverrides] = useState<Map<string, boolean>>(new Map());
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
 
   const filterRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -229,10 +195,7 @@ export default function TikTokMarketplacePage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filterActive = accountFilter.length > 0;
 
-  const notify = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 6000);
-  };
+
 
   useEffect(() => {
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
@@ -487,7 +450,7 @@ export default function TikTokMarketplacePage() {
 
   return (
     <div className="p-4 md:p-8">
-      <Toast toast={toast} onClose={() => setToast(null)} />
+
       {mapTarget && (
         <MapUnmappedModal
           target={mapTarget}
@@ -797,7 +760,7 @@ export default function TikTokMarketplacePage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-foreground">{error}</td>
+                  <td colSpan={9} className="px-5 py-12"><ErrorFeedback title="Produk belum dapat dimuat" error={error} action={<button className="underline" onClick={() => setRefreshKey((key) => key + 1)}>Coba lagi</button>} /></td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
@@ -980,7 +943,7 @@ function MapUnmappedModal({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Gagal menyimpan mapping.");
-      if (data?.stockWarnings?.length) alert(`Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${data.stockWarnings.slice(0, 10).join("\n")}`);
+      if (data?.stockWarnings?.length) notify("warning", `Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${data.stockWarnings.slice(0, 10).join("\n")}`);
       onMapped(target.accountId, target.product.platformProductId, channelSku, `"${channelSku}" → ${sku.trim() || variantId}`);
       onClose();
     } catch (e) {
@@ -1122,7 +1085,7 @@ function MapUnmappedModal({
           )}
         </div>
 
-        {error && <p className="mt-2 text-xs text-foreground">{error}</p>}
+        {error && <FormError>{error}</FormError>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -1240,10 +1203,10 @@ function FragmentRow({
         <td className="px-5 py-4">
           <div className="flex flex-col gap-1">
             <span
-              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit bg-muted text-foreground`}
+              className="w-fit"
               title={row.platformProductId ?? row.channelSku ?? undefined}
             >
-              <Radio size={11} /> TikTok Shop {effectiveActive ? "●" : ""}
+              <StatusBadge status={effectiveActive ? "active" : "inactive"} />
             </span>
             <span className="text-[10px] text-muted-foreground max-w-[120px] truncate">
               {row.platformProductId ?? row.channelSku}
@@ -1266,6 +1229,7 @@ function FragmentRow({
           <span className="cursor-help" title={stockTitle}>
             {fmtNumber(row.stockTotal)}
           </span>
+          {row.stockTotal === 0 && <StatusBadge status="out" className="ml-2" />}
           <span className="block text-[10px] text-muted-foreground font-normal">{row.accountLabel}</span>
         </td>
 

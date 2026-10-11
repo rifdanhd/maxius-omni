@@ -1,21 +1,10 @@
 "use client";
+import { StatusBadge } from "@/components/ui/status-badge";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  AlertCircle,
-  AlertTriangle,
-  ChevronDown,
-  Info,
-  Loader2,
-  PackageOpen,
-  Percent,
-  Plus,
-  RefreshCw,
-  Search,
-  Store,
-  Tag,
-} from "lucide-react";
+import { AlertTriangle, ChevronDown, Info, Loader2, PackageOpen, Percent, Plus, RefreshCw, Search, Store, Tag } from "lucide-react";
 import {
   classifyPromotionTab,
   countPromotionTabs,
@@ -80,14 +69,7 @@ const ACTIVITY_TYPE_LABEL: Record<string, string> = {
   SHIPPING_DISCOUNT: "Diskon Ongkir",
 };
 
-// Badge warna per status activity (nilai API TikTok).
-const STATUS_BADGE: Record<string, string> = {
-  ONGOING: "bg-muted text-foreground border-border",
-  NOT_START: "bg-muted text-foreground border-border",
-  DEACTIVATED: "bg-muted text-foreground border-border",
-  ENDED: "bg-muted text-muted-foreground border-border",
-  NOT_EFFECTIVE: "bg-muted text-foreground border-border",
-};
+const STATUS_LABEL: Record<string, string> = { ONGOING: "Aktif", NOT_START: "Terjadwal", DEACTIVATED: "Nonaktif", ENDED: "Berakhir", NOT_EFFECTIVE: "Belum berlaku" };
 
 const PRODUCT_LEVEL_LABEL: Record<string, string> = {
   PRODUCT: "Level Produk (SPU)",
@@ -136,10 +118,6 @@ function formatRelativeTime(iso: string | null | undefined): string {
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay < 30) return `${diffDay} hari lalu`;
   return fmtDateTime(iso);
-}
-
-function statusBadgeClass(status: string): string {
-  return STATUS_BADGE[status] ?? "bg-muted text-foreground border-border";
 }
 
 function activityTypeLabel(type: string): string {
@@ -405,12 +383,7 @@ export default function PromotionsPage() {
       </div>
 
       {/* Error banner */}
-      {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {/* Banner alert UNVERIFIED / PENDING menggantung — jangan sampai activity
           zombie terlewat: create sukses menurut sebagian sumber tapi tidak
@@ -607,18 +580,9 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
                                   {activity.title}
                                 </p>
                                 <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                  <span
-                                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full border ${statusBadgeClass(activity.status)}`}
-                                  >
-                                    {activity.status}
-                                  </span>
+                                  <StatusBadge status={activity.status} label={STATUS_LABEL[activity.status] ?? "Status baru"} />
                                   {unverifiedActivityIds.has(activity.externalActivityId) && (
-                                    <span
-                                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-full border bg-muted text-foreground border-border"
-                                      title="Create dari Maxius tidak terkonfirmasi — cek TikTok Seller Center"
-                                    >
-                                      Perlu cek manual
-                                    </span>
+                                    <StatusBadge status="warning" label="Perlu cek manual" />
                                   )}
                                   <span className="text-[11px] text-muted-foreground">
                                     {activityTypeLabel(activity.activityType)}

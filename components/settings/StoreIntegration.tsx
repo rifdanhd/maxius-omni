@@ -1,5 +1,11 @@
 "use client";
 
+import { Feedback, PageState } from "@/components/ui/feedback";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
+import { friendlyError } from "@/lib/ui/feedback";
+import { notify } from "@/components/ui/notify";
+import { confirmAction } from "@/components/ui/confirm-action";
 import { useState, useEffect } from "react";
 import { MonitorPlay, RefreshCw, Trash2, ShoppingBag } from "lucide-react";
 import AddMarketplaceModal from "./AddMarketplaceModal";
@@ -69,7 +75,7 @@ export default function StoreIntegration() {
     const key = params.get("success") !== null ? "success" : params.get("error");
     if (key) {
       queueMicrotask(() =>
-        setNotice(OAUTH_MESSAGES[key] ?? { ok: false, text: `Otorisasi gagal: ${key}.` }),
+        setNotice(OAUTH_MESSAGES[key] ?? { ok: false, text: "Penyambungan toko belum berhasil. Coba hubungkan ulang." }),
       );
       const url = new URL(window.location.href);
       url.searchParams.delete("success");
@@ -125,41 +131,24 @@ export default function StoreIntegration() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Apakah kamu yakin ingin menghapus toko ${name}?`)) {
+    if (await confirmAction(`Apakah kamu yakin ingin menghapus toko ${name}?`)) {
       try {
         const res = await authFetch(`/api/stores/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error("Gagal menghapus toko. Coba lagi.");
-        alert("Toko berhasil dihapus!");
+        notify("success", "Toko berhasil dihapus!");
         loadStores();
       } catch (e) {
-        alert("Gagal menghapus toko: " + (e instanceof Error ? e.message : String(e)));
+        notify("error", "Gagal menghapus toko: " + (e instanceof Error ? e.message : String(e)));
       }
     }
   };
-
-  const statusMeta = (store: StoreItem) =>
-    store.isFrozen
-      ? { dot: "bg-muted-foreground", text: "Dibekukan" }
-      : store.status === "connected"
-        ? { dot: "bg-muted-foreground", text: "Terhubung" }
-        : store.status === "expired"
-          ? { dot: "bg-muted-foreground", text: "Koneksi perlu diperbarui" }
-          : { dot: "bg-muted-foreground", text: "Terputus" };
 
   const platformLabel = (platform?: string) =>
     platform === "SHOPEE" ? "Shopee" : platform === "TIKTOK_SHOP" ? "TikTok Shop" : (platform ?? "—");
 
   return (
     <div className="flex flex-col h-full font-sans">
-      {notice && (
-        <div
-          className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
-            notice.ok ? "bg-muted text-foreground border border-border" : "bg-muted text-foreground border border-border"
-          }`}
-        >
-          {notice.text}
-        </div>
-      )}
+      {notice && <Feedback className="mb-4" variant={notice.ok ? "success" : "error"} title={notice.ok ? "Toko diperbarui" : "Koneksi belum berhasil"} description={notice.ok ? notice.text : friendlyError(notice.text, "Hubungkan kembali toko, lalu coba lagi.")} details={notice.ok ? undefined : notice.text} />}
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row items-start justify-between gap-4 mb-8 p-6 bg-muted border border-border rounded-xl">
         <div className="flex min-w-0 items-start gap-4">
@@ -198,7 +187,7 @@ export default function StoreIntegration() {
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-foreground">{loadError}</td>
+                  <td colSpan={5}><PageState variant="error" title="Toko belum dapat dimuat" description={loadError} action={<Button variant="outline" onClick={loadStores}>Coba lagi</Button>} /></td>
                 </tr>
               ) : stores.length === 0 ? (
               <tr>
@@ -224,12 +213,7 @@ export default function StoreIntegration() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <div className={`w-2 h-2 rounded-full ${statusMeta(store).dot}`}></div>
-                      <span className="text-sm text-foreground" title={store.isFrozen ? (store.frozenReason ?? "Dibekukan admin") : undefined}>
-                        {statusMeta(store).text}
-                      </span>
-                    </div>
+                    <StatusBadge status={store.isFrozen ? "inactive" : store.status ?? "unlinked"} label={store.isFrozen ? "Dibekukan" : store.status === "connected" ? "Terhubung" : store.status === "expired" ? "Koneksi kedaluwarsa" : "Belum terhubung"} />
                     {store.businessName && (
                       <div className="text-xs text-muted-foreground mt-0.5">{store.businessName}</div>
                     )}
@@ -257,6 +241,7 @@ export default function StoreIntegration() {
                       )}
                       <button 
                         onClick={() => handleSync(store.id)}
+                        aria-label={`Perbarui data ${store.name}`}
                         disabled={syncingId !== null || store.isFrozen || store.status !== "connected"}
                         className="text-foreground hover:bg-muted p-1.5 rounded transition-colors"
                         title={syncingId === store.id ? "Memperbarui data produk…" : "Perbarui Data Produk Toko"}
@@ -265,6 +250,7 @@ export default function StoreIntegration() {
                       </button>
                       <button 
                         onClick={() => handleDelete(store.id, store.name)}
+                        aria-label={`Hapus ${store.name}`}
                         className="text-foreground hover:bg-muted hover:text-foreground p-1.5 rounded transition-colors"
                         title="Hapus"
                       >

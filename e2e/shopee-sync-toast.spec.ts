@@ -10,6 +10,17 @@ import { login } from './helpers';
  */
 const SYNC_GLOB = '**/api/marketplace/shopee/products/sync*';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/marketplace/shopee/products?*', route => route.fulfill({
+    json: { rows: [], total: 0, accounts: [{ id: 'acc-1', label: 'Toko Sukses' }], counts: {}, syncProductCount: 100 },
+  }));
+});
+
+async function confirmSync(page: Page) {
+  await page.getByRole('button', { name: 'Perbarui Data', exact: true }).click();
+  await page.getByRole('button', { name: 'Perbarui sekarang', exact: true }).click();
+}
+
 async function stubSync(page: Page, accounts: unknown[]): Promise<void> {
   await page.route(SYNC_GLOB, (route) =>
     route.fulfill({
@@ -26,14 +37,16 @@ test('sync sukses: toast memakai items/models/matched, tanpa "undefined"', async
     { accountId: 'acc-1', label: 'Toko Sukses', items: 12, models: 30, matched: 11 },
   ]);
   await page.goto('/products/marketplace/shopee');
-  await page.getByRole('button', { name: /Sync Semua/ }).click();
+  await confirmSync(page);
 
-  await expect(page.getByText('Sync selesai')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Toko Sukses: 12 item, 30 varian, 11 ter-cocok')).toBeVisible();
+  const toast = page.locator('[data-app-toast="success"]');
+  await expect(toast).toContainText('Sinkron selesai. 11 varian diperbarui.', { timeout: 15_000 });
+  await toast.getByText('Lihat detail', { exact: true }).click();
+  await expect(toast.locator('pre')).toContainText('Toko Sukses: 12 produk, 30 varian, 11 diperbarui');
   await expect(page.getByText('undefined')).toHaveCount(0);
 });
 
-test('sync gagal per akun: toast error berisi nama toko + pesan Shopee', async ({ page }) => {
+test('sync gagal per akun: pesan manusiawi dengan detail Shopee tersembunyi', async ({ page }) => {
   await login(page);
   await stubSync(page, [
     {
@@ -46,20 +59,22 @@ test('sync gagal per akun: toast error berisi nama toko + pesan Shopee', async (
     },
   ]);
   await page.goto('/products/marketplace/shopee');
-  await page.getByRole('button', { name: /Sync Semua/ }).click();
+  await confirmSync(page);
 
-  await expect(page.getByText('Toko Gagal: [Shopee] API error')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Sync selesai')).toHaveCount(0);
+  const toast = page.locator('[data-app-toast="error"]');
+  await expect(toast).toContainText('Koneksi toko perlu diperbarui', { timeout: 15_000 });
+  await expect(toast.locator('pre')).not.toBeVisible();
+  await toast.getByText('Lihat detail', { exact: true }).click();
+  await expect(toast.locator('pre')).toContainText('Toko Gagal: [Shopee] API error');
+  await expect(page.locator('[data-app-toast="success"]')).toHaveCount(0);
 });
 
 test('accounts kosong: toast menjelaskan brand aktif tanpa akun Shopee', async ({ page }) => {
   await login(page);
   await stubSync(page, []);
   await page.goto('/products/marketplace/shopee');
-  await page.getByRole('button', { name: /Sync Semua/ }).click();
+  await confirmSync(page);
 
-  await expect(page.getByText('Brand aktif tidak punya akun Shopee')).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(page.getByText('Sync selesai')).toHaveCount(0);
+  await expect(page.locator('[data-app-toast="error"]')).toContainText('Bisnis aktif belum memiliki toko Shopee', { timeout: 15_000 });
+  await expect(page.locator('[data-app-toast="success"]')).toHaveCount(0);
 });

@@ -1,5 +1,9 @@
 "use client";
 
+import { ErrorFeedback, Feedback, TechnicalDetails } from "@/components/ui/feedback";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { friendlyError, type FeedbackVariant } from "@/lib/ui/feedback";
+import { confirmAction } from "@/components/ui/confirm-action";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Filter, RefreshCw, Search, Store } from "lucide-react";
@@ -87,10 +91,10 @@ function slaBadge(slaDueDate: string | null) {
   const diffMs = new Date(slaDueDate).getTime() - Date.now();
   const hours = diffMs / 3600000;
   if (diffMs < 0) {
-    return { label: "Batas Waktu Respons Terlewat (SLA)", className: "bg-primary text-primary-foreground" };
+    return { label: "Batas waktu respons terlewat", className: "bg-destructive-subtle text-destructive" };
   }
   if (hours <= 24) {
-    return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-muted-foreground text-primary-foreground" };
+    return { label: `Sisa ${Math.max(1, Math.ceil(hours))} jam`, className: "bg-warning-subtle text-warning" };
   }
   return null;
 }
@@ -116,7 +120,7 @@ export default function ReturnsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<{ variant: FeedbackVariant; text: string; details?: string } | null>(null);
   const [detail, setDetail] = useState<ReturnRow | null>(null);
   const [restockingId, setRestockingId] = useState<string | null>(null);
 
@@ -171,13 +175,15 @@ export default function ReturnsPage() {
       if (!res.ok || !data || !Array.isArray(data.results)) throw new Error(data?.error ?? "Gagal memperbarui pengembalian. Coba lagi.");
       const failures = [...new Set([...(data.errors ?? []), ...data.results.filter((result) => result.error).map((result) => `${result.label ?? "Toko"}: ${result.error}`)])];
       if (failures.length) {
-        setSyncMessage(`Pembaruan belum lengkap: ${failures.join(" · ")}`);
+        setSyncMessage({ variant: "error", text: "Sebagian pengembalian belum berhasil diperbarui. Periksa koneksi toko, lalu coba lagi.", details: failures.join(" · ") });
       } else {
-        setSyncMessage(data.results.length ? "Data pengembalian selesai diperbarui." : "Belum ada toko aktif yang dapat diperbarui. Hubungkan toko melalui Pengaturan Toko.");
+        setSyncMessage(data.results.length
+          ? { variant: "success", text: "Data pengembalian selesai diperbarui." }
+          : { variant: "warning", text: "Belum ada toko aktif yang dapat diperbarui. Hubungkan toko melalui Pengaturan Toko." });
       }
       await load();
     } catch (e) {
-      setSyncMessage(e instanceof Error ? e.message : "Gagal sinkronisasi.");
+      setSyncMessage({ variant: "error", text: friendlyError(e, "Pengembalian belum berhasil diperbarui. Silakan coba lagi."), details: e instanceof Error ? e.message : undefined });
     } finally {
       setSyncing(false);
     }
@@ -186,7 +192,7 @@ export default function ReturnsPage() {
   const restock = async (itemId: string) => {
     const item = detail?.items.find((row) => row.id === itemId);
     if (!item || restockingId || detail?.type === "REFUND_ONLY") return;
-    if (!window.confirm(`Konfirmasi ${item.qty} barang sudah diterima, diperiksa, dan layak dijual kembali? Stok pusat akan bertambah ${item.qty}. Aksi ini tidak menyetujui pengembalian dana di marketplace.`)) return;
+    if (!await confirmAction(`Konfirmasi ${item.qty} barang sudah diterima, diperiksa, dan layak dijual kembali? Stok pusat akan bertambah ${item.qty}. Aksi ini tidak menyetujui pengembalian dana di marketplace.`)) return;
     setRestockingId(itemId);
     setSyncMessage(null);
     try {
@@ -198,10 +204,12 @@ export default function ReturnsPage() {
       const result = (await res.json().catch(() => null)) as { ok?: boolean; already?: boolean; error?: string } | null;
       if (!res.ok || !result?.ok) throw new Error(result?.error ?? "Gagal menambah stok. Stok belum dikonfirmasi.");
       setDetail((current) => current ? { ...current, items: current.items.map((row) => row.id === itemId ? { ...row, restockedAt: new Date().toISOString() } : row) } : current);
-      setSyncMessage(result.already ? "Barang ini sudah pernah ditambahkan ke stok; tidak ditambahkan lagi." : "Barang berhasil ditambahkan ke stok pusat. Pengembalian dana tetap dikelola di Seller Center.");
+      setSyncMessage(result.already
+        ? { variant: "info", text: "Barang ini sudah pernah ditambahkan ke stok; tidak ditambahkan lagi." }
+        : { variant: "success", text: "Barang berhasil ditambahkan ke stok pusat. Pengembalian dana tetap dikelola di Seller Center." });
       try { await load(); } catch { setLoadError("Stok sudah dikonfirmasi, tetapi daftar gagal dimuat ulang. Coba muat ulang daftar."); }
     } catch (e) {
-      setSyncMessage(e instanceof Error ? e.message : "Gagal menambah stok. Coba muat ulang sebelum mencoba lagi.");
+      setSyncMessage({ variant: "error", text: friendlyError(e, "Gagal menambah stok. Coba muat ulang sebelum mencoba lagi."), details: e instanceof Error ? e.message : undefined });
     } finally {
       setRestockingId(null);
     }
@@ -228,10 +236,10 @@ export default function ReturnsPage() {
         </button>
       </div>
 
-      {loadError && <div role="alert" className="mb-4 rounded-lg border border-border bg-muted p-4 text-sm">{loadError}<button className="ml-2 underline" onClick={() => load().catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "Gagal memuat ulang."))}>Muat Ulang</button></div>}
+      {loadError && <ErrorFeedback error={loadError} className="mb-4" action={<button className="underline" onClick={() => load().catch((e: unknown) => setLoadError(e instanceof Error ? e.message : "Gagal memuat ulang."))}>Coba lagi</button>} />}
       <p className="mb-4 text-sm text-muted-foreground">Konfirmasi stok hanya setelah barang diterima dan layak dijual; pengembalian dana tanpa retur tidak menambah stok. <Link href="/settings/accounts" className="underline">Pengaturan Toko</Link></p>
       {syncMessage && (
-        <div className="mb-4 rounded-lg bg-muted px-4 py-2 text-sm text-foreground">{syncMessage}</div>
+        <Feedback className="mb-4" variant={syncMessage.variant} title="Pembaruan pengembalian" description={syncMessage.text} details={syncMessage.details} />
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-border pb-2">
@@ -322,17 +330,13 @@ export default function ReturnsPage() {
                   </td>
                   <td className="px-4 py-3 font-medium">{formatPrice(r.refundAmount)}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.className}`}>
-                      {badge.label}
-                    </span>
-                    <div className="mt-1 text-xs text-muted-foreground">{r.rawStatus}</div>
+                    <StatusBadge status={r.status} label={badge.label} />
+                    <TechnicalDetails value={r.rawStatus} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
                       {r.isPlatformAutoApproved && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-                          <CheckCircle2 className="h-3 w-3" /> Disetujui oleh Marketplace
-                        </span>
+                        <StatusBadge status="success" label="Disetujui marketplace" />
                       )}
                       {sla && (
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sla.className}`}>
@@ -340,9 +344,7 @@ export default function ReturnsPage() {
                         </span>
                       )}
                       {r.items.some((it) => !it.variantId) && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
-                          SKU belum ter-mapping
-                        </span>
+                        <StatusBadge status="unlinked" />
                       )}
                     </div>
                   </td>

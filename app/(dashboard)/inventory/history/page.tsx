@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertOctagon,
@@ -237,11 +238,7 @@ export default function InventoryHistoryPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-          {error}
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {/* Tabel riwayat */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">

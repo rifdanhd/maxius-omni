@@ -1,5 +1,8 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
+import { confirmAction } from "@/components/ui/confirm-action";
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import { Plus, Trash2, RefreshCw, History, Save, X, Link2, Boxes, SlidersHorizontal, AlertTriangle, PackagePlus, Link as LinkIcon } from "lucide-react";
@@ -41,7 +44,7 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await authFetch(path, {
     ...opts,
     headers: {
-      
+
       "Content-Type": "application/json",
       ...(opts.headers ?? {}),
     },
@@ -66,7 +69,7 @@ type OrphanSku = {
 const orphanKey = (orphan: OrphanSku) => JSON.stringify([orphan.accountId, orphan.channelSku]);
 type MappingResult = { stockWarnings?: string[] };
 const showStockWarnings = (result: MappingResult) => {
-  if (result.stockWarnings?.length) alert(`Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${result.stockWarnings.slice(0, 10).join("\n")}`);
+  if (result.stockWarnings?.length) notify("warning", `Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${result.stockWarnings.slice(0, 10).join("\n")}`);
 };
 
 const emptyForm = {
@@ -131,6 +134,9 @@ export default function ProductMappingPage() {
     (async () => {
       try {
         await loadAll();
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("accountId")) setForm((previous) => ({ ...previous,
+          accountId: params.get("accountId") ?? "", channelSku: params.get("channelSku") ?? "" }));
         await loadLedger();
         await loadOrphans();
       } catch (e) {
@@ -200,7 +206,7 @@ export default function ProductMappingPage() {
   }
 
   async function handleDelete(id: string, channelSku: string) {
-    if (!confirm(`Hapus mapping SKU "${channelSku}"? Listing ini akan berdiri sendiri (tidak lagi gabung stok).`)) return;
+    if (!await confirmAction(`Hapus mapping SKU "${channelSku}"? Listing ini akan berdiri sendiri (tidak lagi gabung stok).`)) return;
     setError(null);
     try {
       await api(`/api/inventory/mappings/${id}`, { method: "DELETE" });
@@ -333,9 +339,7 @@ export default function ProductMappingPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">{error}</div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {/* Tab — daftar panjang (ribuan baris) dipisah jadi 3 tampilan */}
       <div className="bg-card border border-border rounded-xl shadow-sm">

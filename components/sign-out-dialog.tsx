@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { toast } from 'sonner'
+import { notify } from '@/components/ui/notify'
 import { useAuthStore } from '@/stores/auth-store'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
@@ -32,7 +32,7 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
       onOpenChange(false)
       router.replace('/login?redirect=' + encodeURIComponent(pathname))
     } catch {
-      toast.error('Gagal keluar. Silakan coba lagi.')
+      notify('error', 'Gagal keluar. Silakan coba lagi.')
     } finally {
       setIsLoading(false)
     }

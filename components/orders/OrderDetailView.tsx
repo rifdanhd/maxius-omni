@@ -1,4 +1,7 @@
 "use client";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PageState } from "@/components/ui/feedback";
+import { friendlyError } from "@/lib/ui/feedback";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -147,15 +150,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
             </div>
           </div>
           {detail && (
-            <span
-              className={`max-w-[45%] shrink-0 break-words px-3 py-1 rounded-md border text-xs font-bold ${
-                detail.status === "AWAITING_SHIPMENT"
-                  ? "bg-muted text-foreground border-border"
-                  : "bg-muted text-foreground border-border"
-              }`}
-            >
-              {detail.status}
-            </span>
+            <StatusBadge status={detail.status} />
           )}
         </div>
       </header>
@@ -164,15 +159,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
         {loading && <div className="py-24 text-center text-muted-foreground">Memuat detail pesanan...</div>}
 
         {!loading && error && (
-          <div className="py-24 text-center">
-            <p className="text-foreground mb-4">{error}</p>
-            <button
-              onClick={load}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary"
-            >
-              Coba Lagi
-            </button>
-          </div>
+          <PageState variant="error" title="Pesanan belum dapat dimuat" description={friendlyError(error)} details={error} action={<button onClick={load} className="rounded-md border border-border px-4 py-2">Coba lagi</button>} />
         )}
 
         {!loading && detail && (

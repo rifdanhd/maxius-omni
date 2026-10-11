@@ -1,4 +1,5 @@
 "use client";
+import { ErrorFeedback } from "@/components/ui/feedback";
 
 import { useEffect, useState } from "react";
 import { X, PackageCheck, Truck, MapPin, Loader2, Warehouse, Clock, AlertCircle } from "lucide-react";
@@ -158,6 +159,7 @@ export default function ShopeeShipModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Tutup pengaturan pengiriman Shopee"
             disabled={busy}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           >
@@ -216,13 +218,7 @@ export default function ShopeeShipModal({
           )}
 
           {paramError && (
-            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
-              <AlertCircle size={14} className="shrink-0 mt-0.5" />
-              <span>
-                {paramError} — pesanan ini bisa dikirim via Seller Center Shopee bila API tidak
-                menyediakan opsi.
-              </span>
-            </div>
+            <ErrorFeedback title="Opsi pengiriman belum tersedia" error={paramError} action={<span className="text-xs">Gunakan Seller Center Shopee bila opsi pengiriman belum tersedia di sini.</span>} />
           )}
 
           {!loading && !paramError && !canPickup && !canDropoff && (
@@ -379,10 +375,7 @@ export default function ShopeeShipModal({
           )}
 
           {actionError && (
-            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
-              <AlertCircle size={14} className="shrink-0 mt-0.5" />
-              {actionError}
-            </div>
+            <ErrorFeedback title="Pengiriman belum berhasil" error={actionError} />
           )}
         </div>
 

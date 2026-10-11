@@ -1,3 +1,4 @@
+import { notify } from "@/components/ui/notify";
 import JsBarcode from "jsbarcode";
 import type { OrderCardItem, PrintType } from "./OrderCard";
 
@@ -441,7 +442,7 @@ function escapeHtml(text: string) {
 function openPrintWindow(title: string, bodyHtml: string, extraStyle = "") {
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    alert("Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
+    notify("warning", "Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
     return;
   }
   win.document.write(
@@ -474,7 +475,7 @@ export function printShippingDocument(docUrl: string, title = "Label Pengiriman 
   const isPdf = /\.pdf($|\?)/i.test(docUrl) || !/\.(png|jpe?g|webp)($|\?)/i.test(docUrl);
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    alert("Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
+    notify("warning", "Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
     return;
   }
   win.document.write(`
@@ -516,7 +517,7 @@ export function pdfBlobFromBase64(base64: string): Blob {
 export function printPdfWindow(url: string, title: string) {
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    alert("Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
+    notify("warning", "Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
     return;
   }
   win.document.write(`

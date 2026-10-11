@@ -1,5 +1,7 @@
 "use client";
 
+import { FormError, ErrorFeedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/utils/api-client";
@@ -89,7 +91,7 @@ export default function MasterProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
 
   const [q, setQ] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -113,10 +115,7 @@ export default function MasterProductsPage() {
   const [confirmProduct, setConfirmProduct] = useState<Product | null>(null);
   const [togglingActive, setTogglingActive] = useState(false);
 
-  const notify = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    window.setTimeout(() => setToast(null), 6000);
-  };
+
 
   const productsUrl = (includeInactive: boolean) =>
     includeInactive ? "/api/products?includeInactive=true" : "/api/products";
@@ -193,14 +192,14 @@ export default function MasterProductsPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        alert(data?.error ?? "Gagal menyimpan gambar.");
+        notify("error", data?.error ?? "Gagal menyimpan gambar.");
         return;
       }
       setAturFor(null);
       await refreshProducts();
     } catch (e) {
       console.error(e);
-      alert("Terjadi kesalahan saat menyimpan gambar.");
+      notify("error", "Terjadi kesalahan saat menyimpan gambar.");
     }
   }
 
@@ -592,7 +591,7 @@ export default function MasterProductsPage() {
               ) : error ? (
                 <tr>
                   <td colSpan={9} className="px-5 py-10 text-center text-foreground">
-                    <p>{error}</p>
+                    <ErrorFeedback title="Produk belum dapat dimuat" error={error} />
                     <button className="mt-2 underline" onClick={() => {
                       void refreshProducts().catch((e: unknown) => {
                         setError(e instanceof Error ? e.message : "Gagal memuat produk.");
@@ -919,22 +918,7 @@ export default function MasterProductsPage() {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-[60] max-w-sm">
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
-              toast.type === "success"
-                ? "bg-muted border-border text-foreground"
-                : "bg-muted border-border text-foreground"
-            }`}
-          >
-            <span className="flex-1">{toast.message}</span>
-            <button onClick={() => setToast(null)} className="underline text-xs opacity-70">
-              Tutup
-            </button>
-          </div>
-        </div>
-      )}
+
       {bundleOpen && (
         <BundleModal
           onClose={() => setBundleOpen(false)}
@@ -1258,7 +1242,7 @@ function BundleModal({
           </div>
         </div>
 
-        {error && <p className="mt-2 text-xs text-foreground">{error}</p>}
+        {error && <FormError>{error}</FormError>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button

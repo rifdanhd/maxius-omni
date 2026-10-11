@@ -1,7 +1,8 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
 import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
@@ -207,12 +208,7 @@ export default function SalesReportPage() {
         </select>
       </div>
 
-      {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {loading && !omset ? (
         <div className="flex items-center justify-center rounded-xl border border-border bg-card p-10 text-muted-foreground">

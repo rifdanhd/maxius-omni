@@ -1,5 +1,9 @@
 "use client";
 
+import { notify } from "@/components/ui/notify";
+import { PageState } from "@/components/ui/feedback";
+import { friendlyError } from "@/lib/ui/feedback";
+import { Badge } from "@/components/ui/badge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Mail, ChevronDown, Search, Filter, Calendar, RefreshCw, Printer, Info, X } from "lucide-react";
@@ -16,7 +20,7 @@ import { PackageCheck } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataCard } from "@/components/ui/data-card";
-import { StatusBadge } from "@/components/ui/status-badge";
+
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -551,9 +555,9 @@ export default function OrdersPage() {
         bgWasActive.current = false;
         const last = runs[0];
         if (last?.status === "DONE") {
-          alert(`Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
+          notify("success", `Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
         } else if (last?.status === "FAILED") {
-          alert(`Sync gagal: ${last.error ?? "-"}\n\nKlik "Perbarui Pesanan (Sync)" untuk lanjut dari posisi terakhir.`);
+          notify("error", `Sync gagal: ${last.error ?? "-"}\n\nKlik "Perbarui Pesanan (Sync)" untuk lanjut dari posisi terakhir.`);
         }
         void refreshList().catch((e) => console.error(e));
       }
@@ -600,12 +604,10 @@ export default function OrdersPage() {
         setBgActive(true);
         void refreshRunStatus();
       }
-      alert(
-        `${history ? "Pengambilan riwayat" : "Sync pesanan"} berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
+      notify("info", `${history ? "Pengambilan riwayat" : "Sync pesanan"} berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
           `Anda bisa berpindah menu; progres tampil di halaman ini.` +
           (stillRunning > 0 ? `\n\n${stillRunning} akun masih berjalan dari sync sebelumnya.` : "") +
-          (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : "")
-      );
+          (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : ""));
       return true;
     } catch (e) {
       console.error(e);
@@ -632,7 +634,8 @@ export default function OrdersPage() {
       const detail = (data.results as { label?: string; scanned?: number; updated?: number; error?: string }[])
         ?.map((r) => (r.error ? `${r.label}: ${r.error}` : `${r.label}: ${r.updated ?? 0}/${r.scanned ?? 0} resi dilengkapi`))
         .join("\n");
-      alert(`Sync resi selesai — ${data.updated ?? 0} paket diperbarui dari ${data.scanned ?? 0}.${detail ? `\n\n${detail}` : ""}`);
+      const failed = data.results?.some((result: { error?: string }) => result.error);
+      notify(failed ? "error" : "success", failed ? "Sebagian resi belum diperbarui. Periksa koneksi toko, lalu coba lagi." : `Sinkron resi selesai. ${data.updated ?? 0} paket diperbarui.`, { details: detail });
       const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
       setOrders(refreshed.orders ?? []);
       setTotal(refreshed.total ?? 0);
@@ -677,7 +680,7 @@ export default function OrdersPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data?.error ?? `Gagal mencetak label (${res.status})`);
+        notify("error", data?.error ?? `Gagal mencetak label (${res.status})`);
         return;
       }
       if (data.pdfBase64) {
@@ -690,15 +693,13 @@ export default function OrdersPage() {
       const failedList = (data.failed ?? []) as { orderNo: string; reason: string }[];
       if (failedList.length > 0) {
         const detail = failedList.map((f) => `- ${f.orderNo}: ${f.reason}`).join("\n");
-        alert(
-          `Label gabungan: ${data.count ?? 0} berhasil.${detail ? `\n\nOrder yang terlewat (label resmi belum tersedia):\n${detail}` : ""}`
-        );
+        notify("warning", `Label gabungan: ${data.count ?? 0} berhasil.${detail ? `\n\nOrder yang terlewat (label resmi belum tersedia):\n${detail}` : ""}`);
       } else if (!data.pdfBase64) {
-        alert("Tidak ada label resmi yang bisa digabung (order belum di-ship / tidak punya paket).");
+        notify("warning", "Tidak ada label resmi yang bisa digabung (order belum di-ship / tidak punya paket).");
       }
     } catch (e) {
       console.error(e);
-      alert("Terjadi kesalahan saat mencetak label gabungan.");
+      notify("error", "Terjadi kesalahan saat mencetak label gabungan.");
     } finally {
       setPrintingBulk(false);
     }
@@ -723,12 +724,12 @@ export default function OrdersPage() {
         return p;
       });
     if (printable.length === 0) {
-      alert("Gagal memuat data penerima untuk label.");
+      notify("error", "Gagal memuat data penerima untuk label.");
       return;
     }
     printOrders(printable, "Label");
     if (printable.length < targets.length) {
-      alert(`${targets.length - printable.length} pesanan dilewati (gagal memuat data pesanan).`);
+      notify("warning", `${targets.length - printable.length} pesanan dilewati (gagal memuat data pesanan).`);
     }
   };
 
@@ -763,12 +764,12 @@ export default function OrdersPage() {
           printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
           return;
         }
-        alert("Label resmi TikTok belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
+        notify("warning", "Label resmi TikTok belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
         return;
       }
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {
-        alert("Gagal memuat data penerima untuk label.");
+        notify("error", "Gagal memuat data penerima untuk label.");
         return;
       }
       const printable = toPrintableFromDetail(detail);
@@ -807,7 +808,7 @@ export default function OrdersPage() {
     const tiktok = readySelected.filter((o) => o.account?.platform === "TIKTOK_SHOP");
     const shopee = readySelected.filter((o) => o.account?.platform === "SHOPEE");
     if (tiktok.length > 0 && shopee.length > 0) {
-      alert("Pilih order TikTok atau Shopee saja dalam satu kali Atur Pengiriman.");
+      notify("warning", "Pilih order TikTok atau Shopee saja dalam satu kali Atur Pengiriman.");
       return;
     }
     if (shopee.length > 0) {
@@ -819,7 +820,7 @@ export default function OrdersPage() {
       return;
     }
     if (readySelected.length > 0) {
-      alert("Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
+      notify("warning", "Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
     }
   };
 
@@ -955,7 +956,7 @@ export default function OrdersPage() {
               >
                 {tab.label}
                 {count > 0 && (
-                  <StatusBadge status={activeTab === tab.id ? "info" : "inactive"} label={String(count)} className="text-[10px] px-1.5 py-0.5" />
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">{count}</Badge>
                 )}
               </button>
             );
@@ -980,7 +981,7 @@ export default function OrdersPage() {
                   }`}
                 >
                   {sub.label}
-                  <StatusBadge status={activeSubTab === sub.id ? "info" : "inactive"} label={String(subCount)} className="text-[10px] px-1.5 py-0.5" />
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">{subCount}</Badge>
                 </button>
               );
             })}
@@ -1181,10 +1182,11 @@ export default function OrdersPage() {
               ))}
             </div>
           ) : error ? (
-            <EmptyState
-              icon={<RefreshCw size={40} />}
+            <PageState
+              variant="error"
               title="Gagal memuat pesanan"
-              description={error}
+              description={friendlyError(error)}
+              details={error}
               action={
                 <Button variant="outline" onClick={refreshList} className="gap-2">
                   <RefreshCw size={14} /> Coba lagi
@@ -1220,7 +1222,7 @@ export default function OrdersPage() {
                     return;
                   }
                   if (o.account?.platform !== "TIKTOK_SHOP") {
-                    alert("Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
+                    notify("warning", "Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
                     return;
                   }
                   setPickupTargets([target]);

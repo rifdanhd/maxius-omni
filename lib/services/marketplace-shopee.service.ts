@@ -161,11 +161,14 @@ export async function pushPriceToShopee(params: {
 }
 
 export async function getShopeeAccounts(businessId: string) {
-  return prisma.platformAccount.findMany({
+  const accounts = await prisma.platformAccount.findMany({
     where: { platform: "SHOPEE", businessId },
-    select: { id: true, label: true, externalShopId: true, updatedAt: true },
+    select: { id: true, label: true, externalShopId: true, updatedAt: true, accessToken: true, isFrozen: true },
     orderBy: { label: "asc" },
   });
+  return accounts.map(({ accessToken, isFrozen, ...account }) => ({
+    ...account, isConnected: Boolean(accessToken && account.externalShopId && !isFrozen),
+  }));
 }
 
 export type ShopeeListingRow = {
@@ -181,6 +184,7 @@ export type ShopeeListingRow = {
   stockTotal: number;
   imageUrl: string | null;
   lastSyncedAt: Date | null;
+  mappingStatus: "connected" | "unlinked" | "failed";
 };
 
 export async function listShopeeProducts(opts: {
@@ -191,23 +195,23 @@ export async function listShopeeProducts(opts: {
   pageSize?: number;
   sort?: string;
   tab?: string;
+  mapping?: string;
 }): Promise<{
   rows: ShopeeListingRow[];
   total: number;
   page: number;
   pageSize: number;
   counts: Record<string, number>;
+  lastSyncedAt: Date | null;
+  syncProductCount: number;
 }> {
-  const { businessId, search, accountIds, page = 1, pageSize = 20, sort, tab = "all" } = opts;
+  const { businessId, search, accountIds, page = 1, pageSize = 20, sort, tab = "all", mapping } = opts;
   const where: Record<string, unknown> = {
     account: {
       platform: "SHOPEE",
       businessId,
       ...(accountIds?.length ? { id: { in: accountIds } } : {}),
     },
-    ...(search
-      ? { OR: [{ channelSku: { contains: search } }, { platformTitle: { contains: search } }] }
-      : {}),
   };
   const mappings = await prisma.productMapping.findMany({
     where: where as never,
@@ -217,6 +221,14 @@ export async function listShopeeProducts(opts: {
     },
     orderBy: { updatedAt: "desc" },
   });
+  const jobs = await prisma.syncJob.findMany({
+    where: { account: { platform: "SHOPEE", businessId, ...(accountIds?.length ? { id: { in: accountIds } } : {}) } },
+    distinct: ["accountId", "channelSku", "variantId"],
+    orderBy: { updatedAt: "desc" },
+    select: { accountId: true, channelSku: true, variantId: true, status: true, lastError: true },
+  });
+  const failed = new Set(jobs.filter((job) => job.status === "FAILED" || (job.status === "PENDING" && job.lastError))
+    .map((job) => JSON.stringify([job.accountId, job.channelSku, job.variantId])));
 
   // Kelompokkan per (akun, item) — 1 produk Shopee bisa punya banyak
   // model/SKU; tampilkan 1 baris per produk (konsisten dengan Seller Center
@@ -234,6 +246,7 @@ export async function listShopeeProducts(opts: {
     stockTotal: number;
     imageUrl: string | null;
     lastSyncedAt: Date | null;
+    failed: boolean;
   };
   const groups = new Map<string, Group>();
   for (const m of mappings) {
@@ -254,6 +267,7 @@ export async function listShopeeProducts(opts: {
         stockTotal: stock,
         imageUrl: m.variant?.masterProduct?.imageUrl ?? null,
         lastSyncedAt: m.lastSyncedAt,
+        failed: failed.has(JSON.stringify([m.accountId, m.channelSku, m.variantId])),
       });
       continue;
     }
@@ -264,12 +278,23 @@ export async function listShopeeProducts(opts: {
     else if (!g.variantId) g.variantId = m.variantId;
     if (!g.channelSkus.includes(m.channelSku)) g.channelSkus.push(m.channelSku);
     g.stockTotal += stock;
+    if (failed.has(JSON.stringify([m.accountId, m.channelSku, m.variantId]))) g.failed = true;
     if (m.lastSyncedAt && (!g.lastSyncedAt || m.lastSyncedAt > g.lastSyncedAt)) {
       g.lastSyncedAt = m.lastSyncedAt;
     }
   }
 
   let all = [...groups.values()];
+  const syncProductCount = all.length;
+  const lastSyncedAt = all.reduce<Date | null>((latest, group) =>
+    group.lastSyncedAt && (!latest || group.lastSyncedAt > latest) ? group.lastSyncedAt : latest, null);
+  const mappingState = (group: Group): ShopeeListingRow["mappingStatus"] => group.failed ? "failed" : group.allMapped ? "connected" : "unlinked";
+  if (search) {
+    const query = search.toLocaleLowerCase("id-ID");
+    all = all.filter((group) => group.platformTitle?.toLocaleLowerCase("id-ID").includes(query)
+      || group.channelSkus.some((sku) => sku.toLocaleLowerCase("id-ID").includes(query)));
+  }
+  if (mapping && mapping !== "all") all = all.filter((group) => mappingState(group) === mapping);
 
   // Tab status (paritas dgn halaman TikTok) — counts dari basis sebelum tab
   // dipilih supaya badge tidak saling menghilangkan.
@@ -313,6 +338,20 @@ export async function listShopeeProducts(opts: {
     case "updated_desc":
       all.sort((a, b) => byUpdated(b) - byUpdated(a));
       break;
+    case "updated_asc":
+      all.sort((a, b) => byUpdated(a) - byUpdated(b));
+      break;
+    case "account_asc":
+    case "account_desc":
+      all.sort((a, b) => cmpStr(a.accountLabel, b.accountLabel) * (sort === "account_asc" ? 1 : -1));
+      break;
+    case "mapping_asc":
+    case "mapping_desc":
+      {
+        const labels = { connected: "Terhubung", unlinked: "Belum terhubung", failed: "Gagal sinkron" };
+        all.sort((a, b) => cmpStr(labels[mappingState(a)], labels[mappingState(b)]) * (sort === "mapping_asc" ? 1 : -1));
+      }
+      break;
     default:
       break; // default = updatedAt desc dari query
   }
@@ -332,8 +371,9 @@ export async function listShopeeProducts(opts: {
       stockTotal: g.stockTotal,
       imageUrl: g.imageUrl,
       lastSyncedAt: g.lastSyncedAt,
+      mappingStatus: mappingState(g),
     }));
-  return { rows, total: all.length, page, pageSize, counts };
+  return { rows, total: all.length, page, pageSize, counts, lastSyncedAt, syncProductCount };
 }
 
 /**
@@ -357,11 +397,18 @@ export async function backfillMasterImages(imageByVariant: Map<string, string>):
   }
 }
 
-export async function syncShopeeListings(businessId: string, accountId?: string): Promise<
+export type ShopeeSyncSelection = {
+  accountIds?: string[];
+  products?: Array<{ accountId: string; productId: string }>;
+};
+
+export async function syncShopeeListings(businessId: string, accountId?: string, selection?: ShopeeSyncSelection): Promise<
   Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }>
 > {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: "SHOPEE", businessId, ...(accountId ? { id: accountId } : {}) },
+    where: { platform: "SHOPEE", businessId, ...(accountId ? { id: accountId } : {}),
+      ...(selection?.products ? { id: { in: selection.products.map((product) => product.accountId) } }
+        : selection?.accountIds ? { id: { in: selection.accountIds } } : {}) },
     include: { appCredential: true },
   });
   const results: Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }> = [];
@@ -380,14 +427,19 @@ export async function syncShopeeListings(businessId: string, accountId?: string)
         existing.filter((m) => m.variantId != null).map((m) => [m.channelSku, m.variantId as string])
       );
       const imageByVariant = new Map<string, string>();
+      const productIds = selection?.products
+        ? [...new Set(selection.products.filter((product) => product.accountId === account.id).map((product) => Number(product.productId)))]
+        : null;
       let offset = 0;
       let itemCount = 0;
       let modelCount = 0;
       let matched = 0;
       for (let page = 0; page < 200; page++) {
-        const { items, hasNextPage, nextOffset } = await withRefreshedToken(account, (token, shopId, creds) =>
-          getItemList(token, shopId, { offset, pageSize: 50 }, creds)
-        );
+        const { items, hasNextPage, nextOffset } = productIds
+          ? { items: productIds.slice(offset, offset + 50).map((item_id) => ({ item_id })),
+              hasNextPage: offset + 50 < productIds.length, nextOffset: offset + 50 }
+          : await withRefreshedToken(account, (token, shopId, creds) =>
+              getItemList(token, shopId, { offset, pageSize: 50 }, creds));
         if (items.length === 0) break;
         itemCount += items.length;
         const infos = await withRefreshedToken(account, (token, shopId, creds) =>
@@ -395,6 +447,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string)
         );
         for (const info of infos) {
           const itemId = Number(info.item_id);
+          if (productIds && !productIds.includes(itemId)) continue;
           const title = (info.item_name as string | undefined) ?? null;
           const status = (info.item_status as string | undefined) ?? null;
           const itemSku = info.item_sku as string | undefined;

@@ -19,6 +19,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/orders": "Kelola Pesanan",
   "/orders/returns": "Kelola Pengembalian",
   "/products": "Produk Master",
+  "/products/marketplace/shopee": "Produk Shopee",
   "/products/mapping": "Mapping Stok Terpusat",
   "/products/prices": "Kelola Harga",
   "/products/images": "Kelola Gambar",

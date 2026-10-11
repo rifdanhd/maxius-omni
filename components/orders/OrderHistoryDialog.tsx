@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/ui/feedback";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,18 +56,18 @@ export default function OrderHistoryDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-2 text-sm font-medium" htmlFor="history-from">
               <span>Dari tanggal</span>
-              <input id="history-from" type="date" required value={from} max={to || today}
+              <input id="history-from" type="date" required value={from} max={to || today} aria-invalid={Boolean(error)} aria-describedby={error ? "history-error" : undefined}
                 disabled={busy} onChange={(event) => setFrom(event.target.value)}
                 className="h-10 w-full rounded-md border border-input bg-background px-3" />
             </label>
             <label className="space-y-2 text-sm font-medium" htmlFor="history-to">
               <span>Sampai tanggal</span>
-              <input id="history-to" type="date" required value={to} min={from || undefined} max={today}
+              <input id="history-to" type="date" required value={to} min={from || undefined} max={today} aria-invalid={Boolean(error)} aria-describedby={error ? "history-error" : undefined}
                 disabled={busy} onChange={(event) => setTo(event.target.value)}
                 className="h-10 w-full rounded-md border border-input bg-background px-3" />
             </label>
           </div>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <FormError id="history-error">{error}</FormError>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
             <Button type="submit" disabled={busy || !from || !to}>

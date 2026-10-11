@@ -1,23 +1,11 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
 import { useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import { useRouter } from "next/navigation";
-import {
-  Link2,
-  Loader2,
-  Sparkles,
-  AlertTriangle,
-  Check,
-  ArrowLeft,
-  ArrowRight,
-  Save,
-  ImagePlus,
-  ShieldCheck,
-  Plus,
-  Trash2,
-  Boxes,
-} from "lucide-react";
+import { Link2, Loader2, Sparkles, Check, ArrowLeft, ArrowRight, Save, ImagePlus, ShieldCheck, Plus, Trash2, Boxes } from "lucide-react";
 
 type CopyVariant = {
   name: string;
@@ -79,17 +67,14 @@ export default function ProductCopyPage() {
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"input" | "preview" | "manual">("input");
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
 
   const [parsed, setParsed] = useState<ParsedData | null>(null);
   const [form, setForm] = useState({ name: "", price: "", description: "", category: "" });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
 
-  function showToast(type: "success" | "error", msg: string) {
-    setToast({ type, msg });
-    window.setTimeout(() => setToast(null), 5000);
-  }
+
 
   function toggleImage(url_: string) {
     setSelected((prev) => {
@@ -245,7 +230,7 @@ export default function ProductCopyPage() {
         setError(json?.error ?? `Gagal menyimpan draft (${res.status}).`);
         return;
       }
-      showToast("success", "Draf tersimpan di katalog pusat; belum diterbitkan ke toko. Selanjutnya periksa produk di Produk Master.");
+      notify("success", "Draf tersimpan di katalog pusat; belum diterbitkan ke toko. Selanjutnya periksa produk di Produk Master.");
       window.setTimeout(() => router.push("/products"), 1200);
     } catch (e) {
       console.error(e);
@@ -287,33 +272,9 @@ export default function ProductCopyPage() {
         </p>
       </div>
 
-      {toast && (
-        <div
-          className={`mb-4 px-4 py-3 rounded-md text-sm font-medium flex items-center gap-2 ${
-            toast.type === "success" ? "bg-primary text-primary-foreground" : "bg-primary text-primary-foreground"
-          }`}
-        >
-          {toast.type === "success" ? <Check size={16} /> : <AlertTriangle size={16} />}
-          {toast.msg}
-        </div>
-      )}
 
-      {error && (
-        <div className="mb-4 flex items-start gap-2 border border-border bg-muted rounded-lg px-4 py-3 text-sm text-foreground">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p>{error}</p>
-            {mode === "input" && (
-              <button
-                onClick={startManual}
-                className="mt-1 text-foreground underline font-medium hover:text-foreground"
-              >
-                Isi manual saja
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+
+      {error && <ErrorFeedback error={error} className="mb-4" action={mode === "input" ? <button className="underline" onClick={startManual}>Isi manual saja</button> : undefined} />}
 
       {mode === "input" && (
         <div className="max-w-2xl">

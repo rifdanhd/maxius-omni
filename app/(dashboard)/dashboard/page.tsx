@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, ChevronRight, Check, Info, TrendingUp, TrendingDown } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, ChevronRight, Check, Info, TrendingUp, TrendingDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { authFetch } from "@/lib/utils/api-client";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PageState } from "@/components/ui/feedback";
+import { Button } from "@/components/ui/button";
 
 type Summary = {
   accountsConnected: number;
@@ -86,6 +89,8 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [opsKpi, setOpsKpi] = useState<OpsKpi | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState('potensi'); // potensi, terjual, penjualan, pesanan
   const [panduanAwalOpen, setPanduanAwalOpen] = useState(true);
   const [greet, setGreet] = useState<{ name: string | null; salam: string; date: string } | null>(null);
@@ -115,6 +120,7 @@ export default function DashboardPage() {
           authFetch("/api/analytics", { headers }),
           authFetch("/api/dashboard/kpi", { headers }),
         ]);
+        setLoadError(!summaryRes.ok || !analyticsRes.ok || !kpiRes.ok);
         if (summaryRes.ok) {
           setSummary(await summaryRes.json());
         }
@@ -126,12 +132,13 @@ export default function DashboardPage() {
         }
       } catch (e) {
         console.error(e);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     }
     loadAll();
-  }, []);
+  }, [reloadKey]);
 
   if (loading) {
     return (
@@ -171,6 +178,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  if (loadError) return <PageState variant="error" title="Ringkasan belum dapat dimuat" description="Data toko belum lengkap. Coba muat ulang untuk melihat angka terbaru." action={<Button variant="outline" onClick={() => { setLoading(true); setReloadKey((key) => key + 1); }}>Coba lagi</Button>} />;
 
   const m = analytics?.metrics;
   const chartData = analytics?.chart ?? [];
@@ -229,7 +238,7 @@ export default function DashboardPage() {
           <ActionCard title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
           <ActionCard title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} />
           <ActionCard title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} href="/inventory/mismatch" />
-          <ActionCard title="Sync Error (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} />
+          <ActionCard title="Gagal Sinkron (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} />
         </div>
         {opsKpi && opsKpi.storeHealth.length > 0 && (
           <div className="px-4 md:px-6 pb-6">
@@ -254,12 +263,11 @@ export default function DashboardPage() {
                     return (
                       <tr key={s.accountId} className="border-b border-border last:border-0">
                         <td className="py-2 pr-3 font-medium text-foreground">
-                          <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${unhealthy ? "bg-destructive animate-pulse" : "bg-green-500"}`} title={unhealthy ? "Perlu perhatian" : "Sehat"} />
-                          {s.label}
+                          <div>{s.label}</div><StatusBadge status={unhealthy ? "warning" : "success"} label={unhealthy ? "Perlu perhatian" : "Sehat"} className="mt-1" />
                         </td>
                         <td className="px-3 py-2 text-foreground">{s.platform}</td>
                         <td className="px-3 py-2 text-center">
-                          {s.hasToken ? <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">OK</span> : <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-destructive-subtle text-destructive">Hilang</span>}
+                          <StatusBadge status={s.hasToken ? "success" : "error"} label={s.hasToken ? "Tersedia" : "Belum tersedia"} />
                         </td>
                         <td className="px-3 py-2 text-center text-foreground">{s.errors7d}</td>
                         <td className="px-3 py-2 text-center text-foreground">{s.mismatch}</td>
@@ -303,13 +311,13 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-3">
                       {s.done ? (
-                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white shrink-0">
+                        <div className="w-5 h-5 rounded-full bg-success-subtle flex items-center justify-center text-success shrink-0">
                           <Check size={12} />
                         </div>
                       ) : (
                         <div className="w-5 h-5 rounded-full border-2 border-border border-dashed shrink-0" />
                       )}
-                      <span className={`text-sm ${s.done ? "text-muted-foreground line-through" : "font-semibold text-foreground"}`}>{s.label}</span>
+                      <span className={`text-sm ${s.done ? "text-muted-foreground line-through" : "font-semibold text-foreground"}`}>{s.label}<span className="sr-only">{s.done ? ", selesai" : ", belum selesai"}</span></span>
                     </div>
                     <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground shrink-0" />
                   </Link>
@@ -446,7 +454,7 @@ export default function DashboardPage() {
   );
 }
 
-const CRITICAL_TITLES = ["Oversell", "Stok Menipis", "Stok Kritis", "Stok Mismatch", "Sync Error (7 hari)"];
+const CRITICAL_TITLES = ["Oversell", "Stok Menipis", "Stok Kritis", "Stok Mismatch", "Gagal Sinkron (7 hari)"];
 
 function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
   const isCritical = CRITICAL_TITLES.includes(title) && value !== "0" && value !== "…";
@@ -459,14 +467,14 @@ function ActionCard({ title, value, href }: { title: string, value: string, href
   if (href) {
     return (
       <Link href={href} className={cls}>
-        <span className={`text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{title}</span>
+        <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{isCritical && <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />}{title}</span>
         <span className={`text-2xl font-bold ${valueColor}`}>{value}</span>
       </Link>
     );
   }
   return (
     <div className={cls}>
-      <span className={`text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{title}</span>
+      <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{isCritical && <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />}{title}</span>
       <span className={`text-2xl font-bold ${valueColor}`}>{value}</span>
     </div>
   );
@@ -496,8 +504,8 @@ function MetricTab({ active, onClick, title, value, trend, trendUp, badge, subte
         {trend && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
             trendUp 
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              ? 'bg-success-subtle text-success'
+              : 'bg-destructive-subtle text-destructive'
           }`}>
             {trendUp ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
             {trend}

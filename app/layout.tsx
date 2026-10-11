@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/context/theme-provider";
 import { AppToaster } from "@/components/ui/app-toaster";
+import { ConfirmationHost } from "@/components/ui/confirm-action";
 
 export const metadata: Metadata = {
   title: "Maxius.id",
@@ -29,6 +30,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <AppToaster />
+          <ConfirmationHost />
         </ThemeProvider>
       </body>
     </html>

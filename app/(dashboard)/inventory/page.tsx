@@ -1,7 +1,10 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/notify";
 import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
+import { History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import type { StockRow, StockTab } from "@/app/api/inventory/stock/route";
 import type { OversellEntry } from "@/app/api/inventory/oversells/route";
@@ -57,13 +60,9 @@ export default function InventoryStockPage() {
     Array<{ id: string; note: string | null; stockAfter: number; createdAt: string; user: { username: string } | null }>
   >([]);
   const [safetyLoading, setSafetyLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
+
+
 
   // Initial load & refetch (tab/q/reload): async fn di dalam effect + guard
   // cancelled, tanpa setState sinkron di body effect (aturan
@@ -173,7 +172,7 @@ export default function InventoryStockPage() {
         );
         setEditing(null);
         setReloadKey((k) => k + 1);
-        setToast({ type: "success", message: `Stok fisik berhasil diubah menjadi ${parsed} dan disinkronkan ke toko.` });
+        notify("success", `Stok fisik berhasil diubah menjadi ${parsed} dan disinkronkan ke toko.`);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Gagal menyimpan stok.");
       } finally {
@@ -209,13 +208,9 @@ export default function InventoryStockPage() {
       );
       setEditing(null);
       setReloadKey((k) => k + 1);
-      setToast({
-        type: "success",
-        message:
-          editing.field === "safetyStock"
+      notify("success", editing.field === "safetyStock"
             ? `Stok cadangan berhasil diubah menjadi ${parsed ?? 0}.`
-            : "Batas minimum stok berhasil diperbarui.",
-      });
+            : "Batas minimum stok berhasil diperbarui.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menyimpan.");
     } finally {
@@ -259,7 +254,7 @@ export default function InventoryStockPage() {
         )
       );
       setCounts((prev) => ({ ...prev, oversells: Math.max(0, prev.oversells - 1) }));
-      setToast({ type: "success", message: "Catatan oversell berhasil ditandai sebagai sudah ditangani." });
+      notify("success", "Catatan oversell berhasil ditandai sebagai sudah ditangani.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menandai.");
     } finally {
@@ -273,23 +268,7 @@ export default function InventoryStockPage() {
   return (
     <div className="p-4 md:p-8 relative">
       {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium animate-in slide-in-from-bottom-2 fade-in max-w-sm ${
-          toast.type === "success"
-            ? "bg-card border-border text-foreground"
-            : "bg-destructive text-destructive-foreground border-destructive"
-        }`}>
-          {toast.type === "success" ? (
-            <CheckCircle2 size={16} className="text-green-500 shrink-0" />
-          ) : (
-            <AlertCircle size={16} className="shrink-0" />
-          )}
-          <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-muted-foreground hover:text-foreground">
-            <X size={14} />
-          </button>
-        </div>
-      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-bold text-foreground">Stok Varian</h1>
@@ -331,12 +310,7 @@ export default function InventoryStockPage() {
         ))}
       </div>
 
-      {error && (
-        <div className="mb-4 flex items-start gap-3 bg-destructive-subtle text-destructive text-sm px-4 py-3 rounded-xl border border-destructive/30">
-          <AlertCircle size={16} className="shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {tab !== "oversells" ? (
         <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -512,15 +486,13 @@ export default function InventoryStockPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {r.promoActive > 0 ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
-                            {r.promoActive} aktif
-                          </span>
+                          <StatusBadge status="active" label={`${r.promoActive} aktif`} />
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-medium">{fmt(r.orderedQty)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(r.available)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-foreground"><div>{fmt(r.available)}</div>{r.available === 0 ? <StatusBadge status="out" /> : r.available <= r.minStockResolved ? <StatusBadge status="low" /> : null}</td>
                       <td className="px-4 py-3 text-right">
                         {editing?.variantId === r.variantId && editing.field === "minStock" ? (
                           <span className="inline-flex items-center gap-1">
@@ -643,13 +615,9 @@ export default function InventoryStockPage() {
                       <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(e.failedQty)}</td>
                       <td className="px-4 py-3">
                         {e.handledAt ? (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            Sudah ditangani
-                          </span>
+                          <StatusBadge status="success" label="Sudah ditangani" />
                         ) : (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-destructive-subtle text-destructive">
-                            Belum ditangani
-                          </span>
+                          <StatusBadge status="error" label="Belum ditangani" />
                         )}
                       </td>
                       <td className="px-4 py-3">

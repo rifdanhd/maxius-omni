@@ -1,4 +1,5 @@
 "use client";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 import { useState } from "react";
 import { Clock, RefreshCw, MessageCircle, FileText, PackageCheck, Printer, Store, Package } from "lucide-react";
@@ -121,9 +122,7 @@ export default function OrderCard({
       {/* Header */}
       <div className="px-5 py-3 border-b border-border flex items-center justify-between flex-wrap gap-3 bg-muted/50 rounded-t-xl">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="px-3 py-1 bg-muted text-foreground text-xs font-bold rounded-md border border-border">
-            {statusLabel[order.status] ?? order.status}
-          </div>
+          <StatusBadge status={order.status} label={statusLabel[order.status] ?? "Status baru"} />
           <div className="text-sm text-foreground">
             Nomor Pesanan: <a href={`/orders/detail/${encodeURIComponent(order.id)}`} className="text-foreground font-semibold hover:underline">{order.orderId}</a>
           </div>
@@ -132,7 +131,7 @@ export default function OrderCard({
             {order.deadline}
           </div>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-4">
           <button 
             onClick={onSync}
@@ -140,7 +139,7 @@ export default function OrderCard({
           >
             <RefreshCw size={14} /> Sync dari Marketplace
           </button>
-          
+
           <div className="flex items-center gap-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-xs">
              {platform === "SHOPEE" ? <ShopeeLogo size={14} /> : platform === "TIKTOK_SHOP" ? <TikTokLogo size={14} /> : <Store size={14} />}
              <span>{order.storeName} | {order.platform}</span>
@@ -158,7 +157,7 @@ export default function OrderCard({
             className="w-4 h-4 rounded border-border text-foreground focus:ring-ring"
           />
         </div>
-        
+
         <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-6 flex-1">
           {/* Product details */}
           <div className="col-span-1 sm:col-span-2 xl:col-span-4 min-w-0 flex gap-4">
@@ -171,27 +170,27 @@ export default function OrderCard({
               <p className="text-xs font-medium text-foreground">Jumlah (Qty): {order.qty} x {order.price}</p>
             </div>
           </div>
-          
+
           {/* Total Barang */}
           <div className="col-span-1 min-w-0 break-words">
             <p className="text-xs font-semibold text-foreground mb-1">Total Barang</p>
             <p className="text-sm text-foreground">{order.qty}</p>
           </div>
-          
+
           {/* Total Price */}
           <div className="col-span-1 xl:col-span-2 min-w-0 break-words">
             <p className="text-xs font-semibold text-foreground mb-1">Total Harga</p>
             <p className="text-sm font-bold text-foreground">{order.totalPrice}</p>
             <p className="text-[10px] text-muted-foreground mt-1">{order.paymentMethod}</p>
           </div>
-          
+
           {/* Address */}
           <div className="col-span-1 xl:col-span-2 min-w-0 break-words">
             <p className="text-xs font-semibold text-foreground mb-1">Alamat</p>
             <p className="text-xs text-foreground mb-1">{order.buyerName} ({order.buyerPhone})</p>
             <p className="text-[10px] text-muted-foreground line-clamp-3 leading-tight">{order.address}</p>
           </div>
-          
+
           {/* Date & Note */}
           <div className="col-span-1 xl:col-span-2 min-w-0 break-words">
             <div className="mb-3">
@@ -206,7 +205,7 @@ export default function OrderCard({
                </div>
             </div>
           </div>
-          
+
           {/* Courier */}
           <div className="col-span-1 min-w-0 break-words">
             <div className="mb-3">
@@ -220,7 +219,7 @@ export default function OrderCard({
           </div>
         </div>
       </div>
-      
+
       {/* Footer Info */}
       <div className="px-5 sm:px-10 py-3 bg-muted/50 border-t border-border flex flex-wrap items-start gap-4 sm:gap-12">
          <div>
@@ -232,7 +231,7 @@ export default function OrderCard({
             <p className="text-xs text-foreground">{order.pickupLocation || '-'}</p>
          </div>
       </div>
-      
+
       {/* Action Bar */}
       <div className="px-5 py-3 border-t border-border flex items-center justify-between bg-card rounded-b-xl flex-wrap gap-3">
          {/* Sisi Kiri: Detail, Chat, Cetak, dan Progres Alur Kerja (seperti Desty) */}
@@ -266,7 +265,7 @@ export default function OrderCard({
                {order.fulfillmentStage && <OrderProgressSteps currentStage={order.fulfillmentStage} />}
             </div>
          </div>
-         
+
          {/* Sisi Kanan: Lacak di ujung (seperti Desty) */}
          <div className="flex items-center gap-2.5 ml-auto">
             {onShip && order.status === "AWAITING_SHIPMENT" ? (

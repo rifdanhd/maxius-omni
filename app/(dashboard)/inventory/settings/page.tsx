@@ -1,17 +1,9 @@
 "use client";
+import { StatusBadge } from "@/components/ui/status-badge";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
 import { useEffect, useState } from "react";
-import {
-  BellRing,
-  CheckCircle2,
-  ClipboardList,
-  Loader2,
-  Mail,
-  Save,
-  SlidersHorizontal,
-  Store,
-  TriangleAlert,
-} from "lucide-react";
+import { BellRing, ClipboardList, Loader2, Mail, Save, SlidersHorizontal, Store } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 
 /* ------------------------------ Types ------------------------------ */
@@ -38,7 +30,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      
+
       ...(init?.headers ?? {}),
     },
   });
@@ -177,9 +169,7 @@ export default function InventorySettingsPage() {
         </div>
         <div className="flex items-center gap-2">
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <CheckCircle2 className="h-4 w-4" /> Tersimpan
-            </span>
+            <StatusBadge status="success" label="Tersimpan" />
           )}
           <button
             onClick={save}
@@ -192,12 +182,7 @@ export default function InventorySettingsPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
-          <div>{error}</div>
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {!settings ? (
         <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">

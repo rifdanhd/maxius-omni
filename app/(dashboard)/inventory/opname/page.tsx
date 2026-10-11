@@ -1,16 +1,9 @@
 "use client";
+import { StatusBadge } from "@/components/ui/status-badge";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ClipboardCheck,
-  ClipboardList,
-  Loader2,
-  Plus,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, ClipboardCheck, ClipboardList, Loader2, Plus, RefreshCw, XCircle } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 
 /* ------------------------------ Types ------------------------------ */
@@ -68,17 +61,8 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: "CANCELLED", label: "Dibatalkan" },
 ];
 
-const TAB_BADGE: Record<TabId, string> = {
-  PENDING: "bg-muted text-foreground border-border",
-  IN_PROGRESS: "bg-muted text-foreground border-border",
-  COMPLETED: "bg-muted text-foreground border-border",
-  CANCELLED: "bg-muted text-muted-foreground border-border",
-};
-
-const STATUS_BADGE: Record<string, string> = TAB_BADGE;
-
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pending",
+  PENDING: "Belum dimulai",
   IN_PROGRESS: "Dalam Proses",
   COMPLETED: "Selesai",
   CANCELLED: "Dibatalkan",
@@ -93,7 +77,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      
+
       ...(init?.headers ?? {}),
     },
   });
@@ -189,7 +173,7 @@ export default function StockOpnamePage() {
           >
             {t.label}
             <span
-              className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${TAB_BADGE[t.id]}`}
+              className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground"
             >
               {counts[t.id] ?? 0}
             </span>
@@ -197,11 +181,7 @@ export default function StockOpnamePage() {
         ))}
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-          {error}
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       {/* Daftar opname */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -247,13 +227,7 @@ export default function StockOpnamePage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                        STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground border-border"
-                      }`}
-                    >
-                      {STATUS_LABEL[r.status] ?? r.status}
-                    </span>
+                    <StatusBadge status={r.status} label={STATUS_LABEL[r.status] ?? "Status baru"} />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{fmtDate(r.startedAt)}</td>
                   <td className="px-4 py-3 text-right">
@@ -421,11 +395,7 @@ function CreateModal({
             />
           </label>
 
-          {error && (
-            <div className="mt-3 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-              {error}
-            </div>
-          )}
+          {error && <ErrorFeedback error={error} className="mb-4" />}
         </div>
 
         <div className="flex items-center justify-between flex-wrap gap-3 border-t border-border px-6 py-4">
@@ -607,12 +577,7 @@ function CountModal({
             </div>
           )}
 
-          {error && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
-              <div>{error}</div>
-            </div>
-          )}
+          {error && <ErrorFeedback error={error} className="mb-4" />}
 
           {!opname ? (
             <div className="flex items-center justify-center p-10 text-muted-foreground">

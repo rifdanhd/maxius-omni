@@ -1,4 +1,5 @@
 "use client";
+import { ErrorFeedback } from "@/components/ui/feedback";
 
 import { useEffect, useState } from "react";
 import {
@@ -184,6 +185,7 @@ export default function RequestPickupModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Tutup pengaturan pengiriman"
             disabled={busy}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           >
@@ -356,10 +358,7 @@ export default function RequestPickupModal({
                   </div>
                 ) : null}
                 {slotsError && (
-                  <div className="px-4 py-3 bg-muted text-[11px] text-foreground flex items-start gap-1.5">
-                    <AlertCircle size={13} className="shrink-0 mt-0.5" />
-                    {slotsError}
-                  </div>
+                  <ErrorFeedback title="Jadwal belum dapat dimuat" error={slotsError} />
                 )}
               </div>
             </div>
@@ -390,10 +389,7 @@ export default function RequestPickupModal({
           </div>
 
           {actionError && (
-            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
-              <AlertCircle size={14} className="shrink-0 mt-0.5" />
-              {actionError}
-            </div>
+            <ErrorFeedback title="Pengiriman belum berhasil" error={actionError} />
           )}
         </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorFeedback, Feedback, FormError } from "@/components/ui/feedback";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Loader2 } from "lucide-react";
@@ -21,11 +22,13 @@ function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setSubmitted(true);
 
     if (!username.trim() || !password) {
       setError("Isi username dan password dulu.");
@@ -100,13 +103,15 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {sessionExpired && !error && (
-            <div className="bg-muted text-foreground text-xs px-4 py-3 rounded-xl border border-border">
-              Sesi Anda berakhir, silakan login kembali.
-            </div>
+            <Feedback variant="warning" title="Sesi berakhir" description="Masuk kembali untuk melanjutkan pekerjaan." />
           )}
           <div>
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Username</label>
+            <label htmlFor="login-username" className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Username</label>
             <input
+              id="login-username"
+              autoComplete="username"
+              aria-invalid={submitted && !username.trim()}
+              aria-describedby={submitted && !username.trim() ? "username-error" : undefined}
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -114,26 +119,25 @@ function LoginForm() {
               placeholder="Masukkan username"
               autoFocus
             />
+            {submitted && !username.trim() && <FormError id="username-error">Isi username yang terdaftar.</FormError>}
           </div>
           <div>
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Password</label>
+            <label htmlFor="login-password" className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Password</label>
             <input
+              id="login-password"
+              autoComplete="current-password"
+              aria-invalid={submitted && !password}
+              aria-describedby={submitted && !password ? "password-error" : undefined}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-card/50 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all placeholder:text-muted-foreground"
               placeholder="••••••••"
             />
+            {submitted && !password && <FormError id="password-error">Isi password akun Anda.</FormError>}
           </div>
 
-          {error && (
-            <div className="bg-muted text-foreground text-xs px-4 py-3 rounded-xl border border-border flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <ErrorFeedback error={error} className="mb-4" />}
 
           <button
             type="submit"

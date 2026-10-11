@@ -1,7 +1,9 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
 import { useState } from "react";
-import { Printer, X, Loader2, FileText, Layers, AlertCircle } from "lucide-react";
+import { Printer, X, Loader2, FileText, Layers } from "lucide-react";
 import { printPdfWindow, pdfBlobFromBase64 } from "./printOrders";
 import { authFetch } from "@/lib/utils/api-client";
 
@@ -54,9 +56,9 @@ export default function PrintMethodModal({
       const failedList = (data.failed ?? []) as { orderNo: string; reason: string }[];
       if (failedList.length > 0) {
         const detail = failedList.map((f) => `- ${f.orderNo}: ${f.reason}`).join("\n");
-        alert(`Label gabungan: ${data.count ?? 0} berhasil.${detail ? `\n\nOrder yang dilewati (label resmi belum dapat diambil):\n${detail}` : ""}`);
+        notify("warning", `Label gabungan: ${data.count ?? 0} berhasil.${detail ? `\n\nOrder yang dilewati (label resmi belum dapat diambil):\n${detail}` : ""}`);
       } else if (!data.pdfBase64) {
-        alert("Tidak ada label resmi yang bisa dicetak (order belum di-ship / tanpa paket).");
+        notify("warning", "Tidak ada label resmi yang bisa dicetak (order belum di-ship / tanpa paket).");
         return;
       }
       onDone();
@@ -83,6 +85,7 @@ export default function PrintMethodModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Tutup metode cetak"
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X size={18} />
@@ -134,12 +137,7 @@ export default function PrintMethodModal({
             </div>
           </label>
 
-          {error && (
-            <div className="rounded-xl bg-muted border border-border px-4 py-3 text-xs text-foreground flex items-start gap-2">
-              <AlertCircle size={14} className="shrink-0 mt-0.5" />
-              {error}
-            </div>
-          )}
+          {error && <ErrorFeedback error={error} className="mb-4" />}
         </div>
 
         {/* Footer */}

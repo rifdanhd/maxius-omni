@@ -1,7 +1,10 @@
 "use client";
 
+import { StatusBadge } from "@/components/ui/status-badge";
+import { friendlyError } from "@/lib/ui/feedback";
+import { ErrorFeedback, Feedback, TechnicalDetails } from "@/components/ui/feedback";
 import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2, RefreshCw, Search } from "lucide-react";
+import { Loader2, RefreshCw, Search } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 
 /* ------------------------------ Types ------------------------------ */
@@ -39,13 +42,6 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "SUCCESS", label: "Berhasil" },
   { id: "all", label: "Semua" },
 ];
-
-const STATUS_BADGE: Record<string, string> = {
-  FAILED: "bg-muted text-foreground border-border",
-  PENDING: "bg-muted text-foreground border-border",
-  PROCESSING: "bg-muted text-foreground border-border",
-  SUCCESS: "bg-muted text-foreground border-border",
-};
 
 const fmt = (n: number) => n.toLocaleString("id-ID");
 const fmtDate = (iso: string | null) =>
@@ -207,24 +203,9 @@ export default function SyncMismatchPage() {
         </div>
       </div>
 
-      {notice && (
-        <div
-          className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-            notice.kind === "ok"
-              ? "border-border bg-muted text-foreground"
-              : "border-border bg-muted text-foreground"
-          }`}
-        >
-          {notice.text}
-        </div>
-      )}
+      {notice && <Feedback className="mb-4" variant={notice.kind === "ok" ? "success" : "error"} title={notice.kind === "ok" ? "Sinkron selesai" : "Sinkron belum berhasil"} description={notice.kind === "ok" ? notice.text : friendlyError(notice.text)} details={notice.kind === "err" ? notice.text : undefined} />}
 
-      {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-foreground">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         {loading ? (
@@ -280,21 +261,13 @@ export default function SyncMismatchPage() {
                     {r.retryCount}/{r.maxRetries}
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
-                    <div className="break-words whitespace-normal text-xs text-foreground" title={r.lastError ?? ""}>
-                      {r.lastError ?? "—"}
-                    </div>
+                    {r.lastError ? <><p className="text-xs">{friendlyError(r.lastError, "Pembaruan belum diterima marketplace. Periksa koneksi, lalu coba lagi.")}</p><TechnicalDetails value={r.lastError} /></> : "—"}
                     {r.status === "PENDING" && r.nextRetryAt && (
                       <div className="text-xs text-muted-foreground">retry otomatis {fmtDate(r.nextRetryAt)}</div>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                    <span
-                      className={`mb-1 inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                        STATUS_BADGE[r.status] ?? "bg-muted text-muted-foreground border-border"
-                      }`}
-                    >
-                      {r.status}
-                    </span>
+                    <StatusBadge status={r.status} className="mb-1" />
                     <div>{fmtDate(r.updatedAt)}</div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">

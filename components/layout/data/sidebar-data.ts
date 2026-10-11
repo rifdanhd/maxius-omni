@@ -45,7 +45,7 @@ export const sidebarData: SidebarData = {
       title: 'Produk',
       items: [
         {
-          title: 'Produk',
+          title: 'Katalog Pusat',
           icon: Package,
           items: [
             { title: 'Produk Master', url: '/products', icon: Package },
@@ -58,7 +58,7 @@ export const sidebarData: SidebarData = {
         {
           // Dropdown collapsible (pola sama dgn "Pengaturan"). Halaman
           // /products/marketplace tidak ada (404) → tidak ada item "Semua Produk".
-          title: 'Produk Marketplace',
+          title: 'Produk di Marketplace',
           icon: Compass,
           items: [
             { title: 'Shopee', url: '/products/marketplace/shopee', icon: ShoppingBag },

@@ -1,4 +1,6 @@
 "use client";
+import { TechnicalDetails } from "@/components/ui/feedback";
+import { friendlyError } from "@/lib/ui/feedback";
 
 import { CheckCircle2, XCircle, Printer, X, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
@@ -38,6 +40,7 @@ export default function PickupSuccessModal({
           </h2>
           <button
             onClick={onClose}
+            aria-label="Tutup ringkasan pengiriman"
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X size={18} />
@@ -49,12 +52,12 @@ export default function PickupSuccessModal({
           {/* Ikon centang / gagal */}
           <div className="flex flex-col items-center text-center space-y-3">
             {successCount > 0 ? (
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                <CheckCircle2 size={36} className="text-foreground" />
+              <div className="w-16 h-16 rounded-full bg-success-subtle flex items-center justify-center">
+                <CheckCircle2 size={36} className="text-success" />
               </div>
             ) : (
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                <XCircle size={36} className="text-foreground" />
+              <div className="w-16 h-16 rounded-full bg-destructive-subtle flex items-center justify-center">
+                <XCircle size={36} className="text-destructive" />
               </div>
             )}
 
@@ -86,20 +89,20 @@ export default function PickupSuccessModal({
                   <div
                     key={r.orderId}
                     className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
-                      r.ok ? "bg-muted text-foreground" : "bg-muted text-foreground"
+                      r.ok ? "bg-success-subtle text-success" : "bg-destructive-subtle text-destructive"
                     }`}
                   >
                     {r.ok ? (
-                      <CheckCircle2 size={13} className="shrink-0 text-muted-foreground" />
+                      <CheckCircle2 size={13} className="shrink-0" aria-hidden="true" />
                     ) : (
-                      <XCircle size={13} className="shrink-0 text-muted-foreground" />
+                      <XCircle size={13} className="shrink-0" aria-hidden="true" />
                     )}
                     <span className="font-semibold">{r.orderNo}</span>
                     <span className="ml-auto text-[10px]">
                       {r.ok ? (
                         r.trackingNumber ? `Resi: ${r.trackingNumber}` : "Terkirim"
                       ) : (
-                        <span title={r.error}>{r.error?.slice(0, 40)}{r.error && r.error.length > 40 ? "..." : ""}</span>
+                        <span>Gagal</span>
                       )}
                     </span>
                   </div>
@@ -126,7 +129,7 @@ export default function PickupSuccessModal({
                   {failedItems.map((r) => (
                     <div key={r.orderId} className="flex items-start gap-2 text-xs">
                       <span className="font-semibold text-foreground shrink-0">{r.orderNo}:</span>
-                      <span className="text-foreground">{r.error ?? "Kesalahan tidak diketahui"}</span>
+                      <span className="text-destructive">{friendlyError(r.error, "Pengiriman belum berhasil. Periksa koneksi toko, lalu coba lagi.")}<TechnicalDetails value={r.error} /></span>
                     </div>
                   ))}
                 </div>

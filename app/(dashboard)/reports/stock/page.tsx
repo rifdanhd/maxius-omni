@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorFeedback } from "@/components/ui/feedback";
 import { useEffect, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import {
@@ -98,11 +99,7 @@ export default function StockReportPage() {
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground">
-          {error}
-        </div>
-      )}
+      {error && <ErrorFeedback error={error} className="mb-4" />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {summary.map((s) => (

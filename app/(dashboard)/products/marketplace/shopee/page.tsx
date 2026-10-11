@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, Fragment } from "react";
-import { authFetch } from "@/lib/utils/api-client";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search,
   ChevronDown,
@@ -15,21 +15,19 @@ import {
   Download,
   X,
 } from "lucide-react";
-
-type ShopeeListingRow = {
-  key: string;
-  accountId: string;
-  accountLabel: string;
-  variantId: string | null;
-  platformProductId: string | null;
-  platformTitle: string | null;
-  status: string | null;
-  channelSku: string | null;
-  variantCount: number;
-  stockTotal: number;
-  imageUrl: string | null;
-  lastSyncedAt: string | null;
-};
+import { notify } from "@/components/ui/notify";
+import { Feedback, PageState } from "@/components/ui/feedback";
+import { friendlyError } from "@/lib/ui/feedback";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ShopeeProductDetail, ShopeeProductList } from "@/components/products/shopee/product-list";
+import { fmtDate, fmtNumber, mappingLabels, storeName, type ShopeeListingRow } from "@/components/products/shopee/presentation";
+import { useShopeeDisplay } from "@/hooks/use-shopee-display";
+import { authFetch } from "@/lib/utils/api-client";
 
 type ListResponse = {
   rows: ShopeeListingRow[];
@@ -37,7 +35,9 @@ type ListResponse = {
   page: number;
   pageSize: number;
   counts?: Record<string, number>;
-  accounts: Array<{ id: string; label: string }>;
+  accounts: Array<{ id: string; label: string; isConnected?: boolean }>;
+  lastSyncedAt?: string | null;
+  syncProductCount?: number;
 };
 
 // Kontrak POST /api/marketplace/shopee/products/sync — baris hasil per akun
@@ -83,7 +83,6 @@ type ImportResponse = {
 };
 
 const PAGE_SIZE = 20;
-const PLATFORM_LABEL = "Shopee";
 const TABS: Array<{ id: string; label: string }> = [
   { id: "all", label: "Semua" },
   { id: "active", label: "Aktif" },
@@ -92,33 +91,8 @@ const TABS: Array<{ id: string; label: string }> = [
   { id: "deleted", label: "Dihapus" },
 ];
 
-function fmtNumber(n: number | null | undefined): string {
-  if (n === null || n === undefined) return "-";
-  return n.toLocaleString("id-ID");
-}
-
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "belum sync";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "belum sync";
-  return d.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-function statusLabel(status: string | null | undefined): string {
-  if (!status) return "Belum di-sync";
-  const s = status.toUpperCase();
-  if (s === "NORMAL" || s === "ACTIVE" || s === "ACTIVATE") return "Aktif di Shopee";
-  if (s === "UNLISTED") return "Tanpa dijual (unlisted)";
-  if (s === "SELLER_DEACTIVATED") return "Nonaktif (seller)";
-  if (s === "PLATFORM_DEACTIVATED") return "Nonaktif (platform)";
-  if (s === "FREEZE") return "Dibekukan";
-  if (s === "DRAFT") return "Draf";
-  if (s === "PENDING") return "Menunggu review";
-  if (s === "DELETED") return "Dihapus";
-  return status;
-}
-
 export default function ShopeeMarketplacePage() {
+  const router = useRouter();
   const [rows, setRows] = useState<ShopeeListingRow[]>([]);
   const [total, setTotal] = useState(0);
   const [accounts, setAccounts] = useState<ListResponse["accounts"]>([]);
@@ -134,29 +108,34 @@ export default function ShopeeMarketplacePage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [accountFilter, setAccountFilter] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [mappingFilter, setMappingFilter] = useState("all");
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [syncProductCount, setSyncProductCount] = useState(0);
+  const [detail, setDetail] = useState<ShopeeListingRow | null>(null);
+  const [detailReturnFocus, setDetailReturnFocus] = useState<HTMLButtonElement | null>(null);
+  const [pendingSync, setPendingSync] = useState<{ products?: Array<{ accountId: string; productId: string }>; accountIds?: string[]; count: number } | null>(null);
+  const display = useShopeeDisplay();
   const [syncingAll, setSyncingAll] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importAccounts, setImportAccounts] = useState<string[]>([]);
   const [importLimit, setImportLimit] = useState(100);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const filterRef = useRef<HTMLDivElement>(null);
+  const [syncFailure, setSyncFailure] = useState<{ message: string; detail: string; scope: NonNullable<typeof pendingSync> } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const operationRef = useRef(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filterActive = accountFilter.length > 0;
-
-  const notify = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 6000);
-  };
+  const selectedRows = rows.filter((row) => selected.has(row.key));
+  const busy = syncingAll || importing;
+  const connectedAccounts = accounts.filter((account) => account.isConnected !== false);
 
   useEffect(() => {
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) sp.set("search", q);
     sp.set("sort", sort);
     sp.set("tab", tab);
+    sp.set("mapping", mappingFilter);
     if (accountFilter.length > 0) sp.set("accountIds", accountFilter.join(","));
     let cancelled = false;
     async function run() {
@@ -166,12 +145,20 @@ export default function ShopeeMarketplacePage() {
           headers: { },
         });
         if (cancelled) return;
-        if (!res.ok) { const data = await res.json().catch(() => null); setError(data?.error ?? `Gagal memuat data (${res.status}).`); return; }
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          if (!cancelled) setError(data?.error ?? `Gagal memuat data (${res.status}).`);
+          return;
+        }
         const data: ListResponse = await res.json();
+        if (cancelled) return;
         setRows(data.rows ?? []);
         setTotal(data.total ?? 0);
         setCounts(data.counts ?? {});
         setAccounts(data.accounts ?? []);
+        setLastSyncedAt(data.lastSyncedAt ?? null);
+        setSyncProductCount(data.syncProductCount ?? data.total ?? 0);
+        setSelected(new Set());
         setError(null);
       } catch (e) {
         if (!cancelled) { console.error(e); setError("Terjadi kesalahan saat memuat data."); }
@@ -181,18 +168,12 @@ export default function ShopeeMarketplacePage() {
     }
     run();
     return () => { cancelled = true; };
-  }, [page, q, sort, tab, accountFilter, refreshKey]);
+  }, [page, q, sort, tab, accountFilter, mappingFilter, refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => { setQ(searchInput); setPage(1); }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (!(filterRef.current?.contains(e.target as Node))) setFilterOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   const allPageSelected = rows.length > 0 && rows.every((r) => selected.has(r.key));
   function toggleAll() {
@@ -201,40 +182,59 @@ export default function ShopeeMarketplacePage() {
   function toggleRow(key: string) {
     setSelected((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   }
-  function toggleExpand(key: string) {
-    setExpanded((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  function requestSync(products?: ShopeeListingRow[]) {
+    if (busy || operationRef.current) return;
+    if (products?.some((row) => !row.platformProductId)) {
+      notify("error", "Sebagian produk belum memiliki ID Shopee. Perbarui data toko terlebih dahulu.");
+      return;
+    }
+    const scope = products
+      ? { products: products.map((row) => ({ accountId: row.accountId, productId: row.platformProductId! })), count: products.length }
+      : { ...(accountFilter.length ? { accountIds: [...accountFilter] } : {}), count: syncProductCount };
+    if (!products || products.length >= 50) setPendingSync(scope);
+    else void syncAll(scope);
   }
 
-  async function syncAll() {
+  async function syncAll(scope: NonNullable<typeof pendingSync>) {
+    if (operationRef.current) return;
+    operationRef.current = true;
     setSyncingAll(true);
     setError(null);
+    setSyncFailure(null);
+    const reportFailure = (detail: string) => {
+      const message = friendlyError(detail, "Sinkron gagal. Silakan coba lagi.");
+      setSyncFailure({ message, detail, scope });
+      notify("error", message, { title: "Sinkron gagal", details: detail, action: { label: /koneksi toko/i.test(message) ? "Perbarui koneksi" : "Coba lagi", onClick: () => { if (/koneksi toko/i.test(message)) router.push("/settings/accounts"); else void syncAll(scope); } } });
+    };
     try {
-      const res = await authFetch("/api/marketplace/shopee/products/sync", { method: "POST", headers: { } });
+      const res = await authFetch("/api/marketplace/shopee/products/sync", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...(scope.products ? { products: scope.products } : {}), ...(scope.accountIds ? { accountIds: scope.accountIds } : {}) }),
+      });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Sync gagal.");
+      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "Sinkronisasi gagal.");
       const results = (data?.accounts ?? []) as SyncAccountResult[];
       if (results.length === 0) {
-        notify(
-          "error",
-          "Brand aktif tidak punya akun Shopee — hubungkan toko dulu lewat Tambahkan Marketplace."
-        );
+        reportFailure("Bisnis aktif belum memiliki toko Shopee. Hubungkan toko melalui Pengaturan Toko.");
         return;
       }
       setRefreshKey((k) => k + 1);
       const failed = results.filter((a) => a.error);
       if (failed.length > 0) {
-        notify("error", failed.map((a) => `${a.label}: ${a.error}`).join(" · "));
+        reportFailure(failed.map((a) => `${a.label}: ${a.error}`).join(" · "));
         return;
       }
       const okMsg = results
-        .map((a) => `${a.label}: ${a.items} item, ${a.models} varian, ${a.matched} ter-cocok`)
+        .map((a) => `${storeName(a.label)}: ${fmtNumber(a.items)} produk, ${fmtNumber(a.models)} varian, ${fmtNumber(a.matched)} diperbarui`)
         .join(" · ");
-      notify("success", `Sync selesai — ${okMsg}`);
-    } catch (e) { notify("error", e instanceof Error ? e.message : "Sync gagal."); }
-    finally { setSyncingAll(false); }
+      notify("success", `Sinkron selesai. ${fmtNumber(results.reduce((sum, account) => sum + account.matched, 0))} varian diperbarui.`, { details: okMsg });
+    } catch (e) { reportFailure(e instanceof Error ? e.message : "Sinkron gagal. Silakan coba lagi."); }
+    finally { operationRef.current = false; setSyncingAll(false); }
   }
 
   async function runImport() {
+    if (operationRef.current) return;
+    operationRef.current = true;
     setImporting(true);
     setError(null);
     try {
@@ -247,28 +247,30 @@ export default function ShopeeMarketplacePage() {
         }),
       });
       const data = (await res.json().catch(() => null)) as ImportResponse | null;
-      if (!res.ok || !data?.ok) throw new Error(data?.error ?? `Import gagal (${res.status}).`);
+      if (!res.ok || !data?.ok) throw new Error(data?.error ?? `Impor gagal (${res.status}).`);
       const totals = data.totals;
       const detail = (data.accounts ?? [])
         .map((a) => {
           if (a.error) return `${a.label}: gagal — ${a.error}`;
-          return `${a.label}: +${a.importedItems} listing / ${a.importedVariants} SKU` +
-            (a.orphan > 0 ? `, ${a.orphan} orphan` : "") +
+          return `${storeName(a.label)}: +${fmtNumber(a.importedItems)} produk / ${fmtNumber(a.importedVariants)} SKU` +
+            (a.orphan > 0 ? `, ${a.orphan} belum terhubung` : "") +
             (a.duplicate > 0 ? `, ${a.duplicate} duplikat` : "");
         })
         .join(" · ");
       const tail = totals && totals.zeroStock > 0
-        ? ` ${totals.zeroStock} SKU stok 0 — isi lewat Stok Masuk/Opname sebelum push.`
+        ? ` ${totals.zeroStock} SKU stok 0 — isi lewat Barang Masuk/Opname sebelum mengirim pembaruan stok.`
         : "";
       notify(
         totals && totals.errors > 0 ? "error" : "success",
-        `Import selesai: ${totals?.importedItems ?? 0} listing, ${totals?.importedVariants ?? 0} SKU baru.${detail ? " " + detail : ""}${tail}`
+        totals && totals.errors > 0 ? "Sebagian produk belum berhasil diimpor. Periksa koneksi toko, lalu coba lagi." : `Impor selesai. ${fmtNumber(totals?.importedItems ?? 0)} produk ditambahkan.`,
+        { details: `${detail}${tail}` }
       );
       setImportOpen(false);
       setRefreshKey((k) => k + 1);
     } catch (e) {
-      notify("error", e instanceof Error ? e.message : "Import gagal.");
+      notify("error", e instanceof Error ? e.message : "Impor gagal.");
     } finally {
+      operationRef.current = false;
       setImporting(false);
     }
   }
@@ -277,41 +279,32 @@ export default function ShopeeMarketplacePage() {
   { const start = Math.max(1, Math.min(page - 2, totalPages - 4)); const end = Math.min(totalPages, start + 4); for (let i = start; i <= end; i++) pageNumbers.push(i); }
 
   return (
-    <div className="p-4 md:p-8">
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-[60] max-w-sm">
-          <div className={`rounded-xl border px-4 py-3 text-sm shadow-lg flex items-start gap-2 ${
-            toast.type === "success" ? "bg-muted border-border text-foreground" : "bg-muted border-border text-foreground"}`}>
-            <span className="flex-1">{toast.message}</span>
-            <button onClick={() => setToast(null)} className="underline text-xs opacity-70">Tutup</button>
-          </div>
-        </div>
-      )}
+    <div className="min-w-0 p-3 sm:p-6 [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-ring [&_input]:focus-visible:ring-2 [&_input]:focus-visible:ring-ring [&_select]:focus-visible:ring-2 [&_select]:focus-visible:ring-ring">
+      {syncFailure && <Feedback variant="error" title="Sinkron gagal" description={syncFailure.message} details={syncFailure.detail} className="mb-4" action={<>
+        {/koneksi toko|belum memiliki toko/i.test(syncFailure.message) ? <Button variant="outline" asChild><Link href="/settings/accounts">Perbarui koneksi</Link></Button> : <Button variant="outline" disabled={busy} onClick={() => void syncAll(syncFailure.scope)}>Coba lagi</Button>}
+        <Button variant="ghost" onClick={() => setSyncFailure(null)}>Tutup pesan</Button>
+      </>} />}
 
-      {importOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay/50 p-4">
-          <div className="w-full max-w-lg rounded-xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card shadow-2xl">
+      <Dialog open={importOpen} onOpenChange={(open) => { if (!importing) setImportOpen(open); }}>
+          <DialogContent className="p-0" showCloseButton={!importing}>
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
-              <div>
-                <h2 className="text-base font-bold text-foreground">Import Listing dari Shopee</h2>
-                <p className="text-xs text-muted-foreground">Tarik produk Shopee ke katalog Maxius</p>
-              </div>
-              <button onClick={() => setImportOpen(false)} disabled={importing} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40">
-                <X size={16} />
-              </button>
+              <DialogHeader className="pr-6 text-left">
+                <DialogTitle>Impor produk dari Shopee</DialogTitle>
+                <DialogDescription>Tambahkan produk dan varian baru ke katalog pusat.</DialogDescription>
+              </DialogHeader>
             </div>
 
             <div className="space-y-4 px-5 py-4 text-sm text-foreground">
               <ul className="space-y-1 rounded-lg bg-muted border border-border p-3 text-xs text-foreground">
-                <li>• 1 listing Shopee = 1 produk induk; tiap varian (model) = 1 SKU stok sendiri.</li>
+                <li>• 1 produk Shopee menjadi 1 produk induk; tiap varian memiliki SKU dan stok sendiri.</li>
                 <li>• Kode produk di Shopee (<b>model_sku / item_sku</b>) dipakai untuk membuat hubungan produk; periksa variasi yang sesuai sebelum menggabungkan stok lintas toko.</li>
-                <li>• Listing yang SKU-nya sudah ter-mapping tidak disentuh (aman dijalankan berulang).</li>
+                <li>• Produk yang SKU-nya sudah terhubung tidak disentuh (aman dijalankan berulang).</li>
                 <li>• Stok awal diambil dari Shopee bila tersedia; sisanya 0 dan dicatat di kartu stok — isi lewat <b>Barang Masuk</b>/<b>Hitung Stok Fisik (Opname)</b> sebelum mengirim pembaruan stok.</li>
-                <li>• Gambar produk, harga, dan kategori belum ikut diimport.</li>
+                <li>• Gambar produk ikut diambil jika tersedia; harga dan kategori belum ikut diimpor.</li>
               </ul>
 
               <div>
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-foreground">Toko yang diimport</p>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-foreground">Toko yang diimpor</p>
                 {accounts.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Tidak ada akun Shopee terhubung.</p>
                 ) : (
@@ -326,7 +319,7 @@ export default function ShopeeMarketplacePage() {
                             e.target.checked ? [...prev, a.id] : prev.filter((x) => x !== a.id)
                           )}
                         />
-                        <span className="truncate">{a.label}</span>
+                        <span className="truncate" title={a.id}>{storeName(a.label)}</span>
                       </label>
                     ))}
                   </div>
@@ -340,19 +333,20 @@ export default function ShopeeMarketplacePage() {
               </div>
 
               <div>
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-foreground">Batas item per proses</p>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-foreground">Batas produk per proses</p>
                 <div className="flex items-center gap-2">
                   <select
                     value={importLimit}
                     onChange={(e) => setImportLimit(Number(e.target.value))}
-                    className="h-[38px] rounded-md border border-border bg-card px-3 text-sm outline-none cursor-pointer"
+                    aria-label="Batas produk per proses impor"
+                    className="h-11 rounded-md border border-border bg-card px-3 text-sm outline-none cursor-pointer"
                   >
-                    <option value={50}>50 listing</option>
-                    <option value={100}>100 listing</option>
-                    <option value={200}>200 listing</option>
-                    <option value={500}>500 listing</option>
+                    <option value={50}>50 produk</option>
+                    <option value={100}>100 produk</option>
+                    <option value={200}>200 produk</option>
+                    <option value={500}>500 produk</option>
                   </select>
-                  <span className="text-xs text-muted-foreground">Bisa diulang sampai semua listing masuk.</span>
+                  <span className="text-xs text-muted-foreground">Bisa diulang sampai semua produk masuk.</span>
                 </div>
               </div>
             </div>
@@ -367,40 +361,51 @@ export default function ShopeeMarketplacePage() {
                 className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
               >
                 {importing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                {importing ? "Mengimport..." : "Mulai Import"}
+                {importing ? "Mengimpor..." : "Mulai impor"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={Boolean(pendingSync)} onOpenChange={(open) => { if (!open) setPendingSync(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Perbarui data {pendingSync?.products ? "produk terpilih" : "toko"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingSync?.products ? `${fmtNumber(pendingSync.count)} produk terpilih` : `${pendingSync?.accountIds?.length ?? accounts.length} toko, sekitar ${fmtNumber(pendingSync?.count ?? 0)} produk tercatat`} akan diperiksa ke Shopee. Proses dapat memerlukan beberapa menit dan mengambil stok, judul, serta status terbaru. Stok katalog pusat tidak diubah.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Batal</AlertDialogCancel><AlertDialogAction onClick={() => { if (pendingSync) void syncAll(pendingSync); }}>Perbarui sekarang</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <ShopeeProductDetail row={detail} onClose={() => setDetail(null)} threshold={display.threshold} returnFocus={detailReturnFocus} />
 
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Produk Marketplace › Shopee</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Produk di Marketplace › Shopee</p>
           <h1 className="text-xl font-bold text-foreground">Produk Shopee</h1>
-          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Periksa produk yang dijual di Shopee dan hubungannya dengan katalog pusat; mulai dengan menghubungkan toko di Pengaturan Toko, lalu Import dari Shopee untuk menambahkan produk baru atau Perbarui Data untuk memperbarui produk yang terhubung.</p>
+          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Kelola produk Shopee, pantau stok, dan periksa hubungannya dengan katalog pusat.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => { setImportAccounts(accountFilter); setImportOpen(true); }}
-            disabled={accounts.length === 0 || importing}
-            title={accounts.length === 0 ? "Hubungkan toko Shopee dahulu melalui Pengaturan Toko." : "Tarik listing Shopee menjadi produk + varian + mapping di Maxius"}
-            className="flex items-center gap-2 rounded-md border border-primary px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
-          >
-            <Download size={16} /> Import dari Shopee
-          </button>
-          <button onClick={syncAll} disabled={syncingAll} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60">
-            {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {syncingAll ? "Menyinkronkan..." : "Perbarui Data (Sync Semua)"}
-          </button>
+        <div className="flex max-w-full flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Tooltip><TooltipTrigger asChild><span tabIndex={connectedAccounts.length === 0 ? 0 : undefined}>
+              <Button variant="outline" className="min-h-11" onClick={() => { setImportAccounts(accountFilter.length ? accountFilter : connectedAccounts.map((account) => account.id)); setImportOpen(true); }} disabled={loading || connectedAccounts.length === 0 || busy}>
+                <Download aria-hidden="true" />{importing ? "Mengimpor..." : "Impor dari Shopee"}
+              </Button></span></TooltipTrigger><TooltipContent className="max-w-xs">{connectedAccounts.length === 0 ? "Hubungkan toko melalui Pengaturan Toko terlebih dahulu." : "Tambahkan produk dan varian baru ke katalog pusat. Produk yang sudah terhubung tidak diimpor ulang."}</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><span tabIndex={connectedAccounts.length === 0 ? 0 : undefined}>
+              <Button className="min-h-11" onClick={() => requestSync()} disabled={loading || connectedAccounts.length === 0 || busy} aria-busy={syncingAll}>
+                {syncingAll ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}{syncingAll ? "Menyinkronkan..." : "Perbarui Data"}
+              </Button></span></TooltipTrigger><TooltipContent className="max-w-xs">Ambil stok, judul, gambar, dan status terbaru dari Shopee untuk toko yang dipilih. Tidak mengirim perubahan stok katalog pusat.</TooltipContent></Tooltip>
+          </div>
+          <p className="text-xs text-muted-foreground" aria-live="polite" title="Waktu pembaruan produk terbaru pada toko terpilih, bukan waktu seluruh toko selesai disinkronkan.">Terakhir disinkronkan: {loading ? "Memuat..." : fmtDate(lastSyncedAt)}</p>
         </div>
       </div>
 
-      {!loading && accounts.length === 0 && (
+      {!loading && !error && connectedAccounts.length === 0 && (
         <div className="mb-6 bg-muted border border-border rounded-xl p-6 text-center">
           <PackageOpen size={32} className="mx-auto mb-3 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Belum ada akun Shopee terhubung</p>
-          <p className="text-xs text-foreground mt-1">Hubungkan toko Shopee melalui <Link href="/settings/accounts" className="underline font-semibold">Tambahkan Marketplace</Link> untuk mulai sync produk.</p>
+          <p className="text-xs text-foreground mt-1">Hubungkan toko Shopee melalui <Link href="/settings/accounts" className="underline font-semibold">Tambahkan Marketplace</Link> untuk mulai mengelola produk.</p>
         </div>
       )}
 
@@ -417,7 +422,7 @@ export default function ShopeeMarketplacePage() {
                   setPage(1);
                 }}
                 className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
-                  tab === t.id ? "border-primary text-foreground" : "border-transparent text-foreground hover:text-foreground"
+                  tab === t.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {t.label}
@@ -427,7 +432,7 @@ export default function ShopeeMarketplacePage() {
                       tab === t.id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
                     }`}
                   >
-                    {count}
+                    {fmtNumber(count)}
                   </span>
                 )}
               </button>
@@ -435,152 +440,83 @@ export default function ShopeeMarketplacePage() {
           })}
         </div>
         <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
-          <div className="relative w-80">
+          <div className="relative w-full sm:max-w-xs">
             <input ref={searchRef} type="text" value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Cari nama produk atau SKU marketplace"
-              className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium" />
-            <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
+              aria-label="Cari nama produk atau SKU marketplace" placeholder="Cari nama produk atau SKU"
+              className="border border-border bg-card rounded-md pl-10 pr-3 py-2 text-sm outline-none w-full h-11 font-medium" />
+            <Search size={16} aria-hidden="true" className="pointer-events-none text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           </div>
 
-          <div className="relative">
+          <div className="relative max-w-full">
             <ChevronDown size={14} className="text-muted-foreground absolute left-3 top-2.5 pointer-events-none" />
-            <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}
-              className="border border-border rounded-md pl-8 pr-3 py-2 text-sm outline-none h-[38px] bg-card cursor-pointer font-medium">
+            <select aria-label="Urutkan produk" value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}
+              className="border border-border rounded-md pl-8 pr-3 py-2 text-sm outline-none h-11 max-w-full bg-card cursor-pointer font-medium">
               <option value="name_asc">Urutkan: Nama A–Z</option>
               <option value="name_desc">Urutkan: Nama Z–A</option>
               <option value="sku_asc">SKU: A–Z</option>
               <option value="sku_desc">SKU: Z–A</option>
               <option value="stock_asc">Stok terendah</option>
               <option value="stock_desc">Stok tertinggi</option>
-              <option value="updated_desc">Terakhir di-sync</option>
+              <option value="updated_desc">Sinkron terbaru</option>
+              <option value="updated_asc">Sinkron terlama</option>
+              <option value="account_asc">Toko: A–Z</option>
+              <option value="account_desc">Toko: Z–A</option>
+              <option value="mapping_asc">Status mapping: A–Z</option>
+              <option value="mapping_desc">Status mapping: Z–A</option>
             </select>
           </div>
 
-          <div className="relative" ref={filterRef}>
-            <button onClick={() => setFilterOpen((v) => !v)}
-              className={`flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] ${
-                filterOpen || filterActive ? "border-ring bg-muted/70 text-foreground" : "border-border text-muted-foreground bg-card hover:bg-muted"}`}>
-              <Filter size={14} />
-              <span>Toko/Akun</span>
-              {filterActive && <span className="px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">{accountFilter.length}</span>}
-              <ChevronDown size={14} />
-            </button>
-            {filterOpen && (
-              <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-72 bg-card border border-border rounded-xl shadow-xl z-30 p-4">
-                <p className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">Akun Shopee</p>
-                <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
-                  {accounts.length === 0 && <p className="text-xs text-muted-foreground">Tidak ada akun Shopee terdaftar.</p>}
-                  {accounts.map((a) => (
-                    <label key={a.id} className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-muted rounded px-1 py-1">
-                      <input type="checkbox" className="w-4 h-4" checked={accountFilter.includes(a.id)}
-                        onChange={() => setAccountFilter((prev) => prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id])} />
-                      <span className="truncate">{a.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <button onClick={() => setAccountFilter([])} className="text-xs font-medium text-muted-foreground hover:text-foreground underline">Reset</button>
-                  <button onClick={() => setFilterOpen(false)} className="text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-md">Terapkan</button>
-                </div>
+          <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
+            <DropdownMenuTrigger asChild><Button variant="outline" className="min-h-11" aria-label={filterActive ? `Toko/Akun: ${accountFilter.length} toko dipilih` : "Filter Toko/Akun"}>
+              <Filter aria-hidden="true" />Toko/Akun{filterActive && <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{accountFilter.length}</span>}<ChevronDown aria-hidden="true" />
+            </Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+              <DropdownMenuLabel>Toko Shopee · {accountFilter.length} dipilih</DropdownMenuLabel>
+              <div className="max-h-56 overflow-y-auto">
+                {accounts.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">Belum ada toko Shopee.</p>}
+                {accounts.map((account) => <DropdownMenuCheckboxItem key={account.id} checked={accountFilter.includes(account.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => {
+                  setAccountFilter((previous) => checked ? [...previous, account.id] : previous.filter((id) => id !== account.id)); setPage(1);
+                }}>
+                  <span className="min-w-0"><span className="block truncate">{storeName(account.label)}</span><span className="text-[11px] text-muted-foreground">ID: {account.id}</span></span>
+                </DropdownMenuCheckboxItem>)}
               </div>
-            )}
+              <DropdownMenuSeparator />
+              <div className="flex items-center justify-between px-2 py-1"><Button variant="ghost" size="sm" onClick={() => { setAccountFilter([]); setPage(1); }}>Semua toko</Button><Button size="sm" onClick={() => setFilterOpen(false)}>Selesai</Button></div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <label className="flex min-h-11 items-center gap-2 text-sm">
+            <span className="sr-only">Filter status mapping</span>
+            <select aria-label="Filter status mapping" value={mappingFilter} onChange={(event) => { setMappingFilter(event.target.value); setPage(1); }} className="h-11 max-w-full rounded-md border border-border bg-card px-3">
+              <option value="all">Semua status mapping</option>
+              {Object.entries(mappingLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          {(q || filterActive || mappingFilter !== "all" || tab !== "all") && <Button variant="ghost" className="min-h-11" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setMappingFilter("all"); setTab("all"); setPage(1); }}><X aria-hidden="true" />Hapus filter</Button>}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 text-xs">
+          <div className="flex items-center gap-2" role="group" aria-label="Kepadatan tampilan">
+            <span className="text-muted-foreground">Tampilan</span>
+            <Button size="sm" variant={display.density === "comfortable" ? "secondary" : "ghost"} aria-pressed={display.density === "comfortable"} onClick={() => display.setDensity("comfortable")}>Nyaman</Button>
+            <Button size="sm" variant={display.density === "compact" ? "secondary" : "ghost"} aria-pressed={display.density === "compact"} onClick={() => display.setDensity("compact")}>Ringkas</Button>
           </div>
-
-          {selected.size > 0 && (
-            <div className="flex items-center gap-2 ml-auto bg-muted text-foreground text-xs font-semibold px-3 py-2 rounded-md">
-              {selected.size} produk dipilih
-              <button onClick={() => setSelected(new Set())} className="underline">Batal</button>
-            </div>
-          )}
+          <label className="flex flex-wrap items-center gap-2 text-muted-foreground">Menipis jika stok di bawah
+            <input aria-label="Ambang stok menipis" type="number" min={0} max={1000000} value={display.threshold} onChange={(event) => { if (event.target.value !== "") display.setThreshold(Number(event.target.value)); }} className="h-9 w-20 rounded-md border border-border bg-card px-2 text-right text-foreground" />
+            <span title="Preferensi untuk tampilan Shopee pada perangkat ini; tidak mengubah aturan stok atau notifikasi inventori.">(perangkat ini)</span>
+          </label>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted border-b border-border text-foreground font-semibold">
-              <tr>
-                <th className="px-5 py-3 w-10"><input type="checkbox" className="w-4 h-4 rounded border-border" checked={allPageSelected} onChange={toggleAll} /></th>
-                <th className="px-5 py-3">Informasi Produk</th>
-                <th className="px-5 py-3">SKU</th>
-                <th className="px-5 py-3">Stok</th>
-                <th className="px-5 py-3">Status Mapping</th>
-                <th className="px-5 py-3">Akun</th>
-                <th className="px-5 py-3">Terakhir Sync</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">Memuat data...</td></tr>
-              ) : error ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center text-foreground">{error}</td></tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
-                    <PackageOpen size={28} className="mx-auto mb-2" />
-                    {q.trim() || accountFilter.length || tab !== "all" ? <div className="space-y-2"><p>Tidak ada produk yang cocok dengan pencarian/filter.</p><button className="underline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setTab("all"); setPage(1); }}>Hapus Pencarian dan Filter</button></div> : <div className="space-y-2"><p>Belum ada produk Shopee pada tampilan ini. Gunakan Import dari Shopee untuk menambahkan produk ke katalog pusat.</p><Link href="/settings/accounts" className="underline">Hubungkan atau Periksa Toko Shopee</Link></div>}
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => {
-                  const isExpanded = expanded.has(row.key);
-                  const isMapped = row.variantId && row.variantId !== "";
-                  return (
-                    <Fragment key={row.key}>
-                      <tr className="border-b border-border hover:bg-muted/50 align-top">
-                        <td className="px-5 py-4 pt-5"><input type="checkbox" className="w-4 h-4 rounded border-border" checked={selected.has(row.key)} onChange={() => toggleRow(row.key)} /></td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-start gap-3">
-                            {row.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={row.imageUrl} alt="" className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
-                            ) : (
-                              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
-                                <PackageOpen size={18} />
-                              </div>
-                            )}
-                            <div className="max-w-[240px]">
-                              <div className="text-foreground font-bold leading-tight">{row.platformTitle ?? row.channelSku ?? "-"}</div>
-                              <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full">{PLATFORM_LABEL}</span>
-                              {row.variantCount > 1 && (
-                                <span className="inline-flex items-center gap-1 mt-1.5 ml-1 text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded-full" title="Satu produk Shopee dengan banyak model/SKU — stok diakumulasi dari semua varian.">
-                                  {row.variantCount} varian
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4"><span className="text-sm text-foreground font-mono font-semibold">{row.variantCount > 1 ? `${row.variantCount} SKU` : (row.channelSku ?? "-")}</span></td>
-                        <td className="px-5 py-4 text-foreground font-semibold">{fmtNumber(row.stockTotal)}</td>
-                        <td className="px-5 py-4">
-                          {isMapped ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full">✅ Mapped</span>
-                          ) : (
-                            <Link href="/products/mapping" className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-foreground px-2 py-0.5 rounded-full hover:bg-muted">Belum Terhubung (Mapping)</Link>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-foreground">{row.accountLabel}</td>
-                        <td className="px-5 py-4 text-xs text-muted-foreground">{fmtDate(row.lastSyncedAt)}</td>
-                      </tr>
-                      {isExpanded && (
-                        <tr className="bg-muted/70 border-b border-border">
-                          <td colSpan={7} className="px-5 py-4">
-                            <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Detail Produk</div>
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-foreground">
-                              <div>Platform Product ID: <span className="font-mono">{row.platformProductId ?? "-"}</span></div>
-                              <div>Jumlah SKU: <span className="font-mono">{row.variantCount}</span></div>
-                              <div>Channel SKU: <span className="font-mono">{row.channelSku ?? (row.variantCount > 1 ? "per varian" : "-")}</span></div>
-                              <div>Status Platform: <span>{statusLabel(row.status)}</span></div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        {selectedRows.length > 0 && !loading && !error && <div role="region" aria-label="Aksi produk terpilih" className="flex flex-wrap items-center gap-3 border-b border-border bg-muted px-4 py-3">
+          <span className="text-sm font-semibold" aria-live="polite">{fmtNumber(selectedRows.length)} produk dipilih</span>
+          <Button size="sm" className="min-h-11" onClick={() => requestSync(selectedRows)} disabled={busy || selectedRows.some((row) => !row.platformProductId)}><RefreshCw className={syncingAll ? "animate-spin" : ""} aria-hidden="true" />{syncingAll ? "Menyinkronkan..." : "Sinkron terpilih"}</Button>
+          <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setSelected(new Set())}>Batal pilih</Button>
+          {selectedRows.some((row) => !row.platformProductId) && <p className="text-xs text-muted-foreground">Perbarui data toko untuk melengkapi ID produk sebelum sinkron terpilih.</p>}
+        </div>}
+        {loading ? <div aria-busy="true" aria-label="Memuat produk Shopee" className="space-y-3 p-4">
+          {Array.from({ length: 5 }, (_, index) => <div key={index} className="flex items-center gap-4 rounded-lg border border-border p-3"><Skeleton className="size-10 shrink-0" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div><Skeleton className="h-6 w-16" /></div>)}
+        </div> : error ? <PageState variant="error" title="Produk belum dapat dimuat" description={friendlyError(error)} details={error} action={<Button variant="outline" onClick={() => setRefreshKey((key) => key + 1)}>Coba lagi</Button>} /> : rows.length === 0 ? <div className="space-y-3 p-6 text-center text-sm">
+          <PackageOpen size={28} className="mx-auto text-muted-foreground" aria-hidden="true" />
+          {q.trim() || filterActive || mappingFilter !== "all" || tab !== "all" ? <><p>Tidak ada produk yang cocok dengan pencarian dan filter.</p><Button variant="outline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setMappingFilter("all"); setTab("all"); setPage(1); }}>Hapus pencarian dan filter</Button></> : <><p>Belum ada produk Shopee di katalog pusat.</p>{accounts.length > 0 ? <Button variant="outline" onClick={() => { setImportAccounts(accounts.map((account) => account.id)); setImportOpen(true); }} disabled={busy}><Download aria-hidden="true" />Impor dari Shopee</Button> : <Button variant="outline" asChild><Link href="/settings/accounts">Hubungkan toko Shopee</Link></Button>}</>}
+        </div> : <ShopeeProductList rows={rows} selected={selected} onToggleRow={toggleRow} onToggleAll={toggleAll} sort={sort} onSort={(value) => { setSort(value); setPage(1); }} density={display.density} threshold={display.threshold} busy={busy} onDetail={(row, trigger) => { setDetailReturnFocus(trigger); setDetail(row); }} onSync={requestSync} />}
 
         {total > 0 && (
           <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">

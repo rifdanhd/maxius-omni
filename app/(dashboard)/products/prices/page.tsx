@@ -1,5 +1,7 @@
 "use client";
 
+import { FormError, ErrorFeedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import {
@@ -193,11 +195,7 @@ function InlinePrice({
       >
         <X size={14} />
       </button>
-      {error && (
-        <span className="text-[10px] text-foreground whitespace-nowrap absolute right-0 top-full mt-0.5">
-          {error}
-        </span>
-      )}
+      {error && <FormError>{error}</FormError>}
     </div>
   );
 }
@@ -939,7 +937,7 @@ export default function KelolaHargaPage() {
               ) : error ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-foreground">
-                    {error}
+                    <ErrorFeedback title="Harga belum dapat dimuat" error={error} />
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
@@ -1065,7 +1063,7 @@ export default function KelolaHargaPage() {
                               />
                               {m.overridePrice !== null && (
                                 <button
-                                  onClick={() => clearOverridePrice(row, m).catch((e: unknown) => window.alert(e instanceof Error ? e.message : "Gagal mengubah harga khusus."))}
+                                  onClick={() => clearOverridePrice(row, m).catch((e: unknown) => notify("error", e instanceof Error ? e.message : "Gagal mengubah harga khusus."))}
                                   className="text-[10px] text-muted-foreground hover:text-foreground underline mt-0.5"
                                   title="Hapus Harga Khusus (Override) → gunakan Harga Utama (Default)"
                                 >
