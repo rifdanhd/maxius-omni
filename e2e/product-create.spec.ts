@@ -83,8 +83,9 @@ test('produk baru: buat via form mapping → muncul di /products → tetap ada s
   await expect(page.getByRole('button', { name: /^Lihat 1 varian produk/ })).toBeVisible();
   await page.getByRole('button', { name: /^Lihat 1 varian produk/ }).click();
   await expect(page.getByText(VARIANT_SKU).first()).toBeVisible();
-  // Stok efektif = 7 − stok aman 2 = 5; kolom menampilkan fisik aslinya.
-  await expect(page.getByText('(fisik 7)').first()).toBeVisible();
+  // Stok efektif = 7 − stok aman 2 = 5; editor menampilkan kedua angka sumber.
+  await expect(page.getByLabel(`Stok fisik detail ${VARIANT_SKU}`)).toHaveValue('7');
+  await expect(page.getByLabel(`Stok cadangan detail ${VARIANT_SKU}`)).toHaveValue('2');
   await page.screenshot({ path: SHOT('products-list') });
 
   // 4. Reload — data persisten, bukan sekadar state di memori.
