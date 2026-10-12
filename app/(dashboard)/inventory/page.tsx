@@ -1,8 +1,9 @@
 "use client";
 
-import { ErrorFeedback } from "@/components/ui/feedback";
+import { ErrorFeedback, Feedback } from "@/components/ui/feedback";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { notify } from "@/components/ui/notify";
+import { InlineStockInput } from "@/components/inventory/inline-stock-input";
 import { useEffect, useState } from "react";
 import { History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
@@ -46,6 +47,11 @@ export default function InventoryStockPage() {
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkField, setBulkField] = useState<"stock" | "safetyStock">("stock");
+  const [bulkValue, setBulkValue] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<{
     variantId: string;
@@ -130,6 +136,98 @@ export default function InventoryStockPage() {
       setError(e instanceof Error ? e.message : "Gagal memuat halaman berikutnya.");
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  async function saveInlineStock(
+    row: StockRow,
+    field: "stock" | "safetyStock",
+    value: number,
+    showNotice = true
+  ): Promise<boolean> {
+    setError(null);
+    setNotice(null);
+    try {
+      if (field === "stock") {
+        const result = await api<{ ok: boolean; stockAfter: number }>(
+          `/api/inventory/variants/${row.variantId}/adjust`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              newStock: value,
+              note: "Diatur langsung dari halaman Stok Varian.",
+            }),
+          }
+        );
+        setRows((current) =>
+          current.map((item) =>
+            item.variantId === row.variantId
+              ? {
+                  ...item,
+                  stock: result.stockAfter,
+                  available: Math.max(0, result.stockAfter - item.safetyStock),
+                }
+              : item
+          )
+        );
+      } else {
+        const result = await api<{
+          safetyStock: number;
+          minStock: number | null;
+          minStockResolved: number;
+          notifyEmail: boolean;
+        }>(`/api/inventory/variant/${row.variantId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ safetyStock: value }),
+        });
+        setRows((current) =>
+          current.map((item) =>
+            item.variantId === row.variantId
+              ? {
+                  ...item,
+                  safetyStock: result.safetyStock,
+                  available: Math.max(0, item.stock - result.safetyStock),
+                }
+              : item
+          )
+        );
+      }
+      if (showNotice) {
+        setNotice(
+          `${field === "stock" ? "Stok fisik" : "Stok cadangan"} ${row.sku} disimpan. Sinkronisasi marketplace diproses.`
+        );
+      }
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Gagal menyimpan stok.");
+      return false;
+    }
+  }
+
+  async function applyBulkStock() {
+    const value = Number(bulkValue);
+    if (!Number.isInteger(value) || value < 0) {
+      setError("Nilai massal harus berupa angka bulat 0 atau lebih.");
+      return;
+    }
+    const targets = rows.filter((row) => selected.has(row.variantId));
+    if (targets.length === 0) return;
+
+    setBulkSaving(true);
+    setError(null);
+    setNotice(null);
+    const failed: string[] = [];
+    for (const row of targets) {
+      const saved = await saveInlineStock(row, bulkField, value, false);
+      if (!saved) failed.push(row.variantId);
+    }
+    setBulkSaving(false);
+    setSelected(new Set(failed));
+    if (failed.length === 0) {
+      setBulkValue("");
+      setNotice(`${targets.length} varian berhasil diperbarui. Sinkronisasi marketplace diproses.`);
+    } else {
+      setError(`${targets.length - failed.length} varian berhasil dan ${failed.length} varian gagal diperbarui.`);
     }
   }
 
@@ -311,6 +409,7 @@ export default function InventoryStockPage() {
       </div>
 
       {error && <ErrorFeedback error={error} className="mb-4" />}
+      {notice && <Feedback variant="success" title="Perubahan disimpan" description={notice} className="mb-4" />}
 
       {tab !== "oversells" ? (
         <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -327,6 +426,52 @@ export default function InventoryStockPage() {
                 className="w-full border border-border rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
+            {selected.size > 0 && (
+              <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-muted/40 p-3" role="region" aria-label="Aksi massal stok">
+                <p className="mr-auto self-center text-sm font-semibold text-foreground">
+                  {selected.size} varian dipilih
+                </p>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Data yang diubah
+                  <select
+                    value={bulkField}
+                    onChange={(event) => setBulkField(event.target.value as "stock" | "safetyStock")}
+                    className="mt-1 block h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="stock">Stok fisik</option>
+                    <option value="safetyStock">Stok cadangan</option>
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Nilai baru
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={bulkValue}
+                    onChange={(event) => setBulkValue(event.target.value)}
+                    className="mt-1 block h-9 w-28 rounded-md border border-border bg-background px-3 text-right text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void applyBulkStock()}
+                  disabled={bulkSaving || bulkValue.trim() === ""}
+                  className="h-9 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  {bulkSaving ? "Menyimpan…" : "Terapkan"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  disabled={bulkSaving}
+                  className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  Batal
+                </button>
+              </div>
+            )}
           </div>
 
           {loading ? (
@@ -357,9 +502,27 @@ export default function InventoryStockPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="w-12 px-4 py-3 font-semibold">
+                      <input
+                        type="checkbox"
+                        aria-label="Pilih semua varian yang tampil"
+                        checked={rows.length > 0 && rows.every((row) => selected.has(row.variantId))}
+                        onChange={(event) => {
+                          setSelected((current) => {
+                            const next = new Set(current);
+                            for (const row of rows) {
+                              if (event.target.checked) next.add(row.variantId);
+                              else next.delete(row.variantId);
+                            }
+                            return next;
+                          });
+                        }}
+                        className="size-4 rounded border-border accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    </th>
                     <th className="px-4 py-3 font-semibold">Produk / Varian</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Stok fisik yang dicatat di gudang. Klik pensil untuk mengoreksi jumlah total; pembaruan toko mengikuti pengaturan inventori.">Fisik</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Stok yang disisihkan dan tidak ditawarkan ke toko. Klik riwayat untuk memeriksa perubahan.">Cadangan</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Stok fisik yang dicatat di gudang. Ketik angka baru lalu tekan Enter atau tombol centang.">Fisik</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Stok yang disisihkan dan tidak ditawarkan ke toko.">Cadangan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Info saja: jumlah activity promosi AKTIF yang mencakup varian.">Promosi</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok — demand yang akan datang">Pesanan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Target stok jual: fisik dikurangi cadangan, minimal 0.">Tersedia</th>
@@ -368,7 +531,23 @@ export default function InventoryStockPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((r) => (
-                    <tr key={r.variantId} className="hover:bg-muted">
+                    <tr key={r.variantId} data-testid={`inventory-row-${r.variantId}`} className="hover:bg-muted">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Pilih varian ${r.sku}`}
+                          checked={selected.has(r.variantId)}
+                          onChange={(event) => {
+                            setSelected((current) => {
+                              const next = new Set(current);
+                              if (event.target.checked) next.add(r.variantId);
+                              else next.delete(r.variantId);
+                              return next;
+                            });
+                          }}
+                          className="size-4 rounded border-border accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-start gap-3">
                           {r.imageUrl ? (
@@ -388,99 +567,32 @@ export default function InventoryStockPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-medium">
-                        {editing?.variantId === r.variantId && editing.field === "stock" ? (
-                          <span className="inline-flex flex-col items-end gap-1">
-                            <span className="inline-flex items-center gap-1">
-                              <input
-                                type="number"
-                                min={0}
-                                value={editing.value}
-                                onChange={(e) => setEditing({ ...editing, value: e.target.value })}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveEdit();
-                                  if (e.key === "Escape") setEditing(null);
-                                }}
-                                disabled={saving}
-                                autoFocus
-                                className="w-20 border border-border rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-ring"
-                              />
-                              <button
-                                onClick={handleSaveEdit}
-                                disabled={saving}
-                                className="text-xs font-bold text-foreground hover:underline disabled:opacity-50"
-                              >
-                                Simpan
-                              </button>
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
-                              Tersimpan &amp; di-push ke marketplace
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-end gap-1">
-                            {fmt(r.stock)}
-                            <button
-                              title="Atur stok fisik langsung"
-                              onClick={() =>
-                                setEditing({ variantId: r.variantId, field: "stock", value: String(r.stock) })
-                              }
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          </span>
-                        )}
+                        <InlineStockInput
+                          value={r.stock}
+                          label={`Stok fisik ${r.sku}`}
+                          onSave={(value) => saveInlineStock(r, "stock", value)}
+                        />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {editing?.variantId === r.variantId && editing.field === "safetyStock" ? (
-                          <span className="inline-flex flex-col items-end gap-1">
-                            <span className="inline-flex items-center gap-1">
-                              <input
-                                type="number"
-                                min={0}
-                                value={editing.value}
-                                onChange={(e) => setEditing({ ...editing, value: e.target.value })}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveEdit();
-                                  if (e.key === "Escape") setEditing(null);
-                                }}
-                                disabled={saving}
-                                autoFocus
-                                className="w-20 border border-border rounded-md px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-ring"
-                              />
-                              <button
-                                onClick={handleSaveEdit}
-                                disabled={saving}
-                                className="text-xs font-bold text-foreground hover:underline disabled:opacity-50"
-                              >
-                                Simpan
-                              </button>
-                            </span>
-                            {Number(editing.value) > r.stock && (
-                              <span className="text-[11px] font-medium text-foreground">
-                                Cadangan melebihi stok fisik ({fmt(r.stock)}) — stok tayang akan jadi 0.
-                              </span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1">
-                            {fmt(r.safetyStock)}
-                            <button
-                              title="Ubah cadangan"
-                              onClick={() =>
-                                setEditing({ variantId: r.variantId, field: "safetyStock", value: String(r.safetyStock) })
-                              }
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              title="Riwayat perubahan cadangan"
-                              onClick={() => openSafetyHistory(r)}
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              <History size={13} />
-                            </button>
+                        <span className="inline-flex items-center gap-1">
+                          <InlineStockInput
+                            value={r.safetyStock}
+                            label={`Stok cadangan ${r.sku}`}
+                            onSave={(value) => saveInlineStock(r, "safetyStock", value)}
+                          />
+                          <button
+                            type="button"
+                            title="Riwayat perubahan cadangan"
+                            aria-label={`Riwayat stok cadangan ${r.sku}`}
+                            onClick={() => openSafetyHistory(r)}
+                            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <History size={14} />
+                          </button>
+                        </span>
+                        {r.safetyStock > r.stock && (
+                          <span className="mt-1 block text-[11px] font-medium text-foreground">
+                            Cadangan melebihi fisik; stok tersedia 0.
                           </span>
                         )}
                       </td>

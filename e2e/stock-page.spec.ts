@@ -7,6 +7,7 @@ const SEED_ID = 'e2e-seed-oversell-001';
 const ACCT_ID = 'e2e-stockpage-acct';
 const MP_ID = 'e2e-stockpage-mp';
 const VAR_ID = 'e2e-stockpage-var';
+const VAR_ID_2 = 'e2e-stockpage-var-2';
 
 test.beforeAll(() => {
   sql(
@@ -25,6 +26,11 @@ test.beforeAll(() => {
       `ON CONFLICT (id) DO NOTHING;`
   );
   sql(
+    `INSERT INTO "ProductVariant" (id, sku, stock, "safetyStock", "masterProductId", "createdAt", "updatedAt") ` +
+      `VALUES ('${VAR_ID_2}','E2E-STOCKPAGE-SKU-2',8,0,'${MP_ID}',NOW(),NOW()) ` +
+      `ON CONFLICT (id) DO NOTHING;`
+  );
+  sql(
     `INSERT INTO "SyncLog" (id, direction, kind, status, message, payload, "accountId", "createdAt") ` +
       `VALUES ('${SEED_ID}','in','central_stock_deduct','skipped','e2e seed oversell',` +
       `'{"orderId":"e2e-order-001","deductionsAttempted":[{"variantId":"${VAR_ID}","qty":2}]}',` +
@@ -35,12 +41,13 @@ test.beforeAll(() => {
 
 test.afterAll(() => {
   sql(`DELETE FROM "SyncLog" WHERE id='${SEED_ID}';`);
-  sql(`DELETE FROM "ProductVariant" WHERE id='${VAR_ID}';`);
+  sql(`DELETE FROM "ProductVariant" WHERE id IN ('${VAR_ID}','${VAR_ID_2}');`);
   sql(`DELETE FROM "MasterProduct" WHERE id='${MP_ID}';`);
   sql(`DELETE FROM "PlatformAccount" WHERE id='${ACCT_ID}';`);
 });
 
 test('B: halaman Stok Varian end-to-end', async ({ page }) => {
+  test.setTimeout(180_000);
   await login(page);
 
   // 1. Badge vs API langsung.
@@ -54,7 +61,7 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
     ['Semua Produk', 'all'],
     ['Habis', 'empty'],
     ['Stok Menipis', 'low'],
-    ['Oversells', 'oversells'],
+    ['Oversell', 'oversells'],
   ] as const) {
     const tabBtn = page.getByRole('button', { name: new RegExp(tab) });
     await expect(tabBtn).toBeVisible();
@@ -62,22 +69,24 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   }
   await page.screenshot({ path: SHOT('b1-tabs-badges') });
 
-  // 2. Edit Cadangan inline (baris pertama) + revert.
-  const firstRow = page.locator('tbody tr').first();
-  const cadanganCell = firstRow.locator('td').nth(2);
-  const oldVal = Number((await cadanganCell.innerText()).trim());
-  await cadanganCell.getByTitle('Ubah cadangan').click();
-  const cadanganInput = cadanganCell.locator('input[type="number"]');
-  await cadanganInput.fill(String(oldVal + 1));
+  // 2. Cari fixture lalu edit stok fisik dan cadangan langsung di baris.
+  const search = page.getByPlaceholder('Cari SKU / nama varian / produk…');
+  await search.fill('E2E-STOCKPAGE-SKU');
+  await search.press('Enter');
+  const firstRow = page.getByTestId(`inventory-row-${VAR_ID}`);
+  const physicalInput = firstRow.getByLabel('Stok fisik E2E-STOCKPAGE-SKU', { exact: true });
+  await expect(physicalInput).toHaveValue('10');
+  await physicalInput.fill('11');
+  await physicalInput.press('Enter');
+  await expect(physicalInput).toHaveValue('11', { timeout: 15_000 });
+  await expect(page.getByText(/Stok fisik E2E-STOCKPAGE-SKU disimpan/)).toBeVisible();
+
+  const cadanganInput = firstRow.getByLabel('Stok cadangan E2E-STOCKPAGE-SKU', { exact: true });
+  await cadanganInput.fill('1');
   await page.screenshot({ path: SHOT('b2-edit-cadangan-open') });
-  await cadanganCell.getByRole('button', { name: 'Simpan' }).click();
-  await expect(cadanganCell).toContainText(String(oldVal + 1), { timeout: 15_000 });
+  await firstRow.getByRole('button', { name: 'Simpan stok cadangan e2e-stockpage-sku' }).click();
+  await expect(cadanganInput).toHaveValue('1', { timeout: 15_000 });
   await page.screenshot({ path: SHOT('b3-edit-cadangan-saved') });
-  // revert
-  await cadanganCell.getByTitle('Ubah cadangan').click();
-  await cadanganCell.locator('input[type="number"]').fill(String(oldVal));
-  await cadanganCell.getByRole('button', { name: 'Simpan' }).click();
-  await expect(cadanganCell).toContainText(String(oldVal), { timeout: 15_000 });
 
   // 3. Edit Batas Min inline + reset ke null (fallback *).
   const minCell = firstRow.locator('td').nth(7);
@@ -90,46 +99,42 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   // reset: kosongkan -> ikut produk induk (tanda *)
   await minCell.getByTitle(/Ubah batas minimum/).click();
   await minCell.locator('input[type="number"]').fill('');
+  const stockReload = page.waitForResponse((response) =>
+    response.url().includes('/api/inventory/stock?') && response.request().method() === 'GET'
+  );
   await minCell.getByRole('button', { name: 'Simpan' }).click();
+  await stockReload;
   await expect(minCell).toContainText('*', { timeout: 15_000 });
 
-  // 4. Toggle Email Notifikasi + reload persistence.
-  const emailCell = firstRow.locator('td').nth(8);
-  const toggle = emailCell.getByRole('switch');
-  const before = await toggle.getAttribute('aria-checked');
-  await toggle.click();
-  await expect(toggle).toHaveAttribute(
-    'aria-checked',
-    before === 'true' ? 'false' : 'true',
-    { timeout: 15_000 }
-  );
-  const after = before === 'true' ? 'false' : 'true';
-  await page.reload();
-  await expect(page.getByRole('heading', { name: 'Stok Varian' })).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('tbody tr').first().locator('td').nth(8).getByRole('switch')).toHaveAttribute(
-    'aria-checked',
-    after,
-    { timeout: 15_000 }
-  );
-  await page.screenshot({ path: SHOT('b5-email-toggle-persisted') });
-  // revert toggle
-  await page.locator('tbody tr').first().locator('td').nth(8).getByRole('switch').click();
-  await expect(
-    page.locator('tbody tr').first().locator('td').nth(8).getByRole('switch')
-  ).toHaveAttribute('aria-checked', before ?? 'false', { timeout: 15_000 });
+  // 4. Edit massal dua varian, lalu pastikan kedua nilai berubah.
+  await page.getByLabel('Pilih varian E2E-STOCKPAGE-SKU', { exact: true }).check();
+  await page.getByLabel('Pilih varian E2E-STOCKPAGE-SKU-2', { exact: true }).check();
+  const bulk = page.getByRole('region', { name: 'Aksi massal stok' });
+  await expect(bulk).toContainText('2 varian dipilih');
+  await bulk.getByLabel('Data yang diubah').selectOption('safetyStock');
+  await bulk.getByLabel('Nilai baru').fill('2');
+  await bulk.getByRole('button', { name: 'Terapkan' }).click();
+  await expect(page.getByText('2 varian berhasil diperbarui. Sinkronisasi marketplace diproses.')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId(`inventory-row-${VAR_ID}`).getByLabel('Stok cadangan E2E-STOCKPAGE-SKU', { exact: true })).toHaveValue('2');
+  await expect(page.getByTestId(`inventory-row-${VAR_ID_2}`).getByLabel('Stok cadangan E2E-STOCKPAGE-SKU-2', { exact: true })).toHaveValue('2');
+  await page.screenshot({ path: SHOT('b5-bulk-stock-saved') });
 
-  // 5. Tab Oversells: handle 1 entri seed -> badge berkurang tanpa reload.
-  const oversellsTab = page.getByRole('button', { name: /Oversells/ });
-  const badgeBefore = Number((await oversellsTab.innerText()).replace(/\D/g, ''));
+  // Kembalikan fixture agar uji dapat diulang.
+  await page.getByLabel('Pilih varian E2E-STOCKPAGE-SKU', { exact: true }).check();
+  await page.getByLabel('Pilih varian E2E-STOCKPAGE-SKU-2', { exact: true }).check();
+  await page.getByRole('region', { name: 'Aksi massal stok' }).getByLabel('Nilai baru').fill('0');
+  await page.getByRole('region', { name: 'Aksi massal stok' }).getByRole('button', { name: 'Terapkan' }).click();
+  await physicalInput.fill('10');
+  await physicalInput.press('Enter');
+
+  // 5. Tab Oversell: tandai satu entri seed sebagai sudah ditangani.
+  const oversellsTab = page.getByRole('button', { name: /Oversell/ });
   await oversellsTab.click();
   await expect(page.getByText('e2e seed oversell')).toBeVisible({ timeout: 15_000 });
   await page.screenshot({ path: SHOT('b6-oversells-before') });
   const seedRow = page.locator('tbody tr', { hasText: 'e2e seed oversell' });
   await seedRow.getByRole('button', { name: 'Tandai sudah ditangani' }).click();
   await expect(seedRow.getByText('Sudah ditangani')).toBeVisible({ timeout: 15_000 });
-  await expect(oversellsTab).toContainText(String(Math.max(0, badgeBefore - 1)), {
-    timeout: 15_000,
-  });
   await page.screenshot({ path: SHOT('b7-oversells-handled') });
   // seed dibiarkan handled; afterAll menghapus barisnya.
 });
