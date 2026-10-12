@@ -4,6 +4,14 @@ export const stockQuantity = z.number().int().min(0).max(2_147_483_647);
 export const positiveQuantity = stockQuantity.min(1);
 export const stockInSchema = z.object({ variantId: z.string().trim().min(1).max(200), qty: positiveQuantity, note: z.string().max(2000).optional() });
 export const stockAdjustSchema = z.object({ newStock: stockQuantity, note: z.string().max(2000).optional() });
+export const stockMovementSchema = z.object({
+  variantId: z.string().trim().min(1).max(200),
+  direction: z.enum(["IN", "OUT"]),
+  qty: positiveQuantity,
+  reason: z.string().trim().min(1).max(120),
+  note: z.string().trim().max(1000).optional(),
+  requestId: z.string().trim().min(8).max(200),
+});
 export const opnameCountsSchema = z.object({ counts: z.array(z.object({ variantId: z.string().min(1).max(200), countedStock: stockQuantity })).min(1).max(1000) });
 
 const quantityKeys = new Set(["qty", "quantity", "stock", "newStock", "countedStock", "safetyStock", "increment", "minStock", "threshold", "lowStockDefaultThreshold", "newSellable"]);

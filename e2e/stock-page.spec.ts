@@ -127,7 +127,27 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   await physicalInput.fill('10');
   await physicalInput.press('Enter');
 
-  // 5. Tab Oversell: tandai satu entri seed sebagai sudah ditangani.
+  // 5. Stok masuk/keluar cepat serta riwayat per varian.
+  await firstRow.getByRole('button', { name: 'Masuk', exact: true }).click();
+  let movementDialog = page.getByRole('dialog', { name: 'Stok Masuk' });
+  await movementDialog.getByLabel('Jumlah').fill('2');
+  await movementDialog.getByLabel('Catatan (opsional)').fill('Restok uji browser');
+  await movementDialog.getByRole('button', { name: 'Simpan Stok Masuk' }).click();
+  await expect(physicalInput).toHaveValue('12', { timeout: 20_000 });
+
+  await firstRow.getByRole('button', { name: 'Keluar', exact: true }).click();
+  movementDialog = page.getByRole('dialog', { name: 'Stok Keluar' });
+  await movementDialog.getByLabel('Jumlah').fill('2');
+  await movementDialog.getByLabel('Alasan').selectOption({ label: 'Barang rusak' });
+  await movementDialog.getByRole('button', { name: 'Simpan Stok Keluar' }).click();
+  await expect(physicalInput).toHaveValue('10', { timeout: 20_000 });
+
+  await firstRow.getByLabel('Lihat riwayat stok E2E-STOCKPAGE-SKU').click();
+  await expect(page.getByText('Pembelian atau restok — Restok uji browser')).toBeVisible();
+  await expect(page.getByText('Barang rusak', { exact: true })).toBeVisible();
+  await page.getByTitle('Tutup').click();
+
+  // 6. Tab Oversell: tandai satu entri seed sebagai sudah ditangani.
   const oversellsTab = page.getByRole('button', { name: /Oversell/ });
   await oversellsTab.click();
   await expect(page.getByText('e2e seed oversell')).toBeVisible({ timeout: 15_000 });

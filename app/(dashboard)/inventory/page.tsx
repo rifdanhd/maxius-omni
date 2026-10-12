@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { notify } from "@/components/ui/notify";
 import { InlineStockInput } from "@/components/inventory/inline-stock-input";
 import { useEffect, useState } from "react";
-import { History, PackageOpen, Pencil, RefreshCw, Search, X } from "lucide-react";
+import { History, Minus, PackageOpen, Pencil, Plus, RefreshCw, Search, X } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import type { StockRow, StockTab } from "@/app/api/inventory/stock/route";
 import type { OversellEntry } from "@/app/api/inventory/oversells/route";
@@ -24,6 +24,11 @@ const TABS: { id: TabId; label: string }[] = [
 const fmt = (n: number) => n.toLocaleString("id-ID");
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "medium" });
+
+const MOVEMENT_REASONS = {
+  IN: ["Pembelian atau restok", "Barang retur", "Koreksi stok masuk", "Lainnya"],
+  OUT: ["Barang rusak", "Barang hilang", "Pemakaian internal", "Koreksi stok keluar", "Lainnya"],
+} as const;
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await authFetch(path, {
@@ -52,6 +57,15 @@ export default function InventoryStockPage() {
   const [bulkValue, setBulkValue] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [movement, setMovement] = useState<{
+    row: StockRow;
+    direction: "IN" | "OUT";
+    qty: string;
+    reason: string;
+    note: string;
+    requestId: string;
+  } | null>(null);
+  const [movementSaving, setMovementSaving] = useState(false);
 
   const [editing, setEditing] = useState<{
     variantId: string;
@@ -63,7 +77,15 @@ export default function InventoryStockPage() {
 
   const [safetyHist, setSafetyHist] = useState<{ variantId: string; sku: string } | null>(null);
   const [safetyEntries, setSafetyEntries] = useState<
-    Array<{ id: string; note: string | null; stockAfter: number; createdAt: string; user: { username: string } | null }>
+    Array<{
+      id: string;
+      note: string | null;
+      reason: string;
+      changeQty: number;
+      stockAfter: number;
+      createdAt: string;
+      user: { username: string } | null;
+    }>
   >([]);
   const [safetyLoading, setSafetyLoading] = useState(false);
 
@@ -322,14 +344,82 @@ export default function InventoryStockPage() {
     setSafetyLoading(true);
     try {
       const data = await api<{
-        entries: Array<{ id: string; note: string | null; stockAfter: number; createdAt: string; user: { username: string } | null }>;
-      }>(`/api/inventory/ledger?variantId=${row.variantId}&reason=SAFETY_STOCK_CHANGE&limit=50`);
+        entries: Array<{
+          id: string;
+          note: string | null;
+          reason: string;
+          changeQty: number;
+          stockAfter: number;
+          createdAt: string;
+          user: { username: string } | null;
+        }>;
+      }>(`/api/inventory/ledger?variantId=${row.variantId}&limit=50`);
       setSafetyEntries(data.entries);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat riwayat cadangan.");
       setSafetyHist(null);
     } finally {
       setSafetyLoading(false);
+    }
+  }
+
+  function openMovement(row: StockRow, direction: "IN" | "OUT") {
+    setMovement({
+      row,
+      direction,
+      qty: "",
+      reason: MOVEMENT_REASONS[direction][0],
+      note: "",
+      requestId: crypto.randomUUID(),
+    });
+  }
+
+  async function saveMovement() {
+    if (!movement) return;
+    const qty = Number(movement.qty);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      setError("Jumlah stok harus berupa angka bulat lebih dari 0.");
+      return;
+    }
+    setMovementSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await api<{ stockAfter: number; already?: boolean }>(
+        "/api/inventory/stock-movement",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            variantId: movement.row.variantId,
+            direction: movement.direction,
+            qty,
+            reason: movement.reason,
+            note: movement.note,
+            requestId: movement.requestId,
+          }),
+        }
+      );
+      setRows((current) =>
+        current.map((row) =>
+          row.variantId === movement.row.variantId
+            ? {
+                ...row,
+                stock: result.stockAfter,
+                available: Math.max(0, result.stockAfter - row.safetyStock),
+              }
+            : row
+        )
+      );
+      setNotice(
+        result.already
+          ? "Permintaan ini sudah pernah diproses; stok tidak diubah lagi."
+          : `Stok ${movement.direction === "IN" ? "masuk" : "keluar"} ${movement.row.sku} berhasil dicatat.`
+      );
+      setMovement(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Pergerakan stok gagal disimpan.");
+    } finally {
+      setMovementSaving(false);
     }
   }
 
@@ -527,6 +617,7 @@ export default function InventoryStockPage() {
                     <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok — demand yang akan datang">Pesanan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Target stok jual: fisik dikurangi cadangan, minimal 0.">Tersedia</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Batas minimum per varian. Kosong = ikut threshold produk induk">Batas Min</th>
+                    <th className="px-4 py-3 font-semibold">Aksi stok</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -655,6 +746,32 @@ export default function InventoryStockPage() {
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex min-w-max items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openMovement(r, "IN")}
+                            className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Plus className="size-3.5" aria-hidden="true" /> Masuk
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openMovement(r, "OUT")}
+                            className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Minus className="size-3.5" aria-hidden="true" /> Keluar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openSafetyHistory(r)}
+                            aria-label={`Lihat riwayat stok ${r.sku}`}
+                            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <History className="size-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -752,6 +869,98 @@ export default function InventoryStockPage() {
         </div>
       )}
 
+      {movement && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
+          onClick={() => !movementSaving && setMovement(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="movement-title"
+            className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="movement-title" className="text-base font-bold text-foreground">
+                  Stok {movement.direction === "IN" ? "Masuk" : "Keluar"}
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {movement.row.productName} · <span className="font-mono">{movement.row.sku}</span>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Stok fisik saat ini: {fmt(movement.row.stock)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMovement(null)}
+                disabled={movementSaving}
+                aria-label="Tutup dialog pergerakan stok"
+                className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="mt-4 grid gap-4">
+              <label className="text-sm font-medium text-foreground">
+                Jumlah
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  autoFocus
+                  value={movement.qty}
+                  onChange={(event) => setMovement({ ...movement, qty: event.target.value })}
+                  className="mt-1 block h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </label>
+              <label className="text-sm font-medium text-foreground">
+                Alasan
+                <select
+                  value={movement.reason}
+                  onChange={(event) => setMovement({ ...movement, reason: event.target.value })}
+                  className="mt-1 block h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {MOVEMENT_REASONS[movement.direction].map((reason) => (
+                    <option key={reason}>{reason}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-foreground">
+                Catatan <span className="font-normal text-muted-foreground">(opsional)</span>
+                <textarea
+                  rows={3}
+                  value={movement.note}
+                  onChange={(event) => setMovement({ ...movement, note: event.target.value })}
+                  className="mt-1 block w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMovement(null)}
+                disabled={movementSaving}
+                className="h-10 rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveMovement()}
+                disabled={movementSaving || movement.qty.trim() === ""}
+                className="h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {movementSaving ? "Menyimpan…" : `Simpan Stok ${movement.direction === "IN" ? "Masuk" : "Keluar"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {safetyHist && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
@@ -763,7 +972,7 @@ export default function InventoryStockPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-base font-bold text-foreground">Riwayat cadangan</h2>
+                <h2 className="text-base font-bold text-foreground">Riwayat stok</h2>
                 <p className="text-xs text-muted-foreground mt-0.5 font-mono">{safetyHist.sku}</p>
               </div>
               <button
@@ -778,7 +987,7 @@ export default function InventoryStockPage() {
               <p className="py-6 text-center text-sm text-muted-foreground">Memuat…</p>
             ) : safetyEntries.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                Belum ada perubahan cadangan tercatat untuk varian ini.
+                Belum ada pergerakan stok tercatat untuk varian ini.
               </p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
@@ -787,14 +996,10 @@ export default function InventoryStockPage() {
                   return (
                     <li key={e.id} className="border border-border rounded-lg px-3 py-2 text-sm">
                       <p className="font-semibold text-foreground">
-                        {parsed ? (
-                          <>Cadangan {parsed.from} → {parsed.to}</>
-                        ) : (
-                          e.note ?? "Perubahan cadangan"
-                        )}
+                        {parsed ? <>Cadangan {parsed.from} → {parsed.to}</> : e.note ?? e.reason}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {e.user?.username ?? "sistem"} · {fmtDate(e.createdAt)} · stok fisik {fmt(e.stockAfter)}
+                        {e.changeQty > 0 ? `+${fmt(e.changeQty)}` : fmt(e.changeQty)} · {e.user?.username ?? "sistem"} · {fmtDate(e.createdAt)} · stok fisik {fmt(e.stockAfter)}
                       </p>
                     </li>
                   );

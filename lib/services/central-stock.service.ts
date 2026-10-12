@@ -37,6 +37,7 @@ export const STOCK_REASONS = {
   // Barang masuk (restock fisik). Dipakai endpoint /api/inventory/stock-in.
   // Data lama yang tercatat MANUAL_ADJUSTMENT dibiarkan historis.
   STOCK_IN: "STOCK_IN",
+  STOCK_OUT: "STOCK_OUT",
   MANUAL_ADJUSTMENT: "MANUAL_ADJUSTMENT",
   SYNC_CORRECTION: "SYNC_CORRECTION",
   STOCK_OPNAME: "STOCK_OPNAME",
@@ -50,6 +51,107 @@ export const STOCK_REASONS = {
   RETURN_RESTOCK: "RETURN_RESTOCK",
 } as const;
 export type StockReason = (typeof STOCK_REASONS)[keyof typeof STOCK_REASONS];
+
+export type ManualStockMovement = {
+  variantId: string;
+  direction: "IN" | "OUT";
+  qty: number;
+  reasonLabel: string;
+  note?: string | null;
+  requestId: string;
+  userId?: string | null;
+};
+
+/**
+ * Gerakan stok fisik manual dengan kunci permintaan untuk retry aman.
+ * Baris varian dikunci sebelum cek ledger dan mutasi, sehingga dua request
+ * bersamaan tidak dapat membuat stok keluar menjadi negatif atau mencatat
+ * requestId yang sama dua kali.
+ */
+export async function recordManualStockMovement(
+  params: ManualStockMovement
+): Promise<{
+  ok: boolean;
+  already?: boolean;
+  reason?: string;
+  changeQty?: number;
+  stockAfter?: number;
+}> {
+  if (!Number.isInteger(params.qty) || params.qty <= 0) {
+    return { ok: false, reason: "Jumlah harus berupa angka bulat lebih dari 0." };
+  }
+
+  const ledgerReason =
+    params.direction === "IN" ? STOCK_REASONS.STOCK_IN : STOCK_REASONS.STOCK_OUT;
+  const referenceId = `manual:${params.requestId}`;
+  let changed = false;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const [variant] = await tx.$queryRaw<{ id: string; sku: string; stock: number }[]>`
+      SELECT "id", "sku", "stock" FROM "ProductVariant"
+      WHERE "id" = ${params.variantId} FOR UPDATE
+    `;
+    if (!variant) return { ok: false, reason: "Varian tidak ditemukan." };
+
+    const previous = await tx.stockLedger.findFirst({
+      where: {
+        variantId: params.variantId,
+        referenceId,
+        reason: { in: [STOCK_REASONS.STOCK_IN, STOCK_REASONS.STOCK_OUT] },
+      },
+      select: { changeQty: true, stockAfter: true },
+    });
+    if (previous) {
+      return {
+        ok: true,
+        already: true,
+        changeQty: previous.changeQty,
+        stockAfter: previous.stockAfter,
+      };
+    }
+
+    if (params.direction === "OUT" && variant.stock < params.qty) {
+      return {
+        ok: false,
+        reason: `Stok fisik ${variant.sku} hanya ${variant.stock}; jumlah keluar ${params.qty}.`,
+      };
+    }
+
+    const changeQty = params.direction === "IN" ? params.qty : -params.qty;
+    const stockAfter = variant.stock + changeQty;
+    await tx.productVariant.update({
+      where: { id: variant.id },
+      data:
+        changeQty > 0
+          ? { stock: { increment: changeQty } }
+          : { stock: { decrement: Math.abs(changeQty) } },
+    });
+    await tx.stockLedger.create({
+      data: {
+        id: crypto.randomUUID(),
+        variantId: variant.id,
+        changeQty,
+        reason: ledgerReason,
+        referenceId,
+        note: params.note?.trim()
+          ? `${params.reasonLabel.trim()} — ${params.note.trim()}`
+          : params.reasonLabel.trim(),
+        stockAfter,
+        accountId: null,
+        userId: params.userId ?? null,
+      },
+    });
+    changed = true;
+    return { ok: true, changeQty, stockAfter };
+  });
+
+  if (changed) {
+    pushVariantStockToOthers(params.variantId, null).catch((error) =>
+      console.error(`[CentralStock] push error varian ${params.variantId}:`, error)
+    );
+  }
+  return result;
+}
 
 /**
  * Status order yang membatalkan pemotongan (stok direstore) — order batal
