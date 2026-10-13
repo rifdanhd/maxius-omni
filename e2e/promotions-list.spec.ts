@@ -31,6 +31,7 @@ function activity(overrides: Record<string, unknown>) {
 }
 
 test('Promosi menampilkan data terbaru dan dapat difilter berdasarkan marketplace, status, dan tanggal', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/api/marketplace/tiktok/promotions?*', (route) => route.fulfill({
     json: {
       ok: true,
@@ -60,6 +61,7 @@ test('Promosi menampilkan data terbaru dan dapat difilter berdasarkan marketplac
 
   const rows = page.locator('tbody > tr');
   await expect(rows.nth(0)).toContainText('Promo TikTok Terbaru');
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByLabel('Filter marketplace promosi').selectOption('SHOPEE');
   await expect(page.getByText('Promo Shopee Lama')).toBeVisible();
   await expect(page.getByText('Promo TikTok Terbaru')).toHaveCount(0);

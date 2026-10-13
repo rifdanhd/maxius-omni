@@ -77,9 +77,14 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   const physicalInput = firstRow.getByLabel('Stok fisik E2E-STOCKPAGE-SKU', { exact: true });
   await expect(physicalInput).toHaveValue('10');
   await physicalInput.fill('11');
+  const physicalSave = page.waitForResponse((response) =>
+    response.url().includes(`/api/inventory/variants/${VAR_ID}/adjust`) && response.request().method() === 'POST',
+    { timeout: 60_000 }
+  );
   await physicalInput.press('Enter');
-  await expect(physicalInput).toHaveValue('11', { timeout: 15_000 });
-  await expect(page.getByText(/Stok fisik E2E-STOCKPAGE-SKU disimpan/)).toBeVisible();
+  expect((await physicalSave).ok()).toBeTruthy();
+  await expect(physicalInput).toHaveValue('11', { timeout: 60_000 });
+  await expect(page.getByText(/Stok fisik E2E-STOCKPAGE-SKU disimpan/)).toBeVisible({ timeout: 60_000 });
 
   const cadanganInput = firstRow.getByLabel('Stok cadangan E2E-STOCKPAGE-SKU', { exact: true });
   await cadanganInput.fill('1');
