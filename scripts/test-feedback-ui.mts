@@ -77,3 +77,13 @@ test("token teks status memenuhi kontras AA pada latar semantik terang dan gelap
     }
   }
 });
+
+test("notifikasi umum tidak lagi memakai toast pop-up", () => {
+  const notifySource = fs.readFileSync("components/ui/notify.tsx", "utf8");
+  const rootLayout = fs.readFileSync("app/layout.tsx", "utf8");
+  assert.ok(!notifySource.includes('from "sonner"'));
+  assert.ok(!notifySource.includes("toast.custom"));
+  assert.ok(!rootLayout.includes("<AppToaster"));
+  assert.ok(notifySource.includes("APPLICATION_NOTIFICATION_EVENT"));
+  assert.ok(notifySource.includes("fingerprint: `${variant}:"));
+});

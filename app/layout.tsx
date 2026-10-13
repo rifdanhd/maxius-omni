@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/context/theme-provider";
-import { AppToaster } from "@/components/ui/app-toaster";
 import { ConfirmationHost } from "@/components/ui/confirm-action";
 
 export const metadata: Metadata = {
@@ -29,7 +28,6 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider>
           {children}
-          <AppToaster />
           <ConfirmationHost />
         </ThemeProvider>
       </body>

@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { Search } from "@/components/search";
 import NotificationBell from "@/components/layout/NotificationBell";
+import { InlineNotificationHost } from "@/components/layout/InlineNotificationHost";
 
 // Tidak ada sumber data eksternal yang berubah — subscribe hanya untuk
 // memenuhi kontrak useSyncExternalStore.
@@ -100,6 +101,7 @@ export default function DashboardLayout({
             <ThemeSwitch />
           </div>
         </Header>
+        <InlineNotificationHost />
         <div id="content" tabIndex={-1} className="flex-1 min-h-0 min-w-0 overflow-auto overscroll-y-contain">
           {children}
         </div>
