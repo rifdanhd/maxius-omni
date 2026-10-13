@@ -50,6 +50,7 @@ type Product = {
   status?: string;
   isActive: boolean;
   importedFrom?: string | null;
+  category?: string | null;
   variants: Variant[];
   type?: "single" | "bundle";
   bundleItems?: Array<{
@@ -100,6 +101,10 @@ export default function MasterProductsPage() {
   const [sort, setSort] = useState(SORT_OPTIONS[0]);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterLevel, setFilterLevel] = useState<"all" | "low" | "out">("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [platformFilter, setPlatformFilter] = useState("all");
+  const [storeFilter, setStoreFilter] = useState("all");
+  const [urlReady, setUrlReady] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -154,6 +159,42 @@ export default function MasterProductsPage() {
       cancelled = true;
     };
   }, [showInactive]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab") as TabId | null;
+      const stock = params.get("stock") as "all" | "low" | "out" | null;
+      const selectedSort = SORT_OPTIONS.find((option) => option.id === params.get("sort"));
+      if (tab && ["semua_produk", "produk_satuan", "produk_bundle"].includes(tab)) setActiveTab(tab);
+      if (stock && ["all", "low", "out"].includes(stock)) setFilterLevel(stock);
+      if (selectedSort) setSort(selectedSort);
+      const initialQ = params.get("q") ?? "";
+      setQ(initialQ);
+      setSearchInput(initialQ);
+      setCategoryFilter(params.get("category") ?? "all");
+      setPlatformFilter(params.get("platform") ?? "all");
+      setStoreFilter(params.get("store") ?? "all");
+      setShowInactive(params.get("inactive") === "1");
+      setUrlReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!urlReady) return;
+    const params = new URLSearchParams();
+    if (q.trim()) params.set("q", q.trim());
+    if (activeTab !== "semua_produk") params.set("tab", activeTab);
+    if (filterLevel !== "all") params.set("stock", filterLevel);
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    if (platformFilter !== "all") params.set("platform", platformFilter);
+    if (storeFilter !== "all") params.set("store", storeFilter);
+    if (sort.id !== SORT_OPTIONS[0].id) params.set("sort", sort.id);
+    if (showInactive) params.set("inactive", "1");
+    const query = params.toString();
+    window.history.replaceState(null, "", query ? `${window.location.pathname}?${query}` : window.location.pathname);
+  }, [activeTab, categoryFilter, filterLevel, platformFilter, q, showInactive, sort.id, storeFilter, urlReady]);
 
   async function refreshProducts() {
     const res = await authFetch(productsUrl(showInactive), {
@@ -340,6 +381,13 @@ export default function MasterProductsPage() {
     } else if (filterLevel === "out") {
       list = list.filter((p) => productStockSummary(p).level === "out");
     }
+    if (categoryFilter !== "all") list = list.filter((p) => (p.category ?? "") === categoryFilter);
+    if (platformFilter !== "all") {
+      list = list.filter((p) => p.variants.some((v) => v.mappings.some((m) => m.account?.platform === platformFilter)));
+    }
+    if (storeFilter !== "all") {
+      list = list.filter((p) => p.variants.some((v) => v.mappings.some((m) => m.account?.id === storeFilter)));
+    }
     list = [...list].sort((a, b) => {
       const stockA = productStockSummary(a).stock;
       const stockB = productStockSummary(b).stock;
@@ -359,7 +407,31 @@ export default function MasterProductsPage() {
       }
     });
     return list;
-  }, [products, q, sort, filterLevel, activeTab]);
+  }, [products, q, sort, filterLevel, activeTab, categoryFilter, platformFilter, storeFilter]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(products.map((product) => product.category).filter((value): value is string => Boolean(value)))).sort(),
+    [products]
+  );
+  const stores = useMemo(() => {
+    const values = new Map<string, { id: string; label: string; platform: string }>();
+    products.forEach((product) => product.variants.forEach((variant) => variant.mappings.forEach((mapping) => {
+      if (mapping.account) values.set(mapping.account.id, mapping.account);
+    })));
+    return Array.from(values.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [products]);
+
+  const resetFilters = () => {
+    setSearchInput("");
+    setQ("");
+    setFilterLevel("all");
+    setCategoryFilter("all");
+    setPlatformFilter("all");
+    setStoreFilter("all");
+    setSort(SORT_OPTIONS[0]);
+    setShowInactive(false);
+    switchTab("semua_produk");
+  };
 
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: "semua_produk", label: "Semua Produk", count: products.length },
@@ -423,6 +495,7 @@ export default function MasterProductsPage() {
               Katalog pusat untuk melihat produk, variasi, stok, dan toko yang terhubung; mulai dengan mencari produk dan membuka Lihat varian, atau tambahkan produk dari TikTok Shop maupun Product Copy jika katalog masih kosong.
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <button disabled title="Unduh katalog belum tersedia" className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground opacity-60">
               Unduh (Segera Hadir) <ChevronDown size={16} />
@@ -623,6 +696,36 @@ export default function MasterProductsPage() {
             )}
           </div>
 
+          <select
+            aria-label="Filter kategori"
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+            className="h-[38px] max-w-full rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">Semua kategori</option>
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <select
+            aria-label="Filter marketplace"
+            value={platformFilter}
+            onChange={(event) => setPlatformFilter(event.target.value)}
+            className="h-[38px] rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">Semua marketplace</option>
+            <option value="SHOPEE">Shopee</option>
+            <option value="TIKTOK_SHOP">TikTok Shop</option>
+            <option value="TOKOPEDIA">Tokopedia</option>
+          </select>
+          <select
+            aria-label="Filter toko"
+            value={storeFilter}
+            onChange={(event) => setStoreFilter(event.target.value)}
+            className="h-[38px] max-w-full rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">Semua toko</option>
+            {stores.map((store) => <option key={store.id} value={store.id}>{store.label}</option>)}
+          </select>
+
           <label
             title="Tampilkan juga produk yang dinonaktifkan (soft delete)"
             className="flex items-center gap-2 text-sm text-foreground font-medium cursor-pointer select-none"
@@ -635,6 +738,18 @@ export default function MasterProductsPage() {
             />
             Tampilkan nonaktif
           </label>
+          {(q || filterLevel !== "all" || categoryFilter !== "all" || platformFilter !== "all" || storeFilter !== "all" || sort.id !== SORT_OPTIONS[0].id || showInactive) && (
+            <button type="button" onClick={resetFilters} className="h-[38px] rounded-md border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">
+              Reset
+            </button>
+          )}
+          <div className="flex basis-full flex-wrap gap-2" aria-label="Filter aktif">
+            {q && <button onClick={() => { setQ(""); setSearchInput(""); }} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Cari: {q} ×</button>}
+            {categoryFilter !== "all" && <button onClick={() => setCategoryFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Kategori: {categoryFilter} ×</button>}
+            {platformFilter !== "all" && <button onClick={() => setPlatformFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Marketplace: {platformFilter} ×</button>}
+            {storeFilter !== "all" && <button onClick={() => setStoreFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Toko: {stores.find((store) => store.id === storeFilter)?.label ?? storeFilter} ×</button>}
+            {filterLevel !== "all" && <button onClick={() => setFilterLevel("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Stok: {filterLevel === "out" ? "Habis" : "Menipis"} ×</button>}
+          </div>
         </div>
 
         {/* Table */}

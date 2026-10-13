@@ -15,7 +15,8 @@ export function InlineStockInput({ value, label, onSave, disabled = false }: Inl
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft(String(value));
+    const frame = window.requestAnimationFrame(() => setDraft(String(value)));
+    return () => window.cancelAnimationFrame(frame);
   }, [value]);
 
   const parsed = Number(draft);

@@ -22,6 +22,8 @@ export type StockRow = {
   minStock: number | null;
   minStockResolved: number;
   notifyEmail: boolean;
+  category: string | null;
+  accounts: Array<{ id: string; label: string; platform: string }>;
 };
 
 type RawRow = {
@@ -38,6 +40,8 @@ type RawRow = {
   minStock: number | null;
   threshold: number;
   notifyEmail: number;
+  category: string | null;
+  accounts: unknown;
 };
 
 /**
@@ -109,6 +113,9 @@ export const GET = withAuth(async (req) => {
   const url = new URL(req.url);
   const tab = (url.searchParams.get("tab") ?? "all") as StockTab;
   const q = (url.searchParams.get("q") ?? "").trim();
+  const category = (url.searchParams.get("category") ?? "").trim();
+  const platform = (url.searchParams.get("platform") ?? "").trim();
+  const accountId = (url.searchParams.get("account") ?? "").trim();
   const limit = Math.min(
     Math.max(Number(url.searchParams.get("limit") ?? "50") || 50, 1),
     200
@@ -136,6 +143,21 @@ export const GET = withAuth(async (req) => {
         ? Prisma.sql`AND (pv.stock - pv."safetyStock") > 0 AND ${lowStockSql("pv", "mp")}`
         : Prisma.empty;
 
+  const categoryFilter = category ? Prisma.sql`AND mp.category = ${category}` : Prisma.empty;
+  const mappingFilter = accountId
+    ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM "ProductMapping" fm
+        JOIN "PlatformAccount" fa ON fa.id = fm."accountId"
+        WHERE fm."variantId" = pv.id AND fa."businessId" = ${businessId} AND fa.id = ${accountId}
+      )`
+    : platform
+      ? Prisma.sql`AND EXISTS (
+          SELECT 1 FROM "ProductMapping" fm
+          JOIN "PlatformAccount" fa ON fa.id = fm."accountId"
+          WHERE fm."variantId" = pv.id AND fa."businessId" = ${businessId} AND fa.platform = ${platform}
+        )`
+      : Prisma.empty;
+
   const rows = await prisma.$queryRaw<RawRow[]>`
     SELECT
       pv.id            AS "variantId",
@@ -144,13 +166,23 @@ export const GET = withAuth(async (req) => {
       mp.id            AS "productId",
       mp.name          AS "productName",
       mp."imageUrl"    AS "imageUrl",
+      mp.category       AS category,
       pv.stock         AS stock,
       pv."safetyStock" AS "safetyStock",
       COALESCE(pr."promoActive", 0) AS "promoActive",
       COALESCE(ord."orderedQty", 0) AS "orderedQty",
       pv."minStock"    AS "minStock",
       mp.threshold     AS threshold,
-      pv."notifyEmail" AS "notifyEmail"
+      pv."notifyEmail" AS "notifyEmail",
+      COALESCE((
+        SELECT json_agg(json_build_object('id', mapped.id, 'label', mapped.label, 'platform', mapped.platform) ORDER BY mapped.label)
+        FROM (
+          SELECT DISTINCT pa.id, pa.label, pa.platform
+          FROM "ProductMapping" pm
+          JOIN "PlatformAccount" pa ON pa.id = pm."accountId"
+          WHERE pm."variantId" = pv.id AND pa."businessId" = ${businessId}
+        ) mapped
+      ), '[]'::json) AS accounts
     FROM "ProductVariant" pv
     JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
     LEFT JOIN (
@@ -178,6 +210,8 @@ export const GET = withAuth(async (req) => {
     WHERE mp."businessId" = ${businessId}
     ${searchFilter}
     ${tabFilter}
+    ${categoryFilter}
+    ${mappingFilter}
     ${keyset}
     ORDER BY mp.name ASC, pv.sku ASC, pv.id ASC
     LIMIT ${limit + 1}
@@ -224,7 +258,25 @@ export const GET = withAuth(async (req) => {
       Number(r.threshold)
     ),
     notifyEmail: Number(r.notifyEmail) === 1,
+    category: r.category,
+    accounts: Array.isArray(r.accounts)
+      ? (r.accounts as Array<{ id: string; label: string; platform: string }>)
+      : [],
   }));
+
+  const [categoryRows, accounts] = await Promise.all([
+    prisma.masterProduct.findMany({
+      where: { businessId, category: { not: null } },
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" },
+    }),
+    prisma.platformAccount.findMany({
+      where: { businessId },
+      select: { id: true, label: true, platform: true },
+      orderBy: { label: "asc" },
+    }),
+  ]);
 
   return NextResponse.json({
     rows: data,
@@ -234,6 +286,10 @@ export const GET = withAuth(async (req) => {
       empty: Number(c.empty),
       low: Number(c.low),
       oversells: Number(c.oversells),
+    },
+    filters: {
+      categories: categoryRows.map((row) => row.category).filter((value): value is string => Boolean(value)),
+      accounts,
     },
   });
 });

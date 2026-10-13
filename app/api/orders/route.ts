@@ -52,6 +52,9 @@ export const GET = withAuth(async (req) => {
   //   (tanpa searchType) → default keyword
   const q = searchParams.get("q")?.trim() || null;
   const searchType = searchParams.get("searchType")?.trim() || "keyword";
+  const platform = searchParams.get("platform")?.trim() || null;
+  const accountId = searchParams.get("account")?.trim() || null;
+  const category = searchParams.get("category")?.trim() || null;
 
   let whereSearch: object = {};
   if (q) {
@@ -103,9 +106,26 @@ export const GET = withAuth(async (req) => {
     };
   }
 
-  const where = { AND: [{ account: { businessId: req.businessId } }, whereStatus, whereSearch, whereDate] };
+  const whereChannel = accountId
+    ? { accountId }
+    : platform
+      ? { account: { platform } }
+      : {};
+  const whereCategory = category
+    ? { items: { some: { variant: { masterProduct: { category } } } } }
+    : {};
+  const where = {
+    AND: [
+      { account: { businessId: req.businessId } },
+      whereStatus,
+      whereSearch,
+      whereDate,
+      whereChannel,
+      whereCategory,
+    ],
+  };
 
-  const [orders, total, statusGroups] = await Promise.all([
+  const [orders, total, statusGroups, accounts, categoryRows] = await Promise.all([
     prisma.order.findMany({
       where,
       include: {
@@ -127,6 +147,17 @@ export const GET = withAuth(async (req) => {
       by: ["status"],
       where: { account: { businessId: req.businessId } },
       _count: true,
+    }),
+    prisma.platformAccount.findMany({
+      where: { businessId: req.businessId },
+      select: { id: true, label: true, platform: true },
+      orderBy: { label: "asc" },
+    }),
+    prisma.masterProduct.findMany({
+      where: { businessId: req.businessId, category: { not: null } },
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" },
     }),
   ]);
 
@@ -167,5 +198,9 @@ export const GET = withAuth(async (req) => {
     // Metadata untuk kolom pencarian (server-side) — tetap kirim daftar status kanonik
     // supaya klien bisa fallback kalau butuh referensi.
     statuses: PLAIN_STATUSES,
+    filters: {
+      accounts,
+      categories: categoryRows.map((row) => row.category).filter((value): value is string => Boolean(value)),
+    },
   });
 });

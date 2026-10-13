@@ -4,7 +4,7 @@ import { ErrorFeedback, Feedback } from "@/components/ui/feedback";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { notify } from "@/components/ui/notify";
 import { InlineStockInput } from "@/components/inventory/inline-stock-input";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { History, Minus, PackageOpen, Pencil, Plus, RefreshCw, Search, X } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import type { StockRow, StockTab } from "@/app/api/inventory/stock/route";
@@ -52,6 +52,15 @@ export default function InventoryStockPage() {
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [platformFilter, setPlatformFilter] = useState("all");
+  const [storeFilter, setStoreFilter] = useState("all");
+  const [sort, setSort] = useState("name_asc");
+  const [filterOptions, setFilterOptions] = useState<{
+    categories: string[];
+    accounts: Array<{ id: string; label: string; platform: string }>;
+  }>({ categories: [], accounts: [] });
+  const [urlReady, setUrlReady] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkField, setBulkField] = useState<"stock" | "safetyStock">("stock");
   const [bulkValue, setBulkValue] = useState("");
@@ -89,9 +98,35 @@ export default function InventoryStockPage() {
   >([]);
   const [safetyLoading, setSafetyLoading] = useState(false);
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const params = new URLSearchParams(window.location.search);
+      const initialTab = params.get("tab") as TabId | null;
+      if (initialTab && TABS.some((item) => item.id === initialTab)) setTab(initialTab);
+      const initialQ = params.get("q") ?? "";
+      setQ(initialQ);
+      setQInput(initialQ);
+      setCategoryFilter(params.get("category") ?? "all");
+      setPlatformFilter(params.get("platform") ?? "all");
+      setStoreFilter(params.get("store") ?? "all");
+      setSort(params.get("sort") ?? "name_asc");
+      setUrlReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
-
-
+  useEffect(() => {
+    if (!urlReady) return;
+    const params = new URLSearchParams();
+    if (tab !== "all") params.set("tab", tab);
+    if (q.trim()) params.set("q", q.trim());
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    if (platformFilter !== "all") params.set("platform", platformFilter);
+    if (storeFilter !== "all") params.set("store", storeFilter);
+    if (sort !== "name_asc") params.set("sort", sort);
+    const query = params.toString();
+    window.history.replaceState(null, "", query ? `${window.location.pathname}?${query}` : window.location.pathname);
+  }, [categoryFilter, platformFilter, q, sort, storeFilter, tab, urlReady]);
   // Initial load & refetch (tab/q/reload): async fn di dalam effect + guard
   // cancelled, tanpa setState sinkron di body effect (aturan
   // react-hooks/set-state-in-effect). Stale-while-revalidate seperti history.
@@ -110,15 +145,20 @@ export default function InventoryStockPage() {
         } else {
           const p = new URLSearchParams({ tab, limit: "50" });
           if (q) p.set("q", q);
+          if (categoryFilter !== "all") p.set("category", categoryFilter);
+          if (platformFilter !== "all") p.set("platform", platformFilter);
+          if (storeFilter !== "all") p.set("account", storeFilter);
           const data = await api<{
             rows: StockRow[];
             nextCursor: string | null;
             counts: Counts;
+            filters: typeof filterOptions;
           }>(`/api/inventory/stock?${p.toString()}`);
           if (cancelled) return;
           setRows(data.rows);
           setNextCursor(data.nextCursor);
           setCounts(data.counts);
+          setFilterOptions(data.filters);
           setError(null);
         }
       } catch (e) {
@@ -131,7 +171,7 @@ export default function InventoryStockPage() {
     return () => {
       cancelled = true;
     };
-  }, [tab, q, reloadKey]);
+  }, [tab, q, categoryFilter, platformFilter, storeFilter, reloadKey]);
 
   // Debounce search 300ms (paritas halaman marketplace) — Enter tetap instan.
   useEffect(() => {
@@ -149,6 +189,9 @@ export default function InventoryStockPage() {
     try {
       const p = new URLSearchParams({ tab, limit: "50", cursor: nextCursor });
       if (q) p.set("q", q);
+      if (categoryFilter !== "all") p.set("category", categoryFilter);
+      if (platformFilter !== "all") p.set("platform", platformFilter);
+      if (storeFilter !== "all") p.set("account", storeFilter);
       const data = await api<{ rows: StockRow[]; nextCursor: string | null }>(
         `/api/inventory/stock?${p.toString()}`
       );
@@ -453,6 +496,26 @@ export default function InventoryStockPage() {
   const badge = (id: TabId) =>
     id === "all" ? counts.all : id === "empty" ? counts.empty : id === "low" ? counts.low : counts.oversells;
 
+  const displayRows = useMemo(() => {
+    const sorted = [...rows];
+    sorted.sort((a, b) => {
+      if (sort === "stock_desc") return b.available - a.available;
+      if (sort === "stock_asc") return a.available - b.available;
+      return a.productName.localeCompare(b.productName) || a.sku.localeCompare(b.sku);
+    });
+    return sorted;
+  }, [rows, sort]);
+
+  const resetFilters = () => {
+    setQInput("");
+    setQ("");
+    setCategoryFilter("all");
+    setPlatformFilter("all");
+    setStoreFilter("all");
+    setSort("name_asc");
+    setTab("all");
+  };
+
   return (
     <div className="p-4 md:p-8 relative">
       {/* Toast Notification */}
@@ -504,6 +567,7 @@ export default function InventoryStockPage() {
       {tab !== "oversells" ? (
         <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           <div className="p-4 border-b border-border">
+            <div className="flex flex-wrap items-center gap-2">
             <div className="relative max-w-sm">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -515,6 +579,35 @@ export default function InventoryStockPage() {
                 placeholder="Cari SKU / nama varian / produk…"
                 className="w-full border border-border rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               />
+            </div>
+            <select aria-label="Filter kategori inventori" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+              <option value="all">Semua kategori</option>
+              {filterOptions.categories.map((category) => <option key={category}>{category}</option>)}
+            </select>
+            <select aria-label="Filter marketplace inventori" value={platformFilter} onChange={(event) => { setPlatformFilter(event.target.value); setStoreFilter("all"); }} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+              <option value="all">Semua marketplace</option>
+              <option value="SHOPEE">Shopee</option>
+              <option value="TIKTOK_SHOP">TikTok Shop</option>
+              <option value="TOKOPEDIA">Tokopedia</option>
+            </select>
+            <select aria-label="Filter toko inventori" value={storeFilter} onChange={(event) => setStoreFilter(event.target.value)} className="h-10 max-w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+              <option value="all">Semua toko</option>
+              {filterOptions.accounts.filter((account) => platformFilter === "all" || account.platform === platformFilter).map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
+            </select>
+            <select aria-label="Urutkan inventori" value={sort} onChange={(event) => setSort(event.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+              <option value="name_asc">Nama A-Z</option>
+              <option value="stock_asc">Stok tersedia terendah</option>
+              <option value="stock_desc">Stok tersedia tertinggi</option>
+            </select>
+            {(q || categoryFilter !== "all" || platformFilter !== "all" || storeFilter !== "all" || sort !== "name_asc" || tab !== "all") && (
+              <button type="button" onClick={resetFilters} className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-muted">Reset</button>
+            )}
+            <div className="flex basis-full flex-wrap gap-2" aria-label="Filter inventori aktif">
+              {q && <button onClick={() => { setQInput(""); setQ(""); }} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Cari: {q} ×</button>}
+              {categoryFilter !== "all" && <button onClick={() => setCategoryFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Kategori: {categoryFilter} ×</button>}
+              {platformFilter !== "all" && <button onClick={() => setPlatformFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Marketplace: {platformFilter} ×</button>}
+              {storeFilter !== "all" && <button onClick={() => setStoreFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs">Toko: {filterOptions.accounts.find((account) => account.id === storeFilter)?.label ?? storeFilter} ×</button>}
+            </div>
             </div>
             {selected.size > 0 && (
               <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-muted/40 p-3" role="region" aria-label="Aksi massal stok">
@@ -596,11 +689,11 @@ export default function InventoryStockPage() {
                       <input
                         type="checkbox"
                         aria-label="Pilih semua varian yang tampil"
-                        checked={rows.length > 0 && rows.every((row) => selected.has(row.variantId))}
+                        checked={displayRows.length > 0 && displayRows.every((row) => selected.has(row.variantId))}
                         onChange={(event) => {
                           setSelected((current) => {
                             const next = new Set(current);
-                            for (const row of rows) {
+                            for (const row of displayRows) {
                               if (event.target.checked) next.add(row.variantId);
                               else next.delete(row.variantId);
                             }
@@ -621,7 +714,7 @@ export default function InventoryStockPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {rows.map((r) => (
+                  {displayRows.map((r) => (
                     <tr key={r.variantId} data-testid={`inventory-row-${r.variantId}`} className="hover:bg-muted">
                       <td className="px-4 py-3">
                         <input

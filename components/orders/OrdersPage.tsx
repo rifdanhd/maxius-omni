@@ -323,6 +323,9 @@ function buildQueryParams(input: {
   sort: (typeof SORT_OPTIONS)[number];
   from: string;
   to: string;
+  platform: string;
+  account: string;
+  category: string;
 }) {
   const params = new URLSearchParams();
   params.set("page", String(input.page));
@@ -337,6 +340,9 @@ function buildQueryParams(input: {
   params.set("dir", input.sort.dir);
   if (input.from) params.set("from", input.from);
   if (input.to) params.set("to", input.to);
+  if (input.platform !== "all") params.set("platform", input.platform);
+  if (input.account !== "all") params.set("account", input.account);
+  if (input.category !== "all") params.set("category", input.category);
   return params.toString();
 }
 
@@ -385,6 +391,14 @@ export default function OrdersPage() {
   }, [sortOpen]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [platformFilter, setPlatformFilter] = useState("all");
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [filterOptions, setFilterOptions] = useState<{
+    accounts: Array<{ id: string; label: string; platform: string }>;
+    categories: string[];
+  }>({ accounts: [], categories: [] });
+  const [urlReady, setUrlReady] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
@@ -413,8 +427,49 @@ export default function OrdersPage() {
   const currentSubTabs = SUB_TABS[activeTab] ?? null;
   const currentSubTab = currentSubTabs?.find((s) => s.id === activeSubTab) ?? currentSubTabs?.[0] ?? null;
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab && TABS.some((item) => item.id === tab && item.id !== "returned")) setActiveTab(tab);
+      const subTab = params.get("subtab");
+      if (subTab) setActiveSubTab(subTab);
+      const initialQ = params.get("q") ?? "";
+      setQ(initialQ);
+      setSearchInput(initialQ);
+      setSearchType(SEARCH_TYPES.find((item) => item.id === params.get("searchType")) ?? SEARCH_TYPES[0]);
+      setSort(SORT_OPTIONS.find((item) => item.id === params.get("sort")) ?? SORT_OPTIONS[0]);
+      setFrom(params.get("from") ?? "");
+      setTo(params.get("to") ?? "");
+      setPlatformFilter(params.get("platform") ?? "all");
+      setAccountFilter(params.get("account") ?? "all");
+      setCategoryFilter(params.get("category") ?? "all");
+      setUrlReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!urlReady) return;
+    const params = new URLSearchParams();
+    if (activeTab !== "all") params.set("tab", activeTab);
+    if (activeSubTab !== "all") params.set("subtab", activeSubTab);
+    if (q.trim()) {
+      params.set("q", q.trim());
+      if (searchType.id !== "keyword") params.set("searchType", searchType.id);
+    }
+    if (sort.id !== "newest") params.set("sort", sort.id);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (platformFilter !== "all") params.set("platform", platformFilter);
+    if (accountFilter !== "all") params.set("account", accountFilter);
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    const query = params.toString();
+    window.history.replaceState(null, "", query ? `${window.location.pathname}?${query}` : window.location.pathname);
+  }, [accountFilter, activeSubTab, activeTab, categoryFilter, from, platformFilter, q, searchType.id, sort.id, to, urlReady]);
+
   const fetchOrders = useCallback(
-    async (opts: { page: number; tab: typeof currentTab; subTab: typeof currentSubTab; q: string; searchType: string; sort: typeof sort; from: string; to: string }) => {
+    async (opts: { page: number; tab: typeof currentTab; subTab: typeof currentSubTab; q: string; searchType: string; sort: typeof sort; from: string; to: string; platform: string; account: string; category: string }) => {
       // Gunakan statuses dari sub-tab jika ada & bukan tab 'all'; jika sub-tab memiliki statuses kosong, kembalikan kosong
       const effectiveTab = opts.subTab && opts.subTab.id !== "all"
         ? { id: opts.tab.id, label: opts.tab.label, statuses: opts.subTab.statuses }
@@ -436,12 +491,13 @@ export default function OrdersPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
+        const data = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to, platform: platformFilter, account: accountFilter, category: categoryFilter });
         if (cancelled) return;
         setOrders(data.orders ?? []);
         setTotal(data.total ?? 0);
         setPageCount(data.pageCount ?? 1);
         setCounts(data.counts ?? {});
+        setFilterOptions(data.filters ?? { accounts: [], categories: [] });
         setSelected(new Set());
       } catch (e) {
         console.error(e);
@@ -454,7 +510,7 @@ export default function OrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, currentTab, currentSubTab, q, searchType.id, sort, from, to, fetchOrders]);
+  }, [page, currentTab, currentSubTab, q, searchType.id, sort, from, to, platformFilter, accountFilter, categoryFilter, fetchOrders]);
 
   const handleTab = (id: string) => {
     if (id === "returned") { router.push("/orders/returns"); return; }
@@ -499,14 +555,17 @@ export default function OrdersPage() {
     setFrom("");
     setTo("");
     setSort(SORT_OPTIONS[0]);
+    setPlatformFilter("all");
+    setAccountFilter("all");
+    setCategoryFilter("all");
     setPage(1);
   };
 
-  const hasActiveFilters = q.trim() !== "" || from !== "" || to !== "" || sort.id !== "newest";
+  const hasActiveFilters = q.trim() !== "" || from !== "" || to !== "" || sort.id !== "newest" || platformFilter !== "all" || accountFilter !== "all" || categoryFilter !== "all";
 
   const refreshList = async () => {
     try {
-      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
+      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to, platform: platformFilter, account: accountFilter, category: categoryFilter });
       setOrders(refreshed.orders ?? []);
       setTotal(refreshed.total ?? total);
       setPageCount(refreshed.pageCount ?? pageCount);
@@ -636,7 +695,7 @@ export default function OrdersPage() {
         .join("\n");
       const failed = data.results?.some((result: { error?: string }) => result.error);
       notify(failed ? "error" : "success", failed ? "Sebagian resi belum diperbarui. Periksa koneksi toko, lalu coba lagi." : `Sinkron resi selesai. ${data.updated ?? 0} paket diperbarui.`, { details: detail });
-      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to });
+      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to, platform: platformFilter, account: accountFilter, category: categoryFilter });
       setOrders(refreshed.orders ?? []);
       setTotal(refreshed.total ?? 0);
       setPageCount(refreshed.pageCount ?? 1);
@@ -1029,6 +1088,42 @@ export default function OrdersPage() {
             </div>
           </div>
 
+          <select
+            aria-label="Filter marketplace pesanan"
+            value={platformFilter}
+            onChange={(event) => {
+              setPlatformFilter(event.target.value);
+              setAccountFilter("all");
+              setPage(1);
+            }}
+            className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">Semua marketplace</option>
+            <option value="SHOPEE">Shopee</option>
+            <option value="TIKTOK_SHOP">TikTok Shop</option>
+            <option value="TOKOPEDIA">Tokopedia</option>
+          </select>
+          <select
+            aria-label="Filter toko pesanan"
+            value={accountFilter}
+            onChange={(event) => { setAccountFilter(event.target.value); setPage(1); }}
+            className="h-10 max-w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">Semua toko</option>
+            {filterOptions.accounts
+              .filter((account) => platformFilter === "all" || account.platform === platformFilter)
+              .map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
+          </select>
+          <select
+            aria-label="Filter kategori pesanan"
+            value={categoryFilter}
+            onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }}
+            className="h-10 max-w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">Semua kategori</option>
+            {filterOptions.categories.map((category) => <option key={category}>{category}</option>)}
+          </select>
+
           <div className="relative" ref={sortRef}>
             <button
               onClick={() => setSortOpen((v) => !v)}
@@ -1087,6 +1182,14 @@ export default function OrdersPage() {
               <Filter size={16} /> Reset
             </Button>
           )}
+          <div className="flex basis-full flex-wrap gap-2" aria-label="Filter pesanan aktif">
+            {q && <button onClick={() => { setSearchInput(""); setQ(""); }} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Cari: {q} ×</button>}
+            {platformFilter !== "all" && <button onClick={() => setPlatformFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Marketplace: {platformFilter} ×</button>}
+            {accountFilter !== "all" && <button onClick={() => setAccountFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Toko: {filterOptions.accounts.find((account) => account.id === accountFilter)?.label ?? accountFilter} ×</button>}
+            {categoryFilter !== "all" && <button onClick={() => setCategoryFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Kategori: {categoryFilter} ×</button>}
+            {from && <button onClick={() => setFrom("")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Mulai: {from} ×</button>}
+            {to && <button onClick={() => setTo("")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Sampai: {to} ×</button>}
+          </div>
         </div>
 
         {/* Bulk Action & Pagination */}
