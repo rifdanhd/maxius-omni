@@ -17,10 +17,10 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
       // (get_discount_list) — keduanya menyimpan ke PromotionActivity.
       account: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, businessId: req.businessId },
     },
-    orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ sourceCreatedAt: "desc" }, { startsAt: "desc" }, { createdAt: "desc" }],
     take,
     include: {
-      account: { select: { id: true, label: true } },
+      account: { select: { id: true, label: true, platform: true } },
       items: {
         orderBy: { createdAt: "asc" },
         include: {
@@ -34,6 +34,9 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
 
   return NextResponse.json({
     ok: true,
+    source: "marketplace_api",
+    isExample: false,
+    supportedPlatforms: ["SHOPEE", "TIKTOK_SHOP"],
     activities: activities.map((activity) => ({
       ...activity,
       startsAt: activity.startsAt.toISOString(),

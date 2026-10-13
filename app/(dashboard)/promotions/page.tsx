@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ErrorFeedback } from "@/components/ui/feedback";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronDown, Info, Loader2, PackageOpen, Percent, Plus, RefreshCw, Search, Store, Tag } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronDown, Info, Loader2, PackageOpen, Percent, Plus, RefreshCw, Search, Store, Tag } from "lucide-react";
 import {
   classifyPromotionTab,
   countPromotionTabs,
@@ -44,7 +44,9 @@ type PromotionActivity = {
   sourceCreatedAt: string | null;
   sourceUpdatedAt: string | null;
   lastConfirmedAt: string | null;
-  account: { id: string; label: string };
+  createdAt: string;
+  updatedAt: string;
+  account: { id: string; label: string; platform: string };
   items: PromotionItem[];
 };
 
@@ -88,6 +90,12 @@ const TAB_LABEL: Record<PromotionTabId, string> = {
   aktif: "Aktif",
   upcoming: "Akan Datang",
   ended: "Telah Berakhir",
+};
+
+const PLATFORM_LABEL: Record<string, string> = {
+  SHOPEE: "Shopee",
+  TIKTOK_SHOP: "TikTok Shop",
+  TOKOPEDIA: "Tokopedia",
 };
 
 const fmtDateTime = (iso: string | null | undefined) => {
@@ -211,6 +219,9 @@ export default function PromotionsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
   const [accountFilter, setAccountFilter] = useState("ALL");
+  const [platformFilter, setPlatformFilter] = useState("ALL");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [tab, setTab] = useState<PromotionTabId>("aktif");
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -254,16 +265,23 @@ export default function PromotionsPage() {
 
   // Daftar unik toko dari data ter-load (read-only, filter sisi client).
   const accounts = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const a of activities) map.set(a.account.id, a.account.label);
-    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [activities]);
+    const map = new Map<string, { label: string; platform: string }>();
+    for (const a of activities) map.set(a.account.id, { label: a.account.label, platform: a.account.platform });
+    return Array.from(map.entries())
+      .map(([id, value]) => ({ id, ...value }))
+      .filter((account) => platformFilter === "ALL" || account.platform === platformFilter);
+  }, [activities, platformFilter]);
 
   // Search juga menyentuh produk/SKU di dalam activity.
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return activities.filter((a) => {
+      if (platformFilter !== "ALL" && a.account.platform !== platformFilter) return false;
       if (accountFilter !== "ALL" && a.account.id !== accountFilter) return false;
+      const startsAt = new Date(a.startsAt).getTime();
+      const endsAt = new Date(a.endsAt).getTime();
+      if (dateFrom && endsAt < new Date(`${dateFrom}T00:00:00`).getTime()) return false;
+      if (dateTo && startsAt > new Date(`${dateTo}T23:59:59.999`).getTime()) return false;
       if (!needle) return true;
       const itemText = a.items
         .map(
@@ -275,13 +293,19 @@ export default function PromotionsPage() {
       const haystack = `${a.title} ${a.externalActivityId} ${a.activityType} ${itemText}`.toLowerCase();
       return haystack.includes(needle);
     });
-  }, [activities, q, accountFilter]);
+  }, [activities, q, accountFilter, dateFrom, dateTo, platformFilter]);
 
   // Badge jumlah per tab dihitung dari hasil filter search/toko.
   const counts = useMemo(() => countPromotionTabs(filtered, now), [filtered, now]);
 
   const rows = useMemo(
-    () => filtered.filter((a) => classifyPromotionTab(a, now) === tab),
+    () => filtered
+      .filter((a) => classifyPromotionTab(a, now) === tab)
+      .sort((a, b) => {
+        const aTime = new Date(a.sourceCreatedAt ?? a.startsAt ?? a.createdAt).getTime();
+        const bTime = new Date(b.sourceCreatedAt ?? b.startsAt ?? b.createdAt).getTime();
+        return bTime - aTime;
+      }),
     [filtered, tab, now]
   );
 
@@ -333,7 +357,16 @@ export default function PromotionsPage() {
     });
   }
 
-  const filterActive = q.trim() !== "" || accountFilter !== "ALL";
+  const filterActive = q.trim() !== "" || accountFilter !== "ALL" || platformFilter !== "ALL" || dateFrom !== "" || dateTo !== "";
+
+  function resetFilters() {
+    setSearchInput("");
+    setQ("");
+    setAccountFilter("ALL");
+    setPlatformFilter("ALL");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   return (
     <div className="p-4 md:p-8">
@@ -352,6 +385,9 @@ export default function PromotionsPage() {
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground uppercase tracking-wider">
             Marketplace › Promosi
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Data API Shopee dan TikTok Shop. Integrasi promosi Tokopedia masih menunggu akses API.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -420,9 +456,9 @@ export default function PromotionsPage() {
       )}
 
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        {/* Toolbar: search + dropdown toko + reset filter — satu baris */}
+        {/* Toolbar filter lintas marketplace. */}
         <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
-          <div className="relative w-80">
+          <div className="relative w-full sm:w-80">
             <input
               type="text"
               value={searchInput}
@@ -432,6 +468,21 @@ export default function PromotionsPage() {
             />
             <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />
           </div>
+
+          <select
+            aria-label="Filter marketplace promosi"
+            value={platformFilter}
+            onChange={(e) => {
+              setPlatformFilter(e.target.value);
+              setAccountFilter("ALL");
+            }}
+            className="h-[38px] rounded-md border border-border bg-card px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="ALL">Semua Marketplace</option>
+            <option value="SHOPEE">Shopee</option>
+            <option value="TIKTOK_SHOP">TikTok Shop</option>
+            <option value="TOKOPEDIA" disabled>Tokopedia (belum tersedia)</option>
+          </select>
 
           <div className="relative">
             <Store size={14} className="text-muted-foreground absolute left-3 top-3 pointer-events-none" />
@@ -449,12 +500,30 @@ export default function PromotionsPage() {
             </select>
           </div>
 
+          <label className="relative flex items-center gap-2 text-xs text-muted-foreground">
+            <CalendarDays size={14} aria-hidden="true" />
+            <span className="sr-only">Tanggal mulai promosi</span>
+            <input
+              type="date"
+              aria-label="Tanggal mulai promosi"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              className="h-[38px] rounded-md border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </label>
+          <span className="text-xs text-muted-foreground">sampai</span>
+          <input
+            type="date"
+            aria-label="Tanggal akhir promosi"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(event) => setDateTo(event.target.value)}
+            className="h-[38px] rounded-md border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+
           {filterActive && (
             <button
-              onClick={() => {
-                setSearchInput("");
-                setAccountFilter("ALL");
-              }}
+              onClick={resetFilters}
               className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground h-[38px] hover:bg-muted"
             >
               Reset Filter
@@ -509,12 +578,7 @@ export default function PromotionsPage() {
               Belum ada promo aktif dari marketplace
             </h2>
             <p className="max-w-md text-sm text-muted-foreground">
-              Data promosi muncul otomatis — ingest berjalan tiap 30 menit (TikTok &
-amp; Shopee). Untuk tarik sekarang, jalankan{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
-                scripts/run-promotion-ingest.mts
-              </code>
-              .
+              Data promosi Shopee dan TikTok Shop akan muncul setelah toko terhubung dan sinkronisasi promosi berjalan.
             </p>
           </div>
         ) : rows.length === 0 ? (
@@ -631,6 +695,9 @@ amp; Shopee). Untuk tarik sekarang, jalankan{" "}
                               title={activity.account.label}
                             >
                               {activity.account.label}
+                            </span>
+                            <span className="mt-1 inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              {PLATFORM_LABEL[activity.account.platform] ?? activity.account.platform}
                             </span>
                           </td>
 
