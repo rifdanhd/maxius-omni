@@ -632,10 +632,22 @@ export async function downloadShippingDocument(
   packageNumber?: string,
   creds?: ShopeeCreds
 ): Promise<Uint8Array> {
-  const r = await postShopApi("/api/v2/logistics/download_shipping_document", accessToken, shopId, {
-    order_list: [{ order_sn: orderSn, ...(packageNumber ? { package_number: packageNumber } : {}) }],
-  }, creds);
-  const candidate = r.file ?? r.file_content ?? r.document ?? r.data;
+  const c = creds ?? envShopeeCreds();
+  const apiPath = "/api/v2/logistics/download_shipping_document";
+  const timestamp = Math.floor(Date.now() / 1000);
+  const sign = signShopApi(apiPath, timestamp, accessToken, shopId, c);
+  const qs = new URLSearchParams({ partner_id: c.partnerId, timestamp: String(timestamp), access_token: accessToken, shop_id: String(shopId), sign });
+  const res = await fetch(`${SHOPEE_API_BASE}${apiPath}?${qs}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ order_list: [{ order_sn: orderSn, ...(packageNumber ? { package_number: packageNumber } : {}) }] }),
+  });
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (!res.ok) throw new ShopeeApiError(`http_${res.status}`, `HTTP ${res.status} saat mengunduh dokumen.`, res.headers.get("x-request-id") ?? "-");
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return bytes;
+  const raw = Buffer.from(bytes).toString("utf8");
+  const data = parseShopeeEnvelope(res.status, raw, apiPath);
+  const candidate = data.response?.file ?? data.response?.file_content ?? data.response?.document ?? data.response?.data;
   if (typeof candidate !== "string") throw new Error("Shopee tidak mengembalikan berkas resi.");
   return Buffer.from(candidate, "base64");
 }
