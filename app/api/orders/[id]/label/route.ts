@@ -47,11 +47,12 @@ export const GET = withAuth(
     // frontend membedakan "belum siap" vs "tidak berlaku", lalu fallback cetak lokal.
     if (order.account.platform === "SHOPEE") {
       const account = await loadShopeeAccount(order.accountId);
-      const packageNumber = order.shipments.find((s) => s.externalId)?.externalId ?? undefined;
+      const shipment = order.shipments.find((s) => s.externalId);
+      const packageNumber = shipment?.externalId ?? undefined;
       if (!account || !packageNumber) return NextResponse.json({ error: "Belum ada nomor paket Shopee untuk dicetak." }, { status: 404 });
       try {
         const pdf = await withRefreshedToken(account, async (token, shopId, creds) => {
-          const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, shipping_document_type: "NORMAL_AIR_WAYBILL" }, creds);
+          const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, tracking_number: shipment?.trackingNo ?? undefined, shipping_document_type: "NORMAL_AIR_WAYBILL" }, creds);
           for (let attempt = 0; attempt < 8; attempt += 1) {
             const result = await getShippingDocumentResult(token, shopId, order.orderNo, packageNumber, creds);
             const entry = Array.isArray(result.result_list) ? result.result_list[0] as Record<string, unknown> : result;
