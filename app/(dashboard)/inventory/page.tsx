@@ -717,7 +717,7 @@ export default function InventoryStockPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {displayRows.map((r) => (
+                  {displayRows.map((r, rowIndex) => (
                     <tr key={r.variantId} data-testid={`inventory-row-${r.variantId}`} className="hover:bg-muted">
                       <td className="px-4 py-3">
                         <input
@@ -737,7 +737,7 @@ export default function InventoryStockPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-start gap-3">
-                          {r.imageUrl ? (
+                          {r.imageUrl && (rowIndex === 0 || displayRows[rowIndex - 1]?.productId !== r.productId) ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={r.imageUrl} alt="" className="w-10 h-10 rounded object-cover bg-muted shrink-0" />
                           ) : (
@@ -746,9 +746,9 @@ export default function InventoryStockPage() {
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-foreground leading-tight">{r.productName}</p>
+                            {(rowIndex === 0 || displayRows[rowIndex - 1]?.productId !== r.productId) && <p className="font-semibold text-foreground leading-tight">{r.productName}</p>}
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {r.variantName ?? r.sku} · <span className="font-mono">{r.sku}</span>
+                              <span className="font-medium">Varian:</span> {r.variantName ?? "Belum diberi nama"} · <span className="font-mono">{r.sku}</span>
                             </p>
                           </div>
                         </div>
