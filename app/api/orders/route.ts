@@ -61,6 +61,14 @@ export const GET = withAuth(async (req) => {
     if (searchType === "orderNo") {
       // Cari hanya berdasarkan No. Pesanan
       whereSearch = { orderNo: { contains: q } };
+    } else if (searchType === "sku") {
+      whereSearch = {
+        OR: [
+          { items: { some: { channelSku: { contains: q } } } },
+          { items: { some: { skuName: { contains: q } } } },
+          { items: { some: { variant: { sku: { contains: q } } } } },
+        ],
+      };
     } else if (searchType === "product") {
       // Cari di nama produk / variasi pada item order
       whereSearch = {

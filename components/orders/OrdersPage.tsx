@@ -352,6 +352,7 @@ function buildQueryParams(input: {
 const SEARCH_TYPES = [
   { id: "keyword", label: "Keyword Pesanan", placeholder: "Cari nomor pesanan, produk, pembeli, resi" },
   { id: "orderNo", label: "No. Pesanan", placeholder: "Cari nomor pesanan" },
+  { id: "sku", label: "SKU", placeholder: "Cari SKU produk" },
   { id: "product", label: "Produk Master", placeholder: "Cari nama produk" },
   { id: "tracking", label: "Nomor Resi", placeholder: "Cari nomor resi" },
 ];
