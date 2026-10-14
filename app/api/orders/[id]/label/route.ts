@@ -4,7 +4,7 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
-import { createShippingDocument, downloadShippingDocument, getShippingDocumentResult } from "@/lib/integrations/shopee";
+import { createShippingDocument, downloadShippingDocument, getShippingDocumentParameter, getShippingDocumentResult } from "@/lib/integrations/shopee";
 import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
 import { downloadValidatedPdf } from "@/lib/security/validate-upload";
 
@@ -52,7 +52,9 @@ export const GET = withAuth(
       if (!account || !packageNumber) return NextResponse.json({ error: "Belum ada nomor paket Shopee untuk dicetak." }, { status: 404 });
       try {
         const pdf = await withRefreshedToken(account, async (token, shopId, creds) => {
-          const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, tracking_number: shipment?.trackingNo ?? undefined, shipping_document_type: "NORMAL_AIR_WAYBILL" }, creds);
+          const parameter = await getShippingDocumentParameter(token, shopId, order.orderNo, packageNumber, creds);
+          const suggestedType = String(parameter.suggest_shipping_document_type ?? "").trim();
+          const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, tracking_number: shipment?.trackingNo ?? undefined, ...(suggestedType ? { shipping_document_type: suggestedType } : {}) }, creds);
           for (let attempt = 0; attempt < 20; attempt += 1) {
             const result = await getShippingDocumentResult(token, shopId, order.orderNo, packageNumber, creds);
             const entry = Array.isArray(result.result_list) ? result.result_list[0] as Record<string, unknown> : result;

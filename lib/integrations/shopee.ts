@@ -576,6 +576,21 @@ export async function createShippingDocument(
   return response;
 }
 
+export async function getShippingDocumentParameter(
+  accessToken: string,
+  shopId: string | number,
+  orderSn: string,
+  packageNumber?: string,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  const response = await postShopApi("/api/v2/logistics/get_shipping_document_parameter", accessToken, shopId, {
+    order_list: [{ order_sn: orderSn, ...(packageNumber ? { package_number: packageNumber } : {}) }],
+  }, creds);
+  const entry = Array.isArray(response.result_list) ? response.result_list[0] as Record<string, unknown> | undefined : undefined;
+  if (entry?.fail_message || entry?.fail_error) throw new Error(`Shopee tidak menyediakan parameter resi: ${String(entry.fail_message ?? entry.fail_error)}`);
+  return entry ?? response;
+}
+
 export async function getShippingDocumentResult(
   accessToken: string,
   shopId: string | number,
