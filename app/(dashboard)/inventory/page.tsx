@@ -523,14 +523,14 @@ export default function InventoryStockPage() {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-foreground">Stok Gudang (Pusat)</h1>
+            <h1 className="text-xl font-bold text-foreground">Atur Stok Gudang</h1>
             <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">Sumber utama</span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Atur stok gudang per varian di halaman ini. Perubahan dari sini yang dikirim ke Shopee, TikTok Shop, dan marketplace lain.
+            Cari varian, lalu ubah angka langsung di kolomnya. Perubahan dari sini akan dikirim ke Shopee, TikTok Shop, dan marketplace lain.
           </p>
           <p className="text-xs text-muted-foreground mt-1" title="effectiveStock() = max(0, Fisik − Cadangan)">
-            Alur stok: <b>Fisik − Cadangan = Tersedia</b>. Halaman marketplace hanya menampilkan hasil sinkronisasi; periksa kegagalan pengiriman di Stok Mismatch.
+            Cara menghitung: <b>Di Gudang − Disisihkan = Bisa Dijual</b>. Marketplace hanya menampilkan hasil sinkronisasi.
           </p>
         </div>
         <button
@@ -707,13 +707,13 @@ export default function InventoryStockPage() {
                       />
                     </th>
                     <th className="px-4 py-3 font-semibold">Produk / Varian</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Stok fisik yang dicatat di gudang. Ketik angka baru lalu tekan Enter atau tombol centang.">Fisik</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Stok yang disisihkan dan tidak ditawarkan ke toko.">Cadangan</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Jumlah barang nyata di gudang. Klik angka untuk mengubah.">Di Gudang</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Jumlah yang disisihkan dan tidak dijual di marketplace.">Disisihkan</th>
                     <th className="px-4 py-3 font-semibold text-right" title="Info saja: jumlah activity promosi AKTIF yang mencakup varian.">Promosi</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Qty order aktif yang BELUM memotong stok — demand yang akan datang">Pesanan</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Target stok jual: fisik dikurangi cadangan, minimal 0.">Tersedia</th>
-                    <th className="px-4 py-3 font-semibold text-right" title="Batas minimum per varian. Kosong = ikut threshold produk induk">Batas Min</th>
-                    <th className="px-4 py-3 font-semibold">Aksi stok</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Jumlah pesanan aktif yang menunggu diproses.">Menunggu Diproses</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Di Gudang dikurangi Disisihkan.">Bisa Dijual</th>
+                    <th className="px-4 py-3 font-semibold text-right" title="Peringatan stok menipis muncul saat jumlah mencapai angka ini.">Peringatan Jika ≤</th>
+                    <th className="px-4 py-3 font-semibold">Tambah / Kurangi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
