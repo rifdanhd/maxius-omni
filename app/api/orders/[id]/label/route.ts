@@ -65,7 +65,7 @@ export const GET = withAuth(
         await prisma.piiAccessLog.create({ data: { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, orderId: order.id, action: "READ_SHIPPING_LABEL" } });
         return NextResponse.json({ docUrl: null, pdfBase64: Buffer.from(pdf).toString("base64"), trackingNumber: order.shipments[0]?.trackingNo ?? null, packageId: packageNumber, status: order.shipments[0]?.status ?? null });
       } catch (error) {
-        return NextResponse.json({ error: error instanceof Error ? error.message : "Resi Shopee belum tersedia." }, { status: 502 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Resi Shopee belum tersedia." }, { status: 422 });
       }
     }
     if (order.account.platform !== "TIKTOK_SHOP") {
