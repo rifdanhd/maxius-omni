@@ -490,9 +490,12 @@ export default function MasterProductsPage() {
         {/* Header Title */}
         <div className="px-4 sm:px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold text-foreground">Produk Master</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-foreground">Katalog Pusat (Produk Master)</h1>
+              <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">Data produk utama</span>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-              Katalog pusat untuk melihat produk, variasi, stok, dan toko yang terhubung; mulai dengan mencari produk dan membuka Lihat varian, atau tambahkan produk dari TikTok Shop maupun Product Copy jika katalog masih kosong.
+              Kelola nama produk, SKU, varian, dan hubungan toko dari satu katalog. Stok di sini adalah stok pusat yang sama dengan <a className="font-semibold underline" href="/inventory">Stok Gudang</a>; gunakan Stok Gudang untuk riwayat, stok masuk/keluar, cadangan, dan edit massal.
             </p>
           </div>
 
@@ -770,9 +773,9 @@ export default function MasterProductsPage() {
                 <th className="px-5 py-3">Informasi Produk</th>
                 <th className="px-5 py-3">Kode Produk Pusat (Master SKU)</th>
                 <th className="px-5 py-3">Rentang Harga (Range Harga)</th>
-                <th className="px-5 py-3">Stok</th>
-                <th className="px-5 py-3">Produk Terkait</th>
-                <th className="px-5 py-3">Toko Terkait</th>
+                <th className="px-5 py-3">Stok Pusat</th>
+                <th className="px-5 py-3">Mapping Marketplace</th>
+                <th className="px-5 py-3">Toko Terhubung</th>
                 <th className="px-5 py-3">Waktu Dibuat / Diperbarui</th>
                 <th className="px-5 py-3">Atur</th>
               </tr>
