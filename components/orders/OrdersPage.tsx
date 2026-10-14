@@ -230,12 +230,15 @@ async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
  */
 async function fetchOfficialLabel(
   id: string
-): Promise<{ docUrl: string; pdfBase64?: string; trackingNumber: string | null } | null> {
+): Promise<{ docUrl: string; pdfBase64?: string; trackingNumber: string | null; error?: string } | null> {
   try {
     const res = await authFetch(`/api/orders/${id}/label`, {
       headers: { },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      return { docUrl: "", trackingNumber: null, error: body?.error ?? `Gagal mengambil resi (${res.status})` };
+    }
     const data = await res.json();
     return data?.pdfBase64
       ? {
@@ -243,10 +246,10 @@ async function fetchOfficialLabel(
           pdfBase64: data.pdfBase64 ?? undefined,
           trackingNumber: data.trackingNumber ?? null,
         }
-      : null;
+      : { docUrl: "", trackingNumber: null, error: "Marketplace belum mengembalikan dokumen resi." };
   } catch (e) {
     console.error(e);
-    return null;
+    return { docUrl: "", trackingNumber: null, error: "Koneksi ke marketplace gagal. Coba lagi." };
   }
 }
 
@@ -823,7 +826,7 @@ export default function OrdersPage() {
           printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
           return;
         }
-        notify("warning", "Label resmi TikTok belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
+        notify(official?.error ? "error" : "warning", official?.error ?? "Resi resmi belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
         return;
       }
       const detail = await fetchOrderDetail(order.id);
