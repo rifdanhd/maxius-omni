@@ -290,6 +290,17 @@ export default function OrderCard({
               </button>
             ) : null}
 
+            {order.status === "AWAITING_SHIPMENT" ? (
+              <button
+                type="button"
+                onClick={() => onPrint("Label")}
+                disabled={shipping}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 border border-border bg-card rounded-md text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                <Printer size={14} /> Cetak Resi
+              </button>
+            ) : null}
+
             <button
               type="button"
               onClick={handleOpenTracking}
