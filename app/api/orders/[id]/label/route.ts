@@ -53,13 +53,13 @@ export const GET = withAuth(
       try {
         const pdf = await withRefreshedToken(account, async (token, shopId, creds) => {
           const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, tracking_number: shipment?.trackingNo ?? undefined, shipping_document_type: "NORMAL_AIR_WAYBILL" }, creds);
-          for (let attempt = 0; attempt < 8; attempt += 1) {
+          for (let attempt = 0; attempt < 20; attempt += 1) {
             const result = await getShippingDocumentResult(token, shopId, order.orderNo, packageNumber, creds);
             const entry = Array.isArray(result.result_list) ? result.result_list[0] as Record<string, unknown> : result;
             const status = String(entry.status ?? entry.document_status ?? "").toUpperCase();
             if (["READY", "SUCCESS", "COMPLETED"].includes(status)) return downloadShippingDocument(token, shopId, order.orderNo, packageNumber, creds);
             if (["FAILED", "ERROR"].includes(status)) throw new Error("Shopee belum dapat membuat dokumen resi untuk paket ini.");
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
           throw new Error("Pembuatan dokumen resi Shopee masih diproses. Coba lagi beberapa saat.");
         });
