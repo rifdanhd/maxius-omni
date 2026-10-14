@@ -253,7 +253,7 @@ export default function OrderCard({
                prefixIcon={<Printer size={14} />}
                placement="top-left"
                items={[
-                  { id: "Label", label: platform === "TIKTOK_SHOP" ? "Cetak Resi TikTok" : "Cetak Label Lokal", description: platform === "TIKTOK_SHOP" ? "Dokumen asli dari TikTok Shop" : "Dibuat oleh Maxius; gunakan Seller Center untuk resi resmi" },
+                  { id: "Label", label: platform === "TIKTOK_SHOP" ? "Cetak Resi TikTok" : platform === "SHOPEE" ? "Cetak Resi Shopee" : "Cetak Label Lokal", description: platform === "TIKTOK_SHOP" ? "Dokumen asli dari TikTok Shop" : platform === "SHOPEE" ? "Dokumen resmi dari Shopee" : "Dibuat oleh Maxius; gunakan Seller Center untuk resi resmi" },
                   { id: "Invoice", label: "Cetak Invoice", description: "Ringkasan transaksi dibuat oleh Maxius" },
                   { id: "PackingList", label: "Daftar Isi Paket (Packing List)", description: "Daftar barang untuk gudang" },
                ]}

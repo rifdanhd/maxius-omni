@@ -551,6 +551,65 @@ export async function getTrackingNumber(
   };
 }
 
+export type ShopeeShippingDocumentRequest = {
+  order_sn: string;
+  package_number?: string;
+  tracking_number?: string;
+  shipping_document_type?: string;
+};
+
+export async function createShippingDocument(
+  accessToken: string,
+  shopId: string | number,
+  request: ShopeeShippingDocumentRequest,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  return postShopApi("/api/v2/logistics/create_shipping_document", accessToken, shopId, {
+    order_list: [request],
+  }, creds);
+}
+
+export async function getShippingDocumentResult(
+  accessToken: string,
+  shopId: string | number,
+  orderSn: string,
+  packageNumber?: string,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  return getShopApi("/api/v2/logistics/get_shipping_document_result", accessToken, shopId, creds, {
+    order_sn: orderSn,
+    ...(packageNumber ? { package_number: packageNumber } : {}),
+  });
+}
+
+export async function getShippingDocumentDataInfo(
+  accessToken: string,
+  shopId: string | number,
+  orderSn: string,
+  packageNumber?: string,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  return getShopApi("/api/v2/logistics/get_shipping_document_data_info", accessToken, shopId, creds, {
+    order_sn: orderSn,
+    ...(packageNumber ? { package_number: packageNumber } : {}),
+  });
+}
+
+export async function downloadShippingDocument(
+  accessToken: string,
+  shopId: string | number,
+  orderSn: string,
+  packageNumber?: string,
+  creds?: ShopeeCreds
+): Promise<Uint8Array> {
+  const r = await postShopApi("/api/v2/logistics/download_shipping_document", accessToken, shopId, {
+    order_list: [{ order_sn: orderSn, ...(packageNumber ? { package_number: packageNumber } : {}) }],
+  }, creds);
+  const candidate = r.file ?? r.file_content ?? r.document ?? r.data;
+  if (typeof candidate !== "string") throw new Error("Shopee tidak mengembalikan berkas resi.");
+  return Buffer.from(candidate, "base64");
+}
+
 export async function getItemList(
   accessToken: string,
   shopId: string | number,

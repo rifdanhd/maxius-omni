@@ -810,7 +810,7 @@ export default function OrdersPage() {
   const printOrder = async (order: Order, type: PrintType) => {
     if (type === "Label") {
       // Utamakan label RESMI TikTok ASLI (sudah ditambahkan tabel varian langsung di PDF resmi)
-      if (order.account?.platform === "TIKTOK_SHOP") {
+      if (order.account?.platform === "TIKTOK_SHOP" || order.account?.platform === "SHOPEE") {
         const official = await fetchOfficialLabel(order.id);
         if (official?.pdfBase64) {
           printPdfWindow(

@@ -4,6 +4,8 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
+import { createShippingDocument, downloadShippingDocument, getShippingDocumentResult } from "@/lib/integrations/shopee";
+import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
 import { downloadValidatedPdf } from "@/lib/security/validate-upload";
 
 /**
@@ -43,6 +45,29 @@ export const GET = withAuth(
 
     // Guard platform: label resmi hanya TikTok — response 400 (bukan 404) agar
     // frontend membedakan "belum siap" vs "tidak berlaku", lalu fallback cetak lokal.
+    if (order.account.platform === "SHOPEE") {
+      const account = await loadShopeeAccount(order.accountId);
+      const packageNumber = order.shipments.find((s) => s.externalId)?.externalId ?? undefined;
+      if (!account || !packageNumber) return NextResponse.json({ error: "Belum ada nomor paket Shopee untuk dicetak." }, { status: 404 });
+      try {
+        const pdf = await withRefreshedToken(account, async (token, shopId, creds) => {
+          await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, shipping_document_type: "NORMAL_AIR_WAYBILL" }, creds);
+          for (let attempt = 0; attempt < 8; attempt += 1) {
+            const result = await getShippingDocumentResult(token, shopId, order.orderNo, packageNumber, creds);
+            const status = String(result.status ?? result.document_status ?? result.result ?? "").toUpperCase();
+            if (["READY", "SUCCESS", "COMPLETED"].includes(status) || result.file) return downloadShippingDocument(token, shopId, order.orderNo, packageNumber, creds);
+            if (["FAILED", "ERROR"].includes(status)) throw new Error("Shopee belum dapat membuat dokumen resi untuk paket ini.");
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          throw new Error("Pembuatan dokumen resi Shopee masih diproses. Coba lagi beberapa saat.");
+        });
+        if (pdf[0] !== 0x25 || pdf[1] !== 0x50 || pdf[2] !== 0x44 || pdf[3] !== 0x46) throw new Error("Format dokumen Shopee tidak valid.");
+        await prisma.piiAccessLog.create({ data: { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, orderId: order.id, action: "READ_SHIPPING_LABEL" } });
+        return NextResponse.json({ docUrl: null, pdfBase64: Buffer.from(pdf).toString("base64"), trackingNumber: order.shipments[0]?.trackingNo ?? null, packageId: packageNumber, status: order.shipments[0]?.status ?? null });
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Resi Shopee belum tersedia." }, { status: 502 });
+      }
+    }
     if (order.account.platform !== "TIKTOK_SHOP") {
       return unsupportedPlatform(order.account.platform);
     }
