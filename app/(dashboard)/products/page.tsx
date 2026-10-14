@@ -1,7 +1,6 @@
 "use client";
 
-import { ErrorFeedback, Feedback, FormError } from "@/components/ui/feedback";
-import { InlineStockInput } from "@/components/inventory/inline-stock-input";
+import { ErrorFeedback, FormError } from "@/components/ui/feedback";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { notify } from "@/components/ui/notify";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
@@ -121,11 +120,6 @@ export default function MasterProductsPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [confirmProduct, setConfirmProduct] = useState<Product | null>(null);
   const [togglingActive, setTogglingActive] = useState(false);
-  const [stockMessage, setStockMessage] = useState<string | null>(null);
-  const [stockError, setStockError] = useState<string | null>(null);
-  const [variantSaveState, setVariantSaveState] = useState<
-    Record<string, { status: "processing" | "success" | "failed"; message: string }>
-  >({});
 
 
 
@@ -204,78 +198,6 @@ export default function MasterProductsPage() {
     const data = await res.json();
     setProducts(data.products ?? []);
     setError(null);
-  }
-
-  async function saveVariantStock(
-    productId: string,
-    variant: Variant,
-    field: "stock" | "safetyStock",
-    value: number
-  ) {
-    setStockError(null);
-    setStockMessage(null);
-    setVariantSaveState((current) => ({
-      ...current,
-      [variant.id]: { status: "processing", message: "Menyimpan perubahan…" },
-    }));
-    try {
-      const path =
-        field === "stock"
-          ? `/api/inventory/variants/${variant.id}/adjust`
-          : `/api/inventory/variant/${variant.id}`;
-      const body =
-        field === "stock"
-          ? { newStock: value, note: "Diatur dari Katalog Pusat." }
-          : { safetyStock: value };
-      const response = await authFetch(path, {
-        method: field === "stock" ? "POST" : "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        stockAfter?: number;
-        safetyStock?: number;
-      };
-      if (!response.ok) throw new Error(data.error ?? "Stok belum berhasil disimpan.");
-
-      setProducts((current) =>
-        current.map((product) =>
-          product.id === productId
-            ? {
-                ...product,
-                variants: product.variants.map((item) =>
-                  item.id === variant.id
-                    ? {
-                        ...item,
-                        stock: field === "stock" ? (data.stockAfter ?? value) : item.stock,
-                        safetyStock:
-                          field === "safetyStock" ? (data.safetyStock ?? value) : item.safetyStock,
-                      }
-                    : item
-                ),
-              }
-            : product
-        )
-      );
-      setVariantSaveState((current) => ({
-        ...current,
-        [variant.id]: {
-          status: "success",
-          message: "Stok tersimpan; sinkronisasi marketplace diproses.",
-        },
-      }));
-      setStockMessage(`Stok ${variant.sku} berhasil disimpan.`);
-      return true;
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Stok belum berhasil disimpan.";
-      setStockError(message);
-      setVariantSaveState((current) => ({
-        ...current,
-        [variant.id]: { status: "failed", message },
-      }));
-      return false;
-    }
   }
 
   async function setProductActive(product: Product, active: boolean) {
@@ -484,8 +406,6 @@ export default function MasterProductsPage() {
 
   return (
     <div className="p-4 md:p-8">
-      {stockError && <ErrorFeedback error={stockError} title="Stok belum berhasil disimpan" className="mb-4" />}
-      {stockMessage && <Feedback variant="success" title="Stok tersimpan" description={stockMessage} className="mb-4" />}
       <div className="bg-card border border-border rounded-xl shadow-sm">
         {/* Header Title */}
         <div className="px-4 sm:px-6 py-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
@@ -917,19 +837,11 @@ export default function MasterProductsPage() {
                             <div className="grid min-w-[12rem] gap-2">
                               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <span>Fisik</span>
-                                <InlineStockInput
-                                  value={product.variants[0].stock}
-                                  label={`Stok fisik daftar ${product.variants[0].sku}`}
-                                  onSave={(value) => saveVariantStock(product.id, product.variants[0], "stock", value)}
-                                />
+                                <span className="font-semibold text-foreground">{product.variants[0].stock.toLocaleString("id-ID")}</span>
                               </div>
                               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <span>Cadangan</span>
-                                <InlineStockInput
-                                  value={product.variants[0].safetyStock}
-                                  label={`Stok cadangan daftar ${product.variants[0].sku}`}
-                                  onSave={(value) => saveVariantStock(product.id, product.variants[0], "safetyStock", value)}
-                                />
+                                <span className="font-semibold text-foreground">{product.variants[0].safetyStock.toLocaleString("id-ID")}</span>
                               </div>
                               <p className="text-xs font-semibold text-foreground">
                                 Tersedia {effectiveStock(product.variants[0].stock, product.variants[0].safetyStock)}
@@ -1098,18 +1010,10 @@ export default function MasterProductsPage() {
                                           -
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
-                                          <InlineStockInput
-                                            value={v.stock}
-                                            label={`Stok fisik detail ${v.sku}`}
-                                            onSave={(value) => saveVariantStock(product.id, v, "stock", value)}
-                                          />
+                                          <span>{v.stock.toLocaleString("id-ID")}</span>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
-                                          <InlineStockInput
-                                            value={v.safetyStock}
-                                            label={`Stok cadangan detail ${v.sku}`}
-                                            onSave={(value) => saveVariantStock(product.id, v, "safetyStock", value)}
-                                          />
+                                          <span>{v.safetyStock.toLocaleString("id-ID")}</span>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
                                           <div className="text-foreground font-semibold">{effectiveStock(v.stock, v.safetyStock)}</div>
@@ -1118,19 +1022,7 @@ export default function MasterProductsPage() {
                                           )}
                                         </td>
                                         <td className="px-4 py-2.5">
-                                          {variantSaveState[v.id] ? (
-                                            <div className="max-w-48">
-                                              <StatusBadge
-                                                status={variantSaveState[v.id].status}
-                                                label={variantSaveState[v.id].status === "success" ? "Tersimpan" : undefined}
-                                              />
-                                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                                {variantSaveState[v.id].message}
-                                              </p>
-                                            </div>
-                                          ) : (
-                                            <span className="text-xs text-muted-foreground">Belum diubah</span>
-                                          )}
+                                          <a href="/inventory" className="text-xs font-semibold underline">Kelola di Stok Varian</a>
                                         </td>
                                         <td className="px-4 py-2.5">
                                           <a
