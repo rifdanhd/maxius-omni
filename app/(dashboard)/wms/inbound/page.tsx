@@ -7,7 +7,7 @@ export default function PlaceholderPage() {
           <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
         </svg>
       </div>
-      <h1 className="mb-2 text-2xl font-bold text-foreground">Halaman Wms / Inbound</h1>
+      <h1 className="mb-2 text-2xl font-bold text-foreground">Barang Masuk</h1>
       <p className="max-w-md text-muted-foreground">
         Halaman ini masih dalam tahap pengembangan dan akan segera hadir pada update berikutnya.
       </p>
