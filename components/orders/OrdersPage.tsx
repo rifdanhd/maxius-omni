@@ -28,14 +28,14 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 const PAGE_SIZES = [20, 50, 100, 250, 500, 1000];
 
 const TABS: { id: string; label: string; statuses: string[] | null }[] = [
-  { id: "all", label: "Semua Pesanan", statuses: null },
+  { id: "all", label: "Semua", statuses: null },
   { id: "unpaid", label: "Belum Dibayar", statuses: ["UNPAID"] },
   // ON_HOLD = pembayaran masuk & sedang dicek; belum wajib kirim.
   { id: "new", label: "Pembayaran Sedang Diperiksa", statuses: ["ON_HOLD"] },
   { id: "ready", label: "Perlu Diproses", statuses: ["AWAITING_SHIPMENT"] },
   {
     id: "shipped",
-    label: "Pengiriman",
+    label: "Telah Diproses",
     statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT"],
   },
   { id: "completed", label: "Selesai", statuses: ["DELIVERED", "COMPLETED"] },
