@@ -94,7 +94,7 @@ export function parseShopeeEnvelope(
       env.request_id ?? "-"
     );
   }
-  if (env.error) {
+  if (env.error && env.error !== "common.batch_api_all_failed") {
     throw new ShopeeApiError(env.error, env.message ?? "-", env.request_id ?? "-");
   }
   return env;
@@ -564,9 +564,16 @@ export async function createShippingDocument(
   request: ShopeeShippingDocumentRequest,
   creds?: ShopeeCreds
 ): Promise<Record<string, unknown>> {
-  return postShopApi("/api/v2/logistics/create_shipping_document", accessToken, shopId, {
+  const response = await postShopApi("/api/v2/logistics/create_shipping_document", accessToken, shopId, {
     order_list: [request],
   }, creds);
+  const failed = Array.isArray(response.result_list)
+    ? (response.result_list as Array<Record<string, unknown>>).find((item) => String(item.fail_reason ?? item.error ?? "").trim())
+    : null;
+  if (failed) {
+    throw new Error(`Shopee menolak cetak resi: ${String(failed.fail_reason ?? failed.error)}`);
+  }
+  return response;
 }
 
 export async function getShippingDocumentResult(
