@@ -4,7 +4,7 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { unsupportedPlatform } from "@/lib/utils/platform-guard";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
-import { createShippingDocument, downloadShippingDocument, getShippingDocumentJobStatus } from "@/lib/integrations/shopee";
+import { createShippingDocument, downloadShippingDocument, getShippingDocumentResult } from "@/lib/integrations/shopee";
 import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
 import { downloadValidatedPdf } from "@/lib/security/validate-upload";
 
@@ -52,13 +52,11 @@ export const GET = withAuth(
       try {
         const pdf = await withRefreshedToken(account, async (token, shopId, creds) => {
           const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, shipping_document_type: "NORMAL_AIR_WAYBILL" }, creds);
-          const createdResult = created.result as Record<string, unknown> | undefined;
-          const jobId = String(created.job_id ?? createdResult?.job_id ?? "");
-          if (!jobId) throw new Error("Shopee tidak mengembalikan ID pekerjaan dokumen resi.");
           for (let attempt = 0; attempt < 8; attempt += 1) {
-            const result = await getShippingDocumentJobStatus(token, shopId, jobId, creds);
-            const status = String(result.status ?? result.document_status ?? (result.result as Record<string, unknown> | undefined)?.status ?? "").toUpperCase();
-            if (["READY", "SUCCESS", "COMPLETED"].includes(status) || result.file) return downloadShippingDocument(token, shopId, order.orderNo, packageNumber, creds);
+            const result = await getShippingDocumentResult(token, shopId, order.orderNo, packageNumber, creds);
+            const entry = Array.isArray(result.result_list) ? result.result_list[0] as Record<string, unknown> : result;
+            const status = String(entry.status ?? entry.document_status ?? "").toUpperCase();
+            if (["READY", "SUCCESS", "COMPLETED"].includes(status)) return downloadShippingDocument(token, shopId, order.orderNo, packageNumber, creds);
             if (["FAILED", "ERROR"].includes(status)) throw new Error("Shopee belum dapat membuat dokumen resi untuk paket ini.");
             await new Promise((resolve) => setTimeout(resolve, 500));
           }

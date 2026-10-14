@@ -583,10 +583,9 @@ export async function getShippingDocumentResult(
   packageNumber?: string,
   creds?: ShopeeCreds
 ): Promise<Record<string, unknown>> {
-  return getShopApi("/api/v2/logistics/get_shipping_document_result", accessToken, shopId, creds, {
-    order_sn: orderSn,
-    ...(packageNumber ? { package_number: packageNumber } : {}),
-  });
+  return postShopApi("/api/v2/logistics/get_shipping_document_result", accessToken, shopId, {
+    order_list: [{ order_sn: orderSn, ...(packageNumber ? { package_number: packageNumber } : {}) }],
+  }, creds);
 }
 
 export async function getShippingDocumentJobStatus(
