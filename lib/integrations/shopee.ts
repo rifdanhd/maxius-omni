@@ -589,6 +589,15 @@ export async function getShippingDocumentResult(
   });
 }
 
+export async function getShippingDocumentJobStatus(
+  accessToken: string,
+  shopId: string | number,
+  jobId: string,
+  creds?: ShopeeCreds
+): Promise<Record<string, unknown>> {
+  return postShopApi("/api/v2/logistics/get_shipping_document_job_status", accessToken, shopId, { job_id: jobId }, creds);
+}
+
 export async function getShippingDocumentDataInfo(
   accessToken: string,
   shopId: string | number,
