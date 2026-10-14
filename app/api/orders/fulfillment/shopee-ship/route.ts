@@ -143,7 +143,8 @@ export const POST = withAuth(async (req) => {
               prisma.shipment.update({
                 where: { id: s.id },
                 data: {
-                  ...(trackingNumber && !s.trackingNo ? { trackingNo: trackingNumber } : {}),
+                  ...(trackingNumber ? { trackingNo: trackingNumber } : {}),
+                  status: "AWAITING_COLLECTION",
                   shippedAt: s.shippedAt ?? new Date(),
                 },
               })
