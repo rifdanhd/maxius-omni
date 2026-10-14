@@ -91,7 +91,7 @@ export default function OrderCard({
   const [trackingLoading, setTrackingLoading] = useState(false);
   const sla = computeSla(order);
   const platform = order.platform.trim().toUpperCase().replace(/\s+/g, "_");
-  const statusLabel: Record<string, string> = { UNPAID: "Belum Dibayar", ON_HOLD: "Pembayaran Sedang Diperiksa", AWAITING_SHIPMENT: "Perlu Diproses", AWAITING_COLLECTION: "Menunggu Diambil Kurir", IN_TRANSIT: "Dalam Pengiriman", PARTIALLY_SHIPPING: "Dikirim Sebagian", DELIVERED: "Diterima Pembeli", COMPLETED: "Selesai", CANCELLED: "Dibatalkan" };
+  const statusLabel: Record<string, string> = { UNPAID: "Belum Dibayar", ON_HOLD: "Pembayaran Sedang Diperiksa", AWAITING_SHIPMENT: "Perlu Diproses", PROCESSED: "Telah Diproses", AWAITING_COLLECTION: "Menunggu Diambil Kurir", IN_TRANSIT: "Dalam Pengiriman", PARTIALLY_SHIPPING: "Dikirim Sebagian", DELIVERED: "Diterima Pembeli", COMPLETED: "Selesai", CANCELLED: "Dibatalkan" };
   const [trackingError, setTrackingError] = useState<string | null>(null);
 
   // Riwayat tracking di-fetch on-demand saat modal Lacak dibuka (sekali per

@@ -36,7 +36,7 @@ const TABS: { id: string; label: string; statuses: string[] | null }[] = [
   {
     id: "shipped",
     label: "Telah Diproses",
-    statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT"],
+    statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT", "PROCESSED"],
   },
   { id: "completed", label: "Selesai", statuses: ["DELIVERED", "COMPLETED"] },
   { id: "cancelled", label: "Pembatalan", statuses: ["CANCELLED"] },
@@ -48,7 +48,7 @@ const TABS: { id: string; label: string; statuses: string[] | null }[] = [
 type SubTab = { id: string; label: string; statuses: string[] };
 const SUB_TABS: Record<string, SubTab[]> = {
   shipped: [
-    { id: "all", label: "Semua", statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT"] },
+    { id: "all", label: "Semua", statuses: ["PARTIALLY_SHIPPING", "AWAITING_COLLECTION", "IN_TRANSIT", "PROCESSED"] },
     { id: "in_transit", label: "Dalam Pengiriman", statuses: ["IN_TRANSIT", "PARTIALLY_SHIPPING"] },
     { id: "delivered", label: "Menunggu Diambil Kurir", statuses: ["AWAITING_COLLECTION"] },
   ],
