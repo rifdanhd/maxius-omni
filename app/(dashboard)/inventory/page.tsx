@@ -522,12 +522,15 @@ export default function InventoryStockPage() {
 
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Stok Varian</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground">Stok Gudang (Pusat)</h1>
+            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">Sumber utama</span>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Pantau stok gudang per variasi; mulai dengan mencari produk dan memeriksa stok Fisik serta Cadangan sebelum mengubahnya.
+            Atur stok gudang per varian di halaman ini. Perubahan dari sini yang dikirim ke Shopee, TikTok Shop, dan marketplace lain.
           </p>
           <p className="text-xs text-muted-foreground mt-1" title="effectiveStock() = max(0, Fisik − Cadangan)">
-            Target stok jual = stok fisik − stok cadangan (buffer), minimal 0. Angka di toko baru berubah jika pengiriman pembaruan berhasil; periksa masalah pengiriman di Stok Mismatch.
+            Alur stok: <b>Fisik − Cadangan = Tersedia</b>. Halaman marketplace hanya menampilkan hasil sinkronisasi; periksa kegagalan pengiriman di Stok Mismatch.
           </p>
         </div>
         <button

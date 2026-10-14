@@ -384,7 +384,7 @@ export default function ShopeeMarketplacePage() {
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Produk di Marketplace › Shopee</p>
           <h1 className="text-xl font-bold text-foreground">Produk Shopee</h1>
-          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Kelola produk Shopee, pantau stok, dan periksa hubungannya dengan katalog pusat.</p>
+          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Pantau stok yang tampil di Shopee dan status mapping. Untuk mengubah stok gudang, gunakan <a className="font-semibold underline" href="/inventory">Stok Gudang (Pusat)</a>.</p>
         </div>
         <div className="flex max-w-full flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">

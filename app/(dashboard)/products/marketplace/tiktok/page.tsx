@@ -1147,8 +1147,8 @@ function FragmentRow({
   const lastSync = row.lastSyncedAt ? fmtDate(row.lastSyncedAt) : "belum sync";
   const stockTitle =
     row.variants[0].platformStock !== null
-      ? "Stok tayang TikTok (hasil sync terakhir)."
-      : "Stok lokal varian (belum ada stok tayang dari platform).";
+      ? "Stok tayang TikTok (hasil sinkronisasi dari Stok Gudang Pusat)."
+      : "Belum ada stok tayang dari platform; atur stok di Stok Gudang (Pusat).";
 
   return (
     <>
