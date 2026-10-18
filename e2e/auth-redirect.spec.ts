@@ -18,14 +18,15 @@ test('C2: API 401 dari dalam halaman -> redirect /login?reason=session_expired',
   await login(page);
   await expect(page.getByText('Yang Perlu Dilakukan')).toBeVisible({ timeout: 30_000 });
   await page.goto('/inventory');
-  await expect(page.getByRole('heading', { name: 'Stok Varian' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Atur Stok Gudang' })).toBeVisible({
     timeout: 60_000,
   });
   await page.context().clearCookies();
   await page.getByRole('button', { name: 'Muat Ulang' }).click();
   await page.waitForURL('**/login**', { timeout: 30_000 });
   expect(page.url()).toContain('reason=session_expired');
-  await expect(page.getByText('Sesi Anda berakhir, silakan login kembali.')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Sesi berakhir');
+  await expect(page.getByRole('status')).toContainText('Masuk kembali untuk melanjutkan pekerjaan.');
   await expect(page.getByPlaceholder('Masukkan username')).toBeVisible();
   await page.screenshot({ path: SHOT('c2-expired-message') });
 });

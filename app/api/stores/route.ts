@@ -21,6 +21,10 @@ export const GET = withAuth(async (req) => {
         hasToken && acc.tokenExpiresAt
           ? acc.tokenExpiresAt.getTime() <= Date.now()
           : false;
+      const canRefresh = hasToken && Boolean(acc.refreshToken) && !acc.isFrozen && (
+        acc.platform === "SHOPEE" ? Boolean(acc.externalShopId)
+          : acc.platform === "TIKTOK_SHOP" && Boolean(acc.shopCipher)
+      );
       return {
         id: acc.id,
         name: acc.label,
@@ -31,6 +35,7 @@ export const GET = withAuth(async (req) => {
         frozenReason: acc.frozenReason,
         lastSyncAt: acc.productMapping[0]?.lastSyncedAt?.toISOString() ?? null,
         status: !hasToken ? "disconnected" : expired ? "expired" : "connected",
+        canRefresh,
         connectedAt: acc.createdAt.toISOString(),
         tokenExpiresAt: acc.tokenExpiresAt?.toISOString() ?? null,
         scope: acc.scope,

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { applyMarketplaceCover } from "@/lib/services/gallery.service";
+import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
 import {
   searchProducts,
   getProduct,
@@ -198,16 +199,22 @@ async function fetchProductRemote(
 
 /** List produk dari sebuah akun dengan pagination (cap 100 halaman). */
 async function enumerateAccountProducts(account: {
+  id: string;
+  label: string;
   accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
   shopCipher: string | null;
 }): Promise<Map<string, Record<string, unknown>>> {
   const byId = new Map<string, Record<string, unknown>>();
   let token: string | null = null;
   for (let page = 0; page < 100; page++) {
-    const res = await searchProducts(account.accessToken!, account.shopCipher ?? undefined, {
-      pageSize: 100,
-      pageToken: token ?? undefined,
-    });
+    const res = await withRefreshedTiktokToken(account, (accessToken, creds) =>
+      searchProducts(accessToken, account.shopCipher ?? undefined, {
+        pageSize: 100,
+        pageToken: token ?? undefined,
+      }, creds)
+    );
     for (const p of res.products) {
       const id = String(p.id ?? "");
       if (id) byId.set(id, p);

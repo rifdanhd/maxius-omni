@@ -80,7 +80,7 @@ test('M8a API: endpoint fulfillment/label menolak order Shopee sebelum panggilan
 
   const spS = await page.request.get(`/api/orders/${ORD_S}/shipping-parameter`, { headers: auth });
   expect(spS.status()).toBe(502);
-  expect((await spS.json()).ok).toBe(false);
+  expect((await spS.json()).error).toBe('Operasi gagal. Coba lagi atau periksa log server.');
 
   // Shopee-ship: gagal per-order (akun tanpa token) & status order TIDAK berubah.
   const ss = await page.request.post('/api/orders/fulfillment/shopee-ship', {
@@ -195,7 +195,7 @@ test('M8a/M8c UI: pickup Shopee buka ShopeeShipModal; Cetak Label = label lokal 
   // Akun e2e tanpa token → opsi API gagal dimuat, modal menampilkan hint Seller Center.
   await card.getByRole('button', { name: 'Atur Pengiriman', exact: true }).click();
   await expect(page.getByText('Atur Pengiriman Shopee (1)')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('bisa dikirim via Seller Center')).toBeVisible();
+  await expect(page.getByText('Gunakan Seller Center Shopee bila opsi pengiriman belum tersedia di sini.')).toBeVisible();
   await page.getByRole('button', { name: 'Batal', exact: true }).click();
   await expect(page.getByText('Atur Pengiriman Shopee (1)')).toHaveCount(0);
 

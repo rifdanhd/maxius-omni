@@ -39,10 +39,10 @@ test('sync sukses: toast memakai items/models/matched, tanpa "undefined"', async
   await page.goto('/products/marketplace/shopee');
   await confirmSync(page);
 
-  const toast = page.locator('[data-app-toast="success"]');
+  await page.getByRole('button', { name: /^Notifikasi/ }).click();
+  const toast = page.getByRole('dialog', { name: 'Pusat notifikasi' });
   await expect(toast).toContainText('Sinkron selesai. 11 varian diperbarui.', { timeout: 15_000 });
-  await toast.getByText('Lihat detail', { exact: true }).click();
-  await expect(toast.locator('pre')).toContainText('Toko Sukses: 12 produk, 30 varian, 11 diperbarui');
+  await expect(page.locator('[data-app-toast]')).toHaveCount(0);
   await expect(page.getByText('undefined')).toHaveCount(0);
 });
 
@@ -61,7 +61,7 @@ test('sync gagal per akun: pesan manusiawi dengan detail Shopee tersembunyi', as
   await page.goto('/products/marketplace/shopee');
   await confirmSync(page);
 
-  const toast = page.locator('[data-app-toast="error"]');
+  const toast = page.locator('[data-app-inline-notification]');
   await expect(toast).toContainText('Koneksi toko perlu diperbarui', { timeout: 15_000 });
   await expect(toast.locator('pre')).not.toBeVisible();
   await toast.getByText('Lihat detail', { exact: true }).click();
@@ -75,6 +75,6 @@ test('accounts kosong: toast menjelaskan brand aktif tanpa akun Shopee', async (
   await page.goto('/products/marketplace/shopee');
   await confirmSync(page);
 
-  await expect(page.locator('[data-app-toast="error"]')).toContainText('Bisnis aktif belum memiliki toko Shopee', { timeout: 15_000 });
+  await expect(page.locator('[data-app-inline-notification]')).toContainText('Bisnis aktif belum memiliki toko Shopee', { timeout: 15_000 });
   await expect(page.locator('[data-app-toast="success"]')).toHaveCount(0);
 });

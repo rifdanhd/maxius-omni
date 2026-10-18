@@ -93,6 +93,7 @@ function LoginForm() {
               src="/Logo/Logo_backroundNO.png" 
               alt="Maxius.id Logo" 
               fill
+              sizes="96px"
               className="object-contain drop-shadow-md"
               priority
             />

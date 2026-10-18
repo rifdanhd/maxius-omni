@@ -79,13 +79,15 @@ test('produk baru: buat via form mapping → muncul di /products → tetap ada s
   // debounce pencarian 300ms — tunggu benar-benar tersaring (1 baris) dulu,
   // kalau tidak assertion "Lihat 1 varian produk" kena strict-mode (banyak baris).
   await expect(page.locator('tbody tr')).toHaveCount(1, { timeout: 30_000 });
-  await expect(page.getByText(NAME)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(NAME, { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: /^Lihat 1 varian produk/ })).toBeVisible();
   await page.getByRole('button', { name: /^Lihat 1 varian produk/ }).click();
   await expect(page.getByText(VARIANT_SKU).first()).toBeVisible();
-  // Stok efektif = 7 − stok aman 2 = 5; editor menampilkan kedua angka sumber.
-  await expect(page.getByLabel(`Stok fisik detail ${VARIANT_SKU}`)).toHaveValue('7');
-  await expect(page.getByLabel(`Stok cadangan detail ${VARIANT_SKU}`)).toHaveValue('2');
+  const variant = page.getByTestId(`catalog-variant-${sql(`SELECT id FROM "ProductVariant" WHERE sku='${VARIANT_SKU}';`)}`);
+  await expect(variant.locator('td').nth(3)).toHaveText('7');
+  await expect(variant.locator('td').nth(4)).toHaveText('2');
+  await expect(variant.locator('td').nth(5)).toHaveText('5');
+  await expect(variant.getByRole('link', { name: 'Kelola di Stok Varian' })).toHaveAttribute('href', '/inventory');
   await page.screenshot({ path: SHOT('products-list') });
 
   // 4. Reload — data persisten, bukan sekadar state di memori.
@@ -95,7 +97,7 @@ test('produk baru: buat via form mapping → muncul di /products → tetap ada s
   });
   await search.fill(NAME);
   await expect(page.locator('tbody tr')).toHaveCount(1, { timeout: 30_000 });
-  await expect(page.getByText(NAME)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(NAME, { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: /^Lihat 1 varian produk/ })).toBeVisible();
   await page.screenshot({ path: SHOT('after-reload') });
 

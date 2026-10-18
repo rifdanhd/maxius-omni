@@ -19,7 +19,7 @@ type TiktokAccount = {
 // Akun dibekukan DITOLAK di sini (proteksi level kode, bukan sekadar UI).
 export async function withRefreshedTiktokToken<T>(
   account: TiktokAccount,
-  fn: (accessToken: string) => Promise<T>,
+  fn: (accessToken: string, creds: TiktokCreds) => Promise<T>,
 ): Promise<T> {
   const fresh = await prisma.platformAccount.findUnique({
     where: { id: account.id },
@@ -30,30 +30,32 @@ export async function withRefreshedTiktokToken<T>(
   }
   assertAccountActive(fresh);
   const creds: TiktokCreds = resolveTiktokCreds(fresh.appCredential);
-  if (!account.accessToken) {
+  if (!fresh.accessToken) {
     throw new Error(
       `"${account.label}" belum punya access token — hubungkan ulang via OAuth TikTok.`,
     );
   }
-  let token = account.accessToken;
-  if (account.tokenExpiresAt && account.tokenExpiresAt.getTime() <= Date.now()) {
-    if (!account.refreshToken) {
+  let token = fresh.accessToken;
+  let refreshed = false;
+  if (fresh.tokenExpiresAt && fresh.tokenExpiresAt.getTime() <= Date.now()) {
+    if (!fresh.refreshToken) {
       throw new Error(
         `"${account.label}" token kedaluwarsa tanpa refresh token — hubungkan ulang via OAuth TikTok.`,
       );
     }
-    token = await doRefresh(account.id, account.refreshToken, creds);
+    token = await doRefresh(account.id, fresh.refreshToken, creds);
+    refreshed = true;
   }
   try {
-    return await fn(token);
+    return await fn(token, creds);
   } catch (e) {
     const isAuth =
       e instanceof TikTokApiError
         ? e.kind === "AUTH"
         : /auth|token|expired|invalid/i.test(e instanceof Error ? e.message : String(e));
-    if (!isAuth || !account.refreshToken) throw e;
-    token = await doRefresh(account.id, account.refreshToken, creds);
-    return fn(token);
+    if (!isAuth || !fresh.refreshToken || refreshed) throw e;
+    token = await doRefresh(account.id, fresh.refreshToken, creds);
+    return fn(token, creds);
   }
 }
 

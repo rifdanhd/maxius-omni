@@ -44,21 +44,25 @@ export async function withRefreshedToken<T>(
   account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>,
   fn: (accessToken: string, shopId: string, creds: ShopeeCreds) => Promise<T>
 ): Promise<T> {
-  assertAccountActive(account);
-  const creds = credsOf(account);
-  const shopId = account.externalShopId;
-  if (!account.accessToken || !shopId) {
+  const fresh = await loadShopeeAccount(account.id);
+  if (!fresh || fresh.platform !== "SHOPEE") {
+    throw new Error(`Akun Shopee "${account.label}" tidak ditemukan.`);
+  }
+  assertAccountActive(fresh);
+  const creds = credsOf(fresh);
+  const shopId = fresh.externalShopId;
+  if (!fresh.accessToken || !shopId) {
     throw new Error(
       `"${account.label}" belum punya access token / shop_id — hubungkan ulang via OAuth Shopee.`
     );
   }
   try {
-    return await fn(account.accessToken, shopId, creds);
+    return await fn(fresh.accessToken, shopId, creds);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const authLike = /error_auth|auth|token|expired|invalid/i.test(msg);
-    if (!authLike || !account.refreshToken) throw e;
-    const r = await refreshAccessToken(account.refreshToken, shopId, creds);
+    if (!authLike || !fresh.refreshToken) throw e;
+    const r = await refreshAccessToken(fresh.refreshToken, shopId, creds);
     await prisma.platformAccount.update({
       where: { id: account.id },
       data: {

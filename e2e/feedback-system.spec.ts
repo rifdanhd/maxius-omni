@@ -40,8 +40,8 @@ for (const variant of [{ theme: "light", width: 1280 }, { theme: "dark", width: 
     await page.route(SYNC, (route) => route.fulfill({ json: { ok: true, accounts: [{ label: "Toko Kaos Kaki", error: "[Shopee] error_auth: token expired access_token=secret-fixture req-123" }] } }));
     await page.goto(PATH);
     await sync(page);
-    const toast = page.locator('[data-app-toast="error"]');
-    const banner = page.locator('[data-feedback="error"]').filter({ hasText: "Sinkron gagal" });
+    const toast = page.locator('[data-app-inline-notification] [data-feedback="error"]');
+    const banner = page.locator('#content [data-feedback="error"]').filter({ hasText: "Sinkron gagal" });
     await expect(toast).toHaveAttribute("role", "alert");
     await expect(toast).toContainText("Koneksi toko perlu diperbarui");
     await expect(toast.getByRole("button", { name: "Perbarui koneksi" })).toBeVisible();
@@ -55,7 +55,7 @@ for (const variant of [{ theme: "light", width: 1280 }, { theme: "dark", width: 
     await expect(toast.locator("pre")).not.toContainText("secret-fixture");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `test-results/feedback-${variant.theme}-${variant.width}.png`, fullPage: true });
-    await toast.getByRole("button", { name: "Tutup notifikasi" }).click();
+    await toast.getByRole("button", { name: "Tutup", exact: true }).click();
     await expect(toast).toHaveCount(0);
     await expect(banner).toBeVisible();
     await banner.getByRole("link", { name: "Perbarui koneksi" }).click();
@@ -63,25 +63,25 @@ for (const variant of [{ theme: "light", width: 1280 }, { theme: "dark", width: 
   });
 }
 
-test("toast sukses menutup otomatis dan maksimum tiga pesan ditampilkan", async ({ page }) => {
+test("sukses masuk ke lonceng; error berikutnya tidak membuat popup bertumpuk", async ({ page }) => {
   let failed = false;
   await page.route(SYNC, (route) => route.fulfill({ json: { ok: true, accounts: failed ? [{ label: "Toko Kaos Kaki", error: "Gagal memperbarui data. Coba lagi." }] : [{ label: "Toko Kaos Kaki", items: 24, models: 24, matched: 24 }] } }));
   await page.goto(PATH);
   await sync(page);
-  const success = page.locator('[data-app-toast="success"]');
-  await expect(success).toHaveAttribute("role", "status");
+  await page.getByRole('button', { name: /^Notifikasi/ }).click();
+  const success = page.getByRole('dialog', { name: 'Pusat notifikasi' });
   await expect(success).toContainText("24 varian diperbarui");
-  expect(await success.locator("svg").count()).toBeGreaterThan(0);
-  await page.mouse.move(0, 899);
-  await expect(success).toHaveCount(0, { timeout: 8000 });
+  await expect(page.locator('[data-app-toast]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   failed = true;
   for (let index = 0; index < 4; index++) {
     await page.getByTestId("shopee-product-row").getByRole("button", { name: "Aksi Kaos Kaki Bola" }).click();
     await page.getByRole("menuitem", { name: "Sinkron produk ini" }).click();
-    await expect(page.locator('[data-feedback="error"]')).toBeVisible();
+    await expect(page.locator('[data-app-inline-notification]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Perbarui Data", exact: true })).toBeEnabled();
   }
-  await expect(page.locator("[data-app-toast]")).toHaveCount(3);
+  await expect(page.locator("[data-app-toast]")).toHaveCount(0);
+  await expect(page.locator('[data-app-inline-notification]')).toHaveCount(1);
 });
 
 test("lonceng: 9+, kelompok waktu, tandai dibaca, persistensi dan navigasi", async ({ page }) => {
@@ -139,7 +139,7 @@ test("hapus toko memakai konfirmasi, batal tidak mengirim request, error dapat d
   expect(deletes).toBe(0);
   await remove.click();
   await dialog.getByRole("button", { name: "Hapus", exact: true }).click();
-  await expect(page.locator('[data-app-toast="error"]')).toBeVisible();
+  await expect(page.locator('[data-app-inline-notification]')).toBeVisible();
   expect(deletes).toBe(1);
 });
 

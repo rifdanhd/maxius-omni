@@ -925,7 +925,8 @@ export async function searchProducts(
     status?: string;
     sellerSkus?: string[];
     pageToken?: string;
-  } = {}
+  } = {},
+  creds?: TiktokCreds,
 ): Promise<{
   products: Array<Record<string, unknown>>;
   totalCount: number;
@@ -946,7 +947,8 @@ export async function searchProducts(
     accessToken,
     query,
     hasBody ? body : null,
-    shopCipher
+    shopCipher,
+    creds
   );
   const data = result.data as
     | { products?: Array<Record<string, unknown>>; total_count?: number; next_page_token?: string }

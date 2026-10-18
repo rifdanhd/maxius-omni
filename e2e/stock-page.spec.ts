@@ -56,7 +56,7 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   const apiCounts = ((await apiRes.json()) as { counts: Record<string, number> }).counts;
 
   await page.goto('/inventory');
-  await expect(page.getByRole('heading', { name: 'Stok Varian' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Atur Stok Gudang' })).toBeVisible({ timeout: 30_000 });
   for (const [tab, key] of [
     ['Semua Produk', 'all'],
     ['Habis', 'empty'],
@@ -94,7 +94,7 @@ test('B: halaman Stok Varian end-to-end', async ({ page }) => {
   await page.screenshot({ path: SHOT('b3-edit-cadangan-saved') });
 
   // 3. Edit Batas Min inline + reset ke null (fallback *).
-  const minCell = firstRow.locator('td').nth(7);
+  const minCell = firstRow.locator('td').nth(8);
   await minCell.getByTitle(/Ubah batas minimum/).click();
   const minInput = minCell.locator('input[type="number"]');
   await minInput.fill('999');

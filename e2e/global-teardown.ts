@@ -1,6 +1,7 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { dbInfo } from './helpers';
 
 /**
  * Pastikan database e2e tidak tertinggal. Run Playwright = satu DB
@@ -11,16 +12,18 @@ export default async function globalTeardown(): Promise<void> {
   const marker = path.resolve(__dirname, '..', '.e2e-db.json');
   try {
     if (fs.existsSync(marker)) {
-      const info = JSON.parse(fs.readFileSync(marker, 'utf8')) as { name?: string };
-      if (info.name && /^maxius_test_e2e_/.test(info.name)) {
-        execSync(
-          `psql postgresql://udan@localhost:5432/postgres -c "DROP DATABASE IF EXISTS \\"${info.name}\\" WITH (FORCE)"`,
+      const info = dbInfo();
+      const adminUrl = new URL(info.url);
+      adminUrl.pathname = '/postgres';
+      if (info.name) {
+        execFileSync(
+          'psql', [adminUrl.href, '-v', 'ON_ERROR_STOP=1', '-c', `DROP DATABASE IF EXISTS "${info.name}" WITH (FORCE)`],
           { stdio: 'ignore' }
         );
       }
       fs.rmSync(marker, { force: true });
     }
   } catch {
-    /* sweeper test-db.ts (>1 jam) akan memungut sisa */
+    /* Shutdown server pengujian juga membersihkan database milik sesi ini. */
   }
 }

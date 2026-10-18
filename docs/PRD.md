@@ -1263,6 +1263,7 @@ Jika ada fitur yang terlihat bagus tetapi tidak membantu menyelesaikan masalah i
 
 Jangan over-engineer.
 
+
 Bangun MVP yang stabil terlebih dahulu.
 
 Setiap implementasi harus mempertimbangkan:

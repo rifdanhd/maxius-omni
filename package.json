@@ -7,6 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:backend": "playwright test -c playwright.backend.config.ts",
     "worker:stock": "tsx scripts/stock-outbox-worker.mts",
     "audit:orphans": "tsx scripts/detect-orphans.mts",
     "postinstall": "prisma generate",

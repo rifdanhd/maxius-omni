@@ -15,13 +15,12 @@
  * `DATABASE_URL` ikut diset ke URL pg yang sama supaya kode lama yang masih
  * membaca DATABASE_URL ikut benar.
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
 const ADMIN_DB_NAME = "postgres";
-const LEGACY_DEFAULT_ADMIN = "postgresql://udan@localhost:5432/maxius_dev";
-const STALE_MS = 60 * 60 * 1000;
+const DEFAULT_ADMIN_URL = `postgresql://${encodeURIComponent(process.env.USER ?? "postgres")}@127.0.0.1:5432/postgres`;
 
 function parseEnvFile(file: string, key: string): string | undefined {
   let text: string;
@@ -56,11 +55,21 @@ function withPath(url: string, dbName: string): string {
 
 /** URL koneksi admin — CREATE/DROP DATABASE perintah server-wide, db-nya bebas. */
 function adminUrl(): string {
-  const fromEnv = process.env.POSTGRES_URL ?? process.env.POSTGRES_ADMIN_URL;
-  if (fromEnv) return withPath(fromEnv, ADMIN_DB_NAME);
-  const fromFile = parseEnvFile(path.join(process.cwd(), ".env"), "POSTGRES_URL");
-  if (fromFile) return withPath(fromFile, ADMIN_DB_NAME);
-  return LEGACY_DEFAULT_ADMIN;
+  const configured = process.env.POSTGRES_ADMIN_URL ?? process.env.POSTGRES_URL
+    ?? parseEnvFile(path.join(process.cwd(), ".env"), "POSTGRES_URL")
+    ?? DEFAULT_ADMIN_URL;
+  let parsed: URL;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error("URL database pengujian tidak valid.");
+  }
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)
+      || !["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)
+      || [...parsed.searchParams.keys()].some((key) => /^(host|hostaddr|service)$/i.test(key))) {
+    throw new Error("Pengujian hanya boleh memakai PostgreSQL lokal. Atur POSTGRES_ADMIN_URL ke localhost.");
+  }
+  return withPath(configured, ADMIN_DB_NAME);
 }
 
 function quoteIdent(name: string): string {
@@ -68,7 +77,7 @@ function quoteIdent(name: string): string {
 }
 
 function runSql(url: string, statement: string): string {
-  return execSync(`npx prisma db execute --url=${JSON.stringify(url)} --stdin`, {
+  return execFileSync(process.execPath, [path.join(process.cwd(), "node_modules/prisma/build/index.js"), "db", "execute", "--url", url, "--stdin"], {
     input: statement,
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
@@ -83,8 +92,7 @@ export interface TestDb {
 
 /**
  * Buat database Postgres kosong khusus test + `prisma migrate deploy`.
- * Nama unik per proses; sisa database dari run yang crash dibuang otomatis
- * bila sudah lebih dari 1 jam.
+ * Nama unik per proses; cleanup hanya membuang database yang dibuat run ini.
  */
 export function setupTestDb(prefix: string, options: { migrate?: boolean } = {}): TestDb {
   const admin = adminUrl();
@@ -92,15 +100,13 @@ export function setupTestDb(prefix: string, options: { migrate?: boolean } = {})
   const name = `maxius_test_${safePrefix}_${Date.now().toString(36)}_${process.pid}`;
   const url = withPath(admin, name);
 
-  dropStaleTestDatabases(admin);
-
   runSql(admin, `CREATE DATABASE ${quoteIdent(name)}`);
 
   process.env.POSTGRES_URL = url;
   process.env.DATABASE_URL = url;
 
   if (options.migrate !== false) {
-    execSync("npx prisma migrate deploy", {
+    execFileSync(process.execPath, [path.join(process.cwd(), "node_modules/prisma/build/index.js"), "migrate", "deploy"], {
       env: { ...process.env, POSTGRES_URL: url, DATABASE_URL: url },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -124,35 +130,4 @@ export function setupTestDb(prefix: string, options: { migrate?: boolean } = {})
   });
 
   return { name, url, cleanup };
-}
-
-/** Buang database sisa run sebelumnya yang lebih tua dari STALE_MS. */
-function dropStaleTestDatabases(admin: string): void {
-  let rows: string[] = [];
-  try {
-    rows = execSync(
-      `psql ${JSON.stringify(admin)} -Atc ` +
-        JSON.stringify(
-          `SELECT datname FROM pg_database WHERE datname LIKE 'maxius_test_%'`
-        ),
-      { encoding: "utf8" }
-    )
-      .split("\n")
-      .filter(Boolean);
-  } catch {
-    return; // psql tidak tersedia → lewati sweeping
-  }
-
-  const now = Date.now();
-  for (const dbName of rows) {
-    const stamp = dbName.match(/_([0-9a-z]+)_(\d+)$/);
-    if (!stamp) continue;
-    const ts = Number.parseInt(stamp[1], 36);
-    if (!Number.isFinite(ts) || now - ts < STALE_MS) continue;
-    try {
-      runSql(admin, `DROP DATABASE IF EXISTS ${quoteIdent(dbName)} WITH (FORCE)`);
-    } catch {
-      /* skip */
-    }
-  }
 }

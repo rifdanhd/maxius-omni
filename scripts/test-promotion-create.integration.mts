@@ -118,8 +118,11 @@ let getByIdPayload: Record<string, unknown> | null = null;
 let pendingAuditSeenAtCreateCall: number | null = null;
 
 function makeClient() {
+  let title = "";
+  let attached: Array<Record<string, unknown>> = [];
   return {
-    async create() {
+    async create(...args: Parameters<import("../lib/services/promotion-write.service-create").PromotionTikTokClient["create"]>) {
+      title = args[2].title;
       calls.create += 1;
       // Bukti "audit PENDING SEBELUM call TikTok": saat fake create dieksekusi,
       // baris audit PENDING untuk sesi ini HARUS sudah ada di DB.
@@ -128,18 +131,19 @@ function makeClient() {
       });
       return { activityId: "EXT-NEW-1", status: "NOT_START" };
     },
-    async attach() {
+    async attach(...args: Parameters<import("../lib/services/promotion-write.service-create").PromotionTikTokClient["attach"]>) {
       calls.attach += 1;
       if (attachShouldFail) {
         const err = new Error("[Tokopedia | Shop] API error (110050): products limit exceeded | req-1");
         Object.assign(err, { code: 110050, requestId: "req-1" });
         throw err;
       }
+      attached = [...attached, ...args[3]];
       return { totalCount: 2 };
     },
     async getById() {
       calls.getById += 1;
-      return { code: 0, data: getByIdPayload ?? { status: "NOT_START", begin_time: Math.floor(BEGIN.getTime() / 1000), end_time: Math.floor(END.getTime() / 1000) } };
+      return { code: 0, data: getByIdPayload ?? { activity_id: "EXT-NEW-1", title, activity_type: "DIRECT_DISCOUNT", product_level: "PRODUCT", products: attached, status: "NOT_START", begin_time: Math.floor(BEGIN.getTime() / 1000), end_time: Math.floor(END.getTime() / 1000) } };
     },
   };
 }
@@ -243,6 +247,12 @@ await ok("create sukses (dengan ack overlap G3): audit SUCCESS, attach benar, G5
   assert.equal(audit.action, "CREATE_ACTIVITY");
   assert.equal(audit.username, "tester");
   assert.ok(audit.payloadSent?.includes("DIRECT_DISCOUNT"));
+  const monitored = await prisma.promotionActivity.findUniqueOrThrow({ where: { accountId_externalActivityId: { accountId: account.id, externalActivityId: "EXT-NEW-1" } }, include: { items: true } });
+  assert.equal(monitored.title, res.title);
+  assert.equal(monitored.items.length, 2);
+  assert.ok(monitored.items.every((item) => item.productMappingId));
+  await prisma.promotionActivityItem.deleteMany({ where: { activityId: monitored.id } });
+  await prisma.promotionActivity.delete({ where: { id: monitored.id } });
 });
 await ok("create sukses TANPA overlap: SUCCESS dengan overlapWarningAcknowledged=false", async () => {
   calls = { create: 0, attach: 0, getById: 0 };
@@ -255,6 +265,9 @@ await ok("create sukses TANPA overlap: SUCCESS dengan overlapWarningAcknowledged
   assert.equal(res.resultStatus, "SUCCESS");
   assert.equal(res.attachedCount, 1);
   assert.equal(res.overlapWarningAcknowledged, false);
+  const monitored = await prisma.promotionActivity.findUniqueOrThrow({ where: { accountId_externalActivityId: { accountId: account.id, externalActivityId: "EXT-NEW-1" } } });
+  await prisma.promotionActivityItem.deleteMany({ where: { activityId: monitored.id } });
+  await prisma.promotionActivity.delete({ where: { id: monitored.id } });
   // m2 (DEACTIVATED saja) tidak diblok — konsisten dengan keputusan Tahap 2.
 });
 await ok("BUKTI audit PENDING sudah ada di DB SAAT call TikTok dieksekusi", async () => {
@@ -326,6 +339,22 @@ await ok("create call melempar (network error) → UNVERIFIED dengan tiktokCode 
   assert.equal(audit.resultStatus, "UNVERIFIED");
   assert.equal(audit.tiktokCode, 105003);
   assert.equal(audit.requestId, "req-9");
+});
+
+await ok("G5 menolak ID activity berbeda dan tidak menyimpan promosi yang salah", async () => {
+  getByIdPayload = {
+    activity_id: "EXT-WRONG-ID", title: "Promosi berbeda", activity_type: "DIRECT_DISCOUNT", product_level: "PRODUCT",
+    status: "NOT_START", begin_time: Math.floor(BEGIN.getTime() / 1000), end_time: Math.floor(END.getTime() / 1000),
+  };
+  try {
+    const result = await createPromotion({ ...baseReq, mappingIds: [m2.id], discountByMappingId: { [m2.id]: 20 } }, { client: makeClient() });
+    assert.ok(result.ok);
+    assert.equal(result.resultStatus, "UNVERIFIED");
+    assert.match(result.unverifiedReason ?? "", /ID promosi/);
+    assert.equal(await prisma.promotionActivity.count({ where: { accountId: account.id, externalActivityId: "EXT-WRONG-ID" } }), 0);
+  } finally {
+    getByIdPayload = null;
+  }
 });
 
 console.log("=== Alert: UNVERIFIED & PENDING menggantung TERLIHAT (bukan cuma di DB) ===");

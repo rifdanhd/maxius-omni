@@ -18,7 +18,7 @@
  */
 import crypto from "crypto";
 import assert from "node:assert";
-import jwt from "jsonwebtoken";
+import { NextRequest } from "next/server";
 import { setupTestDb } from "@/scripts/lib/test-db";
 
 const db = setupTestDb("test-settings");
@@ -72,12 +72,13 @@ const user = await prisma.user.create({
     id: crypto.randomUUID(),
     username: "admin-settings",
     passwordHash: "x",
-    userBusiness: { create: [{ businessId: business.id }] },
+    userBusiness: { create: [{ businessId: business.id, role: "owner" }] },
   },
 });
 const jwtSecret = process.env.JWT_SECRET;
 assert.ok(jwtSecret, "JWT_SECRET harus ada di .env utk test handler");
-const token = jwt.sign({ sub: user.id, username: user.username }, jwtSecret, { expiresIn: "10m" });
+const { createSessionToken } = await import("@/lib/services/auth.service");
+const token = createSessionToken(user, business.id);
 const authHeaders = { authorization: `Bearer ${token}`, "content-type": "application/json" };
 
 /* ─────────────────────── 1 — Settings semantics ─────────────────────── */
@@ -170,7 +171,7 @@ await ok("product-copy: draft baru memakai ambang setting brand (bukan 20)", asy
 
 await ok("HANDLER /api/inventory/mappings: produk baru ber-threshold setting brand", async () => {
   await updateInventorySettings(business.id, { lowStockDefaultThreshold: 9 });
-  const req = new Request("http://localhost/api/inventory/mappings", {
+  const req = new NextRequest("http://localhost/api/inventory/mappings", {
     method: "POST",
     headers: authHeaders,
     body: JSON.stringify({
@@ -243,7 +244,7 @@ console.log("=== 4 — notifyLowStock gate di /api/stock-alerts ===");
 
 await ok("bell dimatikan → handler mengembalikan alerts kosong", async () => {
   await updateInventorySettings(business.id, { notifyLowStock: false });
-  const req = new Request("http://localhost/api/stock-alerts", { headers: authHeaders });
+  const req = new NextRequest("http://localhost/api/stock-alerts", { headers: authHeaders });
   const res = await (stockAlertsRoute.GET as (r: unknown) => Promise<Response>)(req);
   assert.ok(res.ok);
   const data = (await res.json()) as { count: number; alerts: unknown[] };

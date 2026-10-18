@@ -21,7 +21,7 @@ test('F0: verifikasi runtime halaman Stok Mismatch + tombol Retry', async ({ pag
     .locator('[data-slot="sidebar"]')
     .getByRole('link', { name: 'Stok Mismatch' });
   if (!(await navLink.isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: 'Inventori', exact: true }).click();
+    await page.getByRole('button', { name: /^Inventori(?: \d+)?$/ }).click();
   }
   await expect(navLink).toBeVisible();
 
@@ -40,13 +40,21 @@ test('F0: verifikasi runtime halaman Stok Mismatch + tombol Retry', async ({ pag
 
   await page.goto('/inventory/mismatch');
   await expect(page.getByRole('heading', { name: 'Stok Mismatch' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mismatch', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Perlu Tindakan (Mismatch)', exact: true })).toBeVisible();
   await expect(page.getByText(channelSku).first()).toBeVisible();
-  await expect(page.getByText('fixture: push gagal (e2e)')).toBeVisible();
+  const job = page.locator('tbody tr').filter({ hasText: 'fixture: push gagal (e2e)' });
+  await expect(job.locator('p').filter({ hasText: 'fixture: push gagal (e2e)' })).toBeVisible();
 
   await page.screenshot({ path: SHOT('f0-mismatch-page.png'), fullPage: true });
 
-  await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await expect(page.getByText(/Retry (berhasil|selesai)/)).toBeVisible({ timeout: 30_000 });
+  const retried = page.waitForResponse((res) => res.url().includes('/api/sync-jobs/e2e-mismatch-verify/retry') && res.request().method() === 'POST');
+  await job.getByRole('button', { name: 'Coba Lagi (Retry)', exact: true }).click();
+  const response = await retried;
+  expect(response.status()).toBe(200);
+  expect((await response.json()).job.status).toBe('FAILED');
+  const notice = page.locator('#content [role="alert"]').filter({ hasText: 'Sinkron belum berhasil' });
+  await expect(notice).toBeVisible();
+  await notice.getByText('Lihat detail', { exact: true }).click();
+  await expect(notice.getByText('Percobaan selesai, status pembaruan: FAILED.')).toBeVisible();
   await page.screenshot({ path: SHOT('f0-mismatch-retry.png'), fullPage: true });
 });

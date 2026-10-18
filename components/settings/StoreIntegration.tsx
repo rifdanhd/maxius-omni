@@ -17,6 +17,7 @@ type StoreItem = {
   platform?: string;
   businessName?: string;
   status?: string;
+  canRefresh?: boolean;
   connectedAt?: string;
   tokenExpiresAt?: string | null;
   scope?: string | null;
@@ -60,6 +61,7 @@ export default function StoreIntegration() {
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [failedSyncIds, setFailedSyncIds] = useState<string[]>([]);
 
   useEffect(() => {
     // Banner hasil OAuth dibaca dari query string redirect callback
@@ -123,9 +125,11 @@ export default function StoreIntegration() {
       const res = await authFetch(`/api/stores/${id}/sync`, { method: "POST" });
       const data = await res.json().catch(() => null) as { error?: string; message?: string; success?: boolean } | null;
       if (!res.ok || !data?.success) throw new Error(data?.error ?? "Pembaruan data belum berhasil.");
+      setFailedSyncIds((ids) => ids.filter((storeId) => storeId !== id));
       setNotice({ ok: true, text: data.message ?? "Data produk toko selesai diperbarui." });
       await loadStores();
     } catch (e) {
+      setFailedSyncIds((ids) => ids.includes(id) ? ids : [...ids, id]);
       setNotice({ ok: false, text: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
     } finally { setSyncingId(null); }
   };
@@ -148,7 +152,7 @@ export default function StoreIntegration() {
 
   return (
     <div className="flex flex-col h-full font-sans">
-      {notice && <Feedback className="mb-4" variant={notice.ok ? "success" : "error"} title={notice.ok ? "Toko diperbarui" : "Koneksi belum berhasil"} description={notice.ok ? notice.text : friendlyError(notice.text, "Hubungkan kembali toko, lalu coba lagi.")} details={notice.ok ? undefined : notice.text} />}
+      {notice && <Feedback className="mb-4" variant={notice.ok ? "success" : "error"} title={notice.ok ? "Toko diperbarui" : "Koneksi belum berhasil"} description={notice.ok ? notice.text : friendlyError(notice.text, "Coba perbarui data toko lagi. Jika tetap gagal, periksa izin toko di marketplace.")} details={notice.ok ? undefined : notice.text} />}
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row items-start justify-between gap-4 mb-8 p-6 bg-muted border border-border rounded-xl">
         <div className="flex min-w-0 items-start gap-4">
@@ -213,7 +217,10 @@ export default function StoreIntegration() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={store.isFrozen ? "inactive" : store.status ?? "unlinked"} label={store.isFrozen ? "Dibekukan" : store.status === "connected" ? "Terhubung" : store.status === "expired" ? "Koneksi kedaluwarsa" : "Belum terhubung"} />
+                    <StatusBadge status={store.isFrozen ? "inactive" : store.status === "expired" && store.canRefresh ? "pending" : store.status ?? "unlinked"} label={store.isFrozen ? "Dibekukan" : store.status === "connected" ? "Terhubung" : store.status === "expired" ? store.canRefresh ? "Menunggu pembaruan" : "Perlu dihubungkan ulang" : "Belum terhubung"} />
+                    {!store.isFrozen && store.status === "expired" && store.canRefresh && (
+                      <div className="mt-1 max-w-[240px] text-xs text-muted-foreground">Koneksi akan dicoba diperbarui otomatis saat data toko disinkronkan.</div>
+                    )}
                     {store.businessName && (
                       <div className="text-xs text-muted-foreground mt-0.5">{store.businessName}</div>
                     )}
@@ -225,13 +232,12 @@ export default function StoreIntegration() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-3">
-                      {store.status !== "connected" && store.authorizePath && (
+                      {!store.isFrozen && store.authorizePath && ((store.status !== "connected" && !store.canRefresh) || failedSyncIds.includes(store.id)) && (
                         <button
                           onClick={() => {
-                            const sep = store.authorizePath!.includes("?") ? "&" : "?";
-                            window.location.assign(
-                              `${store.authorizePath!}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
-                            );
+                            const url = new URL(store.authorizePath!, window.location.origin);
+                            url.searchParams.set("businessId", getActiveBusinessId());
+                            window.location.assign(url.href);
                           }}
                           className="text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary px-3 py-1.5 rounded transition-colors"
                           title="Hubungkan ulang via OAuth"
@@ -242,8 +248,8 @@ export default function StoreIntegration() {
                       <button 
                         onClick={() => handleSync(store.id)}
                         aria-label={`Perbarui data ${store.name}`}
-                        disabled={syncingId !== null || store.isFrozen || store.status !== "connected"}
-                        className="text-foreground hover:bg-muted p-1.5 rounded transition-colors"
+                        disabled={syncingId !== null || store.isFrozen || (store.status !== "connected" && !store.canRefresh)}
+                        className="text-foreground hover:bg-muted p-1.5 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         title={syncingId === store.id ? "Memperbarui data produk…" : "Perbarui Data Produk Toko"}
                       >
                         <RefreshCw size={16} className={syncingId === store.id ? "animate-spin" : ""} />

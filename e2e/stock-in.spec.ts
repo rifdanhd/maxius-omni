@@ -47,11 +47,11 @@ test.afterAll(() => {
 
 test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => {
   await login(page);
-  await page.goto('/products/mapping');
-  await expect(page.getByRole('heading', { name: 'Mapping Stok Terpusat' })).toBeVisible({ timeout: 30_000 });
-
-  // Daftar varian kini di tab terpisah.
-  await page.getByTestId('mapping-tab-varian').click();
+  await page.goto('/inventory');
+  await expect(page.getByRole('heading', { name: 'Atur Stok Gudang' })).toBeVisible({ timeout: 30_000 });
+  const search = page.getByPlaceholder('Cari SKU / nama varian / produk…');
+  await search.fill(SKU);
+  await search.press('Enter');
 
   // Baris varian seed (SKU unik).
   const row = page.locator('tbody tr', { hasText: SKU }).first();
@@ -59,23 +59,24 @@ test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => 
   await expect(row).toContainText('0');
 
   // 1. Buka form Barang Masuk & isi qty 2.
-  await row.getByRole('button', { name: 'Barang Masuk' }).click();
-  const form = page.getByText(/Barang Masuk: E2E StockIn Master TMP/);
+  await row.getByRole('button', { name: 'Masuk', exact: true }).click();
+  const form = page.getByRole('dialog', { name: 'Stok Masuk' });
   await expect(form).toBeVisible();
   await page.screenshot({ path: SHOT('1-form-open') });
 
-  await page.locator('input[type="number"]').last().fill('2');
-  await page.getByText(/Catatan/).locator('..').locator('input[type="text"]').first().fill('e2e restock');
+  await form.getByLabel('Jumlah').fill('2');
+  await form.getByLabel('Catatan (opsional)').fill('e2e restock');
 
   // 2. Catat → stok berubah jadi 2.
-  await page.getByRole('button', { name: 'Catat' }).click();
-  await expect(row).toContainText('2', { timeout: 15_000 });
+  await form.getByRole('button', { name: 'Simpan Stok Masuk' }).click();
+  await expect(row.getByLabel(`Stok fisik ${SKU}`, { exact: true })).toHaveValue('2');
 
   // 3. Riwayat Stok memuat baris STOCK_IN +2.
-  await page.getByTestId('mapping-tab-riwayat').click();
-  await expect(page.getByText('Riwayat Stok (stock_ledger)')).toBeVisible({ timeout: 15_000 });
-  const ledgerRow = page.locator('tbody tr', { hasText: SKU }).filter({ hasText: 'STOCK_IN' }).first();
+  await row.getByLabel(`Lihat riwayat stok ${SKU}`).click();
+  const ledgerRow = page.locator('tbody tr').filter({ hasText: 'e2e restock' }).first();
   await expect(ledgerRow).toBeVisible({ timeout: 15_000 });
   await expect(ledgerRow).toContainText('+2');
+  expect(sql(`SELECT stock FROM "ProductVariant" WHERE id='${VAR_ID}';`)).toBe('2');
+  expect(sql(`SELECT COUNT(*) FROM "StockLedger" WHERE "variantId"='${VAR_ID}' AND "changeQty"=2;`)).toBe('1');
   await page.screenshot({ path: SHOT('2-ledger') });
 });

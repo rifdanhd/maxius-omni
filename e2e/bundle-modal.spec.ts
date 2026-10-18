@@ -58,14 +58,13 @@ async function openBundleModal(page: Page) {
   await expect(page.getByRole('heading', { name: 'Tambah Produk Bundle' })).toBeVisible();
 }
 
-test('dropdown menampilkan 4 opsi (2 aktif, 2 segera-hadir)', async ({ page }) => {
+test('dropdown menampilkan jalur tambah produk yang tersedia', async ({ page }) => {
   await login(page);
   await page.goto('/products');
   await expect(page.getByRole('heading', { name: 'Produk Master' })).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: /Tambah Produk Baru/ }).click();
   await expect(page.getByText('Tambah Produk Bundle')).toBeVisible();
-  await expect(page.getByText('Tambah dari Marketplace')).toBeVisible();
-  await expect(page.getByText('Segera hadir').first()).toBeVisible();
+  await expect(page.getByText('Tambah dari TikTok Shop', { exact: true })).toBeVisible();
   await page.screenshot({ path: SHOT('dropdown') });
 });
 
@@ -87,7 +86,7 @@ test('validasi: submit tanpa nama & tanpa komponen diblokir di frontend', async 
   await page.screenshot({ path: SHOT('validation') });
 });
 
-test('E2E: buat bundle 2 komponen → toast + tab Bundle', async ({ page }) => {
+test('E2E: buat bundle 2 komponen → katalog dan persistensi', async ({ page }) => {
   await login(page);
   await openBundleModal(page);
   await page.getByPlaceholder(/Paket Hemat/).fill(BUNDLE_NAME);
@@ -104,9 +103,7 @@ test('E2E: buat bundle 2 komponen → toast + tab Bundle', async ({ page }) => {
   await page.getByRole('button', { name: 'Simpan bundle' }).click();
   // Catatan: pakai string literal (substring match), BUKAN RegExp — nama bundle
   // mengandung kurung literal "(...)" yang berarti grup di sintaks RegExp.
-  await expect(page.getByText(`Produk bundle "${BUNDLE_NAME}" berhasil dibuat`)).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect.poll(() => sql(`SELECT COUNT(*) FROM "MasterProduct" WHERE name='${BUNDLE_NAME}';`)).toBe('1');
   // Modal tertutup + tab Bundle aktif + produk muncul
   await expect(page.getByRole('heading', { name: 'Tambah Produk Bundle' })).toBeHidden({ timeout: 10_000 });
   await expect(page.getByText(BUNDLE_NAME).first()).toBeVisible({ timeout: 30_000 });
@@ -119,10 +116,8 @@ test('E2E: buat bundle 2 komponen → toast + tab Bundle', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Produk Master' })).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByRole('button', { name: /^Lihat \d+ varian produk/ }).first()).toBeVisible({
-    timeout: 30_000,
-  });
   await page.getByRole('button', { name: /^Produk Bundle/ }).click();
   await expect(page.getByText(BUNDLE_NAME).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('row').filter({ hasText: BUNDLE_NAME }).getByRole('button', { name: 'Lihat 2 komponen bundle' })).toBeVisible();
   await page.screenshot({ path: SHOT('after-reload') });
 });

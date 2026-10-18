@@ -107,7 +107,9 @@ test('aksi satu produk dan bulk hanya mengirim pilihan serta mencegah klik ganda
   await expect(page.getByRole('button', { name: 'Menyinkronkan...' })).toBeDisabled();
   await expect.poll(() => bodies.length).toBe(1);
   expect(bodies[0]).toEqual({ products: [{ accountId: 'shop-1', productId: '100' }] });
-  await expect(page.locator('[data-app-toast="success"]')).toContainText('Sinkron selesai');
+  await page.getByRole('button', { name: /^Notifikasi/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Pusat notifikasi' })).toContainText('Sinkron selesai');
+  await page.keyboard.press('Escape');
   await expect(first).toBeVisible();
   await first.getByRole('checkbox').check();
   await page.getByTestId('shopee-product-row').nth(1).getByRole('checkbox').check();

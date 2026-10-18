@@ -91,6 +91,9 @@ await ok("worker resmi: job Shopee → retry (bukan sukses palsu), stok utuh", a
   const variant = await prisma.productVariant.create({
     data: { sku: "SHP-1", stock: 50, masterProductId: master.id },
   });
+  await prisma.productMapping.create({
+    data: { accountId: shopeeAcc.id, channelSku: "SP-1", variantId: variant.id, updatedAt: new Date() },
+  });
   await enqueueSyncJobs(variant.id, [{ accountId: shopeeAcc.id, channelSku: "SP-1" }], 50);
   const res = await processDueSyncJobs();
   assert.equal(res.succeeded, 0, "TIDAK boleh sukses palsu");

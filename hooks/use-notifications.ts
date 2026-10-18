@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { APPLICATION_NOTIFICATION_EVENT, localNotificationStorageKey, notificationStorageKey, readLocalNotifications, readNotificationMemory, reconcileNotifications, writeLocalNotifications, type ApplicationNotificationDetail, type NotificationItem, type NotificationMemory } from "@/lib/ui/notifications";
 
 type SyncResponse = { rows: Array<{ id: string; status: string; retryCount: number; updatedAt: string; account: { label: string }; variant: { productName: string } }>; nextCursor?: string | null };
-type Store = { id: string; name: string; status: string; isFrozen?: boolean; tokenExpiresAt?: string };
+type Store = { id: string; name: string; status: string; canRefresh?: boolean; isFrozen?: boolean; tokenExpiresAt?: string };
 type View = { scope: string; rows: NotificationItem[]; loading: boolean; failed: string[]; more: boolean };
 const initial: View = { scope: "", rows: [], loading: true, failed: [], more: false };
 
@@ -59,7 +59,7 @@ export function useNotifications() {
       } else { failed.push("sinkronisasi"); failedSources.add("sync"); }
       if (stores.status === "fulfilled") {
         for (const store of stores.value) {
-          if (store.status !== "expired" && !store.isFrozen) continue;
+          if (!store.isFrozen && (store.status !== "expired" || store.canRefresh)) continue;
           items.push({ id: `store:${store.id}`, source: "store", fingerprint: `${store.status}:${store.isFrozen}:${store.tokenExpiresAt}`, severity: "error", title: store.isFrozen ? "Koneksi toko dibekukan" : "Koneksi toko kedaluwarsa", description: `${store.name} · Periksa koneksi melalui Pengaturan Toko.`, href: "/settings/accounts" });
         }
       } else { failed.push("koneksi toko"); failedSources.add("store"); }

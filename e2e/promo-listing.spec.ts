@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { sql, login } from './helpers';
+import { sql, login, dbInfo } from './helpers';
 
 const SHOT = (n: string) =>
   `/Users/udan/Downloads/maxius-project/maxius-platform/e2e/screenshots/promo-listing-${n}.png`;
@@ -60,8 +60,8 @@ test.beforeAll(() => {
 test.afterAll(() => {
   // FK-safe: audit → item → activity → mapping → varian → produk → toko.
   sql(`DELETE FROM "PromotionAuditLog" WHERE "accountId" = '${ACCT}';`);
-  sql(`DELETE FROM "PromotionActivityItem" WHERE "activityId" = '${ACT}';`);
-  sql(`DELETE FROM "PromotionActivity" WHERE id = '${ACT}';`);
+  sql(`DELETE FROM "PromotionActivityItem" WHERE "activityId" IN (SELECT id FROM "PromotionActivity" WHERE "accountId"='${ACCT}');`);
+  sql(`DELETE FROM "PromotionActivity" WHERE "accountId" = '${ACCT}';`);
   sql(`DELETE FROM "ProductMapping" WHERE id = '${MAP}';`);
   sql(`DELETE FROM "ProductVariant" WHERE id = '${VAR}';`);
   sql(`DELETE FROM "MasterProduct" WHERE id = '${MP}';`);
@@ -85,7 +85,7 @@ test('listing promosi: activity tampil, bisa dicari/difilter, bertahan setelah r
   const title = page.getByText(TITLE);
   await expect(title).toBeVisible({ timeout: 30_000 });
   // Status + label toko ikut tampil di baris yang sama.
-  await expect(page.getByText('ONGOING').first()).toBeVisible();
+  await expect(page.locator('tbody tr').filter({ hasText: TITLE }).getByText('Aktif', { exact: true })).toBeVisible();
   // scope ke baris tabel — LABEL juga ada sebagai <option> filter toko (hidden).
   await expect(page.locator('tbody tr').filter({ hasText: LABEL })).toBeVisible();
   await page.screenshot({ path: SHOT('row') });
@@ -105,7 +105,7 @@ test('listing promosi: activity tampil, bisa dicari/difilter, bertahan setelah r
   await expect(page.getByText(TITLE)).toBeVisible({ timeout: 15_000 });
 
   // 4. Filter toko: hanya toko fixture yang dipilih → activity tetap tampil.
-  const storeFilter = page.locator('select').first();
+  const storeFilter = page.locator('select').nth(1);
   await storeFilter.selectOption(ACCT);
   await expect(page.getByText(TITLE)).toBeVisible({ timeout: 15_000 });
 
@@ -146,26 +146,48 @@ test('audit UNVERIFIED → banner peringatan + badge "Perlu cek manual" di listi
   await page.screenshot({ path: SHOT('unverified-banner') });
 
   // Tutup banner → badge di baris TETAP ada (hanya banner yang dismis).
-  await page.getByRole('button', { name: 'Tutup' }).click();
+  await page.getByRole('button', { name: 'Tutup', exact: true }).click();
   await expect(banner).toHaveCount(0);
   await expect(page.getByText('Perlu cek manual')).toBeVisible();
 
   sql(`DELETE FROM "PromotionAuditLog" WHERE id = '${ACT}-audit';`);
 });
 
-// BUG (belum diperbaiki): promo hasil wizard TIDAK pernah muncul di listing.
-// Root cause: POST /api/marketplace/tiktok/promotions/create hanya menulis
-// PromotionAuditLog (SUCCESS/TIKTOK_ERROR/UNVERIFIED) — TIDAK pernah membuat
-// PromotionActivity; halaman /promotions membaca PromotionActivity (diisi
-// ingest). Secara offline hasil create selalu "Promosi TIDAK jadi dibuat."
-// (akun tanpa accessToken/shopCipher → audit TIKTOK_ERROR, 400).
-// Ganti `test.fixme` → `test` bila create mulai menulis activity / ingest
-// otomatis dijalankan setelah create.
-test.fixme('promo hasil create muncul sendiri di listing promosi', async ({ page }) => {
+test('promo terverifikasi hasil create muncul sendiri di listing promosi', async ({ page }) => {
+  process.env.POSTGRES_URL = dbInfo().url;
+  process.env.DATABASE_URL = dbInfo().url;
+  const { prisma } = await import('../lib/db/prisma');
+  const { createPromotion } = await import('../lib/services/promotion-write.service-create');
+  const title = 'Promosi Hasil Wizard E2E';
+  const beginAt = new Date(Date.now() + 3 * 3600000);
+  const endAt = new Date(Date.now() + 27 * 3600000);
+  await prisma.platformAccount.update({ where: { id: ACCT }, data: { accessToken: 'fixture-token', shopCipher: 'fixture-cipher' } });
+  try {
+    const created = await createPromotion({
+      accountId: ACCT, userId: sql(`SELECT id FROM "User" WHERE username='admin';`), username: 'admin',
+      mappingIds: [MAP], discountByMappingId: { [MAP]: 10 },
+      title, beginAt: beginAt.toISOString(), endAt: endAt.toISOString(), confirmationWord: 'BUAT', acknowledgeActiveOverlap: true,
+    }, { client: {
+      create: async () => ({ activityId: 'fixture-created-promotion', status: 'NOT_START' }),
+      attach: async () => ({ totalCount: 1 }),
+      getById: async () => ({ code: 0, data: {
+        activity_id: 'fixture-created-promotion', title, activity_type: 'DIRECT_DISCOUNT', product_level: 'PRODUCT', status: 'NOT_START',
+        begin_time: Math.floor(beginAt.getTime() / 1000), end_time: Math.floor(endAt.getTime() / 1000),
+        products: [{ id: 'E2E-PL-P1', discount: '10' }],
+      } }),
+    } });
+    expect(created.ok && created.resultStatus).toBe('SUCCESS');
+  } finally {
+    await prisma.$disconnect();
+  }
   await login(page);
   await page.goto('/promotions');
   await expect(page.getByRole('heading', { name: 'Promosi Marketplace' })).toBeVisible({
     timeout: 30_000,
   });
+  await page.getByRole('button', { name: /^Akan Datang/ }).click();
   await expect(page.getByText('Promosi Hasil Wizard E2E')).toBeVisible({ timeout: 30_000 });
+  await page.reload();
+  await page.getByRole('button', { name: /^Akan Datang/ }).click();
+  await expect(page.getByText('Promosi Hasil Wizard E2E')).toBeVisible();
 });

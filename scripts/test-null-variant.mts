@@ -107,8 +107,8 @@ try {
   console.log("=== listShopeeProducts ===");
   const shopee = await listShopeeProducts({ businessId: BIZ });
   ok(shopee.total === 2, "shopee: 2 rows (mapped + unmapped) tanpa crash");
-  const shNull = shopee.rows.find((r) => r.key === "b1-map-shopee-null")!;
-  const shReal = shopee.rows.find((r) => r.key === "b1-map-shopee-real")!;
+  const shNull = shopee.rows.find((r) => r.channelSku === "B1-SH-NULL")!;
+  const shReal = shopee.rows.find((r) => r.channelSku === "B1-SH-REAL")!;
   ok(shNull !== undefined && shNull.variantId === null, "shopee unmapped: variantId null");
   ok(shNull.stockTotal === 0, "shopee unmapped: stockTotal fallback 0 (platformStock null)");
   ok(shReal.variantId === "b1-var1" && shReal.stockTotal === 42, "shopee mapped: variantId + stock variant normal");

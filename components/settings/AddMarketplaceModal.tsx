@@ -2,7 +2,7 @@
 
 import TikTokLogo from "@/components/icons/TikTokLogo";
 import ShopeeLogo from "@/components/icons/ShopeeLogo";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getActiveBusinessId } from "@/lib/utils/api-client";
 
 type PlatformConfig = {
@@ -17,10 +17,9 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
     // (flag server SHOPEE_AUTHORIZE_ENABLED di .env tetap sbg kill-switch admin).
     if (!authorizePath) return;
     // Bawa brand aktif: akun baru dibuat di brand ini (callback).
-    const sep = authorizePath.includes("?") ? "&" : "?";
-    window.location.assign(
-      `${authorizePath}${sep}businessId=${encodeURIComponent(getActiveBusinessId())}`
-    );
+    const url = new URL(authorizePath, window.location.origin);
+    url.searchParams.set("businessId", getActiveBusinessId());
+    window.location.assign(url.href);
   };
 
   // Lazada, Blibli, Shopify & WooCommerce dihapus dari modal (belum didukung).
@@ -30,18 +29,13 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 backdrop-blur-sm p-4">
-      <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card rounded-xl shadow-xl w-full max-w-2xl font-sans">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="gap-0 bg-card p-0 sm:max-w-2xl">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <h2 className="text-lg font-bold text-foreground">Pilih Marketplace</h2>
-          <button 
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
+        <DialogHeader className="border-b border-border px-6 py-4 pr-12 text-left">
+          <DialogTitle>Pilih Marketplace</DialogTitle>
+          <DialogDescription>Pilih marketplace untuk menghubungkan toko dan memberikan izin akses.</DialogDescription>
+        </DialogHeader>
 
         {/* Body */}
         <div className="p-6">
@@ -59,8 +53,8 @@ export default function AddMarketplaceModal({ onClose }: { onClose: () => void }
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

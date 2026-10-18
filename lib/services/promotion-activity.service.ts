@@ -111,7 +111,7 @@ async function storeItem(
   return true;
 }
 
-async function storeConfirmedActivity(accountId: string, payload: RemoteObject) {
+export async function storeConfirmedActivity(accountId: string, payload: RemoteObject) {
   const data = asObject(payload.data);
   const externalActivityId = asString(data?.activity_id);
   const title = asString(data?.title);

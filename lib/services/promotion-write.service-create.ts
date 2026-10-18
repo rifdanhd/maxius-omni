@@ -14,9 +14,9 @@
  * gagal / tidak cocok) → WAJIB memicu alert admin (lihat lib/services/
  * promotion-alert.service.ts), bukan SUCCESS palsu.
  */
-import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
+import { storeConfirmedActivity } from "@/lib/services/promotion-activity.service";
 import {
   MAX_PRODUCTS_PER_BATCH,
   computePriceRow,
@@ -442,11 +442,16 @@ export async function createPromotion(
         if (!matches) {
           finalStatus = "UNVERIFIED";
           unverifiedReason = `Get by ID tidak cocok (status=${remoteStatus ?? "?"}, begin=${remoteBegin ?? "?"}, end=${remoteEnd ?? "?"}).`;
+        } else if (data.activity_id !== externalActivityId) {
+          finalStatus = "UNVERIFIED";
+          unverifiedReason = "ID promosi dari hasil verifikasi tidak cocok dengan promosi yang dibuat.";
+        } else {
+          await storeConfirmedActivity(req.accountId, remote);
         }
       } catch (error) {
         const info = extractError(error);
         finalStatus = "UNVERIFIED";
-        unverifiedReason = `Get by ID gagal: ${info.message}`;
+        unverifiedReason = `Verifikasi atau penyimpanan hasil promosi gagal: ${info.message}`;
       }
     }
 

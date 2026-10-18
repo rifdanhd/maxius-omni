@@ -58,6 +58,11 @@ function plusHours(h: number): string {
 }
 
 test('A: wizard campaign promosi TikTok end-to-end', async ({ page }) => {
+  let creates = 0;
+  await page.route('**/api/marketplace/tiktok/promotions/create', (route) => {
+    creates++;
+    return route.fulfill({ json: { ok: true, resultStatus: 'SUCCESS', title: 'Promosi pengujian lokal', attachedCount: 1, externalActivityId: 'fixture-activity' } });
+  });
   // 1. Login.
   await page.goto('/login');
   await page.getByPlaceholder('Masukkan username').fill('admin');
@@ -172,5 +177,6 @@ test('A: wizard campaign promosi TikTok end-to-end', async ({ page }) => {
   const unverified = page.getByText(/perlu pengecekan manual/);
   const failed = page.getByText('Promosi TIDAK jadi dibuat.');
   await expect(success.or(unverified).or(failed)).toBeVisible({ timeout: 180_000 });
+  expect(creates).toBe(1);
   await page.screenshot({ path: SHOT('a7-create-result') });
 });

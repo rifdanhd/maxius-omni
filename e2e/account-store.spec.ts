@@ -33,7 +33,7 @@ test('daftar toko: baris tampil dengan platform, status & brand yang benar', asy
   const row = page.locator('tr', { hasText: LABEL });
   await expect(row).toBeVisible({ timeout: 30_000 });
   await expect(row).toContainText('TikTok Shop');
-  await expect(row).toContainText('Terputus'); // tanpa token
+  await expect(row).toContainText('Belum terhubung');
   await expect(row).toContainText('Maxius'); // businessName dari brand aktif
   await page.screenshot({ path: SHOT('list') });
 });
@@ -48,7 +48,8 @@ test('modal Tambah Marketplace: 2 kartu (Shopee logo resmi + TikTok Shop), sisan
   ).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole('button', { name: 'Tambahkan Marketplace' }).click();
-  await expect(page.getByRole('heading', { name: 'Pilih Marketplace' })).toBeVisible();
+  const modal = page.getByRole('dialog', { name: 'Pilih Marketplace' });
+  await expect(modal).toBeVisible();
 
   // Lazada, Blibli, Shopify & WooCommerce sudah dihapus dari modal.
   for (const name of ['Lazada', 'Blibli', 'Shopify', 'WooCommerce']) {
@@ -59,7 +60,7 @@ test('modal Tambah Marketplace: 2 kartu (Shopee logo resmi + TikTok Shop), sisan
   for (const name of ['Shopee', 'TikTok Shop']) {
     // exact: false — kartu TikTok membawa <img alt="TikTok Shop"> sehingga
     // accessible name-nya jadi "TikTok Shop TikTok Shop".
-    await expect(page.getByRole('button', { name })).toBeVisible();
+    await expect(modal.getByRole('button', { name })).toBeVisible();
   }
   // Shopee: ikon = logo brand asli (path fill token tema brand), bukan ikon lucide.
   await expect(
@@ -94,9 +95,8 @@ test('hapus toko lewat UI: konfirmasi → baris hilang → data terhapus dari DB
   await expect(row).toBeVisible({ timeout: 30_000 });
   expect(sql(`SELECT COUNT(*) FROM "PlatformAccount" WHERE id = '${ACCT}';`)).toBe('1');
 
-  // window.confirm + alert sama-sama ditangani (auto-accept).
-  page.on('dialog', (d) => d.accept());
   await row.getByTitle('Hapus').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Hapus', exact: true }).click();
 
   await expect(page.locator('tr', { hasText: LABEL })).toHaveCount(0, { timeout: 30_000 });
   expect(sql(`SELECT COUNT(*) FROM "PlatformAccount" WHERE id = '${ACCT}';`)).toBe('0');
