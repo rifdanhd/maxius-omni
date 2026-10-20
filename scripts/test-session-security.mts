@@ -7,6 +7,11 @@ assert.equal(isSameOriginRequest(new NextRequest("http://localhost:3000/api", { 
 assert.equal(allowedRole("staff", "PUT", "/api/inventory/settings"), false);
 assert.equal(allowedRole("admin", "PUT", "/api/inventory/settings"), true);
 assert.equal(allowedRole("unknown", "GET", "/api/orders"), false);
+assert.equal(allowedRole("reviewer", "GET", "/api/orders"), true);
+assert.equal(allowedRole("reviewer", "HEAD", "/api/products"), true);
+assert.equal(allowedRole("reviewer", "POST", "/api/orders"), false);
+assert.equal(allowedRole("reviewer", "GET", "/api/product-copy/parse"), false);
+assert.equal(allowedRole("reviewer", "POST", "/api/product-copy/parse"), false);
 const limit = new RateLimiter(1);
 assert.equal(limit.allow("a", 1, 1000, 0), true);
 assert.equal(limit.allow("a", 1, 1000, 1), false);

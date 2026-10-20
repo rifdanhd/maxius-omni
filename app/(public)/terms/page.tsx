@@ -32,7 +32,7 @@ export default function TermsPage() {
         <li>You are responsible for the accounts you create in MAXIUS and for keeping your credentials safe.</li>
         <li>You are responsible for the stores you connect and for the content of the data synced from them.</li>
         <li>You confirm you have the right to authorize MAXIUS to access those stores.</li>
-        <li>You must use the service in line with the marketplace platforms' own rules.</li>
+        <li>You must use the service in line with the marketplace platforms&apos; own rules.</li>
       </ul>
 
       <H2>Limitation of liability</H2>

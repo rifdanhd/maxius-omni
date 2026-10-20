@@ -108,6 +108,13 @@ async function postShopApi(
   creds?: ShopeeCreds
 ): Promise<Record<string, unknown>> {
   const c = creds ?? envShopeeCreds();
+
+  // Guard simulasi demo: jika akun terafiliasi dengan bisnis demo, bypass panggilan keluar
+  const { isShopIdentifierDemo } = await import("@/lib/services/demo-guard.service");
+  if (await isShopIdentifierDemo({ shopId, accessToken })) {
+    return { simulated: true, shop_id: shopId, message: "Demo simulation - no external call made" };
+  }
+
   const timestamp = Math.floor(Date.now() / 1000);
   const sign = signShopApi(apiPath, timestamp, accessToken, shopId, c);
   const qs = new URLSearchParams({
@@ -135,6 +142,13 @@ async function getShopApi(
   query?: Record<string, string | number | string[] | number[]>
 ): Promise<Record<string, unknown>> {
   const c = creds ?? envShopeeCreds();
+
+  // Guard simulasi demo: jika akun terafiliasi dengan bisnis demo, bypass panggilan keluar
+  const { isShopIdentifierDemo } = await import("@/lib/services/demo-guard.service");
+  if (await isShopIdentifierDemo({ shopId, accessToken })) {
+    return { simulated: true, shop_id: shopId, order_list: [], item_list: [], total_count: 0 };
+  }
+
   const timestamp = Math.floor(Date.now() / 1000);
   const sign = signShopApi(apiPath, timestamp, accessToken, shopId, c);
   const qs = new URLSearchParams({

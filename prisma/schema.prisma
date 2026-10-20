@@ -38,6 +38,7 @@ model BundleItem {
 model Business {
   id              String            @id @default(cuid())
   name            String
+  isDemo          Boolean           @default(false)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime @updatedAt
   masterProduct   MasterProduct[]

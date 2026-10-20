@@ -89,6 +89,16 @@ async function callApi(
     allQueryParams.shop_cipher = shopCipher;
   }
 
+  // Guard simulasi demo: jika akun terafiliasi dengan bisnis demo, bypass panggilan keluar
+  const { isShopIdentifierDemo } = await import("@/lib/services/demo-guard.service");
+  if (await isShopIdentifierDemo({ shopCipher, accessToken })) {
+    return {
+      code: 0,
+      message: "success (demo simulated)",
+      data: { simulated: true, products: [], total_count: 0, orders: [] },
+    };
+  }
+
   const sign = generateSign(apiPath, allQueryParams, body, creds);
   allQueryParams.sign = sign;
 

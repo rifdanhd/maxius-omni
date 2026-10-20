@@ -22,75 +22,104 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+const isDryRun = process.argv.includes("--dry-run");
+
 async function main() {
+  if (isDryRun) {
+    console.log("🔍 MODE DRY-RUN AKTIF: Tidak ada data yang akan diubah di database.\n");
+  }
+
   const brands = [
-    { id: "business-default", name: "Maxius" },
-    { id: "business-raxen", name: "Raxen" },
-    { id: "business-kaos-kaki-sport", name: "Kaos Kaki Sport" },
-    { id: "business-den-sport", name: "Den Sport" },
-    { id: "business-getobdg", name: "Geto.bdg" },
+    { id: "business-default", name: "Maxius", isDemo: false },
+    { id: "business-raxen", name: "Raxen", isDemo: false },
+    { id: "business-kaos-kaki-sport", name: "Kaos Kaki Sport", isDemo: false },
+    { id: "business-den-sport", name: "Den Sport", isDemo: false },
+    { id: "business-getobdg", name: "Geto.bdg", isDemo: false },
   ];
+
+  console.log("1. Evaluasi Bisnis Produksi (5 Brand Fondasi):");
   for (const b of brands) {
-    // business-default existing di production di-rename (bukan duplikat).
-    await prisma.business.upsert({
-      where: { id: b.id },
-      update: { name: b.name },
-      create: { id: b.id, name: b.name },
-    });
-  }
-  console.log(`✅ Business: ${brands.map((b) => b.name).join(", ")}`);
-
-  // Password RANDOM — dicetak SEKALI ke terminal ini saja, tidak disimpan di
-  // file/log manapun. Operator wajib mencatatnya lalu ganti setelah login pertama.
-  const adminPassword = crypto.randomBytes(18).toString("base64url");
-  const passwordHash = bcrypt.hashSync(adminPassword, 10);
-  const admin = await prisma.user.upsert({
-    where: { username: "admin" },
-    update: {},
-    create: { id: crypto.randomUUID(), username: "admin", passwordHash, canViewFullPii: true },
-  });
-  const adminCreated = admin.passwordHash === passwordHash;
-  if (adminCreated) {
-    console.log(`✅ User: username=admin`);
-    console.log(`\n⚠️  PASSWORD ADMIN (cetak sekali, catat sekarang):\n\n   ${adminPassword}\n`);
-  } else {
-    console.log(`✅ User: username=admin (sudah ada — password TIDAK diubah)`);
-  }
-
-  const setting = await prisma.inventorySetting.upsert({
-    where: { id: "inventory-default" },
-    update: {},
-    create: { id: "inventory-default" },
-  });
-  console.log(`✅ InventorySetting: id=${setting.id}`);
-
-  for (const c of [
-    { id: "app-cred-shopee-legacy", platform: "SHOPEE", label: "Legacy ENV (Seller app)" },
-    { id: "app-cred-tiktok-legacy", platform: "TIKTOK_SHOP", label: "Legacy ENV" },
-  ]) {
-    await prisma.appCredential.upsert({
-      where: { platform_label: { platform: c.platform, label: c.label } },
-      update: {},
-      create: { id: c.id, platform: c.platform, label: c.label },
-    });
-  }
-  console.log(`✅ AppCredential: Legacy ENV (Shopee + TikTok)`);
-
-  // Bootstrap owner only; never grant every existing user all businesses.
-  const [users, businesses] = await Promise.all([
-    prisma.user.findMany({ where: { id: admin.id }, select: { id: true, username: true } }),
-    prisma.business.findMany({ select: { id: true } }),
-  ]);
-  for (const u of users) {
-    for (const b of businesses) {
-      await prisma.userBusiness.upsert({
-        where: { userId_businessId: { userId: u.id, businessId: b.id } },
-        update: {},
-        create: { userId: u.id, businessId: b.id, role: "owner" },
+    const existing = await prisma.business.findUnique({ where: { id: b.id } });
+    if (existing) {
+      console.log(`   - [EXISTING] Business id="${b.id}" name="${existing.name}" (isDemo: ${existing.isDemo}) -> update name: "${b.name}", isDemo: false`);
+    } else {
+      console.log(`   - [CREATE]   Business id="${b.id}" name="${b.name}" isDemo=false`);
+    }
+    if (!isDryRun) {
+      await prisma.business.upsert({
+        where: { id: b.id },
+        update: { name: b.name, isDemo: false },
+        create: { id: b.id, name: b.name, isDemo: false },
       });
     }
   }
-  console.log(`✅ UserBusiness: ${users.length} user × ${businesses.length} brand`);
+
+  console.log("\n2. Evaluasi User Admin:");
+  const existingAdmin = await prisma.user.findUnique({ where: { username: "admin" } });
+  let adminId = existingAdmin?.id;
+  if (existingAdmin) {
+    console.log(`   - [EXISTING] User 'admin' id="${existingAdmin.id}" sudah ada. Password TIDAK diubah.`);
+  } else {
+    console.log("   - [CREATE]   User 'admin' belum ada -> akan dibuat dengan ID random dan password baru.");
+    if (!isDryRun) {
+      const adminPassword = crypto.randomBytes(18).toString("base64url");
+      const passwordHash = bcrypt.hashSync(adminPassword, 10);
+      adminId = crypto.randomUUID();
+      await prisma.user.create({
+        data: { id: adminId, username: "admin", passwordHash, canViewFullPii: true },
+      });
+      console.log(`\n⚠️  PASSWORD ADMIN (cetak sekali, catat sekarang):\n\n   ${adminPassword}\n`);
+    }
+  }
+
+  console.log("\n3. Evaluasi InventorySetting:");
+  const existingSetting = await prisma.inventorySetting.findUnique({ where: { id: "inventory-default" } });
+  if (existingSetting) {
+    console.log(`   - [EXISTING] InventorySetting id="inventory-default" sudah ada.`);
+  } else {
+    console.log(`   - [CREATE]   InventorySetting id="inventory-default" akan dibuat.`);
+    if (!isDryRun) {
+      await prisma.inventorySetting.create({ data: { id: "inventory-default" } });
+    }
+  }
+
+  console.log("\n4. Evaluasi AppCredential (Shopee + TikTok Legacy ENV):");
+  const creds = [
+    { id: "app-cred-shopee-legacy", platform: "SHOPEE", label: "Legacy ENV (Seller app)" },
+    { id: "app-cred-tiktok-legacy", platform: "TIKTOK_SHOP", label: "Legacy ENV" },
+  ];
+  for (const c of creds) {
+    const existingCred = await prisma.appCredential.findUnique({
+      where: { platform_label: { platform: c.platform, label: c.label } },
+    });
+    if (existingCred) {
+      console.log(`   - [EXISTING] AppCredential platform="${c.platform}" label="${c.label}" id="${existingCred.id}"`);
+    } else {
+      console.log(`   - [CREATE]   AppCredential platform="${c.platform}" label="${c.label}" id="${c.id}"`);
+      if (!isDryRun) {
+        await prisma.appCredential.create({ data: c });
+      }
+    }
+  }
+
+  console.log("\n5. Evaluasi Hak Akses UserBusiness (Admin -> 5 Brand, Role: owner):");
+  if (adminId) {
+    for (const b of brands) {
+      const existingUb = await prisma.userBusiness.findUnique({
+        where: { userId_businessId: { userId: adminId, businessId: b.id } },
+      });
+      if (existingUb) {
+        console.log(`   - [EXISTING] UserBusiness userId="${adminId}" businessId="${b.id}" role="${existingUb.role}"`);
+      } else {
+        console.log(`   - [CREATE]   UserBusiness userId="${adminId}" businessId="${b.id}" role="owner"`);
+        if (!isDryRun) {
+          await prisma.userBusiness.create({
+            data: { userId: adminId, businessId: b.id, role: "owner" },
+          });
+        }
+      }
+    }
+  }
 
   const counts = await Promise.all([
     prisma.user.count(),
@@ -99,9 +128,13 @@ async function main() {
     prisma.appCredential.count(),
     prisma.userBusiness.count(),
   ]);
+
   console.log(
-    `\nRingkasan DB: users=${counts[0]}, businesses=${counts[1]}, accounts=${counts[2]}, credentials=${counts[3]}, userBusiness=${counts[4]}`
+    `\nRingkasan Database Saat Ini: users=${counts[0]}, businesses=${counts[1]}, accounts=${counts[2]}, credentials=${counts[3]}, userBusiness=${counts[4]}`
   );
+  if (isDryRun) {
+    console.log("\n✅ HASIL DRY-RUN: Konfirmasi 100% aman — 0 baris database diubah.");
+  }
 }
 
 main()

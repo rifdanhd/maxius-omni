@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/utils/api";
+import { NextResponse } from "next/server";
+import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   parseProductFromUrl,
   CopyError,
@@ -8,7 +8,11 @@ import {
 
 // POST /api/product-copy/parse
 // Body: { url: string } → ambil HTML halaman produk publik & parse (tanpa simpan).
-export const POST = withAuth(async (req: NextRequest) => {
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
+  if (req.user?.role === "reviewer") {
+    return NextResponse.json({ ok: false, error: "Akses ditolak untuk role reviewer." }, { status: 403 });
+  }
+
   const body = (await req.json().catch(() => null)) as { url?: unknown } | null;
   const url = typeof body?.url === "string" ? body.url.trim() : "";
   if (!url) {
