@@ -9,6 +9,16 @@ import {
 } from "@/lib/services/central-stock.service";
 import { resolveTiktokCreds } from "@/lib/services/app-credential.service";
 import { upsertTikTokReturn } from "@/lib/services/return-ingest.service";
+import { getOrderDetail } from "@/lib/integrations/tiktokShop";
+import { ingestTikTokOrdersPage, OrderRaw } from "@/lib/services/order-sync.service";
+
+export async function GET() {
+  return Response.json({
+    status: "ok",
+    service: "tiktok-webhook",
+    timestamp: new Date().toISOString(),
+  });
+}
 
 async function listActiveTiktokSecrets(): Promise<Array<{ appKey: string; appSecret: string }>> {
   const rows = await prisma.appCredential.findMany({
@@ -169,30 +179,27 @@ export async function POST(req: NextRequest) {
           message: "Otorisasi TikTok segera kedaluwarsa — minta seller authorize ulang.",
           payload: rawBody,
         });
-      } else switch (payload.type) {
-        case 1:
-          await handleOrderStatusChange(account.id, rawBody, payload);
-          break;
-        case 5:
-          await handleProductStatusChange(account.id, rawBody, payload);
-          break;
-        // Return & Refund: 12 = return status change, 64 = aftersales request
-        // status, 65 = RMA status, 67 = refund success. Semua → funnel ingest
-        // retur yang sama (idempoten per return_id).
-        case 12:
-        case 64:
-        case 65:
-        case 67:
-          await handleReturnStatusChange(account.id, rawBody, payload);
-          break;
-        default:
-          await logSync({
-            accountId: account.id,
-            kind: `unknown_type_${String(payload.type)}`,
-            status: "skipped",
-            message: "Topik webhook tidak dikenali / tidak disubscribe.",
-            payload: rawBody,
-          });
+      } else if (payload.type === 1 || eventName === "ORDER_STATUS_CHANGE") {
+        await handleOrderStatusChange(account.id, rawBody, payload);
+      } else if (payload.type === 5 || eventName === "PRODUCT_STATUS_CHANGE") {
+        await handleProductStatusChange(account.id, rawBody, payload);
+      } else if (
+        payload.type === 12 ||
+        payload.type === 64 ||
+        payload.type === 65 ||
+        payload.type === 67 ||
+        eventName === "RETURN_STATUS_CHANGE" ||
+        eventName === "REVERSE_STATUS_UPDATE"
+      ) {
+        await handleReturnStatusChange(account.id, rawBody, payload);
+      } else {
+        await logSync({
+          accountId: account.id,
+          kind: `unknown_type_${String(payload.type ?? eventName)}`,
+          status: "skipped",
+          message: "Topik webhook tidak dikenali / tidak disubscribe.",
+          payload: rawBody,
+        });
       }
     } catch (err) {
       const message = err instanceof Error ? err.stack ?? err.message : String(err);
@@ -236,17 +243,57 @@ async function handleOrderStatusChange(
     return;
   }
 
-  const mapping = await prisma.platformOrderMapping.findUnique({
+  let mapping = await prisma.platformOrderMapping.findUnique({
     where: { accountId_externalOrderId: { accountId, externalOrderId } },
     select: { id: true, orderId: true, rawStatus: true, lastWebhookUpdateTime: true },
   });
+
+  if (!mapping) {
+    // Auto-ingest jika order baru pertama kali diterima via real-time webhook
+    try {
+      const account = await prisma.platformAccount.findUnique({
+        where: { id: accountId },
+        select: { accessToken: true, shopCipher: true },
+      });
+      if (account?.accessToken && account.shopCipher) {
+        const orderData = await getOrderDetail(account.accessToken, externalOrderId, account.shopCipher);
+        if (orderData) {
+          const syncRes = {
+            fetched: 1,
+            created: 0,
+            skipped: 0,
+            errors: [],
+            reconciled: 0,
+            reconcileScan: 0,
+            trackingEvents: 0,
+          };
+          await ingestTikTokOrdersPage(prisma, accountId, [orderData as OrderRaw], syncRes);
+          mapping = await prisma.platformOrderMapping.findUnique({
+            where: { accountId_externalOrderId: { accountId, externalOrderId } },
+            select: { id: true, orderId: true, rawStatus: true, lastWebhookUpdateTime: true },
+          });
+          if (mapping) {
+            await logSync({
+              accountId,
+              kind: "order_auto_ingest",
+              status: "success",
+              message: `Order ${externalOrderId} berhasil di-ingest via real-time webhook`,
+              payload: rawBody,
+            });
+          }
+        }
+      }
+    } catch (ingestErr) {
+      console.warn(`[webhook] auto-ingest order ${externalOrderId} gagal:`, ingestErr);
+    }
+  }
 
   if (!mapping) {
     await logSync({
       accountId,
       kind: "order_status_change",
       status: "error",
-      errorMessage: "order belum di-sync, jalankan /api/orders/sync manual",
+      errorMessage: "order belum di-sync dan auto-ingest gagal, jalankan /api/orders/sync manual",
       payload: rawBody,
     });
     return;

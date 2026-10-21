@@ -443,6 +443,27 @@ export async function getOrders(
 }
 
 /**
+ * getOrderDetail — ambil 1 detail order TikTok Shop berdasarkan order ID.
+ * GET /order/202309/orders?ids={orderId}
+ */
+export async function getOrderDetail(
+  accessToken: string,
+  orderId: string,
+  shopCipher?: string
+): Promise<Record<string, unknown> | null> {
+  const result = await callApi(
+    "GET",
+    "/order/202309/orders",
+    accessToken,
+    { ids: orderId },
+    null,
+    shopCipher
+  );
+  const data = result.data as { orders?: Array<Record<string, unknown>> } | undefined;
+  return data?.orders?.[0] ?? null;
+}
+
+/**
  * getProduct — cari 1 produk TikTok via channelSku.
  * channelSku bisa berupa `seller_sku` ATAU `sku.id` ATAU `product.id`,
  * karena banyak produk (mis. RIKI) punya seller_sku kosong.
