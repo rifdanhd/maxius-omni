@@ -75,19 +75,23 @@ for v in SHOPEE_PARTNER_ID SHOPEE_PARTNER_KEY SHOPEE_REDIRECT_URI \
          TIKTOK_APP_KEY TIKTOK_APP_SECRET TIKTOK_REDIRECT_URI TIKTOK_SERVICE_ID TIKTOK_AUTHORIZE_URL WEBHOOK_BASE_URL; do
   grep -qE "^${v}=.+" .env || warn_missing+=("$v")
 done
-[ "${#warn_missing[@]}" -gt 0 ] && log "PERINGATAN non-fatal — env belum diisi: ${warn_missing[*]}"
+if [ "${#warn_missing[@]}" -gt 0 ]; then
+  log "PERINGATAN non-fatal — env belum diisi: ${warn_missing[*]}"
+fi
 
 # Kondisi nilai yang terlihat publik/aman-divalidasi (bukan rahasia):
-grep -qE '^TIKTOK_REDIRECT_(URI|URL)=.*vercel\.app' .env 2>/dev/null &&
+if grep -qE '^TIKTOK_REDIRECT_(URI|URL)=.*vercel\.app' .env 2>/dev/null; then
   STALE_ENV_WARN+=("TIKTOK_REDIRECT_URI/URL masih menunjuk vercel.app — ganti ke https://maxius.id/...")
-grep -qE '^WEBHOOK_BASE_URL=.*ngrok' .env 2>/dev/null &&
+fi
+if grep -qE '^WEBHOOK_BASE_URL=.*ngrok' .env 2>/dev/null; then
   STALE_ENV_WARN+=("WEBHOOK_BASE_URL masih ngrok — ganti ke https://maxius.id")
+fi
 env_port="$(grep -E '^PORT=' .env | tail -1 | cut -d= -f2- | tr -d '"'\'' ' || true)"
 if [ -n "$env_port" ] && [ "$env_port" != "3000" ]; then
   STALE_ENV_WARN+=("PORT di .env = ${env_port}, tapi unit systemd memakai -p 3000 — samakan (unit memaksa 3000)")
 fi
 for w in "${STALE_ENV_WARN[@]:-}"; do
-  [ -n "$w" ] && log "PERINGATAN: $w"
+  if [ -n "$w" ]; then log "PERINGATAN: $w"; fi
 done
 
 # ── 1b. Bentrok pm2 — hanya BERBAHAYA bila pm2 memegang port 3000 ────────────
