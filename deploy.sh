@@ -99,7 +99,7 @@ done
 #  yang ditolak hanya bila salah satu proses pm2 memegang port 3000 = milik
 #  maxius-omni → restart systemd pasti bentrok.)
 if command -v pm2 >/dev/null 2>&1 && pm2 jlist 2>/dev/null | grep -q '"name"'; then
-  pm2_pids="$(pm2 jlist 2>/dev/null | grep -oE '"pid":[0-9]+' | cut -d: -f2 | sort -u)"
+  pm2_pids="$(pm2 jlist 2>/dev/null | grep -oE '"pid":[0-9]+' | cut -d: -f2 | sort -u || true)"
   port3000_pids="$(ss -ltnpH 'sport = :3000' 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)"
   conflict_pid=""
   for p in $port3000_pids; do
