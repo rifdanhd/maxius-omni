@@ -106,7 +106,21 @@ export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
         }
       } catch (e) {
         out.errors += 1;
-        console.warn(`[AutoSync] order akun ${acc.id} gagal:`, e instanceof Error ? e.message : String(e));
+        const errMsg = e instanceof Error ? e.message : String(e);
+        console.warn(`[AutoSync] order akun ${acc.id} gagal:`, errMsg);
+        // Tulis error ke SyncLog agar kegagalan (mis. token expired) terlihat di UI.
+        await prisma.syncLog
+          .create({
+            data: {
+              direction: "in",
+              kind: "order_sync",
+              status: "error",
+              message: `auto-sync gagal: ${errMsg.slice(0, 500)}`,
+              payload: JSON.stringify({ error: errMsg }),
+              accountId: acc.id,
+            },
+          })
+          .catch(() => {});
       }
     }
     return out;

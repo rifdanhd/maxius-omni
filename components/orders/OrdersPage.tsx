@@ -895,17 +895,19 @@ export default function OrdersPage() {
 
   const handlePickupSuccessClose = async () => {
     setPickupResult(null);
-    await refreshList();
+    // Refresh ringan setelah tutup — tidak blocking, tidak mengganggu UX.
+    void refreshList().catch(() => {});
   };
 
   const handleOpenPrintLabels = (successfulOrderIds: string[]) => {
     setPrintOrderIds(successfulOrderIds);
+    // Tutup PickupSuccessModal lalu buka PrintMethodModal langsung.
+    setPickupResult(null);
     setShowPrintModal(true);
   };
 
   const handlePrintDone = async () => {
     setShowPrintModal(false);
-    setPickupResult(null);
     setPrintOrderIds([]);
     await refreshList();
   };
@@ -1366,7 +1368,7 @@ export default function OrdersPage() {
         />
       )}
 
-      {showPrintModal && pickupResult && (
+      {showPrintModal && printOrderIds.length > 0 && (
         <PrintMethodModal
           title={`Label Pengiriman (${printOrderIds.length})`}
           orderIds={printOrderIds}
