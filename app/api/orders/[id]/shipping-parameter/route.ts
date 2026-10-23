@@ -54,6 +54,7 @@ export const GET = withAuth(
       return NextResponse.json({ ok: true, orderNo: order.orderNo, ...param });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[shipping-parameter] Gagal mengambil opsi pengiriman order ${order.orderNo}:`, e);
       return NextResponse.json({ ok: false, error: msg }, { status: 502 });
     }
   }
