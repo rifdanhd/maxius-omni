@@ -237,10 +237,11 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
   else
     log "Tidak ada build produksi lama (BUILD_ID); backup dilewati"
   fi
+  export CI=1
   export NEXT_TELEMETRY_DISABLED=1
   export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
   log "NEXT_PUBLIC_ENABLE_OFFICE=false npm run build -- --webpack  (NODE_OPTIONS=${NODE_OPTIONS})"
-  if NEXT_PUBLIC_ENABLE_OFFICE=false npm run build -- --webpack; then
+  if NEXT_PUBLIC_ENABLE_OFFICE=false npm run build -- --webpack && [ -s .next/BUILD_ID ]; then
     :
   else
     if [ "$build_backup_created" = "1" ]; then
@@ -250,7 +251,7 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
       cp -a -- .next.bak .next
       log "Build gagal; .next lama dipulihkan, .next.bak tetap tersedia"
     fi
-    die "build gagal — service tidak direstart"
+    die "build gagal atau .next/BUILD_ID tidak ditemukan — service tidak direstart"
   fi
 else
   log "SKIP_BUILD=1 — build dilewati"

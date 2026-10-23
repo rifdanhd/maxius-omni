@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.tiktokcdn-us.com" },
     ],
   },
+  experimental: {
+    // Disable automated upgrade prompts during build on interactive terminals
+    // @ts-expect-error Next 16 experimental option
+    agentUpgrade: false,
+  },
 };
 
 export default nextConfig;
