@@ -16,7 +16,6 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     // Disable automated upgrade prompts during build on interactive terminals
-    // @ts-expect-error Next 16 experimental option
     agentUpgrade: false,
   },
 };
