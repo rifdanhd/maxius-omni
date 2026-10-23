@@ -276,12 +276,12 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 if [ "$ok" != "1" ]; then
-  "$JOURNAL" -u "$SVC" -n 40 --no-pager || true
+  $JOURNAL -u "$SVC" -n 40 --no-pager || true
   die "service tidak sehat (log journal di atas)"
 fi
 
 # ── 10. Verifikasi instrumentation (auto-retry SyncJob) ───────────────────────
-if [ -n "$JOURNAL" ] && "$JOURNAL" -u "$SVC" --since "-5 min" --no-pager 2>/dev/null |
+if [ -n "$JOURNAL" ] && $JOURNAL -u "$SVC" --since "-5 min" --no-pager 2>/dev/null |
   grep -qF '[SyncRetry] auto-retry SyncJob aktif'; then
   log "instrumentation OK — [SyncRetry] auto-retry SyncJob aktif"
 else
