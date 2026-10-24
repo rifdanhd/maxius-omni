@@ -17,6 +17,7 @@
  * by cursor). Progres live dibaca UI via GET /api/orders/sync/status.
  */
 import { prisma } from "@/lib/db/prisma";
+import { DEFAULT_INITIAL_ORDER_SYNC_DAYS, initialOrderSyncDays } from "@/lib/services/order-sync-range.policy";
 import { getOrderList, ShopeeRateLimitError } from "@/lib/integrations/shopee";
 import { getOrders } from "@/lib/integrations/tiktokShop";
 import {
@@ -33,7 +34,7 @@ import {
 const KIND = "orders";
 /** Jendela waktu Shopee per panggilan — batas resmi get_order_list. */
 const WINDOW_SEC = 15 * 86400;
-const INITIAL_SYNC_DAYS = 30;
+const INITIAL_SYNC_DAYS = DEFAULT_INITIAL_ORDER_SYNC_DAYS;
 /** Jeda antar halaman (di luar jeda rate-limit) agar tidak membanjiri API. */
 const PAGE_DELAY_MS = 400;
 /** Retry per halaman sebelum run dinyatakan FAILED (resumable). */
@@ -82,10 +83,10 @@ export type EnqueueAccountResult = {
  */
 export async function enqueueOrderRuns(
   businessId: string,
-  opts?: { full?: boolean; history?: { from: Date; to: Date } }
+  opts?: { full?: boolean; history?: { from: Date; to: Date }; accountId?: string }
 ): Promise<EnqueueAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
-    where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, businessId },
+    where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, businessId, isFrozen: false, ...(opts?.accountId ? { id: opts.accountId } : {}) },
     select: {
       id: true,
       label: true,
@@ -137,12 +138,13 @@ export async function enqueueOrderRuns(
       runId = resumable.id;
     } else {
       const now = new Date();
+      const initialDays = initialOrderSyncDays(acc.externalShopId);
       const since = opts?.full || opts?.history ? null : acc.lastPulledAt;
       const useDelta = since !== null;
       const rangeField = opts?.history ? "create_time_history" : useDelta ? "update_time" : "create_time";
       const windowFrom = opts?.history?.from ?? (useDelta
         ? new Date(since.getTime() - 600_000) // overlap 10 mnt (clock skew / run kecil sebelumnya)
-        : new Date(now.getTime() - INITIAL_SYNC_DAYS * 86_400_000));
+        : new Date(now.getTime() - initialDays * 86_400_000));
       const run = await prisma.syncRun.create({
         data: {
           businessId,
@@ -150,7 +152,7 @@ export async function enqueueOrderRuns(
           kind: KIND,
           status: "QUEUED",
           phase: "pulling",
-          message: opts?.history ? "antrian — riwayat sesuai tanggal pilihan" : useDelta ? "antrian — delta dari watermark" : "antrian — 30 hari terakhir",
+          message: opts?.history ? "antrian — riwayat sesuai tanggal pilihan" : useDelta ? "antrian — delta dari watermark" : `antrian — ${initialDays} hari terakhir`,
           startedAt: now,
           rangeField,
           windowFrom,

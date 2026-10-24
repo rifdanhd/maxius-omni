@@ -128,7 +128,7 @@ test("lonceng membedakan kosong dari gagal dimuat dan dapat dicoba lagi di HP", 
 
 test("hapus toko memakai konfirmasi, batal tidak mengirim request, error dapat ditutup", async ({ page }) => {
   let deletes = 0;
-  await page.route("**/api/stores/shop-1", (route) => { deletes++; return route.fulfill({ status: 500, json: { error: "fixture" } }); });
+  await page.route("**/api/stores/shop-1", (route) => { deletes++; return route.fulfill({ status: 403, json: { error: "Akses ditolak." } }); });
   await page.goto("/settings/accounts");
   const remove = page.getByRole("button", { name: /hapus/i }).first();
   await remove.click();
@@ -140,7 +140,48 @@ test("hapus toko memakai konfirmasi, batal tidak mengirim request, error dapat d
   await remove.click();
   await dialog.getByRole("button", { name: "Hapus", exact: true }).click();
   await expect(page.locator('[data-app-inline-notification]')).toBeVisible();
+  await expect(page.locator('#content [data-feedback="error"]')).toContainText("Akses ditolak.");
+  await expect(page.locator('tr', { hasText: "Toko Kaos Kaki" })).toBeVisible();
   expect(deletes).toBe(1);
+});
+
+test("hapus toko menampilkan proses, mencegah klik ganda, dan menghapus baris setelah sukses", async ({ page }) => {
+  let deletes = 0;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/stores/shop-1", async (route) => {
+    deletes++;
+    await pending;
+    await route.fulfill({ json: { success: true } });
+  });
+  await page.goto("/settings/accounts");
+  const row = page.locator('tr', { hasText: "Toko Kaos Kaki" });
+  await row.getByRole("button", { name: /hapus/i }).click();
+  const dialog = page.getByRole("alertdialog");
+  try {
+    await dialog.getByRole("button", { name: "Hapus", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: "Menghapus toko…" })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Batal" })).toBeDisabled();
+    await expect(dialog.getByRole("status")).toContainText("Sedang menghapus data toko");
+    await expect.poll(() => deletes).toBe(1);
+  } finally {
+    release();
+  }
+  await expect(dialog).not.toBeVisible();
+  await expect(row).toHaveCount(0);
+  await expect(page.locator('#content [data-feedback="success"]')).toContainText("Toko Kaos Kaki berhasil dihapus");
+  expect(deletes).toBe(1);
+});
+
+test("hapus toko tidak menganggap respons tanpa bukti sukses sebagai berhasil", async ({ page }) => {
+  await page.route("**/api/stores/shop-1", (route) => route.fulfill({ json: {} }));
+  await page.goto("/settings/accounts");
+  const row = page.locator('tr', { hasText: "Toko Kaos Kaki" });
+  await row.getByRole("button", { name: /hapus/i }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Hapus", exact: true }).click();
+  await expect(page.locator('#content [data-feedback="error"]')).toContainText("Hasil penghapusan belum dapat dipastikan");
+  await expect(row).toBeVisible();
+  await expect(page.locator('#content [data-feedback="success"]')).toHaveCount(0);
 });
 
 test("login: error di bawah field terhubung ke input untuk pembaca layar", async ({ page }) => {

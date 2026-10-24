@@ -5,8 +5,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { friendlyError } from "@/lib/ui/feedback";
 import { notify } from "@/components/ui/notify";
-import { confirmAction } from "@/components/ui/confirm-action";
-import { useState, useEffect } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useState, useEffect, useRef } from "react";
 import { MonitorPlay, RefreshCw, Trash2, ShoppingBag } from "lucide-react";
 import AddMarketplaceModal from "./AddMarketplaceModal";
 import { authFetch, getActiveBusinessId, setActiveBusinessId } from "@/lib/utils/api-client";
@@ -62,6 +62,10 @@ export default function StoreIntegration() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [failedSyncIds, setFailedSyncIds] = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Pick<StoreItem, "id" | "name"> | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const deleteInFlight = useRef(false);
 
   useEffect(() => {
     // Banner hasil OAuth dibaca dari query string redirect callback
@@ -134,22 +138,41 @@ export default function StoreIntegration() {
     } finally { setSyncingId(null); }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (await confirmAction(`Apakah kamu yakin ingin menghapus toko ${name}?`)) {
-      try {
-        const res = await authFetch(`/api/stores/${id}`, { method: "DELETE" });
-        if (!res.ok) {
-          const data: unknown = await res.json().catch(() => null);
-          const message = data && typeof data === "object" && "error" in data && typeof data.error === "string"
-            ? data.error
-            : "Gagal menghapus toko. Coba lagi.";
-          throw new Error(message);
-        }
-        notify("success", "Toko berhasil dihapus!");
-        await loadStores();
-      } catch (e) {
-        notify("error", e instanceof Error ? e.message : "Gagal menghapus toko. Coba lagi.");
+  const handleDelete = async () => {
+    if (!deleteTarget || deleteInFlight.current) return;
+    const target = deleteTarget;
+    deleteInFlight.current = true;
+    setDeletingId(target.id);
+    setDeleteNotice(null);
+    try {
+      const res = await authFetch(`/api/stores/${target.id}`, {
+        method: "DELETE",
+        signal: AbortSignal.timeout(75_000),
+      });
+      const data: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        const message = data && typeof data === "object" && "error" in data && typeof data.error === "string"
+          ? data.error
+          : "Gagal menghapus toko. Coba lagi.";
+        throw new Error(message);
       }
+      if (!data || typeof data !== "object" || !("success" in data) || data.success !== true) {
+        throw new Error("Hasil penghapusan belum dapat dipastikan. Muat ulang daftar toko untuk memeriksa statusnya.");
+      }
+      setStores((current) => current.filter((store) => store.id !== target.id));
+      const text = `Toko ${target.name} berhasil dihapus.`;
+      setDeleteNotice({ ok: true, text });
+      notify("success", text);
+    } catch (e) {
+      const text = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError" || e instanceof TypeError)
+        ? "Respons penghapusan belum diterima. Muat ulang daftar toko untuk memeriksa statusnya sebelum mencoba lagi."
+        : e instanceof Error ? e.message : "Gagal menghapus toko. Coba lagi.";
+      setDeleteNotice({ ok: false, text });
+      notify("error", text);
+    } finally {
+      deleteInFlight.current = false;
+      setDeletingId(null);
+      setDeleteTarget(null);
     }
   };
 
@@ -158,6 +181,7 @@ export default function StoreIntegration() {
 
   return (
     <div className="flex flex-col h-full font-sans">
+      {deleteNotice && <Feedback className="mb-4" variant={deleteNotice.ok ? "success" : "error"} title={deleteNotice.ok ? "Toko berhasil dihapus" : "Penghapusan toko belum berhasil"} description={deleteNotice.text} action={!deleteNotice.ok ? <Button variant="outline" onClick={loadStores}>Muat ulang daftar toko</Button> : undefined} />}
       {notice && <Feedback className="mb-4" variant={notice.ok ? "success" : "error"} title={notice.ok ? "Toko diperbarui" : "Koneksi belum berhasil"} description={notice.ok ? notice.text : friendlyError(notice.text, "Coba perbarui data toko lagi. Jika tetap gagal, periksa izin toko di marketplace.")} details={notice.ok ? undefined : notice.text} />}
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row items-start justify-between gap-4 mb-8 p-6 bg-muted border border-border rounded-xl">
@@ -261,9 +285,11 @@ export default function StoreIntegration() {
                         <RefreshCw size={16} className={syncingId === store.id ? "animate-spin" : ""} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(store.id, store.name)}
+                        type="button"
+                        onClick={() => { setDeleteNotice(null); setDeleteTarget({ id: store.id, name: store.name }); }}
                         aria-label={`Hapus ${store.name}`}
-                        className="text-foreground hover:bg-muted hover:text-foreground p-1.5 rounded transition-colors"
+                        disabled={deletingId !== null || syncingId !== null}
+                        className="text-foreground hover:bg-muted hover:text-foreground p-1.5 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         title="Hapus"
                       >
                         <Trash2 size={16} />
@@ -277,6 +303,18 @@ export default function StoreIntegration() {
         </table>
       </div>
 
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open && !deleteInFlight.current) setDeleteTarget(null); }}
+        title="Hapus toko ini?"
+        desc={`Hapus toko ${deleteTarget?.name ?? ""} beserta pesanan dan mapping produk terkait dari Maxius? Produk master dan stok gudang tetap disimpan.`}
+        confirmText={deletingId ? "Menghapus toko…" : "Hapus"}
+        destructive
+        isLoading={deletingId !== null}
+        handleConfirm={() => { void handleDelete(); }}
+      >
+        {deletingId && <p role="status" className="text-sm text-muted-foreground">Sedang menghapus data toko. Tunggu hingga proses selesai.</p>}
+      </ConfirmDialog>
       {isModalOpen && <AddMarketplaceModal onClose={() => setIsModalOpen(false)} />}
     </div>
   );

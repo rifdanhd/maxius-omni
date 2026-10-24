@@ -18,6 +18,7 @@
  * Kill-switch: AUTO_SYNC_DISABLED=true; opt-in dev: AUTO_SYNC_DEV=true.
  */
 import { prisma } from "@/lib/db/prisma";
+import { enqueueOrderRuns } from "@/lib/services/order-run.service";
 import { syncOrdersTikTok } from "@/lib/services/order-sync.service";
 import { syncOrdersShopee } from "@/lib/services/shopee-order-sync.service";
 import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
@@ -58,8 +59,8 @@ export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
   ordersInFlight = true;
   try {
     const accounts = await prisma.platformAccount.findMany({
-      where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, accessToken: { not: null } },
-      select: { id: true, platform: true, lastPulledAt: true },
+      where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, accessToken: { not: null }, isFrozen: false },
+      select: { id: true, platform: true, lastPulledAt: true, businessId: true },
     });
     const out: OrdersAutoSummary = { accounts: accounts.length, created: 0, skipped: 0, errors: 0 };
     for (const acc of accounts) {
@@ -70,10 +71,13 @@ export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
       });
       if (activeRun) continue;
 
-      // Watermark: update_time ≥ lastPulledAt (fallback 30 hari utk tick
-      // pertama) — tarikan delta kecil, bukan seluruh histori tiap 5 menit.
-      const since = acc.lastPulledAt ?? new Date(Date.now() - 30 * 86_400_000);
       try {
+        if (!acc.lastPulledAt) {
+          const runs = await enqueueOrderRuns(acc.businessId, { accountId: acc.id });
+          out.errors += runs.filter((run) => run.error).length;
+          continue;
+        }
+        const since = acc.lastPulledAt;
         const r =
           acc.platform === "TIKTOK_SHOP"
             ? await syncOrdersTikTok(acc.id, undefined, { since })

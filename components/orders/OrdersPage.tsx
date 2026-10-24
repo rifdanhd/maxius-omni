@@ -1027,7 +1027,7 @@ export default function OrdersPage() {
           </AlertTitle>
           <AlertDescription className="text-warning">
             <p>
-              Sinkronisasi pertama mengambil 30 hari terakhir. Pembaruan berikutnya mengambil pesanan baru atau yang berubah sejak sinkronisasi terakhir. Gunakan Ambil Riwayat untuk tanggal yang lebih lama.
+              Sinkronisasi pertama mengambil pesanan terbaru sesuai periode toko (default 30 hari). Pembaruan berikutnya mengambil pesanan baru atau yang berubah sejak sinkronisasi terakhir. Gunakan Ambil Riwayat untuk tanggal yang lebih lama.
             </p>
             <p>Pembaruan berjalan di latar belakang. Anda dapat berpindah menu selama proses berlangsung.</p>
             <p>Untuk pekerjaan harian, gunakan rentang tanggal dan tab Perlu Diproses. Pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
