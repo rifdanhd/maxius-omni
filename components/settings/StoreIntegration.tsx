@@ -138,11 +138,17 @@ export default function StoreIntegration() {
     if (await confirmAction(`Apakah kamu yakin ingin menghapus toko ${name}?`)) {
       try {
         const res = await authFetch(`/api/stores/${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error("Gagal menghapus toko. Coba lagi.");
+        if (!res.ok) {
+          const data: unknown = await res.json().catch(() => null);
+          const message = data && typeof data === "object" && "error" in data && typeof data.error === "string"
+            ? data.error
+            : "Gagal menghapus toko. Coba lagi.";
+          throw new Error(message);
+        }
         notify("success", "Toko berhasil dihapus!");
-        loadStores();
+        await loadStores();
       } catch (e) {
-        notify("error", "Gagal menghapus toko: " + (e instanceof Error ? e.message : String(e)));
+        notify("error", e instanceof Error ? e.message : "Gagal menghapus toko. Coba lagi.");
       }
     }
   };

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
@@ -52,11 +53,19 @@ export const DELETE = withAuth(async (req, ctx) => {
       // 9. Hapus PlatformAccount (relasi lain sudah CASCADE: ProductMapping,
       //    SyncJob, PromotionActivity, ReturnRequest, StockLedger nulled)
       await tx.platformAccount.delete({ where: { id } });
-    });
+    }, { timeout: 60_000 });
 
     return NextResponse.json({ success: true, message: "Store deleted successfully" });
   } catch (error) {
     console.error("Error deleting store:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2028") {
+        return NextResponse.json({ error: "Transaksi penghapusan toko tidak dapat diselesaikan. Coba lagi atau hubungi admin untuk memeriksa log server." }, { status: 409 });
+      }
+      if (error.code === "P2003") {
+        return NextResponse.json({ error: "Toko masih memiliki data terkait yang menghalangi penghapusan. Hubungi admin untuk memeriksa log server." }, { status: 409 });
+      }
+    }
     return NextResponse.json({ error: "Failed to delete store" }, { status: 500 });
   }
 });
