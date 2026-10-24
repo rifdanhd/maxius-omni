@@ -4,7 +4,7 @@ import { ErrorFeedback } from "@/components/ui/feedback";
 import { notify } from "@/components/ui/notify";
 import { useState } from "react";
 import { Printer, X, Loader2, FileText, Layers } from "lucide-react";
-import { printPdfWindow, pdfBlobFromBase64 } from "./printOrders";
+import { openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64 } from "./printOrders";
 import { authFetch } from "@/lib/utils/api-client";
 
 /**
@@ -36,6 +36,9 @@ export default function PrintMethodModal({
     if (printing || !isTikTok) return;
     setPrinting(true);
     setError(null);
+    // Buka jendela sinkron (masih dalam user gesture) — fetch label-pack bisa
+    // lebih lama dari masa user gesture, window.open sesudah await diblokir.
+    const win = openPrintWindow(title);
     try {
       const res = await authFetch("/api/orders/label-pack", {
         method: "POST",
@@ -44,25 +47,30 @@ export default function PrintMethodModal({
       });
       const data = await res.json();
       if (!res.ok) {
+        win?.close();
         setError(data?.error ?? `Gagal mencetak label (${res.status})`);
         return;
       }
-      if (data.pdfBase64) {
-        printPdfWindow(
+      if (data.pdfBase64 && win) {
+        fillPrintPdfWindow(
+          win,
           URL.createObjectURL(pdfBlobFromBase64(data.pdfBase64)),
           `${title} (${data.count ?? 0})`
         );
+      } else if (win) {
+        win.close();
       }
       const failedList = (data.failed ?? []) as { orderNo: string; reason: string }[];
       if (failedList.length > 0) {
         const detail = failedList.map((f) => `- ${f.orderNo}: ${f.reason}`).join("\n");
         notify("warning", `Label gabungan: ${data.count ?? 0} berhasil.${detail ? `\n\nOrder yang dilewati (label resmi belum dapat diambil):\n${detail}` : ""}`);
       } else if (!data.pdfBase64) {
-        notify("warning", "Tidak ada label resmi yang bisa dicetak (order belum di-ship / tanpa paket).");
+        notify("error", "Tidak ada label resmi yang bisa dicetak (order belum di-ship / tanpa paket).");
         return;
       }
       onDone();
     } catch {
+      win?.close();
       setError("Terjadi kesalahan saat mencetak label.");
     } finally {
       setPrinting(false);

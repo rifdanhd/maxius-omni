@@ -290,7 +290,7 @@ export default function OrderCard({
               </button>
             ) : null}
 
-            {order.status === "AWAITING_SHIPMENT" ? (
+            {order.status === "AWAITING_SHIPMENT" || order.status === "AWAITING_COLLECTION" ? (
               <button
                 type="button"
                 onClick={() => onPrint("Label")}

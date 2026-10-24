@@ -439,23 +439,45 @@ function escapeHtml(text: string) {
   return String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-function openPrintWindow(title: string, bodyHtml: string, extraStyle = "") {
+/**
+ * openPrintWindow — buka jendela cetak. HARUS dipanggil sinkron dari stack
+ * handler klik (sebelum await apa pun): pop-up blocker hanya mengizinkan
+ * window.open selama user gesture aktif, sedangkan fetch label resmi bisa
+ * memakan waktu jauh lebih lama. Tanpa `html`, jendela diisi placeholder
+ * "Menyiapkan dokumen…" lalu kontennya menyusul via fillPrintPdfWindow/printOrders.
+ */
+export function openPrintWindow(title: string, html?: string): Window | null {
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    notify("warning", "Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
-    return;
+    notify("error", "Pop-up diblokir. Izinkan pop-up untuk situs ini, lalu ulangi cetak.");
+    return null;
+  }
+  if (html) {
+    writePrintDocument(win, html);
+    return win;
   }
   win.document.write(
-    `<html><head><title>${title}</title><style>${printThemeStyles()}${PRINT_STYLES}${extraStyle}</style></head><body>${bodyHtml}</body></html>`
+    `<!DOCTYPE html><html><head><title>${escapeHtml(title)}</title><style>${printThemeStyles()}* { box-sizing: border-box; margin: 0; padding: 0; } body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--print-background, #fff); color: var(--print-foreground, #111); font-family: ui-sans-serif, system-ui, sans-serif; } .pending { font-size: 14px; font-weight: 600; opacity: 0.75; }</style></head><body><div class="pending">Menyiapkan dokumen…</div></body></html>`
   );
+  win.document.close();
+  return win;
+}
+
+function writePrintDocument(win: Window, html: string) {
+  if (win.closed) return;
+  win.document.write(html);
   win.document.close();
   win.focus();
   setTimeout(() => {
-    win.print();
+    try {
+      win.print();
+    } catch {
+      /* abaikan */
+    }
   }, 300);
 }
 
-export function printOrders(orders: PrintableOrder[], type: PrintType) {
+export function printOrders(orders: PrintableOrder[], type: PrintType, win?: Window | null) {
   const builders: Record<PrintType, { build: (o: PrintableOrder) => string; style?: string }> = {
     Label: { build: buildLabel, style: LABEL_STYLE },
     Invoice: { build: buildInvoice },
@@ -463,7 +485,12 @@ export function printOrders(orders: PrintableOrder[], type: PrintType) {
   };
   const { build, style = "" } = builders[type];
   const body = orders.map((o) => build(o)).join("");
-  openPrintWindow(`Cetak ${type}`, body, style);
+  const html = `<html><head><title>Cetak ${type}</title><style>${printThemeStyles()}${PRINT_STYLES}${style}</style></head><body>${body}</body></html>`;
+  if (win) {
+    writePrintDocument(win, html);
+    return;
+  }
+  openPrintWindow(`Cetak ${type}`, html);
 }
 
 /**
@@ -475,7 +502,7 @@ export function printShippingDocument(docUrl: string, title = "Label Pengiriman 
   const isPdf = /\.pdf($|\?)/i.test(docUrl) || !/\.(png|jpe?g|webp)($|\?)/i.test(docUrl);
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    notify("warning", "Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
+    notify("error", "Pop-up diblokir. Izinkan pop-up untuk situs ini, lalu ulangi cetak.");
     return;
   }
   win.document.write(`
@@ -511,15 +538,11 @@ export function pdfBlobFromBase64(base64: string): Blob {
 }
 
 /**
- * printPdfWindow — tampilkan PDF (URL lokal blob/remote) utk dicetak. PDF multi
- * halaman dirender dalam iframe; win.print() mencetak seluruh halaman sekaligus.
+ * fillPrintPdfWindow — isi jendela cetak yang sudah terbuka (lihat openPrintWindow)
+ * dengan PDF blob/remote lalu picu dialog print setelah PDF termuat.
  */
-export function printPdfWindow(url: string, title: string) {
-  const win = window.open("", "_blank", "width=900,height=700");
-  if (!win) {
-    notify("warning", "Izin pop-up diblokir. Izinkan pop-up untuk mencetak, lalu ulangi.");
-    return;
-  }
+export function fillPrintPdfWindow(win: Window, url: string, title = "Label Pengiriman") {
+  if (win.closed) return;
   win.document.write(`
     <!DOCTYPE html>
     <html>
@@ -550,4 +573,15 @@ export function printPdfWindow(url: string, title: string) {
   };
   frame?.addEventListener("load", trigger);
   setTimeout(trigger, 800);
+}
+
+/**
+ * printPdfWindow — tampilkan PDF (URL lokal blob/remote) utk dicetak.
+ * Catatan: bila PDF baru didapat lewat fetch, buka jendela dgn openPrintWindow
+ * di dalam handler klik, lalu isi dgn fillPrintPdfWindow — window.open setelah
+ * await diblokir pop-up blocker.
+ */
+export function printPdfWindow(url: string, title: string) {
+  const win = openPrintWindow(title);
+  if (win) fillPrintPdfWindow(win, url, title);
 }

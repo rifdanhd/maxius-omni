@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { Archive, Mail, ChevronDown, Search, Filter, Calendar, RefreshCw, Printer, Info, X } from "lucide-react";
 import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
-import { printOrders, printShippingDocument, printPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
+import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
 import { ordersToCsv, downloadCsv, type ExportOrderRow } from "./exportOrders";
 import RequestPickupModal, { type PickupShipResult, type RequestPickupOrder } from "./RequestPickupModal";
 import ShopeeShipModal from "./ShopeeShipModal";
@@ -735,6 +735,9 @@ export default function OrdersPage() {
   const printSelectedBulkLabel = async (targets: Order[]) => {
     if (printingBulk) return;
     setPrintingBulk(true);
+    // Buka jendela sinkron (masih dalam user gesture) — fetch label bisa jauh
+    // lebih lama dari masa user gesture, window.open sesudah await diblokir.
+    const win = openPrintWindow("Label Gabungan");
     try {
       const res = await authFetch("/api/orders/bulk-label", {
         method: "POST",
@@ -743,25 +746,30 @@ export default function OrdersPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        win?.close();
         notify("error", data?.error ?? `Gagal mencetak label (${res.status})`);
         return;
       }
-      if (data.pdfBase64) {
+      if (data.pdfBase64 && win) {
         // Satu PDF gabungan (multi halaman) → 1 window cetak, print sekali jalan.
-        printPdfWindow(
+        fillPrintPdfWindow(
+          win,
           URL.createObjectURL(pdfBlobFromBase64(data.pdfBase64)),
           `Label Gabungan (${data.count})`
         );
+      } else if (win) {
+        win.close();
       }
       const failedList = (data.failed ?? []) as { orderNo: string; reason: string }[];
       if (failedList.length > 0) {
         const detail = failedList.map((f) => `- ${f.orderNo}: ${f.reason}`).join("\n");
         notify("warning", `Label gabungan: ${data.count ?? 0} berhasil.${detail ? `\n\nOrder yang terlewat (label resmi belum tersedia):\n${detail}` : ""}`);
       } else if (!data.pdfBase64) {
-        notify("warning", "Tidak ada label resmi yang bisa digabung (order belum di-ship / tidak punya paket).");
+        notify("error", "Tidak ada label resmi yang bisa digabung (order belum di-ship / tidak punya paket).");
       }
     } catch (e) {
       console.error(e);
+      win?.close();
       notify("error", "Terjadi kesalahan saat mencetak label gabungan.");
     } finally {
       setPrintingBulk(false);
@@ -771,6 +779,9 @@ export default function OrdersPage() {
   /** Label pengiriman thermal (browser print) dengan rincian produk & varian lengkap. */
   const printLocalLabels = async (targets: Order[]) => {
     if (targets.length === 0) return;
+    // Buka jendela sinkron sebelum fetch detail (pop-up blocker vs user gesture).
+    const win = openPrintWindow("Cetak Label");
+    if (!win) return;
     const details = await Promise.all(targets.map((o) => fetchOrderDetail(o.id)));
     const printable = details
       .filter((d): d is OrderDetail => d !== null)
@@ -787,10 +798,11 @@ export default function OrdersPage() {
         return p;
       });
     if (printable.length === 0) {
+      win.close();
       notify("error", "Gagal memuat data penerima untuk label.");
       return;
     }
-    printOrders(printable, "Label");
+    printOrders(printable, "Label", win);
     if (printable.length < targets.length) {
       notify("warning", `${targets.length - printable.length} pesanan dilewati (gagal memuat data pesanan).`);
     }
@@ -815,23 +827,40 @@ export default function OrdersPage() {
     if (type === "Label") {
       // Utamakan label RESMI TikTok ASLI (sudah ditambahkan tabel varian langsung di PDF resmi)
       if (order.account?.platform === "TIKTOK_SHOP" || order.account?.platform === "SHOPEE") {
+        // Buka jendela sinkron di dalam user gesture; fetch label resmi (untuk
+        // Shopee ada polling s/d ~20 dtk) jauh lebih lama dari masa user gesture,
+        // sehingga window.open setelah await diblokir pop-up blocker.
+        const win = openPrintWindow(`Label ${order.orderNo}`);
+        if (!win) return;
         const official = await fetchOfficialLabel(order.id);
         if (official?.pdfBase64) {
-          printPdfWindow(
-            URL.createObjectURL(pdfBlobFromBase64(official.pdfBase64)),
-            `Label ${order.orderNo}`
-          );
+          try {
+            fillPrintPdfWindow(
+              win,
+              URL.createObjectURL(pdfBlobFromBase64(official.pdfBase64)),
+              `Label ${order.orderNo}`
+            );
+          } catch {
+            win.close();
+            notify("error", "Dokumen label tidak dapat ditampilkan. Coba lagi.");
+          }
           return;
         }
         if (official?.docUrl) {
+          win.close();
           printShippingDocument(official.docUrl, `Label ${order.orderNo}`);
           return;
         }
-        notify(official?.error ? "error" : "warning", official?.error ?? "Resi resmi belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
+        win.close();
+        notify("error", official?.error ?? "Resi resmi belum tersedia. Atur pengiriman atau periksa koneksi toko, lalu coba lagi.");
         return;
       }
+      // Label lokal — buka jendela dahulu, isi setelah data pesanan siap.
+      const localWin = openPrintWindow(`Label ${order.orderNo}`);
+      if (!localWin) return;
       const detail = await fetchOrderDetail(order.id);
       if (!detail) {
+        localWin.close();
         notify("error", "Gagal memuat data penerima untuk label.");
         return;
       }
@@ -843,7 +872,7 @@ export default function OrdersPage() {
       if (!printable.courier && ship?.carrier) {
         printable.courier = ship.carrier;
       }
-      printOrders([printable], "Label");
+      printOrders([printable], "Label", localWin);
       return;
     }
     printOrders([toPrintable(order)], type);
@@ -900,9 +929,18 @@ export default function OrdersPage() {
   };
 
   const handleOpenPrintLabels = (successfulOrderIds: string[]) => {
-    setPrintOrderIds(successfulOrderIds);
-    // Tutup PickupSuccessModal lalu buka PrintMethodModal langsung.
     setPickupResult(null);
+    const targetOrders = orders.filter((o) => successfulOrderIds.includes(o.id));
+    const hasShopee = targetOrders.some((o) => o.account?.platform === "SHOPEE");
+    if (hasShopee && targetOrders.length > 0) {
+      for (const o of targetOrders) {
+        if (o.account?.platform === "SHOPEE") {
+          void printOrder(o, "Label");
+        }
+      }
+      return;
+    }
+    setPrintOrderIds(successfulOrderIds);
     setShowPrintModal(true);
   };
 
@@ -1000,7 +1038,7 @@ export default function OrdersPage() {
 
       {/* Main Card */}
       <DataCard
-        className="min-w-0 shrink-0 overflow-hidden"
+        className="min-w-0 shrink-0"
         contentClassName="min-w-0 p-0"
       >
         {/* Tabs */}

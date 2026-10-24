@@ -47,27 +47,69 @@ export const GET = withAuth(
     // frontend membedakan "belum siap" vs "tidak berlaku", lalu fallback cetak lokal.
     if (order.account.platform === "SHOPEE") {
       const account = await loadShopeeAccount(order.accountId);
-      const shipment = order.shipments.find((s) => s.externalId);
-      const packageNumber = shipment?.externalId ?? undefined;
-      if (!account || !packageNumber) return NextResponse.json({ error: "Belum ada nomor paket Shopee untuk dicetak." }, { status: 404 });
+      const shipment = order.shipments.find((s) => s.externalId) ?? order.shipments[0];
+      const packageNumber = shipment?.externalId?.trim() ? shipment.externalId.trim() : undefined;
+      if (!account) return NextResponse.json({ error: "Akun Shopee tidak ditemukan." }, { status: 404 });
       try {
         const pdf = await withRefreshedToken(account, async (token, shopId, creds) => {
-          const parameter = await getShippingDocumentParameter(token, shopId, order.orderNo, packageNumber, creds);
-          const suggestedType = String(parameter.suggest_shipping_document_type ?? "").trim();
-          const created = await createShippingDocument(token, shopId, { order_sn: order.orderNo, package_number: packageNumber, tracking_number: shipment?.trackingNo ?? undefined, ...(suggestedType ? { shipping_document_type: suggestedType } : {}) }, creds);
+          let suggestedType: string | undefined = undefined;
+          try {
+            const parameter = await getShippingDocumentParameter(token, shopId, order.orderNo, packageNumber, creds);
+            suggestedType = String(parameter.suggest_shipping_document_type ?? "").trim() || undefined;
+          } catch (paramErr) {
+            console.warn(`[label/shopee] getShippingDocumentParameter notice:`, paramErr);
+          }
+
+          try {
+            await createShippingDocument(
+              token,
+              shopId,
+              {
+                order_sn: order.orderNo,
+                ...(packageNumber ? { package_number: packageNumber } : {}),
+                ...(shipment?.trackingNo ? { tracking_number: shipment.trackingNo } : {}),
+                ...(suggestedType ? { shipping_document_type: suggestedType } : {}),
+              },
+              creds
+            );
+          } catch (createErr) {
+            console.warn(`[label/shopee] createShippingDocument notice:`, createErr);
+          }
+
           for (let attempt = 0; attempt < 20; attempt += 1) {
             const result = await getShippingDocumentResult(token, shopId, order.orderNo, packageNumber, creds);
-            const entry = Array.isArray(result.result_list) ? result.result_list[0] as Record<string, unknown> : result;
+            const entry = Array.isArray(result.result_list) ? (result.result_list[0] as Record<string, unknown>) : result;
             const status = String(entry.status ?? entry.document_status ?? "").toUpperCase();
-            if (["READY", "SUCCESS", "COMPLETED"].includes(status)) return downloadShippingDocument(token, shopId, order.orderNo, packageNumber, creds);
-            if (["FAILED", "ERROR"].includes(status)) throw new Error("Shopee belum dapat membuat dokumen resi untuk paket ini.");
+            if (["READY", "SUCCESS", "COMPLETED"].includes(status)) {
+              return downloadShippingDocument(token, shopId, order.orderNo, packageNumber, creds);
+            }
+            if (["FAILED", "ERROR"].includes(status)) {
+              const failReason = entry.fail_message || entry.fail_error;
+              throw new Error(`Shopee belum dapat membuat dokumen resi: ${failReason || "status FAILED"}`);
+            }
             await new Promise((resolve) => setTimeout(resolve, 1000));
           }
           throw new Error("Pembuatan dokumen resi Shopee masih diproses. Coba lagi beberapa saat.");
         });
-        if (pdf[0] !== 0x25 || pdf[1] !== 0x50 || pdf[2] !== 0x44 || pdf[3] !== 0x46) throw new Error("Format dokumen Shopee tidak valid.");
-        await prisma.piiAccessLog.create({ data: { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, orderId: order.id, action: "READ_SHIPPING_LABEL" } });
-        return NextResponse.json({ docUrl: null, pdfBase64: Buffer.from(pdf).toString("base64"), trackingNumber: order.shipments[0]?.trackingNo ?? null, packageId: packageNumber, status: order.shipments[0]?.status ?? null });
+        if (pdf[0] !== 0x25 || pdf[1] !== 0x50 || pdf[2] !== 0x44 || pdf[3] !== 0x46) {
+          throw new Error("Format dokumen Shopee tidak valid.");
+        }
+        await prisma.piiAccessLog.create({
+          data: {
+            id: crypto.randomUUID(),
+            userId: req.user.id,
+            username: req.user.username,
+            orderId: order.id,
+            action: "READ_SHIPPING_LABEL",
+          },
+        });
+        return NextResponse.json({
+          docUrl: null,
+          pdfBase64: Buffer.from(pdf).toString("base64"),
+          trackingNumber: shipment?.trackingNo ?? order.shipments[0]?.trackingNo ?? null,
+          packageId: packageNumber ?? order.orderNo,
+          status: shipment?.status ?? order.shipments[0]?.status ?? null,
+        });
       } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : "Resi Shopee belum tersedia." }, { status: 422 });
       }
