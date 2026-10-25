@@ -3,11 +3,11 @@
 import { notify } from "@/components/ui/notify";
 import { PageState } from "@/components/ui/feedback";
 import { friendlyError } from "@/lib/ui/feedback";
-import { Badge } from "@/components/ui/badge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, Mail, ChevronDown, Search, Filter, Calendar, RefreshCw, Printer, Info, X } from "lucide-react";
-import OrderCard, { type PrintType } from "./OrderCard";
+import { Calendar, Download, Filter, Info, MoreHorizontal, PackageCheck, Printer, RefreshCw, Search, X } from "lucide-react";
+import { type PrintType } from "./OrderCard";
+import OrderRow, { ORDER_GRID } from "./OrderRow";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
 import { ordersToCsv, downloadCsv, type ExportOrderRow } from "./exportOrders";
@@ -16,11 +16,9 @@ import ShopeeShipModal from "./ShopeeShipModal";
 import PickupSuccessModal from "./PickupSuccessModal";
 import PrintMethodModal from "./PrintMethodModal";
 import OrderHistoryDialog, { type OrderHistoryRange } from "./OrderHistoryDialog";
-import { PackageCheck } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataCard } from "@/components/ui/data-card";
-
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -169,15 +167,8 @@ function toCardOrder(o: Order) {
     totalPrice: formatPrice(o.amount),
     paymentMethod: o.currency ?? "IDR",
     buyerName: o.buyerName ?? "-",
-    buyerPhone: "",
-    address: "",
-    orderDate,
-    sellerNote: null,
     courier: shipment?.carrier ?? "-",
     trackingNumber: shipment?.trackingNo ?? "-",
-    buyerNote: null,
-    pickupLocation: null,
-    fulfillmentStage: null,
     shippingDueTime: o.shippingDueTime,
     items: o.items.map((it) => ({
       name: it.variant?.masterProduct?.name ?? it.productName ?? it.productId ?? "-",
@@ -357,6 +348,11 @@ const SEARCH_TYPES = [
   { id: "tracking", label: "Nomor Resi", placeholder: "Cari nomor resi" },
 ];
 
+const SELECT_CLASS =
+  "h-9 max-w-full rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const CHIP_CLASS =
+  "inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs text-foreground hover:bg-muted/70";
+
 export default function OrdersPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("all");
@@ -364,35 +360,20 @@ export default function OrdersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
   const [searchType, setSearchType] = useState(SEARCH_TYPES[0]);
-  const [searchTypeOpen, setSearchTypeOpen] = useState(false);
-  const searchTypeRef = useRef<HTMLDivElement>(null);
-
-  // Close search-type dropdown when clicking outside
-  useEffect(() => {
-    if (!searchTypeOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (searchTypeRef.current && !searchTypeRef.current.contains(e.target as Node)) {
-        setSearchTypeOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [searchTypeOpen]);
   const [sort, setSort] = useState(SORT_OPTIONS[0]);
-  const [sortOpen, setSortOpen] = useState(false);
-  const sortRef = useRef<HTMLDivElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
 
-  // Close sort dropdown when clicking outside
+  // Tutup menu "Lainnya" saat klik di luar
   useEffect(() => {
-    if (!sortOpen) return;
+    if (!moreOpen) return;
     const handler = (e: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
-        setSortOpen(false);
-      }
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [sortOpen]);
+  }, [moreOpen]);
+
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -474,7 +455,7 @@ export default function OrdersPage() {
 
   const fetchOrders = useCallback(
     async (opts: { page: number; tab: typeof currentTab; subTab: typeof currentSubTab; q: string; searchType: string; sort: typeof sort; from: string; to: string; platform: string; account: string; category: string }) => {
-      // Gunakan statuses dari sub-tab jika ada & bukan tab 'all'; jika sub-tab memiliki statuses kosong, kembalikan kosong
+      // Gunakan statuses dari sub-tab jika ada & bukan tab 'all'
       const effectiveTab = opts.subTab && opts.subTab.id !== "all"
         ? { id: opts.tab.id, label: opts.tab.label, statuses: opts.subTab.statuses }
         : opts.tab;
@@ -528,10 +509,6 @@ export default function OrdersPage() {
     setPage(1);
   };
 
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
-  };
-
   // Debounce: tunggu jeda pengetikan sebelum query dicommit & fetch dijalankan.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -541,9 +518,15 @@ export default function OrdersPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const handleSortChange = (opt: (typeof SORT_OPTIONS)[number]) => {
-    setSort(opt);
-    setSortOpen(false);
+  const handleSearchTypeChange = (id: string) => {
+    setSearchType(SEARCH_TYPES.find((item) => item.id === id) ?? SEARCH_TYPES[0]);
+    setSearchInput("");
+    setQ("");
+    setPage(1);
+  };
+
+  const handleSortChange = (id: string) => {
+    setSort(SORT_OPTIONS.find((item) => item.id === id) ?? SORT_OPTIONS[0]);
     setPage(1);
   };
 
@@ -887,18 +870,15 @@ export default function OrdersPage() {
 
   const allSelected = orders.length > 0 && orders.every((o) => selected.has(o.id));
 
-  /** Apakah tab aktif adalah "Siap Dikirim" (AWAITING_SHIPMENT)? */
+  /** Apakah tab aktif adalah "Perlu Diproses" (AWAITING_SHIPMENT)? */
   const isReadyTab = currentTab.id === "ready";
 
-  /** handlePickup — buka modal "Atur Pengiriman" untuk pesanan terpilih. */
-  const handlePickup = () => {
-    const readySelected = orders.filter(
-      (o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT"
-    );
-    // Pisahkan per platform: TikTok → modal slot handover, Shopee → ShopeeShipModal
-    // (booking via Shopee Open API). Campuran tidak diproses dalam satu aksi.
-    const tiktok = readySelected.filter((o) => o.account?.platform === "TIKTOK_SHOP");
-    const shopee = readySelected.filter((o) => o.account?.platform === "SHOPEE");
+  /** Buka modal pengiriman sesuai platform untuk daftar order yang sudah difilter. */
+  const openShipModal = (targets: Order[]) => {
+    // TikTok → modal slot handover, Shopee → ShopeeShipModal (Shopee Open API).
+    // Campuran tidak diproses dalam satu aksi.
+    const tiktok = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
+    const shopee = targets.filter((o) => o.account?.platform === "SHOPEE");
     if (tiktok.length > 0 && shopee.length > 0) {
       notify("warning", "Pilih order TikTok atau Shopee saja dalam satu kali Atur Pengiriman.");
       return;
@@ -911,9 +891,13 @@ export default function OrdersPage() {
       setPickupTargets(tiktok.map(toPickupOrder));
       return;
     }
-    if (readySelected.length > 0) {
+    if (targets.length > 0) {
       notify("warning", "Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
     }
+  };
+
+  const handlePickup = () => {
+    openShipModal(orders.filter((o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT"));
   };
 
   const handlePickupConfirm = (result: PickupShipResult) => {
@@ -954,381 +938,267 @@ export default function OrdersPage() {
     router.push(`/orders/detail/${order.id}`);
   };
 
+  const busy = syncing || bgActive;
+
   return (
-    <div className="p-3 sm:p-6 font-sans min-h-full min-w-0 flex flex-col">
-      {/* Page Header */}
+    <div className="flex min-h-full min-w-0 flex-col gap-4 p-3 font-sans sm:p-6">
       <PageHeader
         title="Kelola Pesanan"
-        description="Kelola pesanan lintas toko; mulai dengan Perbarui Pesanan, pilih Perlu Diproses, atur pengiriman, lalu cetak resi dan daftar isi paket sebelum menyerahkan barang ke kurir."
+        description="Semua pesanan dari toko Anda dalam satu tempat. Perbarui pesanan, atur pengiriman, lalu cetak label sebelum menyerahkan paket ke kurir."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button disabled title="Arsip belum tersedia" variant="ghost" size="icon" className="h-9 w-9" aria-label="Arsip">
-              <Archive size={18} />
+            <Button onClick={() => void handleSync()} disabled={busy} className="gap-2">
+              <RefreshCw size={16} className={busy ? "animate-spin" : ""} />
+              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Perbarui Pesanan"}
             </Button>
-            <Button disabled title="Email belum tersedia" variant="ghost" size="icon" className="h-9 w-9" aria-label="Email">
-              <Mail size={18} />
-            </Button>
-            <Button
-              onClick={() => void handleSync()}
-              disabled={syncing || bgActive}
-              className="gap-2"
-            >
-              <RefreshCw size={16} className={syncing || bgActive ? "animate-spin" : ""} />
-              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Perbarui Pesanan (Sync)"}
-            </Button>
-            <Button variant="outline" onClick={() => setHistoryOpen(true)} disabled={syncing || bgActive} className="gap-2">
+            <Button variant="outline" onClick={() => setHistoryOpen(true)} disabled={busy} className="gap-2">
               <Calendar size={16} /> Ambil Riwayat
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleReconcile}
-              disabled={reconciling}
-              className="gap-2 text-foreground border-border hover:bg-muted"
-            >
-              <RefreshCw size={16} className={reconciling ? "animate-spin" : ""} />
-              {reconciling ? "Menyinkronkan Resi..." : "Lengkapi Data Resi (Sync)"}
-            </Button>
-            <Button variant="outline" onClick={handleExportVisible} className="gap-2">
-              Unduh Halaman Ini (CSV) <ChevronDown size={16} />
-            </Button>
+            <div className="relative" ref={moreRef}>
+              <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Aksi lainnya" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
+                <MoreHorizontal size={18} />
+              </Button>
+              {moreOpen && (
+                <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-card py-1 shadow-lg">
+                  <button
+                    type="button"
+                    disabled={reconciling}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted disabled:opacity-50"
+                    onClick={() => { setMoreOpen(false); void handleReconcile(); }}
+                  >
+                    <RefreshCw size={14} className={reconciling ? "animate-spin" : ""} />
+                    {reconciling ? "Menyinkronkan resi..." : "Lengkapi data resi"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={orders.length === 0}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted disabled:opacity-50"
+                    onClick={() => { setMoreOpen(false); handleExportVisible(); }}
+                  >
+                    <Download size={14} /> Unduh halaman ini (CSV)
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         }
       />
 
-      <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={syncing || bgActive} onSubmit={handleSync} />
+      <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={busy} onSubmit={handleSync} />
 
       {/* Progres background run (SyncRun) */}
       {bgActive && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border border-info bg-info-subtle px-3 py-2 text-sm text-info">
-          <RefreshCw size={14} className="animate-spin shrink-0" />
+        <div className="flex items-center gap-2 rounded-md border border-info bg-info-subtle px-3 py-2 text-sm text-info" role="status">
+          <RefreshCw size={14} className="shrink-0 animate-spin" />
           <span>
-            Menarik order di latar belakang — <b>{bgProgress?.fetched ?? 0} ditarik</b>, {bgProgress?.created ?? 0} baru,{" "}
+            Menarik pesanan di latar belakang: <b>{bgProgress?.fetched ?? 0} ditarik</b>, {bgProgress?.created ?? 0} baru,{" "}
             {bgProgress?.skipped ?? 0} sudah ada
-            {bgProgress?.phase === "rate_wait" ? " · jeda rate limit API (wajar)" : ""}. Anda bisa berpindah menu; halaman ini
-            menampilkan progres terbaru.
+            {bgProgress?.phase === "rate_wait" ? ", jeda rate limit API (wajar)" : ""}. Anda boleh berpindah menu.
           </span>
         </div>
       )}
 
-      {/* Fase 1 — edukasi batas API & pola pakai */}
+      {/* Edukasi batas API & pola pakai */}
       {!infoDismissed && (
-        <Alert className="mt-3 border-warning bg-warning-subtle text-warning [&>svg]:text-warning">
+        <Alert className="border-warning bg-warning-subtle text-warning [&>svg]:text-warning">
           <Info size={16} className="text-warning" />
           <AlertTitle className="flex w-full items-start justify-between gap-2 text-warning">
-            Tentang sinkronisasi pesanan masal
-            <button
-              type="button"
-              onClick={() => setInfoDismissed(true)}
-              className="rounded p-0.5 hover:bg-warning-subtle"
-              aria-label="Tutup informasi"
-            >
+            Tentang sinkronisasi pesanan
+            <button type="button" onClick={() => setInfoDismissed(true)} className="rounded p-0.5 hover:bg-warning-subtle" aria-label="Tutup informasi">
               <X size={14} />
             </button>
           </AlertTitle>
-          <AlertDescription className="text-warning">
-            <p>
-              Sinkronisasi pertama mengambil pesanan terbaru sesuai periode toko (default 30 hari). Pembaruan berikutnya mengambil pesanan baru atau yang berubah sejak sinkronisasi terakhir. Gunakan Ambil Riwayat untuk tanggal yang lebih lama.
-            </p>
-            <p>Pembaruan berjalan di latar belakang. Anda dapat berpindah menu selama proses berlangsung.</p>
-            <p>Untuk pekerjaan harian, gunakan rentang tanggal dan tab Perlu Diproses. Pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
-            <p>Dokumen invoice dan daftar isi paket dibuat oleh Maxius. Label TikTok berasal dari marketplace; untuk resi Shopee resmi, gunakan Seller Center.</p>
+          <AlertDescription className="space-y-1 text-warning">
+            <p>Sync pertama mengambil pesanan sesuai periode toko (default 30 hari). Sync berikutnya hanya mengambil pesanan baru atau yang berubah. Untuk tanggal lebih lama, gunakan Ambil Riwayat.</p>
+            <p>Untuk pekerjaan harian, buka tab Perlu Diproses dan pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
+            <p>Invoice dan packing list dibuat oleh Maxius. Label TikTok berasal dari marketplace; untuk resi Shopee resmi, gunakan Seller Center.</p>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Main Card */}
-      <DataCard
-        className="min-w-0 shrink-0"
-        contentClassName="min-w-0 p-0"
-      >
-        {/* Tabs */}
-        <div className="flex items-center overflow-x-auto border-b border-border px-4 bg-card">
+      <DataCard className="min-w-0 shrink-0" contentClassName="min-w-0 p-0">
+        {/* Tab status — garis bawah, jumlah di samping label (gaya Shopee) */}
+        <div className="flex items-center overflow-x-auto border-b border-border bg-card px-2 sm:px-4" role="tablist">
           {TABS.map((tab) => {
             const count = tab.statuses === null
               ? Object.values(counts).reduce((a, b) => a + b, 0)
-              : (tab.statuses ?? []).reduce((acc, s) => acc + (counts[s] ?? 0), 0);
+              : tab.statuses.reduce((acc, s) => acc + (counts[s] ?? 0), 0);
+            const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={active}
                 onClick={() => handleTab(tab.id)}
-                className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
-                  activeTab === tab.id
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-foreground hover:text-foreground"
+                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors sm:px-4 ${
+                  active ? "border-primary font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab.label}
                 {count > 0 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">{count}</Badge>
+                  <span className={`text-xs tabular-nums ${tab.id === "ready" ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+                    ({count.toLocaleString("id-ID")})
+                  </span>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Sub-Tabs (hanya untuk tab tertentu) */}
+        {/* Sub-tab sebagai chip (gaya TikTok Shop) */}
         {currentSubTabs && (
-          <div className="flex items-center gap-0 overflow-x-auto border-b border-border px-4 bg-muted/50">
+          <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-card px-4 py-2.5">
             {currentSubTabs.map((sub) => {
-              const subCount = sub.id === "all"
-                ? (currentTab.statuses ?? []).reduce((acc, s) => acc + (counts[s] ?? 0), 0)
-                : sub.statuses.reduce((acc, s) => acc + (counts[s] ?? 0), 0);
+              const subCount = sub.statuses.reduce((acc, s) => acc + (counts[s] ?? 0), 0);
+              const active = activeSubTab === sub.id;
               return (
                 <button
                   key={sub.id}
                   onClick={() => handleSubTab(sub.id)}
-                  className={`whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
-                    activeSubTab === sub.id
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted"
                   }`}
                 >
-                  {sub.label}
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">{subCount}</Badge>
+                  {sub.label} ({subCount.toLocaleString("id-ID")})
                 </button>
               );
             })}
           </div>
         )}
 
-        {/* Filter Row */}
-        <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap bg-card">
-          <div className="flex min-w-0 basis-full sm:basis-auto bg-card border border-border rounded-lg h-10 flex-1 max-w-xl relative">
-            {/* Keyword type dropdown */}
-            <div className="relative" ref={searchTypeRef}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSearchTypeOpen((v) => !v)}
-                className="h-full px-3 bg-muted border-r border-border text-sm text-foreground font-medium flex items-center gap-1.5 hover:bg-muted min-w-[130px] rounded-l-lg"
+        {/* Filter */}
+        <div className="flex flex-col gap-3 border-b border-border bg-card p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex h-9 min-w-0 flex-1 basis-full overflow-hidden rounded-md border border-border bg-card focus-within:ring-2 focus-within:ring-ring sm:basis-auto sm:max-w-xl">
+              <select
+                aria-label="Jenis pencarian"
+                value={searchType.id}
+                onChange={(e) => handleSearchTypeChange(e.target.value)}
+                className="border-r border-border bg-muted px-3 text-sm font-medium text-foreground outline-none"
               >
-                <span>{searchType.label}</span>
-                <ChevronDown size={13} className="ml-auto text-muted-foreground" />
-              </Button>
-              {searchTypeOpen && (
-                <div className="absolute left-0 top-full mt-1 w-48 bg-card border border-border rounded-xl shadow-xl z-30 py-1.5">
-                  {SEARCH_TYPES.map((type) => (
-                    <Button
-                      key={type.id}
-                      variant="ghost"
-                      className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 justify-start"
-                      onClick={() => { setSearchType(type); setSearchTypeOpen(false); setSearchInput(""); setQ(""); }}
-                    >
-                      {type.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1 flex items-center px-3 gap-2">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder={searchType.placeholder}
-                className="min-w-0 w-full text-sm outline-none bg-transparent"
-              />
-              <Search size={16} className="text-muted-foreground shrink-0" />
-            </div>
-          </div>
-
-          <select
-            aria-label="Filter marketplace pesanan"
-            value={platformFilter}
-            onChange={(event) => {
-              setPlatformFilter(event.target.value);
-              setAccountFilter("all");
-              setPage(1);
-            }}
-            className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">Semua marketplace</option>
-            <option value="SHOPEE">Shopee</option>
-            <option value="TIKTOK_SHOP">TikTok Shop</option>
-            <option value="TOKOPEDIA">Tokopedia</option>
-          </select>
-          <select
-            aria-label="Filter toko pesanan"
-            value={accountFilter}
-            onChange={(event) => { setAccountFilter(event.target.value); setPage(1); }}
-            className="h-10 max-w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">Semua toko</option>
-            {filterOptions.accounts
-              .filter((account) => platformFilter === "all" || account.platform === platformFilter)
-              .map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
-          </select>
-          <select
-            aria-label="Filter kategori pesanan"
-            value={categoryFilter}
-            onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }}
-            className="h-10 max-w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">Semua kategori</option>
-            {filterOptions.categories.map((category) => <option key={category}>{category}</option>)}
-          </select>
-
-          <div className="relative" ref={sortRef}>
-            <button
-              onClick={() => setSortOpen((v) => !v)}
-              className={`h-10 px-4 border rounded-lg text-sm bg-card flex items-center gap-2 min-w-[140px] max-w-[200px] justify-between ${
-                sortOpen
-                  ? "border-ring text-foreground bg-muted/70 ring-2 ring-ring/15"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <span className="truncate">{sort.label}</span> <ChevronDown size={14} className="shrink-0" />
-            </button>
-            {sortOpen && (
-              <div className="absolute max-w-[calc(100vw-2rem)] right-0 top-full mt-1 w-80 bg-card border border-border rounded-xl shadow-xl z-20 py-2">
-                {SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => handleSortChange(opt)}
-                    className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 ${
-                      sort.id === opt.id
-                        ? "font-semibold text-foreground bg-muted"
-                        : "text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {sort.id === opt.id && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
-                    {sort.id !== opt.id && <span className="w-1.5 h-1.5 shrink-0" />}
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex max-w-full flex-wrap items-center gap-2 min-h-10 py-2 sm:py-0 border border-border rounded-lg px-3 bg-card">
-            <Calendar size={16} className="text-muted-foreground" />
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => handleDateChange("from", e.target.value)}
-              className="text-sm outline-none w-[130px] text-foreground"
-            />
-            <span className="text-muted-foreground">s.d.</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => handleDateChange("to", e.target.value)}
-              className="text-sm outline-none w-[130px] text-foreground"
-            />
-          </div>
-
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              className="h-10 gap-2 text-foreground"
-            >
-              <Filter size={16} /> Reset
-            </Button>
-          )}
-          <div className="flex basis-full flex-wrap gap-2" aria-label="Filter pesanan aktif">
-            {q && <button onClick={() => { setSearchInput(""); setQ(""); }} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Cari: {q} ×</button>}
-            {platformFilter !== "all" && <button onClick={() => setPlatformFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Marketplace: {platformFilter} ×</button>}
-            {accountFilter !== "all" && <button onClick={() => setAccountFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Toko: {filterOptions.accounts.find((account) => account.id === accountFilter)?.label ?? accountFilter} ×</button>}
-            {categoryFilter !== "all" && <button onClick={() => setCategoryFilter("all")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Kategori: {categoryFilter} ×</button>}
-            {from && <button onClick={() => setFrom("")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Mulai: {from} ×</button>}
-            {to && <button onClick={() => setTo("")} className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-foreground">Sampai: {to} ×</button>}
-          </div>
-        </div>
-
-        {/* Bulk Action & Pagination */}
-        <div className="px-4 py-3 bg-muted/50 flex flex-wrap gap-3 items-center justify-between border-b border-border">
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-border text-foreground focus:ring-ring"
-                checked={allSelected}
-                onChange={toggleSelectAll}
-              />
-              <span className="text-sm font-medium text-foreground">Pilih Semua</span>
-            </label>
-            {selected.size > 0 && (
-              <>
-                {isReadyTab && (
-                  <button
-                    onClick={handlePickup}
-                    disabled={printingBulk}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary rounded-md text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50 shadow-xs transition-colors"
-                  >
-                    <PackageCheck size={14} /> Atur Pengiriman ({selected.size})
-                  </button>
-                )}
-                <PrintDropdown
-                  variant="filled"
-                  prefixIcon={<Printer size={14} />}
-                  label={`Cetak (${selected.size})`}
-                  placement="bottom-left"
-                  onSelect={(type) => printSelectedBulk(type)}
-                  items={[
-                    // M8c — "Label" selalu ditawarkan: order TikTok → label resmi
-                    // TikTok (PDF gabungan), order non-TikTok → label lokal.
-                    {
-                      id: "Label" as PrintType,
-                      label: "Cetak Label",
-                      description: labelMenuDescription(orders, selected),
-                    },
-                    { id: "Invoice" as PrintType, label: "Cetak Invoice", description: "Ringkasan transaksi dibuat oleh Maxius" },
-                    { id: "PackingList" as PrintType, label: "Cetak Daftar Isi Paket (Packing List)", description: "Daftar barang pesanan terpilih dibuat oleh Maxius" },
-                  ]}
-                />
-              </>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-foreground">
-            <label className="flex items-center gap-2">Pesanan per halaman
-              <select aria-label="Pesanan per halaman" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); setSelected(new Set()); }} className="rounded-md border border-border bg-card px-2 py-1">
-                {PAGE_SIZES.map((size) => <option key={size} value={size}>{size.toLocaleString("id-ID")}</option>)}
+                {SEARCH_TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
               </select>
-            </label>
-            <span className="font-semibold text-foreground">{total}</span>
-            <span>Total pesanan</span>
-            {pageCount > 1 && (
-              <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  Sebelumnya
-                </Button>
-                <span className="px-2 text-xs">
-                  {((page - 1) * pageSize + 1).toLocaleString("id-ID")}–{Math.min(page * pageSize, total).toLocaleString("id-ID")} dari {total.toLocaleString("id-ID")} pesanan
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  disabled={page >= pageCount}
-                >
-                  Berikutnya
-                </Button>
+              <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder={searchType.placeholder}
+                  className="w-full min-w-0 bg-transparent text-sm outline-none"
+                />
+                <Search size={16} className="shrink-0 text-muted-foreground" />
               </div>
+            </div>
+
+            <select
+              aria-label="Filter marketplace pesanan"
+              value={platformFilter}
+              onChange={(event) => { setPlatformFilter(event.target.value); setAccountFilter("all"); setPage(1); }}
+              className={SELECT_CLASS}
+            >
+              <option value="all">Semua marketplace</option>
+              <option value="SHOPEE">Shopee</option>
+              <option value="TIKTOK_SHOP">TikTok Shop</option>
+              <option value="TOKOPEDIA">Tokopedia</option>
+            </select>
+            <select
+              aria-label="Filter toko pesanan"
+              value={accountFilter}
+              onChange={(event) => { setAccountFilter(event.target.value); setPage(1); }}
+              className={SELECT_CLASS}
+            >
+              <option value="all">Semua toko</option>
+              {filterOptions.accounts
+                .filter((account) => platformFilter === "all" || account.platform === platformFilter)
+                .map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
+            </select>
+            <select
+              aria-label="Filter kategori pesanan"
+              value={categoryFilter}
+              onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }}
+              className={SELECT_CLASS}
+            >
+              <option value="all">Semua kategori</option>
+              {filterOptions.categories.map((category) => <option key={category}>{category}</option>)}
+            </select>
+
+            <div className="flex h-9 max-w-full items-center gap-2 rounded-md border border-border bg-card px-3">
+              <Calendar size={14} className="shrink-0 text-muted-foreground" />
+              <input type="date" aria-label="Tanggal mulai" value={from} onChange={(e) => handleDateChange("from", e.target.value)} className="w-[120px] bg-transparent text-sm text-foreground outline-none" />
+              <span className="text-xs text-muted-foreground">s.d.</span>
+              <input type="date" aria-label="Tanggal akhir" value={to} onChange={(e) => handleDateChange("to", e.target.value)} className="w-[120px] bg-transparent text-sm text-foreground outline-none" />
+            </div>
+
+            <select aria-label="Urutkan pesanan" value={sort.id} onChange={(e) => handleSortChange(e.target.value)} className={`${SELECT_CLASS} sm:ml-auto`}>
+              {SORT_OPTIONS.map((opt) => <option key={opt.id} value={opt.id}>{opt.label}</option>)}
+            </select>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 gap-1.5 text-muted-foreground">
+                <Filter size={14} /> Reset filter
+              </Button>
             )}
           </div>
+
+          {(q || platformFilter !== "all" || accountFilter !== "all" || categoryFilter !== "all" || from || to) && (
+            <div className="flex flex-wrap gap-2" aria-label="Filter pesanan aktif">
+              {q && <button onClick={() => { setSearchInput(""); setQ(""); }} className={CHIP_CLASS}>Cari: {q} <X size={12} /></button>}
+              {platformFilter !== "all" && <button onClick={() => setPlatformFilter("all")} className={CHIP_CLASS}>Marketplace: {PLATFORM[platformFilter] ?? platformFilter} <X size={12} /></button>}
+              {accountFilter !== "all" && <button onClick={() => setAccountFilter("all")} className={CHIP_CLASS}>Toko: {filterOptions.accounts.find((account) => account.id === accountFilter)?.label ?? accountFilter} <X size={12} /></button>}
+              {categoryFilter !== "all" && <button onClick={() => setCategoryFilter("all")} className={CHIP_CLASS}>Kategori: {categoryFilter} <X size={12} /></button>}
+              {from && <button onClick={() => setFrom("")} className={CHIP_CLASS}>Mulai: {from} <X size={12} /></button>}
+              {to && <button onClick={() => setTo("")} className={CHIP_CLASS}>Sampai: {to} <X size={12} /></button>}
+            </div>
+          )}
         </div>
 
-      </DataCard>
+        {/* Header kolom — berganti jadi bar aksi saat ada pesanan terpilih */}
+        {selected.size > 0 ? (
+          <div className="flex flex-wrap items-center gap-3 border-b border-border bg-primary/5 px-4 py-2">
+            <input type="checkbox" className="h-4 w-4 rounded border-border" checked={allSelected} onChange={toggleSelectAll} aria-label="Pilih semua pesanan" />
+            <span className="text-sm font-medium text-foreground">{selected.size} pesanan dipilih</span>
+            {isReadyTab && (
+              <Button size="sm" onClick={handlePickup} disabled={printingBulk} className="gap-1.5">
+                <PackageCheck size={14} /> Atur Pengiriman
+              </Button>
+            )}
+            <PrintDropdown
+              variant="filled"
+              prefixIcon={<Printer size={14} />}
+              label="Cetak"
+              placement="bottom-left"
+              onSelect={(type) => printSelectedBulk(type)}
+              items={[
+                // "Label" selalu ditawarkan: order TikTok → label resmi (PDF gabungan), non-TikTok → label lokal.
+                { id: "Label" as PrintType, label: "Cetak Label", description: labelMenuDescription(orders, selected) },
+                { id: "Invoice" as PrintType, label: "Cetak Invoice", description: "Ringkasan transaksi dibuat oleh Maxius" },
+                { id: "PackingList" as PrintType, label: "Cetak Daftar Isi Paket (Packing List)", description: "Daftar barang pesanan terpilih dibuat oleh Maxius" },
+              ]}
+            />
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto">Batal pilih</Button>
+          </div>
+        ) : (
+          <div className={`hidden items-center border-b border-border bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground ${ORDER_GRID}`}>
+            <label className="flex items-center gap-3">
+              <input type="checkbox" className="h-4 w-4 rounded border-border" checked={allSelected} onChange={toggleSelectAll} aria-label="Pilih semua pesanan" />
+              Produk
+            </label>
+            <span>Total pesanan</span>
+            <span>Status</span>
+            <span>Pengiriman</span>
+            <span>Aksi</span>
+          </div>
+        )}
 
-        {/* Orders List */}
-        <div className="mt-4 min-w-0">
-          {loading ? (
-            <div className="space-y-3" aria-busy="true">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-28 rounded-xl bg-card border border-border animate-pulse"
-                  style={{ animationDelay: `${i * 80}ms` }}
-                />
-              ))}
-            </div>
-          ) : error ? (
+        {/* Daftar pesanan */}
+        {loading ? (
+          <div className="divide-y divide-border" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-28 animate-pulse bg-muted/40" style={{ animationDelay: `${i * 80}ms` }} />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="p-4">
             <PageState
               variant="error"
               title="Gagal memuat pesanan"
@@ -1340,70 +1210,82 @@ export default function OrdersPage() {
                 </Button>
               }
             />
-          ) : orders.length === 0 ? (
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="p-4">
             <EmptyState
               icon={<PackageCheck size={40} />}
               title="Tidak ada pesanan"
-              description="Belum ada pesanan pada filter ini. Coba ganti tab/status, ubah kata kunci, atau jalankan Sync Pesanan."
+              description="Belum ada pesanan pada filter ini. Coba ganti tab, ubah kata kunci, atau jalankan sync pesanan."
               action={
-                <Button variant="outline" onClick={() => void handleSync()} disabled={syncing || bgActive} className="gap-2">
-                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Sync Pesanan
+                <Button variant="outline" onClick={() => void handleSync()} disabled={busy} className="gap-2">
+                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Perbarui Pesanan
                 </Button>
               }
             />
-          ) : (
-            orders.map((order) => (
-              <OrderCard
+          </div>
+        ) : (
+          <div>
+            {orders.map((order) => (
+              <OrderRow
                 key={order.id}
                 order={toCardOrder(order)}
                 checked={selected.has(order.id)}
                 onToggleChecked={() => toggleSelect(order.id)}
-                onSync={handleSync}
                 onPrint={(type) => printOrder(order, type)}
-                onPickup={() => {
-                  // Single-order pickup dari kartu — buka modal sesuai platform.
-                  const o = order;
-                  const target = toPickupOrder(o);
-                  if (o.account?.platform === "SHOPEE") {
-                    setShopeeTargets([target]);
-                    return;
-                  }
-                  if (o.account?.platform !== "TIKTOK_SHOP") {
-                    notify("warning", "Atur Pengiriman hanya untuk order TikTok Shop & Shopee.");
-                    return;
-                  }
-                  setPickupTargets([target]);
-                }}
+                onPickup={() => openShipModal([order])}
                 shipping={false}
                 onDetail={() => handleOpenDetail(order)}
               />
-            ))
-          )}
+            ))}
+          </div>
+        )}
+
+        {/* Footer: total & paginasi */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          <span>
+            <span className="font-semibold text-foreground">{total.toLocaleString("id-ID")}</span> total pesanan
+          </span>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2">
+              Per halaman
+              <select
+                aria-label="Pesanan per halaman"
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); setSelected(new Set()); }}
+                className="rounded-md border border-border bg-card px-2 py-1 text-foreground"
+              >
+                {PAGE_SIZES.map((size) => <option key={size} value={size}>{size.toLocaleString("id-ID")}</option>)}
+              </select>
+            </label>
+            {pageCount > 1 && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                  Sebelumnya
+                </Button>
+                <span className="text-xs">
+                  {((page - 1) * pageSize + 1).toLocaleString("id-ID")}–{Math.min(page * pageSize, total).toLocaleString("id-ID")} dari {total.toLocaleString("id-ID")}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page >= pageCount}>
+                  Berikutnya
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
+      </DataCard>
 
       {/* Modal Alur Pengiriman */}
       {pickupTargets && (
-        <RequestPickupModal
-          orders={pickupTargets}
-          onClose={() => setPickupTargets(null)}
-          onConfirm={handlePickupConfirm}
-        />
+        <RequestPickupModal orders={pickupTargets} onClose={() => setPickupTargets(null)} onConfirm={handlePickupConfirm} />
       )}
 
       {shopeeTargets && (
-        <ShopeeShipModal
-          orders={shopeeTargets}
-          onClose={() => setShopeeTargets(null)}
-          onConfirm={handlePickupConfirm}
-        />
+        <ShopeeShipModal orders={shopeeTargets} onClose={() => setShopeeTargets(null)} onConfirm={handlePickupConfirm} />
       )}
 
       {pickupResult && (
-        <PickupSuccessModal
-          result={pickupResult}
-          onClose={handlePickupSuccessClose}
-          onPrintLabels={handleOpenPrintLabels}
-        />
+        <PickupSuccessModal result={pickupResult} onClose={handlePickupSuccessClose} onPrintLabels={handleOpenPrintLabels} />
       )}
 
       {showPrintModal && printOrderIds.length > 0 && (
