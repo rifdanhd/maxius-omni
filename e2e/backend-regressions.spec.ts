@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 const scripts = [
+  'test-master-sku-inventory.integration.mts',
   'test-stock-input.mts', 'test-session-security.mts', 'test-auth-security.mts',
   'test-response-security.mts', 'test-pii-security.mts', 'test-oauth-security.mts',
   'test-upload-security.mts', 'test-safe-fetch.mts', 'test-stock-lock.mts',

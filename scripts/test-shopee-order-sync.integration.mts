@@ -30,7 +30,8 @@ process.env.SHOPEE_PARTNER_ID ??= "999888";
 process.env.SHOPEE_PARTNER_KEY ??= "test-partner-key";
 
 const { prisma } = await import("@/lib/db/prisma");
-const { syncOrdersShopee } = await import("@/lib/services/shopee-order-sync.service");
+const { syncOrdersShopee: pullOrdersShopee } = await import("@/lib/services/shopee-order-sync.service");
+const syncOrdersShopee = (accountId: string) => pullOrdersShopee(accountId, undefined, { since: new Date(Date.now() - 86400000) });
 const { handleShopeeOrderUpdate } = await import(
   "@/lib/services/shopee-order-webhook.service"
 );

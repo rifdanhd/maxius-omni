@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { effectiveStock, lowStockSql, resolveMinStock } from "@/lib/services/central-stock.service";
+import { UNFULFILLED_ORDER_STATUSES } from "@/lib/services/master-stock.service";
 
 export type StockTab = "all" | "empty" | "low";
 
@@ -228,10 +229,15 @@ export const GET = withAuth(async (req) => {
       SUM(CASE WHEN (pv.stock - pv."safetyStock") <= 0 THEN 1 ELSE 0 END) AS "empty",
       SUM(CASE WHEN (pv.stock - pv."safetyStock") > 0 AND ${lowStockSql("pv", "mp")}
         THEN 1 ELSE 0 END) AS "low",
-      (SELECT COUNT(*) FROM "SyncLog" sl
-        JOIN "PlatformAccount" sl_acc ON sl_acc.id = sl."accountId"
-        WHERE sl.kind = 'central_stock_deduct' AND sl."handledAt" IS NULL
-          AND sl_acc."businessId" = ${businessId}) AS "oversells"
+      (SELECT COUNT(*) FROM (
+        SELECT oi."variantId" FROM "OrderItem" oi JOIN "Order" o ON o.id = oi."orderId"
+        JOIN "PlatformAccount" a ON a.id = o."accountId" JOIN "ProductVariant" v ON v.id = oi."variantId"
+        JOIN "MasterProduct" p ON p.id = v."masterProductId"
+        WHERE a."businessId" = ${businessId} AND p."businessId" = ${businessId} AND p."isActive" AND NOT v."isArchived"
+          AND NOT o."importOnly" AND o.status IN (${Prisma.join(UNFULFILLED_ORDER_STATUSES)})
+          AND NOT EXISTS (SELECT 1 FROM "StockLedger" sl WHERE sl."referenceId" = o.id AND sl."variantId" = oi."variantId" AND sl.reason = 'ORDER')
+        GROUP BY oi."variantId", v.stock, v."safetyStock" HAVING SUM(oi.qty) > GREATEST(v.stock - v."safetyStock", 0)
+      ) shortages) AS "oversells"
     FROM "ProductVariant" pv
     JOIN "MasterProduct" mp ON mp.id = pv."masterProductId"
     WHERE mp."businessId" = ${businessId}

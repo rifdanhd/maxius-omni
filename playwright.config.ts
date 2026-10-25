@@ -12,7 +12,8 @@ import path from 'node:path';
  */
 const ROOT = __dirname;
 const MARKER = path.join(ROOT, '.e2e-db.json');
-const PORT = 3100;
+const PORT = Number(process.env.E2E_PORT ?? 3100);
+if (!Number.isInteger(PORT) || PORT < 1024 || PORT > 65534) throw new Error('E2E_PORT tidak valid.');
 const production = process.env.E2E_SERVER_MODE === 'production';
 const origin = `${production ? 'https' : 'http'}://localhost:${PORT}`;
 

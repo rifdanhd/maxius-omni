@@ -4,6 +4,7 @@ import { scheduleStockPush } from "@/lib/services/stock-push-queue.service";
 import { pushPriceToShopee, pushStockToShopee } from "@/lib/services/marketplace-shopee.service";
 import { logStockPush } from "@/lib/services/sync-log.util";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { allocationQuantity, resolveAllocation } from "@/lib/services/stock-allocation.policy";
 
 /** Platform → kolom gate di InventorySetting (Pengaturan Inventori). */
 const PLATFORM_SYNC_GATE = {
@@ -81,6 +82,19 @@ export async function syncStockToMarketplaces(
         return done(false, true, `Akun ${mapping.accountId} tidak ditemukan.`);
       }
 
+      const listing = await prisma.productMapping.findUnique({
+        where: { accountId_channelSku: { accountId: mapping.accountId, channelSku: mapping.channelSku } },
+        include: { variant: { select: { masterProduct: { select: { businessId: true } } } } },
+      });
+      if (listing?.variant && listing.variant.masterProduct.businessId !== account.businessId) {
+        return done(false, true, "Mapping toko dan SKU berbeda customer.");
+      }
+      const policy = resolveAllocation(listing ?? {}, account);
+      const listingCount = policy.mode === "EQUAL" && listing?.variantId
+        ? await prisma.productMapping.count({ where: { variantId: listing.variantId, account: { businessId: account.businessId } } })
+        : 1;
+      const listingStock = allocationQuantity(newStock, policy, listingCount);
+
       // Gate Pengaturan Inventori: auto-push utk platform ini dimatikan →
       // skip dgn jejak SyncLog (tidak pernah silent). Ini konfigurasi
       // DISENGAJA user → success=true (tidak ada aksi retry yang berguna).
@@ -111,7 +125,7 @@ export async function syncStockToMarketplaces(
         // Masuk antrean debounce — coalesce + batch + backoff terjadi di queue.
         // "Diterima antrean" = success (pengiriman downstream + retry-nya
         // dimiliki queue & tercatat di SyncLog).
-        scheduleStockPush(account.id, mapping.channelSku, newStock);
+        scheduleStockPush(account.id, mapping.channelSku, listingStock);
         return done(true, false);
       } else if (account.platform === "SHOPEE") {
         // Adapter Shopee (PHASE B.4, stub): kontrak hasil per-item SAMA dengan
@@ -121,7 +135,7 @@ export async function syncStockToMarketplaces(
           accountId: account.id,
           accountLabel: account.label,
           channelSku: mapping.channelSku,
-          newStock,
+          newStock: listingStock,
         });
         return done(r.success, r.skipped, r.error);
       } else {

@@ -3,9 +3,9 @@ import type { Page } from '@playwright/test';
 import { sql, TEST_ADMIN_PASSWORD } from './helpers';
 
 /**
- * [E2E] Form "Barang Masuk" (stock-in) di halaman Mapping — Daftar Varian.
+ * [E2E] Barang masuk melalui dialog SKU master pada Stok Varian.
  *
- * Seed 1 varian khusus (stok 0) via sqlite, lalu:
+ * Seed 1 varian khusus (stok 0) di database PostgreSQL terisolasi, lalu:
  *  1. Buka form Barang Masuk, isi qty +2, catat.
  *  2. Stok tampil 2; Riwayat Stok memuat baris STOCK_IN +2.
  *  3. afterAll menghapus varian + master + ledger seed (DB kembali bersih).
@@ -48,8 +48,8 @@ test.afterAll(() => {
 test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => {
   await login(page);
   await page.goto('/inventory');
-  await expect(page.getByRole('heading', { name: 'Atur Stok Gudang' })).toBeVisible({ timeout: 30_000 });
-  const search = page.getByPlaceholder('Cari SKU / nama varian / produk…');
+  await expect(page.getByRole('heading', { name: 'Stok Varian', exact: true })).toBeVisible({ timeout: 30_000 });
+  const search = page.getByLabel('Cari SKU atau nama produk');
   await search.fill(SKU);
   await search.press('Enter');
 
@@ -59,20 +59,23 @@ test('Barang Masuk: +2 tercatat ke stok & ledger STOCK_IN', async ({ page }) => 
   await expect(row).toContainText('0');
 
   // 1. Buka form Barang Masuk & isi qty 2.
-  await row.getByRole('button', { name: 'Masuk', exact: true }).click();
-  const form = page.getByRole('dialog', { name: 'Stok Masuk' });
+  await row.getByRole('button', { name: 'Ubah stok', exact: true }).click();
+  const form = page.getByRole('dialog');
   await expect(form).toBeVisible();
   await page.screenshot({ path: SHOT('1-form-open') });
 
-  await form.getByLabel('Jumlah').fill('2');
-  await form.getByLabel('Catatan (opsional)').fill('e2e restock');
+  await form.getByLabel('Jenis perubahan').selectOption('IN');
+  await form.getByLabel('Jumlah barang').fill('2');
+  await form.getByLabel('Alasan wajib').fill('e2e restock');
 
   // 2. Catat → stok berubah jadi 2.
-  await form.getByRole('button', { name: 'Simpan Stok Masuk' }).click();
-  await expect(row.getByLabel(`Stok fisik ${SKU}`, { exact: true })).toHaveValue('2');
+  await form.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(form).toHaveCount(0);
+  await expect.poll(() => sql(`SELECT stock FROM "ProductVariant" WHERE id='${VAR_ID}';`)).toBe('2');
 
   // 3. Riwayat Stok memuat baris STOCK_IN +2.
-  await row.getByLabel(`Lihat riwayat stok ${SKU}`).click();
+  await page.goto('/inventory/history');
+  await page.getByPlaceholder('Cari produk / SKU…').fill(SKU);
   const ledgerRow = page.locator('tbody tr').filter({ hasText: 'e2e restock' }).first();
   await expect(ledgerRow).toBeVisible({ timeout: 15_000 });
   await expect(ledgerRow).toContainText('+2');

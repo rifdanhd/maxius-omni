@@ -47,6 +47,9 @@ model Business {
   inventorySetting InventorySetting?
   syncRuns         SyncRun[]
   stockOutbox      StockOutbox[]
+  warehouses       InventoryWarehouse[]
+  skuKeys          MasterSkuKey[]
+  mappingReviews   SkuMappingReview[]
 
   @@index([id])
 }
@@ -89,6 +92,7 @@ model Order {
   id                      String                 @id
   orderNo                 String
   status                  String
+  importOnly              Boolean                @default(false)
   buyerName               String?
   buyerEmail              String?
   amount                  Float?
@@ -116,6 +120,7 @@ model Order {
   orderMappings           PlatformOrderMapping[]
   returnRequest           ReturnRequest[]
   shipments               Shipment[]
+  warehouseAllocations    WarehouseOrderAllocation[]
 
   @@index([accountId, createTime])
   @@index([createTime, status])
@@ -170,6 +175,9 @@ model PlatformAccount {
   appCredentialId      String?
   frozenReason         String?
   isFrozen             Boolean                @default(false)
+  stockAllocationMode  String                 @default("FULL")
+  stockAllocationValue Int                    @default(100)
+  stockBuffer          Int                    @default(0)
   /// Watermark auto-sync order: tarik update_time ≥ nilainya (NULL = belum pernah).
   lastPulledAt         DateTime?
   orders               Order[]
@@ -202,6 +210,7 @@ model PlatformOrderMapping {
   order                 Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, externalOrderId])
+  @@index([orderId])
 }
 
 model ProductImage {
@@ -218,6 +227,14 @@ model ProductImage {
 model ProductMapping {
   id                    String                  @id @default(cuid())
   channelSku            String
+  sellerSku             String?
+  platformSkuId         String?
+  stockAllocationMode   String?
+  stockAllocationValue  Int?
+  stockBuffer           Int?
+  lastStockPushStatus   String?
+  lastStockPushError    String?
+  lastStockPushAt       DateTime?
   variantId             String?
   accountId             String
   price                 Float?
@@ -234,15 +251,20 @@ model ProductMapping {
   variant               ProductVariant?         @relation(fields: [variantId], references: [id], onDelete: Cascade)
   promotionActivityItem PromotionActivityItem[]
   promotionAuditLog     PromotionAuditLog[]
+  mappingReviews        SkuMappingReview[]
 
   @@unique([accountId, channelSku])
-  @@unique([accountId, variantId])
+  @@index([accountId, variantId])
+  @@index([variantId])
+  @@index([accountId, sellerSku])
 }
 
 model ProductVariant {
   id              String            @id @default(cuid())
   sku             String
   stock           Int
+  version         Int               @default(0)
+  isArchived      Boolean           @default(false)
   name            String?
   safetyStock     Int               @default(0)
   minStock        Int?
@@ -261,6 +283,9 @@ model ProductVariant {
   stockLedger     StockLedger[]
   stockOpnameItem StockOpnameItem[]
   syncJob         SyncJob[]
+  warehouseStock  VariantWarehouseStock[]
+  skuKeys         MasterSkuKey[]
+  warehouseAllocations WarehouseOrderAllocation[]
 
   @@unique([masterProductId, sku])
 }
@@ -421,6 +446,7 @@ model ReturnRequest {
 
   @@unique([accountId, externalReturnId])
   @@index([accountId, status])
+  @@index([orderId])
   @@index([slaDueDate])
 }
 
@@ -454,6 +480,7 @@ model Shipment {
   trackingEvents        ShipmentTrackingEvent[]
 
   @@unique([accountId, orderId, externalId])
+  @@index([orderId])
 }
 
 model ShipmentTrackingEvent {
@@ -474,10 +501,12 @@ model StockLedger {
   changeQty       Int
   reason          String
   referenceId     String?
+  requestFingerprint String?
   note            String?
   stockAfter      Int
   variantId       String
   accountId       String?
+  warehouseId     String?
   userId          String?
   createdAt       DateTime         @default(now())
   account         PlatformAccount? @relation(fields: [accountId], references: [id])
@@ -487,6 +516,73 @@ model StockLedger {
   @@unique([reason, referenceId, variantId])
   @@index([reason, referenceId])
   @@index([variantId, createdAt])
+  @@index([accountId])
+}
+
+model InventoryWarehouse {
+  id         String                  @id @default(cuid())
+  businessId String
+  name       String
+  isDefault  Boolean                 @default(false)
+  business   Business                @relation(fields: [businessId], references: [id])
+  balances   VariantWarehouseStock[]
+  orderAllocations WarehouseOrderAllocation[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+}
+
+model VariantWarehouseStock {
+  variantId   String
+  warehouseId String
+  stock       Int                @default(0)
+  safetyStock Int                @default(0)
+  variant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouse   InventoryWarehouse @relation(fields: [warehouseId], references: [id])
+
+  @@id([variantId, warehouseId])
+  @@index([warehouseId])
+}
+
+model WarehouseOrderAllocation {
+  orderId     String
+  variantId   String
+  warehouseId String
+  quantity    Int
+  order       Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouse   InventoryWarehouse @relation(fields: [warehouseId], references: [id])
+
+  @@id([orderId, variantId, warehouseId])
+  @@index([variantId])
+  @@index([warehouseId])
+}
+
+model MasterSkuKey {
+  businessId String
+  sellerSku  String
+  variantId  String?
+  business   Business        @relation(fields: [businessId], references: [id])
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@id([businessId, sellerSku])
+  @@index([variantId])
+}
+
+model SkuMappingReview {
+  id           String          @id @default(cuid())
+  businessId   String
+  mappingId    String?
+  sellerSku    String
+  reason       String
+  candidateIds Json
+  status       String          @default("PENDING")
+  createdAt    DateTime        @default(now())
+  business     Business        @relation(fields: [businessId], references: [id])
+  mapping      ProductMapping? @relation(fields: [mappingId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@index([mappingId])
 }
 
 model StockOpname {
@@ -535,6 +631,7 @@ model SyncJob {
   @@unique([variantId, accountId, channelSku, status])
   @@index([status, nextRetryAt])
   @@index([variantId])
+  @@index([accountId, variantId, channelSku, updatedAt])
 }
 
 model SyncLog {
@@ -621,4 +718,5 @@ model StockOutbox {
   business    Business @relation(fields: [businessId], references: [id])
 
   @@index([status, createdAt])
+  @@index([businessId, variantId, status])
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
@@ -89,7 +90,23 @@ export const POST = withAuth(async (req) => {
   try {
   const result = await prisma.$transaction(async (tx) => {
   let variantId = body.variantId;
+  let sellerSku = body.sku?.trim() || (body.channelSkuAliases.length === 1 ? body.channelSkuAliases[0].trim() : undefined);
+  if (!variantId && sellerSku) {
+    await lockSellerSkus(tx, req.businessId, [sellerSku]);
+    const resolution = await findMasterSku(tx, req.businessId, sellerSku);
+    if (resolution.ambiguous) {
+      const reviewMapping = await tx.productMapping.upsert({
+        where: { accountId_channelSku: { accountId, channelSku } },
+        create: { accountId, channelSku, sellerSku, updatedAt: new Date() }, update: {},
+      });
+      await queueSkuReview(tx, { businessId: req.businessId, mappingId: reviewMapping.id, sellerSku,
+        candidateIds: resolution.candidates, reason: "SKU seller ganda; pilih SKU master di antrean tinjauan." });
+      return { reviewRequired: true };
+    }
+    variantId = resolution.variantId ?? undefined;
+  }
   const existingForChannel = await tx.productMapping.findUnique({ where: { accountId_channelSku: { accountId, channelSku } } });
+  sellerSku ??= existingForChannel?.sellerSku ?? undefined;
   if (existingForChannel?.variantId && existingForChannel.variantId !== variantId) {
     return NextResponse.json({ error: "SKU ini sudah terhubung ke varian lain di toko yang sama. Gunakan Ganti Varian pada mapping yang ada." }, { status: 409 });
   }
@@ -193,17 +210,20 @@ export const POST = withAuth(async (req) => {
 
     const existingMapping = existingForChannel ?? aliasMapping;
     const mapping = existingMapping
-      ? await tx.productMapping.update({ where: { id: existingMapping.id }, data: { channelSku, variantId }, include: mappingInclude })
+      ? await tx.productMapping.update({ where: { id: existingMapping.id }, data: { channelSku, variantId, ...(sellerSku ? { sellerSku } : {}) }, include: mappingInclude })
       : await tx.productMapping.create({
-      data: { id: crypto.randomUUID(), accountId, channelSku, variantId, updatedAt: new Date() },
+      data: { id: crypto.randomUUID(), accountId, channelSku, variantId, sellerSku: sellerSku ?? null, updatedAt: new Date() },
       include: mappingInclude,
     });
     // Backfill OrderItem historis yang masih orphan utk SKU ini — analytics
     // (topProducts) langsung menampilkan produk master, bukan SKU mentah.
     const backfilled = await backfillOrderItems(accountId, channelSku, variantId, tx, body.channelSkuAliases);
+    if (sellerSku) await registerSellerSku(tx, { businessId: req.businessId, mappingId: mapping.id, sellerSku });
     return { mapping, backfilled, variantId };
   });
   if (result instanceof Response) return result;
+  if ("reviewRequired" in result) return NextResponse.json({ ok: true, reviewRequired: true,
+    stockWarnings: ["SKU seller ganda. Mapping masuk antrean tinjauan; stok belum digabung."] }, { status: 202 });
   const stockWarnings = await reconcileMappedOrders(accountId, result.variantId);
   return NextResponse.json({ ok: true, mapping: result.mapping, backfilled: result.backfilled, stockWarnings }, { status: 201 });
   } catch (e) {

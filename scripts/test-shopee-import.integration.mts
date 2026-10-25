@@ -6,8 +6,8 @@
  *  I1  import awal multi-varian: master+varian+mapping+ledger INIT;
  *      platformStock diisi hanya bila Shopee melaporkan stock_info
  *  I2  idempoten: run ulang → nol master baru, existing naik, ledger tak ganda
- *  I3  single-variant tanpa model → channelSku pakai item_sku
- *  I4  dua model SKU identik → yang kedua jadi `itemId:model_id` (bukan index)
+ *  I3  single-variant tanpa model → ID teknis terpisah dari seller SKU
+ *  I4  dua model SKU identik → antrean tinjauan, stok tidak digabung
  *  I5  mapping orphan (variantId NULL) TIDAK dipoint ke master baru;
  *      SKU lain di item yang sama tetap diimpor
  *  I6  scoping: akun brand lain tidak ikut (businessId pada findMany);
@@ -193,13 +193,15 @@ await ok("I1: import awal multi-varian → master+varian+mapping+ledger INIT", a
   assert.equal(master.productVariant.length, 2);
 
   const mapA = await prisma.productMapping.findUniqueOrThrow({
-    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "SK-A" } },
+    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "1001:11" } },
   });
   const mapB = await prisma.productMapping.findUniqueOrThrow({
-    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "SK-B" } },
+    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "1001:12" } },
   });
   assert.ok(mapA.variantId, "SK-A harus tertaut varian");
   assert.ok(mapB.variantId, "SK-B harus tertaut varian");
+  assert.equal(mapA.sellerSku, "SK-A");
+  assert.equal(mapB.sellerSku, "SK-B");
   assert.equal(mapA.platformStock, 5, "stock_info dilaporkan → platformStock=5");
   assert.equal(
     mapB.platformStock,
@@ -234,7 +236,7 @@ await ok("I2: idempoten → run ulang nol master baru, ledger tidak ganda", asyn
   assert.equal(await prisma.stockLedger.count({ where: { reason: "INIT" } }), ledgersBefore);
 });
 
-await ok("I3: single-variant tanpa model → channelSku pakai item_sku", async () => {
+await ok("I3: single-variant menyimpan seller SKU terpisah dari alamat listing", async () => {
   fixture.items = [{ item_id: 1002 }];
   fixture.info[1002] = {
     item_id: 1002,
@@ -251,12 +253,13 @@ await ok("I3: single-variant tanpa model → channelSku pakai item_sku", async (
   assert.equal(res.importedItems, 1);
   assert.equal(res.importedVariants, 1);
   const map = await prisma.productMapping.findUniqueOrThrow({
-    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "SOLE-1" } },
+    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "1002:0" } },
   });
   assert.ok(map.variantId);
+  assert.equal(map.sellerSku, "SOLE-1");
 });
 
-await ok("I4: SKU kembar → fallback `itemId:model_id` (bukan index urutan)", async () => {
+await ok("I4: SKU seller kembar masuk tinjauan tanpa membuat stok ganda", async () => {
   fixture.items = [{ item_id: 1003 }];
   fixture.info[1003] = {
     item_id: 1003,
@@ -274,15 +277,17 @@ await ok("I4: SKU kembar → fallback `itemId:model_id` (bukan index urutan)", a
     businessId: bizA.id,
     accountIds: [acctA.id],
   });
-  assert.equal(res.importedItems, 1);
-  assert.equal(res.importedVariants, 2);
+  assert.equal(res.importedItems, 0);
+  assert.equal(res.importedVariants, 0);
+  assert.equal(res.orphan, 2);
   await prisma.productMapping.findUniqueOrThrow({
-    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "DUP-SKU" } },
+    where: { accountId_channelSku: { accountId: acctA.id, channelSku: "1003:55" } },
   });
   const second = await prisma.productMapping.findUniqueOrThrow({
     where: { accountId_channelSku: { accountId: acctA.id, channelSku: "1003:66" } },
   });
-  assert.ok(second.variantId, "model_id 66 harus terpetakan, bukan `1003:1`");
+  assert.equal(second.variantId, null, "SKU seller ganda menunggu keputusan user");
+  assert.equal(await prisma.skuMappingReview.count({ where: { businessId: bizA.id, sellerSku: "DUP-SKU", status: "PENDING" } }), 2);
 });
 
 await ok("I5: orphan (variantId NULL) tak dipoint; SKU lain tetap diimpor", async () => {
@@ -366,6 +371,25 @@ await ok("I8: tanpa OAuth → error jelas; API error tidak membocorkan token", a
   assert.ok(failed.error, "error API harus dilaporkan per akun");
   assert.ok(!failed.error!.includes(TOKEN_A), "token akses tidak boleh ada di error");
   assert.ok(!failed.error!.includes("tok-shopee"), "token lain juga tidak boleh bocor");
+});
+
+await ok("I9: seller SKU sama di tiga toko memakai satu stok; customer lain tetap terpisah", async () => {
+  const third = await prisma.platformAccount.create({ data: { platform: "SHOPEE", label: "Toko ketiga", businessId: bizA.id, accessToken: "fixture-third", externalShopId: "888003" } });
+  fixture.items = [{ item_id: 1001 }];
+  fixture.models[1001].model[0].stock_info = [{ stock: 888888 }];
+  for (const account of [acctA2, third]) {
+    const [result] = await importShopeeListings({ businessId: bizA.id, accountIds: [account.id] });
+    assert.equal(result.error, undefined);
+    assert.equal(result.importedVariants, 0);
+  }
+  const linked = await prisma.productMapping.findMany({ where: { accountId: { in: [acctA.id, acctA2.id, third.id] }, sellerSku: "SK-A" }, include: { variant: true } });
+  assert.equal(linked.length, 3);
+  assert.equal(new Set(linked.map((mapping) => mapping.variantId)).size, 1);
+  assert.equal(linked[0].variant!.stock, 5, "Listing tambahan tidak menimpa stok gudang");
+  const [other] = await importShopeeListings({ businessId: bizB.id, accountIds: [acctB.id] });
+  assert.equal(other.error, undefined);
+  const isolated = await prisma.productMapping.findFirstOrThrow({ where: { accountId: acctB.id, sellerSku: "SK-A" } });
+  assert.notEqual(isolated.variantId, linked[0].variantId);
 });
 
 db.cleanup();

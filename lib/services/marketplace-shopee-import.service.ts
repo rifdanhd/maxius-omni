@@ -9,9 +9,8 @@
  * Prinsip (selaras orphan-sku.service):
  *  - SATU listing Shopee = SATU MasterProduct; varian = model Shopee
  *    (warna/size) karena stok dicatat per varian, bukan per item.
- *  - channel SKU disimpan apa adanya yang dilihat seller (model_sku / item_sku)
- *    supaya item order dari Shopee langsung match. SKU kosong → fallback
- *    `itemId:modelId` (format yang dipahami resolveModel()).
+ *  - Listing baru memakai itemId:modelId untuk alamat API. Seller SKU disimpan
+ *    terpisah dan dipakai mencocokkan SKU master dalam customer yang sama.
  *  - SKU yang sudah punya mapping TIDAK pernah dipoint ke master baru: mapping
  *    yang sudah tertaut varian lain hanya di-refresh field platform-nya, dan
  *    mapping orphan (variantId NULL) sengaja dibiarkan ke panel orphan supaya
@@ -28,6 +27,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getItemBaseInfo, getItemList, getModelList, itemBaseImage, readStockInfo } from "@/lib/integrations/shopee";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
 import {
   backfillMasterImages,
   loadShopeeAccount,
@@ -42,10 +42,12 @@ export const SHOPEE_IMPORT_MAX_LIMIT = 500;
 type ShopeeAccount = NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>;
 
 /** Status mapping yang sudah kita tahu ada; `imported` = dibuat di proses ini. */
-type KnownChannel = { id: string; variantId: string | null; imported?: boolean };
+type KnownChannel = { id: string; variantId: string | null; imported?: boolean; platformProductId?: string | null };
 
 type Descriptor = {
   channelSku: string;
+  sellerSku: string | null;
+  platformSkuId: string;
   stock: number;
   stockKnown: boolean;
   platformTitle: string;
@@ -139,10 +141,10 @@ export async function importShopeeListings(params: {
     try {
       const known = await prisma.productMapping.findMany({
         where: { accountId: account.id },
-        select: { id: true, channelSku: true, variantId: true },
+        select: { id: true, channelSku: true, variantId: true, platformProductId: true },
       });
       const byChannelSku = new Map<string, KnownChannel>(
-        known.map((m) => [m.channelSku, { id: m.id, variantId: m.variantId }])
+        known.map((m) => [m.channelSku, { id: m.id, variantId: m.variantId, platformProductId: m.platformProductId }])
       );
 
       let offset = 0;
@@ -200,8 +202,13 @@ async function importOneItem(params: {
 
   const knownRefs: KnownChannel[] = [];
   for (const d of descriptors) {
-    const hit = byChannelSku.get(d.channelSku);
+    const legacy = d.sellerSku ? byChannelSku.get(d.sellerSku) : undefined;
+    const hit = byChannelSku.get(d.channelSku) ?? (legacy && (legacy.platformProductId === String(itemId) || (!legacy.platformProductId && legacy.variantId === null)) ? legacy : undefined);
     if (!hit) continue;
+    byChannelSku.set(d.channelSku, hit);
+    if (hit.id) await prisma.productMapping.updateMany({ where: { id: hit.id, accountId: account.id },
+      data: { sellerSku: d.sellerSku, platformSkuId: d.platformSkuId } });
+    if (hit.id && d.sellerSku) await prisma.$transaction((tx) => registerSellerSku(tx, { businessId, mappingId: hit.id, sellerSku: d.sellerSku! }));
     if (hit.imported || hit.variantId) stats.existing += 1;
     else stats.orphan += 1;
     knownRefs.push(hit);
@@ -232,40 +239,38 @@ async function importOneItem(params: {
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const product = await tx.masterProduct.create({
-        data: {
-          name: itemName ?? pending[0].channelSku,
-          businessId,
-          importedFrom: `SHOPEE:${account.externalShopId ?? ""}`,
-          threshold,
-          imageUrl: image,
-          ...(image
-            ? {
-                productImage: {
-                  create: [{ id: crypto.randomUUID(), url: image, isCover: true, order: 0 }],
-                },
-              }
-            : {}),
-          productVariant: {
-            create: pending.map((d) => ({
-              sku: d.channelSku,
-              name: pending.length > 1 ? d.channelSku : null,
-              stock: d.stock,
-            })),
-          },
-        },
-        select: { productVariant: { select: { id: true, sku: true } } },
-      });
-      const variantIdBySku = new Map(product.productVariant.map((v) => [v.sku, v.id]));
+    const delta = await prisma.$transaction(async (tx) => {
+      await lockSellerSkus(tx, businessId, pending.flatMap((d) => d.sellerSku ? [d.sellerSku] : []));
+      let productId: string | null = null;
+      let initializedCount = 0;
+      let reviewCount = 0;
       for (const d of pending) {
-        const variantId = variantIdBySku.get(d.channelSku);
-        if (!variantId) continue;
-        await tx.productMapping.create({
+        const resolution = d.sellerSku ? await findMasterSku(tx, businessId, d.sellerSku) : null;
+        let variantId = resolution?.variantId ?? null;
+        let initialized = false;
+        const duplicate = d.sellerSku && descriptors.filter((item) => item.sellerSku === d.sellerSku).length > 1;
+        if (!resolution?.ambiguous && !duplicate && !variantId) {
+          if (!productId) {
+            const product = await tx.masterProduct.create({ data: { name: itemName ?? d.sellerSku ?? d.channelSku, businessId,
+              importedFrom: `SHOPEE:${account.externalShopId ?? ""}`, threshold, imageUrl: image } });
+            productId = product.id;
+          }
+          const variant = await tx.productVariant.create({ data: { masterProductId: productId, sku: d.sellerSku ?? d.channelSku,
+            name: pending.length > 1 ? d.sellerSku ?? d.channelSku : null, stock: d.stock } });
+          variantId = variant.id;
+          initialized = true;
+          initializedCount++;
+          if (d.sellerSku) await tx.masterSkuKey.upsert({ where: { businessId_sellerSku: { businessId, sellerSku: d.sellerSku } },
+            create: { businessId, sellerSku: d.sellerSku, variantId }, update: { variantId } });
+        }
+        if (duplicate) variantId = null;
+        const mapping = await tx.productMapping.create({
           data: {
             id: crypto.randomUUID(),
             accountId: account.id,
             channelSku: d.channelSku,
+            sellerSku: d.sellerSku,
+            platformSkuId: d.platformSkuId,
             variantId,
             platformProductId: String(itemId),
             platformTitle: d.platformTitle,
@@ -278,7 +283,13 @@ async function importOneItem(params: {
             updatedAt: now,
           },
         });
-        await tx.stockLedger.create({
+        if (!variantId) {
+          reviewCount++;
+          await queueSkuReview(tx, { businessId, mappingId: mapping.id, sellerSku: d.sellerSku ?? d.channelSku,
+            candidateIds: resolution?.candidates ?? [], reason: duplicate ? "SKU seller ganda pada varian listing yang sama." : "Beberapa SKU master memiliki SKU seller yang sama." });
+          continue;
+        }
+        if (initialized) await tx.stockLedger.create({
           data: {
             id: crypto.randomUUID(),
             variantId,
@@ -289,7 +300,12 @@ async function importOneItem(params: {
           },
         });
       }
+      return { items: productId ? 1 : 0, variants: initializedCount, reviews: reviewCount };
     });
+    stats.importedItems += delta.items;
+    stats.importedVariants += delta.variants;
+    stats.orphan += delta.reviews;
+    stats.existing += pending.length - delta.variants - delta.reviews;
   } catch (e) {
     // SKU bentrok dengan listing lain di toko yang sama → jangan dipaksa,
     // biarkan panel orphan yang memutuskan penempatannya.
@@ -301,8 +317,6 @@ async function importOneItem(params: {
   for (const d of pending) {
     byChannelSku.set(d.channelSku, { id: "", variantId: null, imported: true });
   }
-  stats.importedItems += 1;
-  stats.importedVariants += pending.length;
   stats.zeroStock += pending.filter((d) => d.stock === 0).length;
 }
 
@@ -317,17 +331,14 @@ function buildDescriptors(params: {
   const { itemId, itemName, itemStatus, itemSku, info, models } = params;
   const realModels = models.filter((m) => Number(m.model_id) !== 0);
   const out: Descriptor[] = [];
-  const used = new Set<string>();
 
   const add = (sku: string, stockRaw: unknown, status: string | null, modelId?: number) => {
-    // Dua model dengan SKU identik dalam satu item → pakai bentuk
-    // itemId:model_id (BUKAN index urutan) supaya resolveModel() & push stok
-    // mengenai model yang benar.
-    const channelSku = used.has(sku) ? `${itemId}:${modelId ?? out.length}` : sku;
-    used.add(channelSku);
+    const channelSku = `${itemId}:${modelId ?? 0}`;
     const stock = readStockInfo(stockRaw);
     out.push({
       channelSku,
+      sellerSku: sku === `${itemId}:${modelId ?? 0}` ? null : sku,
+      platformSkuId: String(modelId ?? 0),
       stock: stock ?? 0,
       stockKnown: stock !== null,
       platformTitle: itemName ? (out.length > 0 ? `${itemName} (${channelSku})` : itemName) : channelSku,

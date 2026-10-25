@@ -13,6 +13,7 @@ import {
 } from "@/lib/services/central-stock.service";
 import { logOrphanSku } from "@/lib/services/sync-log.util";
 import { withAccountPullLock } from "@/lib/services/account-pull-lock.service";
+import { initialOrderSyncDays } from "@/lib/services/order-sync-range.policy";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -89,20 +90,15 @@ export async function resolveVariantId(
 ): Promise<string | null> {
   if (!channelSku) return null;
   const keys = [...new Set([channelSku, ...aliases].filter(Boolean))];
-  if (keys.length > 1) {
+  {
     const matches = await prisma.productMapping.findMany({
-      where: { accountId, channelSku: { in: keys }, variantId: { not: null } },
+      where: { accountId, OR: [{ channelSku: { in: keys } }, { sellerSku: { in: keys } }], variantId: { not: null } },
       select: { variantId: true },
     });
     const variants = [...new Set(matches.map((m) => m.variantId).filter((id): id is string => id !== null))];
     if (variants.length > 1) throw new Error(`Mapping SKU "${channelSku}" bertentangan dengan Seller SKU. Periksa mapping toko ini.`);
     return variants[0] ?? null;
   }
-  const mapping = await prisma.productMapping.findUnique({
-    where: { accountId_channelSku: { accountId, channelSku } },
-    select: { variantId: true },
-  });
-  return mapping?.variantId ?? null;
 }
 
 /** Persiapkan field PII dari recipient_address: nama polos, HP & alamat terenkripsi. */
@@ -223,7 +219,7 @@ async function syncOrdersTikTokInner(
       pageToken,
       ...(sinceSec !== null
         ? { updateTimeGe: sinceSec }
-        : { createTimeGe: nowSec - 30 * 86400, createTimeLt: nowSec }),
+        : { createTimeGe: nowSec - initialOrderSyncDays(account.externalShopId) * 86400, createTimeLt: nowSec }),
     });
     orders.push(...(res.orders as OrderRaw[]));
     if (res.orders.length === 0 || !res.nextPageToken) break;
@@ -239,7 +235,7 @@ async function syncOrdersTikTokInner(
     reconcileScan: 0,
     trackingEvents: 0,
   };
-  await ingestTikTokOrdersPage(prisma, accountId, orders, result);
+  await ingestTikTokOrdersPage(prisma, accountId, orders, result, { importOnly: !opts?.since });
   await postTikTokOrderSync(prisma, accountId, result);
   return result;
 }
@@ -253,7 +249,8 @@ export async function ingestTikTokOrdersPage(
   prisma: PrismaLike,
   accountId: string,
   orders: OrderRaw[],
-  result: TikTokOrderSyncResult
+  result: TikTokOrderSyncResult,
+  options?: { importOnly?: boolean }
 ): Promise<void> {
   // Akumulasi orphan SKU (channelSku → qty) utk penanda pasif SyncLog
   // kind=orphan_sku — di-flush setelah loop order, idempotent per marker.
@@ -315,7 +312,7 @@ export async function ingestTikTokOrdersPage(
         }
         // Central stock: order yang "lahir" atau refresh ke AWAITING_SHIPMENT
         // ikut memotong stok gudang. Idempoten via StockLedger (reason ORDER).
-        if (raw.status && ACTIVE_ORDER_STOCK_STATUSES.includes(raw.status)) {
+        if (!options?.importOnly && raw.status && ACTIVE_ORDER_STOCK_STATUSES.includes(raw.status)) {
           try {
             const effect = await deductStockForOrder(existing.orderId);
             if (!effect.ok) result.errors.push(`${externalOrderId}: ${effect.reason ?? "potong stok gagal"}`);
@@ -327,7 +324,7 @@ export async function ingestTikTokOrdersPage(
         }
         // Central stock: order yang refresh ke status batal me-restore stok yang
         // tadi dipotong. Idempoten & aman (skip bila tidak pernah dipotong).
-        if (raw.status && CANCEL_STATUSES.has(raw.status)) {
+        if (!options?.importOnly && raw.status && CANCEL_STATUSES.has(raw.status)) {
           const reason = cancelReasonForStatus(raw.status);
           if (reason) {
             try {
@@ -387,6 +384,7 @@ export async function ingestTikTokOrdersPage(
             amount: toNumber(payment?.total_amount),
             currency: payment?.currency as string | undefined ?? null,
             createTime: toDate(raw.create_time),
+            importOnly: options?.importOnly ?? false,
             paidTime: toDate(raw.paid_time),
             shippingDueTime: toDate(raw.shipping_due_time),
             rtsSlaTime: toDate(raw.rts_sla_time),

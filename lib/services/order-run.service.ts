@@ -381,7 +381,7 @@ async function runShopee(
         return true;
       });
       if (fresh.length > 0) {
-        await ingestShopeeOrderSummaries(prisma, run.accountId, accessToken, shopId, fresh, result);
+        await ingestShopeeOrderSummaries(prisma, run.accountId, accessToken, shopId, fresh, result, { importOnly: run.rangeField !== "update_time" });
       }
 
       const pageLen = page.orders?.length ?? 0;
@@ -488,7 +488,7 @@ async function runTikTok(
     const raws = (res.orders ?? []) as OrderRaw[];
     result.fetched += raws.length;
     if (raws.length > 0) {
-      await ingestTikTokOrdersPage(prisma, run.accountId, raws, result);
+      await ingestTikTokOrdersPage(prisma, run.accountId, raws, result, { importOnly: run.rangeField !== "update_time" });
     }
 
     const next = res.nextPageToken ?? undefined;

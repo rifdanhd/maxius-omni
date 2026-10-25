@@ -41,9 +41,10 @@ export async function registerNodeInstrumentation() {
     (process.env.NODE_ENV === "production" || process.env.SYNC_RETRY_DEV === "true");
   if (retryAllowed && !g.__maxiusSyncRetryTimer) {
     const { processDueSyncJobs } = await import("./lib/services/sync-job.service");
+    const { drainStockOutbox } = await import("./lib/services/stock-outbox.service");
     g.__maxiusSyncRetryTimer = unref(
       setInterval(() => {
-        void processDueSyncJobs()
+        void drainStockOutbox().then(() => processDueSyncJobs())
           .then((r) => {
             if (r.requeued > 0) {
               console.warn(`[SyncRetry] ${r.requeued} job PROCESSING yatim → diantre ulang`);

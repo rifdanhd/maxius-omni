@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 import { effectiveStock } from "@/lib/services/stock-level.policy";
 
-export async function drainStockOutbox(limit = 100): Promise<number> {
+export async function drainStockOutbox(limit = 100, businessId?: string): Promise<number> {
   return prisma.$transaction(async tx => {
     const events = await tx.$queryRaw<{ id: string; variantId: string; businessId: string }[]>`
       SELECT "id", "variantId", "businessId" FROM "StockOutbox"
-      WHERE "status" = 'PENDING' ORDER BY "createdAt", "id"
+      WHERE "status" = 'PENDING' ${businessId ? Prisma.sql`AND "businessId" = ${businessId}` : Prisma.empty} ORDER BY "createdAt", "id"
       LIMIT ${limit} FOR UPDATE SKIP LOCKED
     `;
     for (const event of events) {
@@ -26,5 +27,5 @@ export async function drainStockOutbox(limit = 100): Promise<number> {
       await tx.stockOutbox.update({ where: { id: event.id }, data: { status: "DONE", handledAt: new Date() } });
     }
     return events.length;
-  });
+  }, { timeout: 60_000 });
 }

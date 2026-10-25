@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
+import crypto from "node:crypto";
+import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
 import { applyMarketplaceCover } from "@/lib/services/gallery.service";
 import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
 import {
@@ -180,6 +182,8 @@ function applyProduct(
 
   return {
     platformProductId: productId || null,
+    platformSkuId: matchingSku?.id ? String(matchingSku.id) : null,
+    sellerSku: typeof matchingSku?.seller_sku === "string" ? matchingSku.seller_sku.trim() || null : null,
     platformStatus: (product.status as string | undefined) ?? null,
     platformStatusRaw: JSON.stringify(product),
     platformStock: stock,
@@ -334,6 +338,37 @@ type SyncAccountResult = {
   unmapped: TikTokUnmappedProduct[];
 };
 
+async function autoLinkKnownTikTokSkus(businessId: string, accountId: string, products: TikTokUnmappedProduct[]) {
+  let linked = 0;
+  for (const product of products) for (const sku of product.skus) {
+    if (!sku.sellerSku?.trim() || !sku.skuId) continue;
+    const added = await prisma.$transaction(async (tx) => {
+      const sellerSku = sku.sellerSku!.trim();
+      await lockSellerSkus(tx, businessId, [sellerSku]);
+      const resolution = await findMasterSku(tx, businessId, sellerSku);
+      if (!resolution.variantId && !resolution.ambiguous) return false;
+      const duplicate = product.skus.filter((item) => item.sellerSku?.trim() === sellerSku).length > 1;
+      const variantId = duplicate ? null : resolution.variantId;
+      const old = await tx.productMapping.findUnique({ where: { accountId_channelSku: { accountId, channelSku: sku.skuId } } });
+      if (old?.variantId) return false;
+      const values = { variantId, sellerSku, platformSkuId: sku.skuId, platformProductId: product.platformProductId,
+        platformTitle: product.title, platformStatus: product.status, platformStock: sku.stock, lastSyncedAt: new Date() };
+      const mapping = old ? await tx.productMapping.update({ where: { id: old.id }, data: values })
+        : await tx.productMapping.create({ data: { accountId, channelSku: sku.skuId, ...values, updatedAt: new Date() } });
+      if (!variantId) {
+        await queueSkuReview(tx, { businessId, mappingId: mapping.id, sellerSku, candidateIds: resolution.candidates,
+          reason: duplicate ? "SKU seller ganda pada varian produk TikTok." : "SKU seller memiliki beberapa stok pusat." });
+        return false;
+      }
+      await tx.stockOutbox.create({ data: { id: crypto.randomUUID(), businessId, variantId,
+        eventKey: `auto-map:${mapping.id}:${crypto.randomUUID()}` } });
+      return true;
+    });
+    if (added) linked++;
+  }
+  return linked;
+}
+
 /**
  * syncTikTokListing — tarik semua produk TikTok (per akun) & update status
  * seluruh ProductMapping milik akun itu. Idempoten terhadap totalCount.
@@ -397,10 +432,13 @@ include: {
       const upd = applyProduct({ channelSku: m.channelSku }, product);
       if (String(product.status ?? "").toUpperCase() === "DELETED") deleted += 1;
       await prisma.productMapping.update({ where: { id: m.id }, data: upd });
+      if (upd.sellerSku) await prisma.$transaction((tx) => registerSellerSku(tx, { businessId, mappingId: m.id, sellerSku: upd.sellerSku! }));
       await backfillMasterImageUrl(m.variant?.masterProductId ?? null, productMainImage(product));
       synced += 1;
     }
 
+    const disconnected = findUnmappedProducts(products, account.productMapping.filter((mapping) => mapping.variantId !== null).map((mapping) => mapping.channelSku));
+    synced += await autoLinkKnownTikTokSkus(businessId, account.id, disconnected);
     await prisma.syncLog.create({
       data: {
         direction: "in",
@@ -411,7 +449,8 @@ include: {
         accountId: account.id,
       },
     });
-    const unmapped = findUnmappedProducts(products, account.productMapping.filter((mapping) => mapping.variantId !== null).map((mapping) => mapping.channelSku));
+    const connected = await prisma.productMapping.findMany({ where: { accountId: account.id, account: { businessId }, variantId: { not: null } }, select: { channelSku: true } });
+    const unmapped = findUnmappedProducts(products, connected.map((mapping) => mapping.channelSku));
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
     } catch (e) {
       results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: e instanceof Error ? e.message : "Gagal memperbarui data toko." });

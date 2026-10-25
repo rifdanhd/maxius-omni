@@ -317,11 +317,11 @@ export async function settleDispatchedSyncJobs(
  */
 export const SYNC_JOB_STALE_PROCESSING_MS = 5 * 60_000;
 
-async function requeueStaleProcessingJobs(now: Date): Promise<number> {
+async function requeueStaleProcessingJobs(now: Date, businessId?: string): Promise<number> {
   const cutoff = new Date(now.getTime() - SYNC_JOB_STALE_PROCESSING_MS);
   const msg = "Proses terputus saat push berjalan (restart/crash) — diantre ulang.";
   const stale = await prisma.syncJob.findMany({
-    where: { status: SYNC_JOB_STATUSES.PROCESSING, updatedAt: { lt: cutoff } },
+    where: { status: SYNC_JOB_STATUSES.PROCESSING, updatedAt: { lt: cutoff }, ...(businessId ? { account: { businessId } } : {}) },
     select: { id: true, variantId: true, accountId: true, channelSku: true, retryCount: true },
   });
   let count = 0;
@@ -370,7 +370,7 @@ export async function processDueSyncJobs(opts?: {
 
   // Sweep dulu: PROCESSING yatim (proses mati di tengah push) → bisa dipilih
   // lagi di tick yang sama, jadi tidak pernah tersangkut selamanya.
-  result.requeued = await requeueStaleProcessingJobs(now);
+  result.requeued = await requeueStaleProcessingJobs(now, opts?.businessId);
 
   const due = await prisma.syncJob.findMany({
     where: {

@@ -24,7 +24,9 @@ import { TEST_ADMIN_PASSWORD } from "./lib/e2e-credentials";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const MARKER = path.join(ROOT, ".e2e-db.json");
-const PORT = "3100";
+const PORT = process.env.E2E_PORT ?? "3100";
+if (!/^\d+$/.test(PORT) || Number(PORT) < 1024 || Number(PORT) > 65534) throw new Error("E2E_PORT tidak valid.");
+const UPSTREAM_PORT = String(Number(PORT) + 1);
 const production = process.env.E2E_SERVER_MODE === "production";
 let tlsProxy: https.Server | undefined;
 process.env.TEST_ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
@@ -49,7 +51,7 @@ if (production) {
   const cert = path.join(tlsDir, "localhost.cert.pem");
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-subj", "/CN=localhost", "-days", "1"], { stdio: "ignore" });
   tlsProxy = https.createServer({ key: fs.readFileSync(key), cert: fs.readFileSync(cert) }, (incoming, outgoing) => {
-    const upstream = http.request({ hostname: "127.0.0.1", port: 3101, method: incoming.method, path: incoming.url, headers: incoming.headers }, (response) => {
+    const upstream = http.request({ hostname: "127.0.0.1", port: Number(UPSTREAM_PORT), method: incoming.method, path: incoming.url, headers: incoming.headers }, (response) => {
       outgoing.writeHead(response.statusCode ?? 502, response.headers);
       response.pipe(outgoing);
     });
@@ -62,7 +64,7 @@ if (production) {
   });
 }
 
-const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", ...(production ? ["start", "-H", "127.0.0.1"] : ["dev", "--webpack"]), "-p", production ? "3101" : PORT], {
+const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", ...(production ? ["start", "-H", "127.0.0.1"] : ["dev", "--webpack"]), "-p", production ? UPSTREAM_PORT : PORT], {
   cwd: ROOT,
   stdio: "inherit",
   // MAXIUS_E2E=1 → next.config.ts memakai distDir ".next-e2e" supaya lockfile

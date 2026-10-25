@@ -10,6 +10,7 @@ import {
 import { resolveVariantId } from "@/lib/services/order-sync.service";
 import { logOrphanSku } from "@/lib/services/sync-log.util";
 import { ACTIVE_ORDER_STOCK_STATUSES } from "@/lib/services/central-stock.service";
+import { initialOrderSyncDays } from "@/lib/services/order-sync-range.policy";
 
 type PrismaLike = typeof defaultPrisma;
 
@@ -102,7 +103,8 @@ async function syncShopeeShipments(
 export async function createShopeeOrder(
   prisma: PrismaLike,
   accountId: string,
-  detail: Record<string, unknown>
+  detail: Record<string, unknown>,
+  options?: { importOnly?: boolean }
 ): Promise<string | null> {
   const orderSn = s(detail.order_sn);
   if (!orderSn) return null;
@@ -127,9 +129,9 @@ export async function createShopeeOrder(
     const modelId = n(it.model_id);
     return {
       channelSku:
-        s(it.sku) ??
-        s(it.model_sku) ??
-        (itemId !== null && modelId !== null ? `${itemId}:${modelId}` : ""),
+        itemId !== null && modelId !== null ? `${itemId}:${modelId}`
+          : s(it.sku) ?? s(it.model_sku) ?? (itemId !== null ? `${itemId}:0` : ""),
+      sellerSku: s(it.sku) ?? s(it.model_sku),
       productId: itemId !== null ? String(itemId) : null,
       imageUrl: s(it.image) ?? s(it.image_url),
       productName: s(it.name) ?? s(it.item_name),
@@ -142,7 +144,7 @@ export async function createShopeeOrder(
 
   for (const item of lineItems) {
     if (!item.channelSku) continue;
-    item.variantId = await resolveVariantId(prisma, accountId, item.channelSku);
+    item.variantId = await resolveVariantId(prisma, accountId, item.channelSku, item.sellerSku ? [item.sellerSku] : []);
     if (!item.variantId) {
       await logOrphanSku(accountId, item.channelSku, item.qty);
     }
@@ -191,6 +193,7 @@ export async function createShopeeOrder(
         amount,
         currency: s(detail.currency),
         createTime: toDate(detail.create_time),
+        importOnly: options?.importOnly ?? false,
         paidTime: toDate(detail.payment_time ?? detail.pay_time),
         shippingDueTime: toDate(detail.shipping_due_time),
         accountId,
@@ -277,7 +280,7 @@ async function syncOrdersShopeeInner(
     timeRangeField = "update_time";
     rangeFrom = Math.floor(opts.since.getTime() / 1000) - 600;
   } else {
-    rangeFrom = nowSec - envInt("SHOPEE_ORDER_SYNC_DAYS", 30) * 86400;
+    rangeFrom = nowSec - envInt("SHOPEE_ORDER_SYNC_DAYS", initialOrderSyncDays(account.externalShopId)) * 86400;
   }
 
   // A5 — ber-halaman (cursor) per jendela 15 hari; dedup lintas jendela;
@@ -307,7 +310,7 @@ async function syncOrdersShopeeInner(
         });
         result.fetched += fresh.length;
         if (fresh.length > 0) {
-          await ingestShopeeOrderSummaries(prisma, accountId, account.accessToken, shopId, fresh, result);
+          await ingestShopeeOrderSummaries(prisma, accountId, account.accessToken, shopId, fresh, result, { importOnly: !opts?.since });
         }
         hasMore = r.hasMore;
         cursor = r.nextCursor;
@@ -334,7 +337,8 @@ export async function ingestShopeeOrderSummaries(
   accessToken: string,
   shopId: string,
   summaries: ShopeeOrderSummary[],
-  result: ShopeeSyncResult
+  result: ShopeeSyncResult,
+  options?: { importOnly?: boolean }
 ): Promise<void> {
   // A4 — order yang sudah ada: refresh status saja (progress-only).
   const newSns: string[] = [];
@@ -367,7 +371,7 @@ export async function ingestShopeeOrderSummaries(
           data: { rawStatus },
         }),
       ]);
-      if (canonical !== existing.order.status || ACTIVE_ORDER_STOCK_STATUSES.includes(canonical)) {
+      if (!options?.importOnly && (canonical !== existing.order.status || ACTIVE_ORDER_STOCK_STATUSES.includes(canonical))) {
         // Transisi status → efek stok (A1, idempoten).
         const eff = await applyShopeeStockEffectsForStatus(existing.orderId, canonical);
         if (eff.effect !== "none" && eff.ok === false && eff.note) {
@@ -401,14 +405,14 @@ export async function ingestShopeeOrderSummaries(
         continue;
       }
       try {
-        const orderId = await createShopeeOrder(prisma, accountId, detail);
+        const orderId = await createShopeeOrder(prisma, accountId, detail, options);
         if (!orderId) {
           result.errors.push(`${sn}: gagal disimpan (field wajib hilang)`);
           continue;
         }
         result.created += 1;
         const canonical = canonicalShopeeStatus(s(detail.order_status) ?? "UNKNOWN");
-        const eff = await applyShopeeStockEffectsForStatus(orderId, canonical);
+        const eff = options?.importOnly ? { effect: "none", ok: true, note: undefined } : await applyShopeeStockEffectsForStatus(orderId, canonical);
         if (eff.effect !== "none" && eff.ok === false && eff.note) {
           result.errors.push(`${sn}: stok ${eff.effect} gagal (${eff.note})`);
         }

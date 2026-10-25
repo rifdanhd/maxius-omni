@@ -21,6 +21,15 @@ export async function logStockPush(
   errorMessage?: string
 ) {
   try {
+    await prisma.productMapping.updateMany({
+      where: { accountId, channelSku },
+      data: {
+        lastStockPushStatus: status === "success" ? "SUCCESS" : status === "deferred" ? "PENDING" : "FAILED",
+        lastStockPushError: status === "success" || status === "deferred" ? null : errorMessage ?? message,
+        lastStockPushAt: new Date(),
+        ...(status === "success" ? { platformStock: newStock, lastSyncedAt: new Date() } : {}),
+      },
+    });
     await prisma.syncLog.create({
       data: {
         direction: "out",

@@ -266,6 +266,7 @@ export async function deductStockForOrder(orderId: string): Promise<{
       id: true,
       orderNo: true,
       status: true,
+      importOnly: true,
       accountId: true,
       items: {
         where: { variantId: { not: null } },
@@ -274,6 +275,7 @@ export async function deductStockForOrder(orderId: string): Promise<{
     },
   });
   if (!order) return { ok: false, reason: "order not found" };
+  if (order.importOnly) return { ok: true, already: true, reason: "import_only tidak memengaruhi stok" };
 
   if (order.items.length === 0) {
     // Tidak ada item ter-mapping → tidak ada yang dipotong; bukan error.
@@ -377,6 +379,7 @@ async function atomicDeduct(
   entry: DeductPlanEntry,
   orderId: string
 ): Promise<{ variantId: string; changeQty: number; stockAfter: number } | null> {
+  await tx.$queryRaw`SELECT set_config('maxius.stock_order_id', ${orderId}, true)`;
   const res = await tx.productVariant.updateMany({
     where: { id: entry.variantId, stock: { gte: entry.qty } },
     data: { stock: { decrement: entry.qty } },
@@ -438,9 +441,10 @@ export async function restoreStockForCanceledOrder(
 }> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, orderNo: true, status: true, accountId: true },
+    select: { id: true, orderNo: true, status: true, accountId: true, importOnly: true },
   });
   if (!order) return { ok: false, reason: "order not found" };
+  if (order.importOnly) return { ok: true, already: true, reason: "import_only tidak memengaruhi stok" };
 
   const restores: Array<{ variantId: string; changeQty: number; stockAfter: number }> = [];
 
@@ -469,6 +473,7 @@ export async function restoreStockForCanceledOrder(
 
         const changeQty = Math.abs(d.changeQty);
         const stockAfter = variant.stock + changeQty;
+        await tx.$queryRaw`SELECT set_config('maxius.restore_order_id', ${order.id}, true)`;
         await tx.productVariant.update({
           where: { id: d.variantId },
           data: { stock: { increment: changeQty } },

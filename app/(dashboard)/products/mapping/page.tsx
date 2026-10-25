@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorFeedback } from "@/components/ui/feedback";
+import { SkuReviewPanel } from "@/components/inventory/sku-review-panel";
 import { notify } from "@/components/ui/notify";
 import { confirmAction } from "@/components/ui/confirm-action";
 import { useCallback, useEffect, useState } from "react";
@@ -314,6 +315,7 @@ export default function ProductMappingPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
+      <SkuReviewPanel />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground">Hubungkan Produk &amp; Stok (Mapping Stok Terpusat)</h1>

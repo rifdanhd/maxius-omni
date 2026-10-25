@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { cached } from "@/lib/utils/ttl-cache";
 import { isLowStock } from "@/lib/services/central-stock.service";
+import { Prisma } from "@prisma/client";
+import { UNFULFILLED_ORDER_STATUSES } from "@/lib/services/master-stock.service";
 
 const CACHE_TTL_MS = 60_000;
 
@@ -67,26 +69,26 @@ export const GET = withAuth(async (req) => {
           where: { account: { businessId }, status: "COMPLETED" },
         }),
 
-        prisma.orderItem.groupBy({
-          by: ["variantId"],
-          where: {
-            variantId: { not: null },
-            order: { status: { notIn: ["CANCELLED", "COMPLETED"] }, account: { businessId } },
-          },
-          _sum: { qty: true },
-        }),
+        prisma.$queryRaw<Array<{ variantId: string; qty: bigint }>>`
+          SELECT oi."variantId", SUM(oi.qty) AS qty FROM "OrderItem" oi
+          JOIN "Order" o ON o.id = oi."orderId" JOIN "PlatformAccount" a ON a.id = o."accountId"
+          WHERE a."businessId" = ${businessId} AND NOT o."importOnly"
+            AND o.status IN (${Prisma.join(UNFULFILLED_ORDER_STATUSES)}) AND oi."variantId" IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM "StockLedger" sl WHERE sl."referenceId" = o.id AND sl."variantId" = oi."variantId" AND sl.reason = 'ORDER')
+          GROUP BY oi."variantId"
+        `,
 
         prisma.productVariant.findMany({
-          where: { masterProduct: { businessId } },
-          select: { id: true, stock: true },
+          where: { isArchived: false, masterProduct: { businessId, isActive: true } },
+          select: { id: true, stock: true, safetyStock: true },
         }),
       ]);
 
     const stockByVariant = new Map(
-      variantsStock.map((v) => [v.id, v.stock] as const)
+      variantsStock.map((v) => [v.id, Math.max(0, v.stock - v.safetyStock)] as const)
     );
     const oversell = committed.filter(
-      (c) => (c._sum.qty ?? 0) > (stockByVariant.get(c.variantId ?? "") ?? 0)
+      (c) => stockByVariant.has(c.variantId) && Number(c.qty) > stockByVariant.get(c.variantId)!
     ).length;
 
     return {
