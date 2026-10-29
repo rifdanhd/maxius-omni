@@ -92,6 +92,21 @@ type UnmappedAccount = {
   unmapped: UnmappedProduct[];
 };
 
+type CentralStockPreview = {
+  accountId: string;
+  label: string;
+  updated: Array<{
+    mappingId: string;
+    sku: string;
+    channelSku: string;
+    productName: string;
+    imageUrl: string | null;
+    before: number;
+    after: number;
+  }>;
+  skipped: Array<{ mappingId: string; sku: string; reason: string }>;
+};
+
 /* ------------------------------ Constants / helpers ------------------------------ */
 
 const PAGE_SIZE = 20;
@@ -184,6 +199,8 @@ export default function TikTokMarketplacePage() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const [syncingAll, setSyncingAll] = useState(false);
+  const [syncingCentral, setSyncingCentral] = useState(false);
+  const [centralPreview, setCentralPreview] = useState<CentralStockPreview | null>(null);
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [syncingRows, setSyncingRows] = useState<Set<string>>(new Set());
   const [toggleOverrides, setToggleOverrides] = useState<Map<string, boolean>>(new Map());
@@ -329,6 +346,51 @@ export default function TikTokMarketplacePage() {
     }
   }
 
+  async function syncTikTokToCentral() {
+    if (accountFilter.length !== 1) {
+      notify("error", "Pilih tepat satu toko TikTok pada filter Toko/Akun terlebih dahulu.");
+      return;
+    }
+    setSyncingCentral(true);
+    try {
+      const res = await authFetch("/api/inventory/sync/tiktok-to-central", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: accountFilter[0] }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Sinkronisasi stok pusat gagal.");
+      setCentralPreview(data as CentralStockPreview);
+      notify("success", `${data.label}: preview stok TikTok siap diperiksa.`);
+    } catch (error) {
+      notify("error", error instanceof Error ? error.message : "Sinkronisasi stok pusat gagal.");
+    } finally {
+      setSyncingCentral(false);
+    }
+  }
+
+  async function confirmTikTokToCentral() {
+    if (!centralPreview) return;
+    setSyncingCentral(true);
+    try {
+      const res = await authFetch("/api/inventory/sync/tiktok-to-central", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: centralPreview.accountId, confirm: true }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Penggantian stok pusat gagal.");
+      const skipped = (data.skipped as Array<{ sku: string; reason: string }>) ?? [];
+      notify("success", `${data.label}: ${data.updated?.length ?? 0} stok pusat berhasil diganti${skipped.length ? `, ${skipped.length} dilewati` : ""}.`);
+      setCentralPreview(null);
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      notify("error", error instanceof Error ? error.message : "Penggantian stok pusat gagal.");
+    } finally {
+      setSyncingCentral(false);
+    }
+  }
+
   async function loadUnmapped() {
     setUnmappedLoading(true);
     try {
@@ -463,6 +525,67 @@ export default function TikTokMarketplacePage() {
         />
       )}
 
+      {centralPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-xl border border-border bg-card shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">Preview perubahan stok pusat</p>
+                <h2 className="mt-1 text-lg font-bold text-foreground">{centralPreview.label}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Periksa foto dan SKU sebelum angka TikTok menggantikan stok pusat.</p>
+              </div>
+              <button onClick={() => setCentralPreview(null)} className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted">Tutup</button>
+            </div>
+            <div className="max-h-[60vh] overflow-auto p-5">
+              <div className="overflow-hidden rounded-lg border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="p-3">Produk</th>
+                      <th className="p-3">SKU pusat</th>
+                      <th className="p-3">SKU TikTok</th>
+                      <th className="p-3 text-right">Sekarang</th>
+                      <th className="p-3 text-right">TikTok</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {centralPreview.updated.map((item) => (
+                      <tr key={item.mappingId} className="border-t border-border">
+                        <td className="p-3">
+                          <div className="flex min-w-[220px] items-center gap-3">
+                            {item.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={item.imageUrl} alt={item.productName} className="h-12 w-12 rounded-md border border-border object-cover" />
+                            ) : <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-[10px] text-muted-foreground">No foto</div>}
+                            <span className="font-semibold text-foreground">{item.productName}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 font-mono text-foreground">{item.sku}</td>
+                        <td className="p-3 font-mono text-muted-foreground">{item.channelSku}</td>
+                        <td className="p-3 text-right font-semibold text-foreground">{fmtNumber(item.before)}</td>
+                        <td className={`p-3 text-right font-bold ${item.before === item.after ? "text-muted-foreground" : "text-amber-600"}`}>{fmtNumber(item.after)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {centralPreview.skipped.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                  <b>{centralPreview.skipped.length} SKU dilewati:</b> {centralPreview.skipped.map((item) => `${item.sku} — ${item.reason}`).join("; ")}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border p-5">
+              <button onClick={() => setCentralPreview(null)} className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">Batal</button>
+              <button onClick={confirmTikTokToCentral} disabled={syncingCentral || centralPreview.updated.length === 0} className="flex items-center gap-2 rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
+                {syncingCentral && <Loader2 size={14} className="animate-spin" />}
+                {syncingCentral ? "Mengganti stok..." : `Konfirmasi ${centralPreview.updated.length} SKU`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
@@ -486,6 +609,15 @@ export default function TikTokMarketplacePage() {
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             {syncingAll ? "Menyinkronkan..." : "Perbarui Data (Sync Semua)"}
+          </button>
+          <button
+            onClick={syncTikTokToCentral}
+            disabled={syncingCentral || accountFilter.length !== 1}
+            title="Ganti stok pusat dengan available quantity dari satu toko TikTok yang dipilih"
+            className="flex items-center gap-2 rounded-md border border-amber-500/60 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300"
+          >
+            {syncingCentral ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {syncingCentral ? "Mengganti stok..." : "TikTok → Stok Pusat"}
           </button>
         </div>
       </div>

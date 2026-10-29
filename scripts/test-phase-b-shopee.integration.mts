@@ -50,6 +50,9 @@ const tiktokAcc = await prisma.platformAccount.create({
   },
 });
 
+const fixtureProduct = await prisma.masterProduct.create({ data: { name: "Dispatch fixture", businessId: business.id } });
+const fixtureVariant = await prisma.productVariant.create({ data: { masterProductId: fixtureProduct.id, sku: "DISPATCH", stock: 50 } });
+for (const [accountId, channelSku] of [[shopeeAcc.id, "SP-1"], [tiktokAcc.id, "TT-1"]]) await prisma.productMapping.create({ data: { accountId, channelSku, variantId: fixtureVariant.id, updatedAt: new Date() } });
 console.log("=== PHASE B.4: Shopee adapter (real) ===");
 await ok("Shopee tanpa token → success:false + error OAuth eksplisit, tanpa throw", async () => {
   const results = await syncStockToMarketplaces(
@@ -91,9 +94,7 @@ await ok("worker resmi: job Shopee → retry (bukan sukses palsu), stok utuh", a
   const variant = await prisma.productVariant.create({
     data: { sku: "SHP-1", stock: 50, masterProductId: master.id },
   });
-  await prisma.productMapping.create({
-    data: { accountId: shopeeAcc.id, channelSku: "SP-1", variantId: variant.id, updatedAt: new Date() },
-  });
+  await prisma.productMapping.update({ where: { accountId_channelSku: { accountId: shopeeAcc.id, channelSku: "SP-1" } }, data: { variantId: variant.id } });
   await enqueueSyncJobs(variant.id, [{ accountId: shopeeAcc.id, channelSku: "SP-1" }], 50);
   const res = await processDueSyncJobs();
   assert.equal(res.succeeded, 0, "TIDAK boleh sukses palsu");

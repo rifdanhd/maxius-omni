@@ -169,11 +169,12 @@ export async function enqueueSyncJobs(
  * Throw tetap didukung (gagal tak terduga) dan diperlakukan sama dengan
  * success:false — masuk jalur retry/FAILED di bawah.
  */
-export type SyncJobPushResult = { success: boolean; error?: string };
+export type SyncJobPushResult = { success: boolean; error?: string; outcome?: SyncPushItemResult["outcome"] };
 
 /** Fungsi pengirim aktual — di-inject agar test bisa mensimulasikan gagal. */
 export type SyncJobPusher = (job: {
   id: string;
+  variantId: string;
   accountId: string;
   channelSku: string;
   newSellable: number;
@@ -187,18 +188,24 @@ export type SyncJobPusher = (job: {
  * hasil ini worker SELALU melihat sukses palsu.
  */
 async function defaultPusher(job: {
+  id: string;
+  variantId: string;
   accountId: string;
   channelSku: string;
   newSellable: number;
 }): Promise<SyncJobPushResult> {
-  const variant = await prisma.productVariant.findFirst({ where: { productMapping: { some: { accountId: job.accountId, channelSku: job.channelSku } } }, select: { stock: true, safetyStock: true } });
+  const mapping = await prisma.productMapping.findUnique({ where: { accountId_channelSku: { accountId: job.accountId, channelSku: job.channelSku } }, include: { account: { select: { businessId: true } }, variant: { include: { masterProduct: { select: { businessId: true } } } } } });
+  const variant = mapping?.variant;
   if (!variant) return { success: false, error: "Mapping tidak tersedia." };
+  if (variant.id !== job.variantId || variant.masterProduct.businessId !== mapping.account.businessId) return { success: false, error: "Mapping job sudah berubah atau berbeda customer." };
+  await prisma.syncJob.updateMany({ where: { id: job.id, status: SYNC_JOB_STATUSES.PROCESSING }, data: { newSellable: Math.max(0, effectiveStock(variant.stock, variant.safetyStock)) } });
   const results = await syncStockToMarketplaces(
     [{ accountId: job.accountId, channelSku: job.channelSku }],
-    Math.max(0, effectiveStock(variant.stock, variant.safetyStock))
+    Math.max(0, effectiveStock(variant.stock, variant.safetyStock)),
+    { waitForDelivery: true }
   );
   const r = results[0];
-  return { success: r.success, error: r.error };
+  return { success: r.success, error: r.error, outcome: r.outcome };
 }
 
 /**
@@ -223,7 +230,7 @@ async function runPushAttempt(
   },
   pusher: SyncJobPusher,
   now: Date
-): Promise<{ outcome: "succeeded" | "pendingRetry" | "failed" }> {
+): Promise<{ outcome: "succeeded" | "pendingRetry" | "failed" | "disabled" }> {
   const identity: JobIdentity = {
     id: job.id,
     variantId: job.variantId,
@@ -238,6 +245,10 @@ async function runPushAttempt(
   let pushError: string | null = null;
   try {
     const out = await pusher(job);
+    if (out && ["disabled", "dry_run", "deferred"].includes(out.outcome ?? "")) {
+      await applyStatusTransition(identity, { status: SYNC_JOB_STATUSES.PENDING, nextRetryAt: new Date(now.getTime() + 30_000), lastError: out.error ?? "Push belum diterima marketplace." });
+      return { outcome: "disabled" };
+    }
     if (out && out.success === false) {
       pushError = out.error ?? "push stok ke channel gagal";
     }
@@ -287,9 +298,9 @@ async function runPushAttempt(
 export async function settleDispatchedSyncJobs(
   variantId: string,
   dispatchedSellable: number,
-  results: Pick<SyncPushItemResult, "accountId" | "channelSku" | "success">[]
+  results: Pick<SyncPushItemResult, "accountId" | "channelSku" | "success" | "outcome">[]
 ): Promise<void> {
-  const succeeded = results.filter((r) => r.success);
+  const succeeded = results.filter((r) => r.success && (!r.outcome || r.outcome === "success"));
   if (succeeded.length === 0) return;
   const triples = succeeded.map((r) => ({ accountId: r.accountId, channelSku: r.channelSku }));
   // Buang baris SUCCESS lama utk triple tsb (sisa siklus sebelumnya) supaya
@@ -357,16 +368,18 @@ export async function processDueSyncJobs(opts?: {
   limit?: number;
   /** Bila diisi, hanya job milik akun brand ini yang diproses (worker global: kosong = semua brand). */
   businessId?: string;
+  variantId?: string;
 }): Promise<{
   processed: number;
   succeeded: number;
   pendingRetry: number;
   failed: number;
   requeued: number;
+  disabled: number;
 }> {
   const now = opts?.now ?? new Date();
   const pusher = opts?.pusher ?? defaultPusher;
-  const result = { processed: 0, succeeded: 0, pendingRetry: 0, failed: 0, requeued: 0 };
+  const result = { processed: 0, succeeded: 0, pendingRetry: 0, failed: 0, requeued: 0, disabled: 0 };
 
   // Sweep dulu: PROCESSING yatim (proses mati di tengah push) → bisa dipilih
   // lagi di tick yang sama, jadi tidak pernah tersangkut selamanya.
@@ -378,6 +391,7 @@ export async function processDueSyncJobs(opts?: {
       retryCount: { lt: SYNC_JOB_MAX_RETRIES },
       OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
       ...(opts?.businessId ? businessWhere.syncJob(opts.businessId) : {}),
+      ...(opts?.variantId ? { variantId: opts.variantId } : {}),
     },
     orderBy: { createdAt: "asc" },
     take: opts?.limit ?? 50,
@@ -407,6 +421,7 @@ export async function processDueSyncJobs(opts?: {
       const { outcome } = await runPushAttempt(job, pusher, now);
       if (outcome === "succeeded") result.succeeded += 1;
       else if (outcome === "pendingRetry") result.pendingRetry += 1;
+      else if (outcome === "disabled") result.disabled += 1;
       else result.failed += 1;
     } catch (err) {
       console.error(

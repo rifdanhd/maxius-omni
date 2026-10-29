@@ -3,6 +3,8 @@ export type AllocationMode = typeof ALLOCATION_MODES[number];
 export type AllocationPolicy = { mode: AllocationMode; value: number; buffer: number };
 
 export function allocationQuantity(available: number, policy: AllocationPolicy, listings: number): number {
+  if (![available, policy.value, policy.buffer, listings].every(Number.isFinite)) throw new Error("Konfigurasi alokasi stok harus berupa angka terbatas.");
+  if (policy.buffer < 0 || policy.value < 0 || (policy.mode === "PERCENT" && policy.value > 100)) throw new Error("Buffer dan alokasi stok tidak valid.");
   const base = Math.max(0, available - policy.buffer);
   const quantity = policy.mode === "PERCENT" ? Math.floor(base * policy.value / 100)
     : policy.mode === "FIXED" ? Math.min(base, policy.value)

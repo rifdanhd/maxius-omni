@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { safeStockPushMessage } from "@/lib/services/stock-push-error";
 
 /**
  * logStockPush — catat hasil (atau penjadwalan) push stok ke SyncLog
@@ -21,12 +22,14 @@ export async function logStockPush(
   errorMessage?: string
 ) {
   try {
-    await prisma.productMapping.updateMany({
+    message = safeStockPushMessage(message);
+    errorMessage = errorMessage ? safeStockPushMessage(errorMessage) : undefined;
+    if (!["dry_run", "skipped_disabled"].includes(status)) await prisma.productMapping.updateMany({
       where: { accountId, channelSku },
       data: {
         lastStockPushStatus: status === "success" ? "SUCCESS" : status === "deferred" ? "PENDING" : "FAILED",
         lastStockPushError: status === "success" || status === "deferred" ? null : errorMessage ?? message,
-        lastStockPushAt: new Date(),
+        ...(!["deferred", "skipped"].includes(status) ? { lastStockPushAt: new Date() } : {}),
         ...(status === "success" ? { platformStock: newStock, lastSyncedAt: new Date() } : {}),
       },
     });

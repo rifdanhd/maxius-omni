@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Download, Filter, Info, MoreHorizontal, PackageCheck, Printer, RefreshCw, Search, X } from "lucide-react";
 import { type PrintType } from "./OrderCard";
-import OrderRow, { ORDER_GRID } from "./OrderRow";
+import OrderRow, { ORDER_GRID } from "@/components/orders/OrderRow";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
 import { ordersToCsv, downloadCsv, type ExportOrderRow } from "./exportOrders";
@@ -205,7 +205,7 @@ function toPrintable(o: Order): PrintableOrder {
 async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
   try {
     const res = await authFetch(`/api/orders/${id}`, {
-      headers: { },
+      headers: {},
     });
     if (!res.ok) return null;
     return await res.json();
@@ -224,7 +224,7 @@ async function fetchOfficialLabel(
 ): Promise<{ docUrl: string; pdfBase64?: string; trackingNumber: string | null; error?: string } | null> {
   try {
     const res = await authFetch(`/api/orders/${id}/label`, {
-      headers: { },
+      headers: {},
     });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
@@ -233,10 +233,10 @@ async function fetchOfficialLabel(
     const data = await res.json();
     return data?.pdfBase64
       ? {
-          docUrl: "",
-          pdfBase64: data.pdfBase64 ?? undefined,
-          trackingNumber: data.trackingNumber ?? null,
-        }
+        docUrl: "",
+        pdfBase64: data.pdfBase64 ?? undefined,
+        trackingNumber: data.trackingNumber ?? null,
+      }
       : { docUrl: "", trackingNumber: null, error: "Marketplace belum mengembalikan dokumen resi." };
   } catch (e) {
     console.error(e);
@@ -461,7 +461,7 @@ export default function OrdersPage() {
         : opts.tab;
       const query = buildQueryParams({ ...opts, pageSize, tab: effectiveTab });
       const res = await authFetch(`/api/orders?${query}`, {
-        headers: { },
+        headers: {},
       });
       if (!res.ok) throw new Error(`Terjadi kesalahan saat memuat pesanan (${res.status})`);
       const data = await res.json();
@@ -567,7 +567,7 @@ export default function OrdersPage() {
   const refreshRunStatus = async () => {
     try {
       const res = await authFetch("/api/orders/sync/status", {
-        headers: { },
+        headers: {},
       });
       if (!res.ok) return;
       const data = (await res.json()) as {
@@ -614,7 +614,7 @@ export default function OrdersPage() {
 
   // Polling tiap 4 dtk (query ringan, take 10) — progres terlihat bahkan
   // setelah kembali dari menu lain / dibuka di tab lain.
-  const runStatusRef = useRef<() => Promise<void>>(async () => {});
+  const runStatusRef = useRef<() => Promise<void>>(async () => { });
   useEffect(() => {
     runStatusRef.current = refreshRunStatus; // closure terbaru tiap render
   });
@@ -651,9 +651,9 @@ export default function OrdersPage() {
         void refreshRunStatus();
       }
       notify("info", `${history ? "Pengambilan riwayat" : "Sync pesanan"} berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
-          `Anda bisa berpindah menu; progres tampil di halaman ini.` +
-          (stillRunning > 0 ? `\n\n${stillRunning} akun masih berjalan dari sync sebelumnya.` : "") +
-          (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : ""));
+        `Anda bisa berpindah menu; progres tampil di halaman ini.` +
+        (stillRunning > 0 ? `\n\n${stillRunning} akun masih berjalan dari sync sebelumnya.` : "") +
+        (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : ""));
       return true;
     } catch (e) {
       console.error(e);
@@ -670,7 +670,7 @@ export default function OrdersPage() {
     try {
       const res = await authFetch("/api/orders/fulfillment/reconcile", {
         method: "POST",
-        headers: { },
+        headers: {},
       });
       const data = await res.json();
       if (!res.ok) {
@@ -909,7 +909,7 @@ export default function OrdersPage() {
   const handlePickupSuccessClose = async () => {
     setPickupResult(null);
     // Refresh ringan setelah tutup — tidak blocking, tidak mengganggu UX.
-    void refreshList().catch(() => {});
+    void refreshList().catch(() => { });
   };
 
   const handleOpenPrintLabels = (successfulOrderIds: string[]) => {
@@ -1030,9 +1030,8 @@ export default function OrdersPage() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => handleTab(tab.id)}
-                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors sm:px-4 ${
-                  active ? "border-primary font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors sm:px-4 ${active ? "border-primary font-semibold text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 {tab.label}
                 {count > 0 && (
@@ -1055,9 +1054,8 @@ export default function OrdersPage() {
                 <button
                   key={sub.id}
                   onClick={() => handleSubTab(sub.id)}
-                  className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted"
-                  }`}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted"
+                    }`}
                 >
                   {sub.label} ({subCount.toLocaleString("id-ID")})
                 </button>
@@ -1232,7 +1230,7 @@ export default function OrdersPage() {
                 order={toCardOrder(order)}
                 checked={selected.has(order.id)}
                 onToggleChecked={() => toggleSelect(order.id)}
-                onPrint={(type) => printOrder(order, type)}
+                onPrint={(type: PrintType) => printOrder(order, type)}
                 onPickup={() => openShipModal([order])}
                 shipping={false}
                 onDetail={() => handleOpenDetail(order)}

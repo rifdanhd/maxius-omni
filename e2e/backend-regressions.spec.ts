@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 const scripts = [
+  'test-stock-sync-contract.integration.mts',
   'test-master-sku-inventory.integration.mts',
   'test-stock-input.mts', 'test-session-security.mts', 'test-auth-security.mts',
   'test-response-security.mts', 'test-pii-security.mts', 'test-oauth-security.mts',
@@ -20,15 +21,19 @@ const scripts = [
   'test-phase-c-kpi.integration.mts', 'test-phase-c-reports.integration.mts',
   'test-orphan-sku.integration.mts', 'test-null-variant.mts',
   'test-promotion-create.integration.mts',
+  'test-stock-push-gate.integration.mts',
 ];
 
 for (const script of scripts) {
   test(`backend: ${script}`, async ({}, testInfo) => {
-    const result = spawnSync(process.execPath, ['--import', 'tsx', path.join('scripts', script)], {
-      cwd: process.cwd(), encoding: 'utf8', timeout: 100_000,
+    const timeout = /master-sku-inventory|stock-sync-contract/.test(script) ? 180_000 : 100_000;
+    test.setTimeout(timeout + 20_000);
+    const result = spawnSync(process.execPath, ['--import', 'tsx', '--import', './scripts/lib/deny-marketplace-network.mts', path.join('scripts', script)], {
+      cwd: process.cwd(), encoding: 'utf8', timeout,
       env: {
         ...process.env,
         NODE_ENV: 'test',
+        STOCK_PUSH_ENABLED: 'true',
         POSTGRES_ADMIN_URL: 'postgresql://udan@127.0.0.1:5432/postgres',
         POSTGRES_URL: 'postgresql://udan@127.0.0.1:5432/postgres',
         DATABASE_URL: 'postgresql://udan@127.0.0.1:5432/postgres',

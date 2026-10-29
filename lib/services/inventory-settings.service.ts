@@ -18,8 +18,8 @@ import { DEFAULT_BUSINESS_ID } from "@/lib/services/business-scope.service";
  *   notifyLowStockEmail disimpan tapi BELUM aktif: repo tidak punya provider
  *   email (tidak ada nodemailer/resend/smtp) — tidak bikin sistem baru.
  * - syncPush{Tokopedia,Shopee,Tiktok} → gate auto-push stok di sync.service
- *   (satu-satunya titik push; logic push tidak diduplikasi). Shopee &
- *   Tokopedia belum punya integrasi push — toggle disimpan utk saat siap.
+ *   bersama gate server, brand, dan toko. Shopee dan TikTok sudah memiliki adapter;
+ *   Tokopedia terpisah belum didukung.
  * - opnameReminderFrequency → preferensi pengingat opname rutin (off/daily/
  *   weekly/monthly). Belum ada infra cron di project — job-nya task terpisah.
  */
@@ -36,6 +36,7 @@ export type InventorySettings = {
   syncPushTokopedia: boolean;
   syncPushShopee: boolean;
   syncPushTiktok: boolean;
+  stockPushEnabled: boolean;
   opnameReminderFrequency: OpnameFrequency;
 };
 
@@ -46,6 +47,7 @@ type SettingsRow = {
   syncPushTokopedia: boolean;
   syncPushShopee: boolean;
   syncPushTiktok: boolean;
+  stockPushEnabled?: boolean;
   opnameReminderFrequency: string;
 };
 
@@ -57,7 +59,9 @@ function toSettings(row: SettingsRow): InventorySettings {
     syncPushTokopedia: row.syncPushTokopedia,
     syncPushShopee: row.syncPushShopee,
     syncPushTiktok: row.syncPushTiktok,
-    // Nilai tak dikenal (mis. diubah manual di DB) → fallback "monthly".
+    stockPushEnabled: row.stockPushEnabled ?? true,
+    // Default true untuk backward compatibility toko yang sudah aktif.
+    // Schema lama tanpa kolom tetap memerlukan migrasi; error database menahan push.
     opnameReminderFrequency: (OPNAME_FREQUENCIES as readonly string[]).includes(
       row.opnameReminderFrequency
     )
@@ -91,6 +95,7 @@ export async function getInventorySettings(
               syncPushTokopedia: template.syncPushTokopedia,
               syncPushShopee: template.syncPushShopee,
               syncPushTiktok: template.syncPushTiktok,
+              stockPushEnabled: template.stockPushEnabled,
               opnameReminderFrequency: template.opnameReminderFrequency,
             }
           : {}),
@@ -150,6 +155,7 @@ export function validateInventorySettingsUpdate(
     "syncPushTokopedia",
     "syncPushShopee",
     "syncPushTiktok",
+    "stockPushEnabled",
   ] as const;
   for (const key of booleanKeys) {
     if (key in b) {
@@ -159,7 +165,6 @@ export function validateInventorySettingsUpdate(
       out[key] = b[key];
     }
   }
-
   if ("opnameReminderFrequency" in b) {
     const v = b.opnameReminderFrequency;
     if (typeof v !== "string" || !(OPNAME_FREQUENCIES as readonly string[]).includes(v)) {

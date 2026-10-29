@@ -32,6 +32,7 @@ export const GET = withAuth(async (req) => {
         businessId: acc.businessId,
         businessName: acc.business.name,
         isFrozen: acc.isFrozen,
+        stockPushEnabled: acc.stockPushEnabled,
         frozenReason: acc.frozenReason,
         lastSyncAt: acc.productMapping[0]?.lastSyncedAt?.toISOString() ?? null,
         status: !hasToken ? "disconnected" : expired ? "expired" : "connected",

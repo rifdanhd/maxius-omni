@@ -63,6 +63,7 @@ model InventorySetting {
   syncPushTokopedia        Boolean  @default(true)
   syncPushShopee           Boolean  @default(true)
   syncPushTiktok           Boolean  @default(true)
+  stockPushEnabled         Boolean  @default(true)
   opnameReminderFrequency  String   @default("monthly")
   updatedAt                DateTime @updatedAt
   business                 Business @relation(fields: [businessId], references: [id])
@@ -159,6 +160,7 @@ model PiiAccessLog {
 }
 
 model PlatformAccount {
+  stockPushEnabled Boolean @default(true)
   id                   String                 @id @default(cuid())
   businessId           String                 @default("business-default")
   platform             String

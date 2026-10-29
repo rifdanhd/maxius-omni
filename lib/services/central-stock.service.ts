@@ -1,8 +1,7 @@
 import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import { prisma } from "@/lib/db/prisma";
-import { syncStockToMarketplaces } from "@/lib/services/sync.service";
-import { enqueueSyncJobs, settleDispatchedSyncJobs } from "@/lib/services/sync-job.service";
+import { enqueueSyncJobs, processDueSyncJobs } from "@/lib/services/sync-job.service";
 import {
   buildDeductPlan,
   insufficientStockMessage,
@@ -203,8 +202,8 @@ export function lowStockSql(variantAlias = "pv", productAlias = "mp"): Prisma.Sq
  * nilai terbaru). SyncJob = state machine yang bisa di-query ulang untuk
  * retry backoff; SyncLog tetap append-only history. Enqueue tidak pernah
  * melempar — mutasi central sudah commit dan tidak boleh gagal karenanya.
- * Pasca-dispatch, job yang berhasil di-settle SUCCESS (settleDispatchedSyncJobs)
- * supaya tick auto-retry tidak mendorong nilai yang sama dua kali.
+ * Worker mengklaim job dan menunggu hasil API aktual sebelum SUCCESS; tidak ada
+ * jalur pengiriman kedua di luar klaim durable job.
  */
 export async function pushVariantStockToOthers(
   variantId: string,
@@ -215,23 +214,18 @@ export async function pushVariantStockToOthers(
     select: {
       stock: true,
       safetyStock: true,
-       productMapping: { select: { accountId: true, channelSku: true } },
+      masterProduct: { select: { businessId: true } },
+      productMapping: { select: { accountId: true, channelSku: true, account: { select: { businessId: true } } } },
     },
   });
   if (!variant) return;
 
-   const targets = excludeAccountId
-     ? variant.productMapping.filter((m) => m.accountId !== excludeAccountId)
-     : variant.productMapping;
+  const targets = variant.productMapping.filter((mapping) => mapping.account.businessId === variant.masterProduct.businessId && mapping.accountId !== excludeAccountId);
   if (targets.length === 0) return;
 
   const newStock = effectiveStock(variant.stock, variant.safetyStock);
   await enqueueSyncJobs(variantId, targets, newStock);
-  const results = await syncStockToMarketplaces(targets, newStock);
-  // Push baris ini sudah dieksekusi di atas → tutup SyncJob-nya (nilai yang
-  // sama jangan didorong ulang oleh tick auto-retry). Yang gagal tetap PENDING
-  // dan diserahkan ke processDueSyncJobs().
-  await settleDispatchedSyncJobs(variantId, newStock, results);
+  await processDueSyncJobs({ businessId: variant.masterProduct.businessId, variantId });
 }
 
 /**

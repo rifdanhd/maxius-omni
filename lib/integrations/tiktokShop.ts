@@ -1,4 +1,6 @@
+import { resolveTikTokStockItems, sendTikTokStockBatch, type StockBatchItem, type StockBatchResult } from "./tiktok-stock";
 import crypto from "crypto";
+import { safeStockPushMessage } from "@/lib/services/stock-push-error";
 
 const TIKTOK_API_BASE = "https://open-api.tiktokglobalshop.com";
 
@@ -11,6 +13,7 @@ export class TikTokApiError extends Error {
   code: number;
   requestId: string;
   kind: "AUTH" | "SCOPE" | "API";
+  httpStatus?: number;
   constructor(kind: "AUTH" | "SCOPE" | "API", code: number, message: string, requestId: string) {
     super(
       kind === "AUTH"
@@ -117,6 +120,7 @@ async function callApi(
       "User-Agent": "maxius-platform/1.0.0",
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(30_000),
   });
 
   // Body bisa non-JSON (HTML error page dsb.) — parse aman supaya HTTP error
@@ -133,9 +137,9 @@ async function callApi(
     // (mis. 400 = validasi payload attach). Sebelumnya error ini dilempar
     // generik sehingga audit kehilangan tiktokCode & pesan penyebab.
     const code = typeof data.code === "number" ? data.code : res.status;
-    const message =
+    const message = safeStockPushMessage(
       (typeof data.message === "string" && data.message) ||
-      `HTTP ${res.status} dari ${apiPath}`;
+      `HTTP ${res.status} dari ${apiPath}`, [accessToken, creds?.appSecret, APP_SECRET]);
     const requestId = (data.request_id as string) || "-";
 
     const TOKEN_ERRORS = [105001, 105002, 105003, 105004];
@@ -146,12 +150,14 @@ async function callApi(
     if (SCOPE_ERRORS.includes(code)) {
       throw new TikTokApiError("SCOPE", code, message, requestId);
     }
-    throw new TikTokApiError("API", code, message, requestId);
+    const error = new TikTokApiError("API", code, message, requestId);
+    error.httpStatus = res.status;
+    throw error;
   }
 
   if (data && (data.code as number) !== 0) {
     const code = data.code as number;
-    const message = (data.message as string) || "Unknown error";
+    const message = safeStockPushMessage((data.message as string) || "Unknown error", [accessToken, creds?.appSecret, APP_SECRET]);
     const requestId = (data.request_id as string) || "-";
 
     const TOKEN_ERRORS = [105001, 105002, 105003, 105004];
@@ -468,24 +474,13 @@ export async function getOrderDetail(
  * channelSku bisa berupa `seller_sku` ATAU `sku.id` ATAU `product.id`,
  * karena banyak produk (mis. RIKI) punya seller_sku kosong.
  */
-export async function getProduct(
-  accessToken: string,
-  channelSku: string,
-  shopCipher?: string
-) {
-  const apiPath = "/product/202309/products/search";
-  const attempts: Array<Record<string, unknown>> = [
-    { seller_skus: [channelSku] },
-    { sku_ids: [channelSku] },
-    { product_ids: [channelSku] },
-  ];
-  for (const body of attempts) {
-    const result = await callApi("POST", apiPath, accessToken, { page_size: 1 }, body, shopCipher);
-    const data = result.data as Record<string, unknown> | undefined;
-    const products = data?.products as Record<string, unknown>[] | undefined;
-    if (products && products.length > 0) return products[0];
-  }
-  return null;
+export async function getProduct(accessToken: string, channelSku: string, shopCipher?: string, creds?: TiktokCreds) {
+  const result = await resolveTikTokStockItems(callApi, accessToken, [{ channelSku, quantity: 0 }], shopCipher, creds);
+  const hit = result.resolved.get(channelSku);
+  if (!hit) return null;
+  const response = await callApi("GET", `/product/202309/products/${encodeURIComponent(hit.productId)}`, accessToken, {}, null, shopCipher, creds);
+  const product = response.data as Record<string, unknown> | undefined;
+  return product?.id === hit.productId ? product : null;
 }
 
 /**
@@ -749,150 +744,14 @@ export async function waitForPackageTracking(
   return last;
 }
 
-export async function updateStock(
-  accessToken: string,
-  channelSku: string,
-  newStock: number,
-  shopCipher?: string
-) {
-  const product = await getProduct(accessToken, channelSku, shopCipher);
-  if (!product) {
-    throw new Error(`[Tokopedia | Shop] SKU "${channelSku}" tidak ditemukan.`);
-  }
-
-  const productId = product.id as string;
-  const skus = (product.skus as Array<Record<string, unknown>>) || [];
-  // Cocokkan via seller_sku ATAU sku.id (produk boleh punya seller_sku kosong).
-  const matchingSku =
-    skus.find((s) => s.seller_sku === channelSku) ||
-    skus.find((s) => s.id === channelSku);
-
-  if (!matchingSku) {
-    throw new Error(`[Tokopedia | Shop] SKU detail "${channelSku}" tidak cocok.`);
-  }
-
-  const skuId = matchingSku.id as string;
-  const apiPath = `/product/202309/products/${productId}/inventory/update`;
-
-  const body = {
-    skus: [
-      {
-        id: skuId,
-        inventory: [{ warehouse_id: "", quantity: newStock }],
-      },
-    ],
-  };
-
-  return callApi("POST", apiPath, accessToken, {}, body, shopCipher);
-
+export type { StockBatchItem, StockBatchResult } from "./tiktok-stock";
+export async function updateStock(accessToken: string, channelSku: string, newStock: number, shopCipher?: string, creds?: TiktokCreds) {
+  const result = await updateStockBatch(accessToken, [{ channelSku, quantity: newStock }], shopCipher, creds);
+  if (result.failed.length) throw result.failed[0].error;
+  return { code: 0, data: {} };
 }
-
-/**
- * updateStockBatch — update stok BANYAK SKU sekaligus (TUGAS 3, anti rate-limit).
- *
- * Sebelumnya tiap SKU = getProduct (hingga 3 call search) + 1 call update;
- * di volume tinggi ini boros call & mudah kena rate limit. Versi batch:
- *   1. SATU call search dengan seller_skus[] (paginated s.d. habis),
- *   2. kelompokkan SKU per product_id (update endpoint bekerja per produk,
- *      body-nya memang array skus[] — didukung API),
- *   3. SATU call /inventory/update per produk berisi semua SKU-nya.
- *
- * SKU yang tidak ketemu di search dilaporkan di `failed` (bukan melempar),
- * supaya batch lain tetap jalan.
- */
-export type StockBatchItem = { channelSku: string; quantity: number };
-export type StockBatchResult = {
-  ok: StockBatchItem[];
-  // error disimpan sebagai objek asli (mis. TikTokApiError) — pemanggil
-  // (queue push stok) butuh tipenya utk membedakan rate-limit vs permanen.
-  failed: Array<{ item: StockBatchItem; error: unknown }>;
-};
-
-export async function updateStockBatch(
-  accessToken: string,
-  items: StockBatchItem[],
-  shopCipher?: string
-): Promise<StockBatchResult> {
-  const result: StockBatchResult = { ok: [], failed: [] };
-  if (items.length === 0) return result;
-
-  // 1. Cari produk untuk semua SKU sekaligus (seller_skus[] di-search endpoint).
-  // Map hasil: seller_sku → { productId, skuId } (skuId = ID internal TikTok
-  // yang dibutuhkan endpoint update, bukan seller_sku).
-  const wanted = new Set(items.map((i) => i.channelSku));
-  const resolved = new Map<string, { productId: string; skuId: string }>();
-  let pageToken: string | null = null;
-  do {
-    const search = await searchProducts(accessToken, shopCipher, {
-      pageSize: 100,
-      sellerSkus: [...wanted],
-      pageToken: pageToken ?? undefined,
-    });
-    for (const product of search.products) {
-      const productId = product.id as string;
-      const skus = (product.skus as Array<Record<string, unknown>>) || [];
-      for (const s of skus) {
-        const skuId = s.id as string;
-        const sellerSku = s.seller_sku as string | undefined;
-        if (!skuId) continue;
-        // channelSku di mapping bisa berupa seller_sku ATAU sku id (fallback
-        // getProduct lama menerima keduanya — sandbox nyata membuktikan keduanya
-        // muncul dan TIDAK selalu sama). Cocokkan dua-duanya.
-        for (const w of wanted) {
-          if (w === sellerSku || w === skuId) resolved.set(w, { productId, skuId });
-        }
-      }
-    }
-    pageToken = search.nextPageToken;
-  } while (pageToken);
-
-  // 2. Kelompokkan per produk (update endpoint bekerja per product_id,
-  //    body-nya array skus[] — beberapa SKU satu produk = satu call).
-  const skusByProduct = new Map<string, Array<{ id: string; item: StockBatchItem }>>();
-  for (const item of items) {
-    const hit = resolved.get(item.channelSku);
-    if (!hit) {
-      result.failed.push({ item, error: `SKU "${item.channelSku}" tidak ditemukan di TikTok Shop.` });
-      continue;
-    }
-    const bucket = skusByProduct.get(hit.productId) ?? [];
-    bucket.push({ id: hit.skuId, item });
-    skusByProduct.set(hit.productId, bucket);
-  }
-
-  // 3. Satu call update per produk, berisi semua SKU-nya.
-  //    warehouse_id WAJIB id gudang riil (E2E sandbox: "" → 400 code
-  //    36009004 "must be convertible to Int64" — updateStock lama juga kena).
-  //    Resolve via inventory/search per produk; fallback "" tetap dikirim agar
-  //    error API terlihat jelas di SyncLog, bukan silent.
-  const warehouseCache = new Map<string, string>();
-  for (const [productId, skus] of skusByProduct) {
-    let warehouseId = warehouseCache.get(productId);
-    if (warehouseId === undefined) {
-      try {
-        const whs = await getProductWarehouses(accessToken, shopCipher, productId);
-        warehouseId = whs[0] ?? "";
-      } catch {
-        warehouseId = "";
-      }
-      warehouseCache.set(productId, warehouseId);
-    }
-    const apiPath = `/product/202309/products/${productId}/inventory/update`;
-    const body = {
-      skus: skus.map((s) => ({
-        id: s.id,
-        inventory: [{ warehouse_id: warehouseId, quantity: s.item.quantity }],
-      })),
-    };
-    try {
-      await callApi("POST", apiPath, accessToken, {}, body, shopCipher);
-      result.ok.push(...skus.map((s) => s.item));
-    } catch (err) {
-      for (const s of skus) result.failed.push({ item: s.item, error: err });
-    }
-  }
-
-  return result;
+export async function updateStockBatch(accessToken: string, items: StockBatchItem[], shopCipher?: string, creds?: TiktokCreds): Promise<StockBatchResult> {
+  return sendTikTokStockBatch(callApi, accessToken, items, shopCipher, creds);
 }
 
 /**
@@ -1291,4 +1150,71 @@ export async function getProductWarehouses(
     }
   }
   return Array.from(ids);
+}
+
+export type TikTokInventorySnapshot = {
+  productId: string;
+  skuId: string;
+  sellerSku: string | null;
+  availableQuantity: number;
+  warehouseCount: number;
+};
+
+/**
+ * Ambil available inventory aktual TikTok untuk SKU-sku tertentu.
+ * Inventory Search membatasi SKU ID per request menjadi 600.
+ */
+export async function searchTikTokInventory(
+  accessToken: string,
+  shopCipher: string | undefined,
+  skuIds: string[],
+  creds?: TiktokCreds,
+): Promise<TikTokInventorySnapshot[]> {
+  const snapshots: TikTokInventorySnapshot[] = [];
+  for (let offset = 0; offset < skuIds.length; offset += 600) {
+    const batch = skuIds.slice(offset, offset + 600);
+    if (!batch.length) continue;
+    const result = await callApi(
+      "POST",
+      "/product/202309/inventory/search",
+      accessToken,
+      {},
+      { sku_ids: batch },
+      shopCipher,
+      creds,
+    );
+    const rows = (result.data as {
+      inventory?: Array<{
+        product_id?: string;
+        skus?: Array<{
+          id?: string;
+          seller_sku?: string;
+          total_available_quantity?: number;
+          warehouse_inventory?: Array<{ available_quantity?: number }>;
+        }>;
+      }>;
+    } | undefined)?.inventory;
+    if (!Array.isArray(rows)) throw new Error("[TikTok] Respons inventory search tidak lengkap.");
+    for (const row of rows) {
+      for (const sku of row.skus ?? []) {
+        if (!sku.id || !row.product_id) continue;
+        const warehouseQuantity = (sku.warehouse_inventory ?? []).reduce(
+          (sum, warehouse) => sum + (Number.isInteger(warehouse.available_quantity) ? warehouse.available_quantity! : 0),
+          0,
+        );
+        const availableQuantity = Number.isInteger(sku.total_available_quantity)
+          ? sku.total_available_quantity!
+          : warehouseQuantity;
+        if (availableQuantity < 0) throw new Error(`[TikTok] Available inventory negatif untuk SKU ${sku.id}.`);
+        snapshots.push({
+          productId: row.product_id,
+          skuId: sku.id,
+          sellerSku: sku.seller_sku?.trim() || null,
+          availableQuantity,
+          warehouseCount: sku.warehouse_inventory?.length ?? 0,
+        });
+      }
+    }
+  }
+  return snapshots;
 }

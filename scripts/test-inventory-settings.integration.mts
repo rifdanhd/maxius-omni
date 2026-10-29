@@ -192,6 +192,11 @@ await ok("HANDLER /api/inventory/mappings: produk baru ber-threshold setting bra
 });
 
 /* ─────────────────────── 3 — Sync gate ─────────────────────── */
+const gateProduct = await prisma.masterProduct.create({ data: { name: "Gate fixture", businessId: business.id } });
+const gateVariant = await prisma.productVariant.create({ data: { masterProductId: gateProduct.id, sku: "GATE", stock: 50 } });
+for (const [accountId, channelSku] of [[acc.id, "SET-GATE-1"], [acc.id, "SET-GATE-2"], [accShopee.id, "SET-GATE-S1"], [accShopee.id, "SET-GATE-S2"]]) {
+  await prisma.productMapping.create({ data: { accountId, channelSku, variantId: gateVariant.id, updatedAt: new Date() } });
+}
 console.log("=== 3 — syncPush* gate di sync.service ===");
 
 await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk antrean", async () => {
@@ -202,8 +207,8 @@ await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk ant
     where: {
       accountId: acc.id,
       kind: "stock_push",
-      status: "skipped",
-      message: { contains: "dimatikan" },
+      status: "skipped_disabled",
+      message: { contains: "dinonaktifkan" },
     },
   });
   assert.equal(gateLogs.length, 1, `harus tepat 1 log gate: ${JSON.stringify(gateLogs)}`);
@@ -213,7 +218,7 @@ await ok("TikTok dimatikan → SyncLog 'skipped' dgn pesan gate, tidak masuk ant
   await updateInventorySettings(business.id, { syncPushTiktok: true });
   await syncStockToMarketplaces([{ accountId: acc.id, channelSku: "SET-GATE-2" }], 43);
   const gateLogs2 = await prisma.syncLog.findMany({
-    where: { accountId: acc.id, message: { contains: "dimatikan" } },
+    where: { accountId: acc.id, message: { contains: "dinonaktifkan" } },
   });
   assert.equal(gateLogs2.length, 1, "gate tidak boleh memblokir setelah diaktifkan");
   _resetStockPushQueueForTests();
@@ -223,7 +228,7 @@ await ok("Shopee dimatikan → pesan gate; diaktifkan → pesan 'belum terhubung
   await updateInventorySettings(business.id, { syncPushShopee: false });
   await syncStockToMarketplaces([{ accountId: accShopee.id, channelSku: "SET-GATE-S1" }], 10);
   const gate = await prisma.syncLog.findFirst({
-    where: { accountId: accShopee.id, message: { contains: "dimatikan" } },
+    where: { accountId: accShopee.id, message: { contains: "dinonaktifkan" } },
     orderBy: { createdAt: "desc" },
   });
   assert.ok(gate, "harus ada log gate shopee");

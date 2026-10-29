@@ -1,9 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronDown, ChevronUp, ChevronRight, Check, Info, TrendingUp, TrendingDown } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  Boxes,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  PackageCheck,
+  RefreshCw,
+  ShoppingCart,
+  Store,
+  TrendingDown,
+  TrendingUp,
+  Truck,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { authFetch } from "@/lib/utils/api-client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageState } from "@/components/ui/feedback";
@@ -77,7 +97,7 @@ function formatDateRange(isoStart: string, isoEnd: string): string {
 
 function trendLabel(pct: number | null): string | undefined {
   if (pct === null) return undefined;
-  return `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}%`;
+  return `${Math.abs(pct)}%`;
 }
 
 function trendUp(pct: number | null): boolean {
@@ -91,9 +111,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [activeTab, setActiveTab] = useState('potensi'); // potensi, terjual, penjualan, pesanan
+  const [activeTab, setActiveTab] = useState("potensi"); // potensi, terjual, penjualan, pesanan
   const [panduanAwalOpen, setPanduanAwalOpen] = useState(true);
   const [greet, setGreet] = useState<{ name: string | null; salam: string; date: string } | null>(null);
+
   useEffect(() => {
     queueMicrotask(() => {
       const h = new Date().getHours();
@@ -114,22 +135,16 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadAll() {
       try {
-        const headers = { };
+        const headers = {};
         const [summaryRes, analyticsRes, kpiRes] = await Promise.all([
           authFetch("/api/summary", { headers }),
           authFetch("/api/analytics", { headers }),
           authFetch("/api/dashboard/kpi", { headers }),
         ]);
         setLoadError(!summaryRes.ok || !analyticsRes.ok || !kpiRes.ok);
-        if (summaryRes.ok) {
-          setSummary(await summaryRes.json());
-        }
-        if (analyticsRes.ok) {
-          setAnalytics(await analyticsRes.json());
-        }
-        if (kpiRes.ok) {
-          setOpsKpi(await kpiRes.json());
-        }
+        if (summaryRes.ok) setSummary(await summaryRes.json());
+        if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
+        if (kpiRes.ok) setOpsKpi(await kpiRes.json());
       } catch (e) {
         console.error(e);
         setLoadError(true);
@@ -142,44 +157,48 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-4 md:p-8 animate-pulse">
-        {/* Greeting skeleton */}
-        <div className="mb-6 bg-card rounded-xl border border-border px-6 py-5">
-          <div className="h-7 bg-muted rounded w-64 max-w-full mb-2" />
-          <div className="h-4 bg-muted rounded w-48" />
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8 animate-pulse">
+        <div className="flex items-end justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-7 w-64 max-w-full rounded-md bg-muted" />
+            <div className="h-4 w-48 rounded-md bg-muted" />
+          </div>
+          <div className="h-9 w-40 rounded-lg bg-muted" />
         </div>
-        {/* Action cards skeleton */}
-        <div className="mb-6 bg-card rounded-xl border border-border overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <div className="h-5 bg-muted rounded w-48" />
-          </div>
-          <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="border border-border rounded-lg p-4 h-[100px] bg-muted/30" />
-            ))}
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-[132px] rounded-2xl border border-border bg-card" />
+          ))}
         </div>
-        {/* Chart skeleton */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="p-5 border-b border-border">
-            <div className="h-5 bg-muted rounded w-32" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-x divide-border">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="p-4">
-                <div className="h-3 bg-muted rounded w-28 mb-3" />
-                <div className="h-6 bg-muted rounded w-20 mb-2" />
-                <div className="h-3 bg-muted rounded w-36" />
-              </div>
-            ))}
-          </div>
-          <div className="p-6 h-[300px] bg-muted/20 rounded-b-xl" />
+        <div className="h-[420px] rounded-2xl border border-border bg-card" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-[104px] rounded-2xl border border-border bg-card" />
+          ))}
         </div>
       </div>
     );
   }
 
-  if (loadError) return <PageState variant="error" title="Ringkasan belum dapat dimuat" description="Data toko belum lengkap. Coba muat ulang untuk melihat angka terbaru." action={<Button variant="outline" onClick={() => { setLoading(true); setReloadKey((key) => key + 1); }}>Coba lagi</Button>} />;
+  if (loadError)
+    return (
+      <PageState
+        variant="error"
+        title="Ringkasan belum dapat dimuat"
+        description="Data toko belum lengkap. Coba muat ulang untuk melihat angka terbaru."
+        action={
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLoading(true);
+              setReloadKey((key) => key + 1);
+            }}
+          >
+            Coba lagi
+          </Button>
+        }
+      />
+    );
 
   const m = analytics?.metrics;
   const chartData = analytics?.chart ?? [];
@@ -205,55 +224,150 @@ export default function DashboardPage() {
     },
   ];
   const onboardingDone = onboardingSteps.filter((s) => s.done).length;
+  const onboardingPct = Math.round((onboardingDone / onboardingSteps.length) * 100);
+  const maxStoreValue = Math.max(1, ...(analytics?.topStores ?? []).map((s) => s.value));
 
   return (
-    <div className="p-4 md:p-8">
-      <div className="mb-4 md:mb-6 bg-card rounded-xl border border-border shadow-sm px-4 md:px-6 py-5">
-        <h1 className="text-xl md:text-2xl font-bold text-foreground">
-          {greet ? `${greet.salam}, ${greet.name ?? "Seller"}` : "Selamat datang"} 👋
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {greet ? `${greet.date} · ` : ""}Berikut ringkasan toko Anda hari ini.
-        </p>
-      </div>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
+      {/* ───────── Header ───────── */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-[28px]">
+            {greet ? `${greet.salam}, ${greet.name ?? "Seller"}` : "Selamat datang"} 👋
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {greet ? `${greet.date} · ` : ""}Berikut ringkasan performa toko Anda.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm">
+            <CalendarDays size={15} className="text-muted-foreground" />
+            {analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}
+          </span>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLoading(true);
+              setReloadKey((key) => key + 1);
+            }}
+          >
+            <RefreshCw size={14} className="mr-2" />
+            Muat ulang
+          </Button>
+        </div>
+      </header>
 
-      <div className="mb-4 md:mb-6 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-bold text-foreground">Yang Perlu Dilakukan</h2>
-        </div>
-        <div className="p-4 md:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <ActionCard title="Pesanan Baru" value={summary.newOrders.toString()} />
-          <ActionCard title="Siap Dikirim" value={summary.readyToShip.toString()} />
-          <ActionCard title="Stok Menipis" value={summary.criticalStock.toString()} />
-          <ActionCard title="Oversell" value={summary.oversell.toString()} />
-        </div>
-      </div>
+      {/* ───────── KPI utama (juga berfungsi sebagai tab chart) ───────── */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          icon={Wallet}
+          active={activeTab === "potensi"}
+          onClick={() => setActiveTab("potensi")}
+          title="Potensi Penjualan"
+          value={m ? formatRp(m.revenue.current) : "Rp0"}
+          trend={m ? trendLabel(m.revenue.changePct) : undefined}
+          trendUp={m ? trendUp(m.revenue.changePct) : false}
+          subtext={`Total pesanan: ${potentialOrders}`}
+        />
+        <KpiCard
+          icon={PackageCheck}
+          active={activeTab === "terjual"}
+          onClick={() => setActiveTab("terjual")}
+          title="Produk Terjual"
+          value={m ? m.units.current.toLocaleString("id-ID") : "0"}
+          trend={m ? trendLabel(m.units.changePct) : undefined}
+          trendUp={m ? trendUp(m.units.changePct) : false}
+          subtext={`Rata-rata harian: ${avgDailyUnits.toFixed(1)} pcs`}
+        />
+        <KpiCard
+          icon={CheckCircle2}
+          active={activeTab === "penjualan"}
+          onClick={() => setActiveTab("penjualan")}
+          title="Penjualan Selesai"
+          value={m ? formatRp(m.completedRevenue.current) : "Rp0"}
+          trend={m ? trendLabel(m.completedRevenue.changePct) : undefined}
+          trendUp={m ? trendUp(m.completedRevenue.changePct) : false}
+          subtext={`Rata-rata harian: ${m ? formatRp(m.completedRevenue.current / 7) : "Rp0"}`}
+        />
+        <KpiCard
+          icon={ShoppingCart}
+          active={activeTab === "pesanan"}
+          onClick={() => setActiveTab("pesanan")}
+          title="Pesanan Selesai"
+          value={m ? m.completedOrders.current.toLocaleString("id-ID") : summary.completedOrders.toString()}
+          trend={m ? trendLabel(m.completedOrders.changePct) : undefined}
+          trendUp={m ? trendUp(m.completedOrders.changePct) : false}
+          subtext={`Rata-rata harian: ${avgDailyCompletedOrders.toFixed(1)} pesanan`}
+        />
+      </section>
 
-      <div className="mb-4 md:mb-6 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <h2 className="text-lg font-bold text-foreground">Kesehatan Operasional</h2>
-          <span className="text-xs text-muted-foreground">Stok central & sinkronisasi marketplace</span>
+      {/* ───────── Chart + panel samping ───────── */}
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Panel
+          className="xl:col-span-2"
+          title="Tren Penjualan"
+          subtitle={`Pembaruan terakhir ${new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}`}
+          action={
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+              <span className="rounded-md border border-border bg-muted px-2.5 py-1 text-foreground">Semua Marketplace</span>
+              <span className="rounded-md border border-border px-2.5 py-1 text-muted-foreground">
+                vs {analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}
+              </span>
+            </div>
+          }
+        >
+          <div className="h-[260px] md:h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 8, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dx={-10} />
+                <Tooltip
+                  labelStyle={{ color: "var(--popover-foreground)" }}
+                  itemStyle={{ color: "var(--popover-foreground)" }}
+                  contentStyle={{ borderRadius: "12px", border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)", boxShadow: "var(--chart-tooltip-shadow)" }}
+                />
+                <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: "20px", fontSize: "12px" }} />
+                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="var(--chart-1)" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
+                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Panel>
+
+        <Panel title="Yang Perlu Dilakukan" subtitle="Tindakan prioritas hari ini">
+          <div className="space-y-2.5">
+            <TaskRow icon={ShoppingCart} label="Pesanan Baru" value={summary.newOrders} href="/orders" />
+            <TaskRow icon={Truck} label="Siap Dikirim" value={summary.readyToShip} href="/orders" />
+            <TaskRow icon={Boxes} label="Stok Menipis" value={summary.criticalStock} href="/inventory" critical />
+            <TaskRow icon={AlertTriangle} label="Oversell" value={summary.oversell} href="/inventory" critical />
+          </div>
+        </Panel>
+      </section>
+
+      {/* ───────── Kesehatan operasional ───────── */}
+      <Panel title="Kesehatan Operasional" subtitle="Stok central & sinkronisasi marketplace">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <StatCard icon={Boxes} title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
+          <StatCard icon={AlertTriangle} title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} critical />
+          <StatCard icon={Info} title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} href="/inventory/mismatch" critical />
+          <StatCard icon={RefreshCw} title="Gagal Sinkron (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} critical />
         </div>
-        <div className="p-4 md:p-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <ActionCard title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
-          <ActionCard title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} />
-          <ActionCard title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} href="/inventory/mismatch" />
-          <ActionCard title="Gagal Sinkron (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} />
-        </div>
+
         {opsKpi && opsKpi.storeHealth.length > 0 && (
-          <div className="px-4 md:px-6 pb-6">
-            <h3 className="text-sm font-bold text-foreground mb-2">Kesehatan Toko</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+          <div className="mt-6">
+            <h3 className="mb-3 text-sm font-semibold text-foreground">Kesehatan Toko</h3>
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-3">Toko</th>
-                    <th className="px-3 py-2">Platform</th>
-                    <th className="px-3 py-2 text-center">Token</th>
-                    <th className="px-3 py-2 text-center">Error 7d</th>
-                    <th className="px-3 py-2 text-center">Mismatch</th>
-                    <th className="px-3 py-2 text-center">SKU Belum Mapping</th>
-                    <th className="px-3 py-2">Aktivitas Terakhir</th>
+                  <tr className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-3 font-semibold">Toko</th>
+                    <th className="px-3 py-3 font-semibold">Platform</th>
+                    <th className="px-3 py-3 text-center font-semibold">Token</th>
+                    <th className="px-3 py-3 text-center font-semibold">Error 7d</th>
+                    <th className="px-3 py-3 text-center font-semibold">Mismatch</th>
+                    <th className="px-3 py-3 text-center font-semibold">SKU Belum Mapping</th>
+                    <th className="px-4 py-3 font-semibold">Aktivitas Terakhir</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -261,20 +375,34 @@ export default function DashboardPage() {
                     const lastActive = s.lastOrderAt ?? s.lastSyncAt;
                     const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0 || s.orphanSkus > 0;
                     return (
-                      <tr key={s.accountId} className="border-b border-border last:border-0">
-                        <td className="py-2 pr-3 font-medium text-foreground">
-                          <div>{s.label}</div><StatusBadge status={unhealthy ? "warning" : "success"} label={unhealthy ? "Perlu perhatian" : "Sehat"} className="mt-1" />
+                      <tr key={s.accountId} className="border-t border-border transition-colors hover:bg-muted/40">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold text-foreground">
+                              {s.label.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-foreground">{s.label}</div>
+                              <StatusBadge status={unhealthy ? "warning" : "success"} label={unhealthy ? "Perlu perhatian" : "Sehat"} className="mt-1" />
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-3 py-2 text-foreground">{s.platform}</td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-3 py-3 text-foreground">{s.platform}</td>
+                        <td className="px-3 py-3 text-center">
                           <StatusBadge status={s.hasToken ? "success" : "error"} label={s.hasToken ? "Tersedia" : "Belum tersedia"} />
                         </td>
-                        <td className="px-3 py-2 text-center text-foreground">{s.errors7d}</td>
-                        <td className="px-3 py-2 text-center text-foreground">{s.mismatch}</td>
-                        <td className="px-3 py-2 text-center">
-                          {s.orphanSkus > 0 ? <a href="/products/mapping" className="font-semibold text-foreground hover:underline">{s.orphanSkus}</a> : <span className="text-muted-foreground">0</span>}
+                        <td className="px-3 py-3 text-center text-foreground">{s.errors7d}</td>
+                        <td className="px-3 py-3 text-center text-foreground">{s.mismatch}</td>
+                        <td className="px-3 py-3 text-center">
+                          {s.orphanSkus > 0 ? (
+                            <Link href="/products/mapping" className="font-semibold text-foreground hover:underline">
+                              {s.orphanSkus}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground text-xs">
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
                           {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
                         </td>
                       </tr>
@@ -285,239 +413,304 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-      </div>
+      </Panel>
 
-      {/* Section: Panduan Awal — auto-hidden saat semua langkah selesai */}
+      {/* ───────── Panduan Awal (auto-hidden saat semua langkah selesai) ───────── */}
       {onboardingDone < onboardingSteps.length && (
-        <div className="mb-6 md:mb-8 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="px-4 md:px-6 py-4 flex items-start justify-between gap-3 cursor-pointer hover:bg-muted" onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}>
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold text-foreground">Panduan Awal</h2>
-              <p className="text-sm text-muted-foreground mt-1">Berikut panduan untuk kamu memulai. Kamu akan mendapatkan tips baru seiring bisnis kamu bertumbuh</p>
+        <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <button
+            type="button"
+            className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/40 md:px-6"
+            onClick={() => setPanduanAwalOpen(!panduanAwalOpen)}
+            aria-expanded={panduanAwalOpen}
+          >
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-semibold text-foreground">Panduan Awal</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Selesaikan langkah berikut untuk memulai. Tips baru akan muncul seiring bisnis Anda bertumbuh.
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="h-2 max-w-xs flex-1 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${onboardingPct}%` }} />
+                </div>
+                <span className="text-xs font-semibold text-foreground">
+                  {onboardingDone}/{onboardingSteps.length} selesai
+                </span>
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-muted text-foreground">{onboardingDone}/{onboardingSteps.length}</span>
-              {panduanAwalOpen ? <ChevronUp size={18} className="text-muted-foreground" /> : <ChevronDown size={18} className="text-muted-foreground" />}
-            </div>
-          </div>
+            {panduanAwalOpen ? <ChevronUp size={18} className="mt-1 shrink-0 text-muted-foreground" /> : <ChevronDown size={18} className="mt-1 shrink-0 text-muted-foreground" />}
+          </button>
+
           {panduanAwalOpen && (
-            <div className="p-4 md:p-6 border-t border-border">
-              <div className="space-y-1">
-                {onboardingSteps.map((s) => (
-                  <Link
-                    key={s.label}
-                    href={s.href}
-                    className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-muted group"
-                  >
-                    <div className="flex items-center gap-3">
+            <div className="border-t border-border p-3 md:p-4">
+              <div className="grid grid-cols-1 gap-1 lg:grid-cols-2">
+                {onboardingSteps.map((s, i) => (
+                  <Link key={s.label} href={s.href} className="group flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted">
+                    <div className="flex min-w-0 items-center gap-3">
                       {s.done ? (
-                        <div className="w-5 h-5 rounded-full bg-success-subtle flex items-center justify-center text-success shrink-0">
-                          <Check size={12} />
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-subtle text-success">
+                          <Check size={13} />
                         </div>
                       ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-border border-dashed shrink-0" />
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-[11px] font-semibold text-muted-foreground">
+                          {i + 1}
+                        </div>
                       )}
-                      <span className={`text-sm ${s.done ? "text-muted-foreground line-through" : "font-semibold text-foreground"}`}>{s.label}<span className="sr-only">{s.done ? ", selesai" : ", belum selesai"}</span></span>
+                      <span className={`text-sm ${s.done ? "text-muted-foreground line-through" : "font-medium text-foreground"}`}>
+                        {s.label}
+                        <span className="sr-only">{s.done ? ", selesai" : ", belum selesai"}</span>
+                      </span>
                     </div>
-                    <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground shrink-0" />
+                    <ArrowRight size={15} className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                   </Link>
                 ))}
               </div>
-              <div className="mt-4 pt-4 border-t border-border text-sm text-foreground">
+              <div className="mt-2 border-t border-border px-3 pt-3 text-sm text-muted-foreground">
                 Butuh bantuan langkah demi langkah?{" "}
                 <Link href="/education" className="font-semibold text-foreground hover:underline">
-                  Buka Panduan lengkap →
+                  Buka panduan lengkap →
                 </Link>
               </div>
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Analisis Bisnis</h2>
-            <p className="text-xs text-muted-foreground mt-1">Pembaruan terakhir pada {new Date().toLocaleString()}</p>
-          </div>
-          <button className="border border-border bg-card px-3 py-1.5 rounded-md text-sm text-foreground font-medium hover:bg-muted flex items-center gap-2">
-            Waktu Pesanan Dibuat <ChevronDown size={14}/>
-          </button>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-          <div className="p-4 md:p-5 border-b border-border flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 text-lg font-bold text-foreground">
-              Penjualan <Info size={14} className="text-muted-foreground" />
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground bg-muted font-medium">
-                Semua Marketplace
-              </div>
-              <div className="border border-border rounded-md px-3 py-1.5 text-sm text-foreground bg-card font-medium">
-                {analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}
-              </div>
-              <div className="text-sm text-muted-foreground font-medium flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md border border-border">
-                vs <span className="text-foreground">{analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-x divide-border">
-            <MetricTab active={activeTab === 'potensi'} onClick={() => setActiveTab('potensi')} title="Potensi Penjualan" value={m ? formatRp(m.revenue.current) : "Rp0"} trend={m ? trendLabel(m.revenue.changePct) : undefined} trendUp={m ? trendUp(m.revenue.changePct) : false} subtext={`Total pesanan: ${potentialOrders}`} />
-            <MetricTab active={activeTab === 'terjual'} onClick={() => setActiveTab('terjual')} title="Produk Terjual" value={m ? m.units.current.toString() : "0"} trend={m ? trendLabel(m.units.changePct) : undefined} trendUp={m ? trendUp(m.units.changePct) : false} subtext={`Rata-rata terjual harian: ${avgDailyUnits.toFixed(1)}`} />
-            <MetricTab active={activeTab === 'penjualan'} onClick={() => setActiveTab('penjualan')} title="Penjualan Selesai" value={m ? formatRp(m.completedRevenue.current) : "Rp0"} trend={m ? trendLabel(m.completedRevenue.changePct) : undefined} trendUp={m ? trendUp(m.completedRevenue.changePct) : false} subtext={`Rata-rata penjualan: ${m ? formatRp(m.completedRevenue.current / 7) : "Rp0"}`} />
-            <MetricTab active={activeTab === 'pesanan'} onClick={() => setActiveTab('pesanan')} title="Pesanan Selesai" value={m ? m.completedOrders.current.toString() : summary.completedOrders.toString()} trend={m ? trendLabel(m.completedOrders.changePct) : undefined} trendUp={m ? trendUp(m.completedOrders.changePct) : false} subtext={`Rata-rata pesanan harian: ${avgDailyCompletedOrders.toFixed(1)}`} />
-          </div>
-
-          <div className="p-4 md:p-6 h-[250px] md:h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 8, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: 'var(--muted-foreground)', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: 'var(--muted-foreground)', fontSize: 12}} dx={-10} />
-                <Tooltip labelStyle={{ color: "var(--popover-foreground)" }} itemStyle={{ color: "var(--popover-foreground)" }} contentStyle={{borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--popover)', color: 'var(--popover-foreground)', boxShadow: 'var(--chart-tooltip-shadow)'}} />
-                <Legend iconType="plainline" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px', fontSize: '12px'}} />
-                <Line type="monotone" name="Periode Sekarang" dataKey="current" stroke="var(--chart-1)" strokeWidth={2} dot={false} activeDot={{ r: 6 }} connectNulls={false} />
-                <Line type="monotone" name="Periode Sebelumnya" dataKey="previous" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-base font-bold text-foreground border-b border-border pb-4 mb-4">
-              Toko Teratas <Info size={14} className="text-muted-foreground" />
-            </div>
-            {(analytics?.topStores ?? []).length === 0 ? (
-              <div className="py-8 text-center">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                  <Info size={20} className="text-muted-foreground" />
-                </div>
-                <p className="text-sm font-semibold text-foreground mb-1">Belum Ada Data Penjualan</p>
-                <p className="text-xs text-muted-foreground mb-3">Pesanan akan muncul setelah toko kamu terhubung dan menerima pesanan.</p>
-                <a href="/settings/accounts" className="text-xs font-semibold text-foreground underline hover:no-underline">Hubungkan Toko →</a>
-              </div>
-            ) : (analytics!.topStores.map((store) => (
-              <div key={store.id} className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border border-border rounded-lg p-3 mb-2 last:mb-0">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="w-8 h-8 shrink-0 bg-muted text-foreground rounded-md flex items-center justify-center font-bold text-xs">{store.label.charAt(0)}</div>
-                    <span className="min-w-0 break-words font-semibold text-sm text-foreground">{store.label}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 sm:gap-8">
-                    <div className="min-w-0 break-words">
-                      <p className="text-[10px] text-muted-foreground mb-1">Potensi Penjualan</p>
-                      <p className="text-sm font-semibold">{formatRp(store.value)}</p>
+      {/* ───────── Top lists ───────── */}
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Panel title="Toko Teratas" subtitle="Berdasarkan potensi penjualan">
+          {(analytics?.topStores ?? []).length === 0 ? (
+            <EmptyState
+              title="Belum Ada Data Penjualan"
+              description="Pesanan akan muncul setelah toko Anda terhubung dan menerima pesanan."
+              href="/settings/accounts"
+              cta="Hubungkan Toko"
+            />
+          ) : (
+            <ul className="space-y-3">
+              {analytics!.topStores.map((store, i) => (
+                <li key={store.id} className="rounded-xl border border-border p-3 transition-colors hover:bg-muted/40">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold text-foreground">
+                        {i + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{store.label}</p>
+                        <p className="text-xs text-muted-foreground">{store.platform}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-1">Produk Terjual</p>
-                      <p className="text-sm font-semibold">{store.units}</p>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold text-foreground">{formatRp(store.value)}</p>
+                      <p className="text-xs text-muted-foreground">{store.units} pcs terjual</p>
                     </div>
                   </div>
-              </div>
-            )))}
-          </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, (store.value / maxStoreValue) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
 
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-base font-bold text-foreground border-b border-border pb-4 mb-4">
-              Produk Terjual Teratas <Info size={14} className="text-muted-foreground" />
-            </div>
-            {(analytics?.topProducts ?? []).length === 0 ? (
-              <div className="py-8 text-center">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                  <Info size={20} className="text-muted-foreground" />
-                </div>
-                <p className="text-sm font-semibold text-foreground mb-1">Belum Ada Produk Terjual</p>
-                <p className="text-xs text-muted-foreground mb-3">Data produk terlaris akan muncul saat ada pesanan masuk dalam periode ini.</p>
-                <a href="/products" className="text-xs font-semibold text-foreground underline hover:no-underline">Lihat Produk Master →</a>
-              </div>
-            ) : (analytics!.topProducts.slice(0, 3).map((product) => (
-              <div key={product.key} className="flex justify-between items-start gap-3 border border-border rounded-lg p-3 mb-2 last:mb-0">
+        <Panel title="Produk Terjual Teratas" subtitle="3 produk dengan kuantitas tertinggi">
+          {(analytics?.topProducts ?? []).length === 0 ? (
+            <EmptyState
+              title="Belum Ada Produk Terjual"
+              description="Data produk terlaris akan muncul saat ada pesanan masuk dalam periode ini."
+              href="/products"
+              cta="Lihat Produk Master"
+            />
+          ) : (
+            <ul className="space-y-3">
+              {analytics!.topProducts.slice(0, 3).map((product, i) => (
+                <li key={product.key} className="flex items-start justify-between gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/40">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="w-12 h-12 bg-muted rounded-md shrink-0"></div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-bold text-muted-foreground">
+                      #{i + 1}
+                    </div>
                     <div className="min-w-0">
-                      <p className="break-words text-sm font-semibold text-foreground leading-tight">{product.name}</p>
-                      <p className="break-all text-xs text-muted-foreground mt-1">{product.sku ?? product.channelSku ?? "—"}</p>
+                      <p className="break-words text-sm font-semibold leading-tight text-foreground">{product.name}</p>
+                      <p className="mt-1 break-all text-xs text-muted-foreground">{product.sku ?? product.channelSku ?? "—"}</p>
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-[10px] text-muted-foreground mb-1">Kuantitas</p>
-                    <p className="text-sm font-semibold">{product.qty} Pcs</p>
+                    <p className="text-[11px] text-muted-foreground">Kuantitas</p>
+                    <p className="text-sm font-semibold text-foreground">{product.qty} Pcs</p>
                   </div>
-              </div>
-            )))}
-          </div>
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </section>
     </div>
   );
 }
 
-const CRITICAL_TITLES = ["Oversell", "Stok Menipis", "Stok Kritis", "Stok Mismatch", "Gagal Sinkron (7 hari)"];
+/* ───────────────────────── Komponen UI ───────────────────────── */
 
-function ActionCard({ title, value, href }: { title: string, value: string, href?: string }) {
-  const isCritical = CRITICAL_TITLES.includes(title) && value !== "0" && value !== "…";
-  const cls = `min-w-0 border rounded-lg p-3 sm:p-4 flex flex-col gap-2 justify-between min-h-[100px] hover:shadow-md transition-all cursor-pointer ${
-    isCritical
-      ? "border-destructive/40 bg-destructive-subtle"
-      : "border-border bg-card hover:border-ring"
-  }`;
-  const valueColor = isCritical ? "text-destructive" : "text-foreground";
-  if (href) {
-    return (
-      <Link href={href} className={cls}>
-        <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{isCritical && <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />}{title}</span>
-        <span className={`text-2xl font-bold ${valueColor}`}>{value}</span>
-      </Link>
-    );
-  }
+function Panel({
+  title,
+  subtitle,
+  action,
+  className = "",
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className={cls}>
-      <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isCritical ? "text-destructive" : "text-foreground"}`}>{isCritical && <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />}{title}</span>
-      <span className={`text-2xl font-bold ${valueColor}`}>{value}</span>
-    </div>
+    <section className={`rounded-2xl border border-border bg-card shadow-sm ${className}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5 md:px-6">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
+        {action}
+      </div>
+      <div className="p-5 md:p-6">{children}</div>
+    </section>
   );
 }
 
-function MetricTab({ active, onClick, title, value, trend, trendUp, badge, subtext }: {
+function KpiCard({
+  icon: Icon,
+  active,
+  onClick,
+  title,
+  value,
+  trend,
+  trendUp,
+  subtext,
+}: {
+  icon: LucideIcon;
   active: boolean;
   onClick: () => void;
   title: string;
   value: string;
   trend?: string;
   trendUp?: boolean;
-  badge?: string;
   subtext?: string;
 }) {
   return (
-    <div 
-      className={`p-4 cursor-pointer relative transition-colors ${active ? 'bg-card' : 'bg-muted/50 hover:bg-muted'}`}
+    <button
+      type="button"
       onClick={onClick}
+      aria-pressed={active}
+      className={`group relative rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+        active ? "border-primary ring-1 ring-primary/30" : "border-border"
+      }`}
     >
-      {active && <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-full"></div>}
-      <div className="flex items-center gap-1 text-sm font-semibold text-foreground mb-2">
-        {title} <Info size={12} className="text-muted-foreground" />
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">{title}</span>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${active ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
+          <Icon size={17} />
+        </span>
       </div>
-      <div className="flex flex-wrap items-end gap-2 mb-2">
-        <span className={`break-all text-xl font-bold ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{value}</span>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <span className="break-all text-2xl font-bold tracking-tight text-foreground">{value}</span>
         {trend && (
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
-            trendUp 
-              ? 'bg-success-subtle text-success'
-              : 'bg-destructive-subtle text-destructive'
-          }`}>
-            {trendUp ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
+          <span
+            className={`mb-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              trendUp ? "bg-success-subtle text-success" : "bg-destructive-subtle text-destructive"
+            }`}
+          >
+            {trendUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
             {trend}
           </span>
         )}
-        {badge && (
-          <span className="text-[10px] font-bold bg-muted text-foreground px-1.5 py-0.5 rounded ml-1">
-            {badge}
-          </span>
-        )}
       </div>
-      <p className="text-xs text-muted-foreground">{subtext}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{subtext}</p>
+    </button>
+  );
+}
+
+function TaskRow({
+  icon: Icon,
+  label,
+  value,
+  href,
+  critical,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  href: string;
+  critical?: boolean;
+}) {
+  const alert = critical && value > 0;
+  return (
+    <Link
+      href={href}
+      className={`group flex items-center justify-between gap-3 rounded-xl border p-3.5 transition-all hover:shadow-sm ${
+        alert ? "border-destructive/40 bg-destructive-subtle" : "border-border bg-card hover:bg-muted/40"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${alert ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"}`}>
+          <Icon size={16} aria-hidden="true" />
+        </span>
+        <span className={`text-sm font-medium ${alert ? "text-destructive" : "text-foreground"}`}>{label}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={`text-xl font-bold ${alert ? "text-destructive" : "text-foreground"}`}>{value}</span>
+        <ArrowUpRight size={14} className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      </div>
+    </Link>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  title,
+  value,
+  href,
+  critical,
+}: {
+  icon: LucideIcon;
+  title: string;
+  value: string;
+  href?: string;
+  critical?: boolean;
+}) {
+  const alert = !!critical && value !== "0" && value !== "…";
+  const cls = `block min-w-0 rounded-xl border p-4 transition-all hover:shadow-md ${
+    alert ? "border-destructive/40 bg-destructive-subtle" : "border-border bg-card hover:border-ring"
+  }`;
+  const body = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-medium ${alert ? "text-destructive" : "text-muted-foreground"}`}>{title}</span>
+        <Icon size={15} className={alert ? "text-destructive" : "text-muted-foreground"} aria-hidden="true" />
+      </div>
+      <p className={`mt-3 text-2xl font-bold tracking-tight ${alert ? "text-destructive" : "text-foreground"}`}>{value}</p>
+    </>
+  );
+  return href ? (
+    <Link href={href} className={cls}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
+function EmptyState({ title, description, href, cta }: { title: string; description: string; href: string; cta: string }) {
+  return (
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-border px-4 py-10 text-center">
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <Store size={20} className="text-muted-foreground" />
+      </div>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="mb-3 mt-1 max-w-xs text-xs text-muted-foreground">{description}</p>
+      <Link href={href} className="inline-flex items-center gap-1 text-xs font-semibold text-foreground hover:underline">
+        {cta} <ArrowRight size={12} />
+      </Link>
     </div>
   );
 }

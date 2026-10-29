@@ -15,6 +15,7 @@ type Settings = {
   syncPushTokopedia: boolean;
   syncPushShopee: boolean;
   syncPushTiktok: boolean;
+  stockPushEnabled: boolean;
   opnameReminderFrequency: string;
 };
 
@@ -105,15 +106,16 @@ export default function InventorySettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [globalPushEnabled, setGlobalPushEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function run() {
       try {
-        const { settings: s } = await api<{ settings: Settings }>(
+        const { settings: s, pushRuntime } = await api<{ settings: Settings; pushRuntime?: { globalEnabled: boolean } }>(
           "/api/inventory/settings"
         );
-        if (!cancelled) setSettings(s);
+        if (!cancelled) { setSettings(s); setGlobalPushEnabled(pushRuntime?.globalEnabled ?? null); }
       } catch (e) {
         if (!cancelled) {
           console.error("[InventorySettings] load gagal:", e);
@@ -259,6 +261,10 @@ export default function InventorySettingsPage() {
             desc="Kirim target stok terbaru setelah penyesuaian manual atau hitung stok fisik. Periksa kegagalan di Stok Mismatch."
           >
             <div className="divide-y divide-border">
+              <label className="flex items-center justify-between gap-4 py-3">
+                <div><div className="font-medium">Push stok brand ini</div><div className="text-sm text-muted-foreground">Berlaku untuk semua toko brand ini; pengaturan per toko dan platform tetap diperiksa.</div></div>
+                <Toggle checked={settings.stockPushEnabled} onChange={(value) => setSettings({ ...settings, stockPushEnabled: value })} />
+              </label>
               {(
                 [
                   {
@@ -269,7 +275,7 @@ export default function InventorySettingsPage() {
                   {
                     key: "syncPushShopee" as const,
                     label: "Shopee",
-                    note: "Integrasi push belum tersedia — preferensi disimpan untuk saat integrasi siap.",
+                    note: "Perubahan stok dikirim ke item dan variasi Shopee sesuai mapping toko. Kegagalan API tercatat per listing.",
                   },
                   {
                     key: "syncPushTokopedia" as const,
@@ -284,13 +290,14 @@ export default function InventorySettingsPage() {
                     <div className="text-sm text-muted-foreground">{p.note}</div>
                   </div>
                   <Toggle
-                    disabled={p.key !== "syncPushTiktok"}
+                    disabled={p.key === "syncPushTokopedia"}
                     checked={settings[p.key]}
                     onChange={(v) => setSettings({ ...settings, [p.key]: v })}
                   />
                 </label>
               ))}
             </div>
+            {globalPushEnabled === false && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">Push stok sedang dinonaktifkan pada server. Mengaktifkan pengaturan brand atau platform belum mengirim stok sampai server mengizinkan pengiriman.</p>}
             <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Mematikan push tidak mengubah stok pusat — hanya menahan pengiriman angka ke
               marketplace. Setiap penahanan tercatat di log sinkronisasi.

@@ -6,6 +6,9 @@ import {
   assertAccountActive,
   resolveShopeeCreds,
 } from "@/lib/services/app-credential.service";
+import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { safeStockPushMessage } from "@/lib/services/stock-push-error";
 import {
   ShopeeApiError,
   getItemBaseInfo,
@@ -59,8 +62,7 @@ export async function withRefreshedToken<T>(
   try {
     return await fn(fresh.accessToken, shopId, creds);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const authLike = /error_auth|auth|token|expired|invalid/i.test(msg);
+    const authLike = e instanceof ShopeeApiError && /^(error_auth|invalid_access_token|invalid_acceess_token|error_token)/i.test(e.error);
     if (!authLike || !fresh.refreshToken) throw e;
     const r = await refreshAccessToken(fresh.refreshToken, shopId, creds);
     await prisma.platformAccount.update({
@@ -100,15 +102,23 @@ export async function pushStockToShopee(params: PushParams): Promise<SyncPushIte
     await logStockPush(account.id, params.channelSku, params.newStock, "skipped", error, error);
     return done(false, true, error);
   }
+  const disabled = stockPushDisabledReason(account, await getCachedInventorySettings(account.businessId));
+  if (disabled) {
+    await logStockPush(account.id, params.channelSku, params.newStock, "skipped_disabled", disabled);
+    return { ...done(true, true, disabled), outcome: "disabled" };
+  }
   try {
-    const r = await withRefreshedToken(account, (token, shopId, creds) =>
-      apiUpdateStockBatch(token, shopId, [
+    const r = await withRefreshedToken(account, async (token, shopId, creds) => {
+      const result = await apiUpdateStockBatch(token, shopId, [
         { channelSku: params.channelSku, quantity: params.newStock },
-      ], creds)
-    );
+      ], creds);
+      const auth = result.failed.find((failure) => failure.error instanceof ShopeeApiError && /^(error_auth|invalid_access_token|invalid_acceess_token|error_token)/i.test(failure.error.error));
+      if (auth) throw auth.error;
+      return result;
+    });
     const failed = r.failed[0];
     if (failed) {
-      const msg = failed.error instanceof Error ? failed.error.message : String(failed.error);
+      const msg = safeStockPushMessage(failed.error, [account.accessToken, account.refreshToken, account.appCredential?.clientSecret]);
       await logStockPush(account.id, params.channelSku, params.newStock, "error",
         `SKU "${params.channelSku}" (${account.label}).`, msg);
       return done(false, false, msg);
@@ -117,7 +127,7 @@ export async function pushStockToShopee(params: PushParams): Promise<SyncPushIte
       `Stok ${params.newStock} → SKU "${params.channelSku}" (${account.label}).`);
     return done(true, false);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = safeStockPushMessage(err, [account.accessToken, account.refreshToken, account.appCredential?.clientSecret]);
     const authLike = err instanceof ShopeeApiError && /error_auth/i.test(err.error);
     await logStockPush(account.id, params.channelSku, params.newStock,
       authLike ? "skipped" : "error",

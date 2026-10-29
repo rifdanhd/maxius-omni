@@ -4,7 +4,8 @@ export type MasterStockTab = "all" | "empty" | "low" | "failed" | "unmapped" | "
 export type ListingStock = {
   id: string; accountId: string; store: string; platform: string; channelSku: string;
   sellerSku: string | null; platformSkuId: string | null; platformStock: number | null;
-  status: "SUCCESS" | "FAILED" | "PENDING"; error: string | null; lastSyncedAt: string | null;
+  status: "SUCCESS" | "FAILED" | "PENDING" | "DISABLED"; error: string | null; lastSyncedAt: string | null;
+  blockedReason?: string | null;
   allocation: AllocationPolicy; quantity: number;
   inheritsAllocation: boolean; defaultAllocation: AllocationPolicy;
 };
@@ -13,7 +14,7 @@ export type MasterStockRow = {
   imageUrl: string | null; category: string | null; stock: number; safetyStock: number;
   available: number; pending: number; minimum: number; archived: boolean; promoActive: number;
   ownArchived: boolean;
-  status: "SUCCESS" | "FAILED" | "PENDING"; allocationWarning: boolean;
+  status: "SUCCESS" | "FAILED" | "PENDING" | "DISABLED"; allocationWarning: boolean;
   listings: ListingStock[];
   warehouses: Array<{ id: string; name: string; stock: number; safetyStock: number }>;
 };

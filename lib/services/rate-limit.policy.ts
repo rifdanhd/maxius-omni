@@ -22,10 +22,11 @@ const RETRYABLE_HTTP = new Set([429, 500, 502, 503, 504]);
  */
 export function isTransientPlatformError(err: unknown): boolean {
   if (err instanceof TikTokApiError) {
-    return RETRYABLE_HTTP.has(err.code);
+    return RETRYABLE_HTTP.has(err.code) || RETRYABLE_HTTP.has(err.httpStatus ?? 0) || err.code === 36009003;
   }
   // Network fetch (TypeError: fetch failed dsb.) = sementara, layak retry.
   if (err instanceof TypeError) return true;
+  if (err instanceof Error && ["TimeoutError", "AbortError"].includes(err.name)) return true;
   return false;
 }
 

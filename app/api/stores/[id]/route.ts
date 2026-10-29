@@ -3,6 +3,14 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
+import { z } from "zod";
+
+export const PATCH = withAuth(async (req, ctx) => {
+  const { id } = (await ctx?.params) as { id: string };
+  const input = z.object({ stockPushEnabled: z.boolean() }).strict().parse(await req.json());
+  const changed = await prisma.platformAccount.updateMany({ where: { id, businessId: req.businessId }, data: input });
+  return changed.count ? NextResponse.json({ success: true, stockPushEnabled: input.stockPushEnabled }) : NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 404 });
+});
 
 export const DELETE = withAuth(async (req, ctx) => {
   try {

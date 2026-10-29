@@ -118,7 +118,7 @@ await ok("Shopee order 10 → 110 + SyncJob PENDING utk TikTok", async () => {
   // (jangan panggil pushVariantStockToOthers kedua: dua push paralel
   // memicu race create InventorySetting yang pre-existing).
   let jobs: Array<{ accountId: string; channelSku: string; newSellable: number }> = [];
-  for (let i = 0; i < 100 && jobs.length === 0; i++) {
+  for (let i = 0; i < 100 && (jobs.length === 0 || jobs[0].newSellable !== 110); i++) {
     await new Promise((res) => setTimeout(res, 50));
     jobs = await prisma.syncJob.findMany({
       where: { variantId: variant.id, accountId: tiktokAcc.id, status: "PENDING" },
@@ -224,6 +224,7 @@ await ok("1 sukses (bertoken→antrean) + 1 gagal (tanpa token) → array 2 hasi
     },
   });
   // tiktokAcc fixture TIDAK punya token → hasil aktual success:false.
+  await prisma.productMapping.create({ data: { accountId: goodAcc.id, channelSku: "GOOD-1", variantId: variant.id, updatedAt: new Date() } });
   const results = await syncStockToMarketplaces(
     [
       { accountId: goodAcc.id, channelSku: "GOOD-1" },
@@ -252,7 +253,8 @@ await ok("3x gagal aktual (success:false, tanpa pusher palsu) → FAILED + retry
   const v = await prisma.productVariant.create({
     data: { sku: "FAIL-1", stock: 90, masterProductId: master.id },
   });
-  await enqueueSyncJobs(v.id, [{ accountId: tiktokAcc.id, channelSku: "928372" }], 90);
+  await prisma.productMapping.create({ data: { accountId: tiktokAcc.id, channelSku: "FAIL-CHANNEL", variantId: v.id, updatedAt: new Date() } });
+  await enqueueSyncJobs(v.id, [{ accountId: tiktokAcc.id, channelSku: "FAIL-CHANNEL" }], 90);
   // SENGAJA tanpa `pusher` → defaultPusher produksi: syncStockToMarketplaces
   // asli terhadap akun tanpa token → { success:false } (bukan throw palsu).
   const t0 = Date.now();
@@ -370,6 +372,8 @@ await ok("job sukses → SUCCESS, tidak diproses ulang", async () => {
 });
 
 /* ─────────────────────────── Cleanup ─────────────────────────── */
+const { _resetStockPushQueueForTests } = await import("@/lib/services/stock-push-queue.service");
+_resetStockPushQueueForTests();
 await prisma.$disconnect();
 db.cleanup();
 console.log(`\nPASS: ${passed} test group (phase-a). DB fixture dihapus.`);

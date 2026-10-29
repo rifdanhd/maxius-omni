@@ -1,16 +1,16 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
+import { downloadValidatedPdf } from "@/lib/security/validate-upload";
 
-/**
- * Penggabungan label pengiriman TikTok untuk cetak batch.
- *
+/** Penggabungan label pengiriman TikTok untuk cetak batch.
+
  * TikTok Shop Partner API TIDAK punya endpoint batch utk shipping documents
  * (GetPackageShippingDocument hanya menerima 1 package_id di path; yang ada
  * batch hanyalah /packages/batch_ship utk mengirim paket). Karena itu label tiap
  * order diambil SATU PER SATU (paralel utk kecepatan) lalu digabung jadi 1 PDF
  * di sini memakai pdf-lib.
- *
+
  * Halaman label resmi digabung tanpa menambahkan rincian produk pada resi.
  * Picking List opsional ditambahkan sebagai halaman terpisah.
  */
@@ -180,12 +180,7 @@ function safeText(str: string): string {
     .trim();
 }
 
-/**
- * stampProductVariantOnLabel — menempelkan tabel rincian produk & varian
- * langsung pada area putih bagian bawah label resmi TikTok (halaman 1),
- * sehingga label tetap 100% ASLI (barcode, logo TikTok & J&T, alamat kurir)
- * dan sekaligus memuat varian untuk staf packing gudang.
- */
+/** Menempelkan tabel rincian produk & varian langsung pada area putih bagian bawah label resmi TikTok (halaman 1), sehingga label tetap 100% ASLI (barcode, logo TikTok & J&T, alamat kurir) dan sekaligus memuat varian untuk staf packing gudang. */
 export async function stampProductVariantOnLabel(
   pdfBytes: Uint8Array,
   rows: LabelMergeProductRow[],
@@ -363,13 +358,15 @@ async function fetchDocumentBytes(docUrl: string): Promise<Uint8Array> {
   return new Uint8Array(await downloadValidatedPdf(docUrl));
 }
 
-/**
- * mergeShippingDocuments — ambil label resmi untuk N paket (paralel), unduh
- * isi PDF/PNG tiap docUrl, lalu gabung jadi satu PDF multi-halaman.
- *
+/** Ambil label resmi untuk N paket (paralel), unduh isi PDF/PNG tiap docUrl, lalu gabung jadi satu PDF multi-halaman.
+
  * Gagal pada satu order (belum di-ship / 404 / unduh error) TIDAK menggagalkan
  * yang lain: order itu dicatat di `failed` agar UI bisa memberi tahu user,
  * label yang berhasil tetap digabung.
+ *
+ * PENTING: Jika Shopee mengembalikan format bukan PDF (misal PNG), maka error
+ * dilempar agar label tidak "lopak" tanpa branding resmi. User perlu memastikan
+ * paket sudah di-ship sebelum mencetak.
  */
 export async function mergeShippingDocuments(
   items: LabelMergeItem[]
@@ -391,7 +388,8 @@ export async function mergeShippingDocuments(
   const results = await Promise.allSettled(
     allowed.map(async (item) => {
       // Dipaksa PDF (document_format=PDF) supaya label konsisten utk digabung;
-      // docUrl tetap bisa PNG bila TikTok mengabaikannya → ditangani di bawah.
+      // catatan: Shopee kadang mengembalikan image (PNG) daripada PDF,
+      // jadi kita cek bytes setelah download, bukan hanya rely pada parameter.
       const { docUrl } = await getShippingDocument(
         item.accessToken,
         item.shopCipher ?? undefined,
@@ -400,7 +398,19 @@ export async function mergeShippingDocuments(
         "PDF"
       );
       if (!docUrl) throw new Error("label resmi belum tersedia");
+
       const bytes = await fetchDocumentBytes(docUrl);
+
+      // VALIDASI: pastikan bytes memang berformat PDF.
+      // Jika bukan PDF, lempar error agar UI bisa menampilkan pesan yang jelas
+      // dan tidak menghasilkan PDF "lopak" tanpa branding resmi Shopee.
+      if (!isPdf(bytes)) {
+        throw new Error(
+          "Shopee mengembalikan format bukan PDF. Pastikan paket sudah di-ship dan coba lagi. " +
+            "Error: non-PDF document received."
+        );
+      }
+
       return { orderNo: item.orderNo, bytes };
     })
   );
@@ -423,6 +433,7 @@ export async function mergeShippingDocuments(
       if (isPdf(bytes)) {
         await mergePdfs(merged, bytes);
       } else if (isPng(bytes) || isJpeg(bytes)) {
+        // Jika somehow masih gagal validasi di atas, embed gambar tapi tandai
         await embedLabelImage(merged, bytes);
       } else {
         throw new Error("format dokumen tidak didukung");
@@ -443,4 +454,3 @@ export async function mergeShippingDocuments(
   if (count === 0) return { pdf: null, count: 0, failed };
   return { pdf: await merged.save(), count, failed };
 }
-import { downloadValidatedPdf } from "@/lib/security/validate-upload";

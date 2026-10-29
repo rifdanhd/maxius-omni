@@ -79,6 +79,7 @@ const okRes = (body: Record<string, unknown>) => ({
       },
     });
   }
+  if (call.url.includes("/inventory/search")) return okRes({ code: 0, data: { inventory: [{ product_id: "prod-1", skus: [1,2,3].map((index) => ({ id: `tik-${index}`, seller_sku: `CH-${index}`, warehouse_inventory: [{ warehouse_id: "wh-1" }] })) }] } });
   if (call.url.includes("/inventory/update")) {
     const r = updateResponder(call);
     return { ok: r.status === 200, status: r.status, json: async () => r.body };
@@ -128,8 +129,11 @@ const account = await prisma.platformAccount.create({
 const noTokenAccount = await prisma.platformAccount.create({
   data: { platform: "TIKTOK_SHOP", label: "T3 Tanpa Token", businessId: business.id },
 });
-// (varian tidak dibutuhkan skenario ini — push queue bekerja di lapisan mapping
-// channel SKU; dibuat tanpa relasi varian)
+const master = await prisma.masterProduct.create({ data: { name: "Queue fixture", businessId: business.id } });
+for (const acc of [account, noTokenAccount]) for (const sku of ["CH-1", "CH-2", "CH-3"]) {
+  const variant = await prisma.productVariant.upsert({ where: { masterProductId_sku: { masterProductId: master.id, sku } }, create: { sku, masterProductId: master.id, stock: 100 }, update: {} });
+  await prisma.productMapping.create({ data: { accountId: acc.id, channelSku: sku, variantId: variant.id, updatedAt: new Date() } });
+}
 
 console.log(`\n[1] Coalesce: 5 perubahan beruntun SKU sama → nilai terakhir, 1 deferred`);
 {
@@ -218,7 +222,7 @@ console.log(`\n[3] Rate limit HTTP 429 → retry backoff terjadwal, sukses di pe
     const errors = await syncLogs("error", account.id);
     check(
       "SyncLog error menyebut retry backoff",
-      errors.length === 1 && /retry ke-1/.test(errors[0]?.message ?? ""),
+      errors.length === 1 && /retry.*ke-1/.test(errors[0]?.message ?? ""),
       JSON.stringify(errors.map((e) => e.message))
     );
     check("retry timer terjadwal dgn delay backoff", countBackoffTimers() === 1, `timers=${JSON.stringify(capturedTimers.map((t) => t.delay))}`);
@@ -289,6 +293,27 @@ console.log(`\n[5] Akun tanpa access token → skipped, 0 call API`);
   }
 }
 
+console.log("\n[6] Retry lama tidak menimpa stok baru yang sudah terkirim");
+_resetStockPushQueueForTests(); httpCalls.length = 0; stubTimers();
+try {
+  let attempts = 0;
+  updateResponder = () => ++attempts === 1 ? { status: 429, body: {} } : { status: 200, body: { code: 0, data: {} } };
+  scheduleStockPush(account.id, "CH-1", 20); capturedTimers[0].fn(); await drainAsync();
+  const oldRetry = capturedTimers.find((timer) => timer.delay > 0 && timer.delay < 5000)!;
+  scheduleStockPush(account.id, "CH-1", 99); capturedTimers.filter((timer) => timer.delay === DEBOUNCE_WINDOW_MS).at(-1)!.fn(); await drainAsync();
+  oldRetry.fn(); await drainAsync();
+  check("retry usang tidak mengirim ulang quantity lama", attempts === 2);
+  const mapping = await prisma.productMapping.findUniqueOrThrow({ where: { accountId_channelSku: { accountId: account.id, channelSku: "CH-1" } } });
+  check("snapshot tetap quantity terbaru", mapping.platformStock === 99);
+} finally { restoreTimers(); updateResponder = () => ({ status: 200, body: { code: 0, data: {} } }); }
+console.log("\n[7] Gate diperiksa ulang saat flush, bukan hanya saat enqueue");
+_resetStockPushQueueForTests(); httpCalls.length = 0; stubTimers();
+try {
+  scheduleStockPush(account.id, "CH-1", 55); process.env.STOCK_PUSH_ENABLED = "false";
+  capturedTimers[0].fn(); await drainAsync();
+  check("gate berubah saat menunggu: tidak ada API dipanggil", httpCalls.length === 0);
+  check("penahanan tercatat skipped_disabled", (await syncLogs("skipped_disabled", account.id)).length > 0);
+} finally { process.env.STOCK_PUSH_ENABLED = "true"; restoreTimers(); _resetStockPushQueueForTests(); }
 /* ─────────────── Ringkasan ─────────────── */
 console.log(`\n=== ${pass} PASS, ${fail} FAIL ===`);
 check(`DEBOUNCE_WINDOW_MS dalam rentang diminta (5–10s)`, DEBOUNCE_WINDOW_MS >= 5_000 && DEBOUNCE_WINDOW_MS <= 10_000, `${DEBOUNCE_WINDOW_MS}ms`);

@@ -1,17 +1,12 @@
 import { prisma } from "@/lib/db/prisma";
 import { updatePrice } from "@/lib/integrations/tiktokShop";
-import { scheduleStockPush } from "@/lib/services/stock-push-queue.service";
+import { scheduleStockPush, pushStockAndWait } from "@/lib/services/stock-push-queue.service";
 import { pushPriceToShopee, pushStockToShopee } from "@/lib/services/marketplace-shopee.service";
 import { logStockPush } from "@/lib/services/sync-log.util";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
 import { allocationQuantity, resolveAllocation } from "@/lib/services/stock-allocation.policy";
-
-/** Platform → kolom gate di InventorySetting (Pengaturan Inventori). */
-const PLATFORM_SYNC_GATE = {
-  TOKOPEDIA: "syncPushTokopedia",
-  SHOPEE: "syncPushShopee",
-  TIKTOK_SHOP: "syncPushTiktok",
-} as const;
+import { safeStockPushMessage } from "@/lib/services/stock-push-error";
 
 type Mapping = { accountId: string; channelSku: string };
 
@@ -38,6 +33,7 @@ export type SyncPushItemResult = {
   success: boolean;
   skipped: boolean;
   error?: string;
+  outcome?: "success" | "failed" | "deferred" | "disabled" | "dry_run";
 };
 
 /**
@@ -59,106 +55,61 @@ export type SyncPushItemResult = {
  * Setiap penundaan tercatat di SyncLog ("deferred") — tidak pernah silent.
  */
 export async function syncStockToMarketplaces(
-  mappings: Mapping[],
-  newStock: number
+  mappings: Mapping[], newStock: number, options?: { dryRun?: boolean; waitForDelivery?: boolean }
 ): Promise<SyncPushItemResult[]> {
-  const settled = await Promise.allSettled(
-    mappings.map(async (mapping): Promise<SyncPushItemResult> => {
-      const done = (success: boolean, skipped: boolean, error?: string): SyncPushItemResult => ({
-        accountId: mapping.accountId,
-        channelSku: mapping.channelSku,
-        success,
-        skipped,
-        ...(error ? { error } : {}),
-      });
-
-      const account = await prisma.platformAccount.findUnique({
-        where: { id: mapping.accountId },
-      });
-
-      if (!account) {
-        await logStockPush(mapping.accountId, mapping.channelSku, newStock, "skipped",
-          `Akun ${mapping.accountId} tidak ditemukan — push stok dibatalkan.`);
-        return done(false, true, `Akun ${mapping.accountId} tidak ditemukan.`);
-      }
-
-      const listing = await prisma.productMapping.findUnique({
-        where: { accountId_channelSku: { accountId: mapping.accountId, channelSku: mapping.channelSku } },
-        include: { variant: { select: { masterProduct: { select: { businessId: true } } } } },
-      });
-      if (listing?.variant && listing.variant.masterProduct.businessId !== account.businessId) {
-        return done(false, true, "Mapping toko dan SKU berbeda customer.");
-      }
-      const policy = resolveAllocation(listing ?? {}, account);
-      const listingCount = policy.mode === "EQUAL" && listing?.variantId
-        ? await prisma.productMapping.count({ where: { variantId: listing.variantId, account: { businessId: account.businessId } } })
-        : 1;
-      const listingStock = allocationQuantity(newStock, policy, listingCount);
-
-      // Gate Pengaturan Inventori: auto-push utk platform ini dimatikan →
-      // skip dgn jejak SyncLog (tidak pernah silent). Ini konfigurasi
-      // DISENGAJA user → success=true (tidak ada aksi retry yang berguna).
-      const gateKey = PLATFORM_SYNC_GATE[account.platform as keyof typeof PLATFORM_SYNC_GATE];
-      if (gateKey) {
-        const settings = await getCachedInventorySettings(account.businessId);
-        if (!settings[gateKey]) {
-          await logStockPush(account.id, mapping.channelSku, newStock, "skipped",
-            `Auto-push stok ke ${account.platform} dimatikan di Pengaturan Inventori.`);
-          return done(true, true);
-        }
-      }
-
-      // Saat ini hanya TikTok Shop yang punya integrasi API.
-      // Shopee / Tokopedia akan ditambahkan di sini saat SDK-nya siap.
-      if (account.platform === "TIKTOK_SHOP") {
-        if (!account.accessToken) {
-          await logStockPush(account.id, mapping.channelSku, newStock, "skipped",
-            `"${account.label}" belum punya access token di database.`);
-          return done(false, true, `"${account.label}" belum punya access token — push stok dibatalkan.`);
-        }
-        if (!account.shopCipher) {
-          await logStockPush(account.id, mapping.channelSku, newStock, "skipped",
-            `"${account.label}" belum punya shop_cipher — skip sync.`);
-          return done(false, true, `"${account.label}" belum punya shop_cipher — push stok dibatalkan.`);
-        }
-
-        // Masuk antrean debounce — coalesce + batch + backoff terjadi di queue.
-        // "Diterima antrean" = success (pengiriman downstream + retry-nya
-        // dimiliki queue & tercatat di SyncLog).
-        scheduleStockPush(account.id, mapping.channelSku, listingStock);
-        return done(true, false);
-      } else if (account.platform === "SHOPEE") {
-        // Adapter Shopee (PHASE B.4, stub): kontrak hasil per-item SAMA dengan
-        // TikTok — success:false eksplisit + jejak SyncLog, TANPA throw.
-        // Worker SyncJob membaca hasil ini → retry/FAILED seperti biasa.
-        const r = await pushStockToShopee({
-          accountId: account.id,
-          accountLabel: account.label,
-          channelSku: mapping.channelSku,
-          newStock: listingStock,
-        });
-        return done(r.success, r.skipped, r.error);
-      } else {
-        await logStockPush(account.id, mapping.channelSku, newStock, "skipped",
-          `Platform ${account.platform} belum punya integrasi push stok.`);
-        return done(false, true, `Platform ${account.platform} belum punya integrasi push stok.`);
-      }
-    })
-  );
-
-  // allSettled → fulfilled = hasil per-toko di atas; rejected = error tak
-  // terduga di dalam satu item → success:false (isolasi: item lain tetap utuh).
-  return settled.map((r, i) => {
-    if (r.status === "fulfilled") return r.value;
-    const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
-    return {
-      accountId: mappings[i].accountId,
-      channelSku: mappings[i].channelSku,
-      success: false,
-      skipped: false,
-      error: msg,
+  const settled = await Promise.allSettled(mappings.map(async (mapping): Promise<SyncPushItemResult> => {
+    const done = (success: boolean, skipped: boolean, outcome: SyncPushItemResult["outcome"], error?: string): SyncPushItemResult => ({ ...mapping, success, skipped, outcome, ...(error ? { error } : {}) });
+    const fail = async (message: string) => {
+      await logStockPush(mapping.accountId, mapping.channelSku, newStock, "error", message, message);
+      return done(false, false, "failed", message);
     };
-  });
+    if (!Number.isFinite(newStock) || newStock < 0) return fail("Stok yang dikirim harus angka minimal nol.");
+    const account = await prisma.platformAccount.findUnique({ where: { id: mapping.accountId } });
+    if (!account) return done(false, true, "failed", "Akun marketplace tidak ditemukan.");
+    const listing = await prisma.productMapping.findUnique({
+      where: { accountId_channelSku: mapping }, include: { variant: { select: { masterProduct: { select: { businessId: true } } } } },
+    });
+    if (!listing?.variant) return fail("Mapping SKU master tidak tersedia; tinjau Mapping Stok.");
+    if (listing.variant.masterProduct.businessId !== account.businessId) return fail("Mapping toko dan SKU berbeda customer.");
+    if (account.platform === "SHOPEE") {
+      const ids = mapping.channelSku.match(/^(\d+):(\d+)$/);
+      if (ids && ((listing.platformProductId && listing.platformProductId !== ids[1]) || (listing.platformSkuId && listing.platformSkuId !== ids[2]))) return fail("SKU_MISMATCH: item/model Shopee bertentangan dengan metadata mapping; tinjau listing sebelum push.");
+    }
+    const settings = await getCachedInventorySettings(account.businessId);
+    const disabled = stockPushDisabledReason(account, settings);
+    const policy = resolveAllocation(listing, account);
+    const count = policy.mode === "EQUAL" ? await prisma.productMapping.count({ where: { variantId: listing.variantId, account: { businessId: account.businessId } } }) : 1;
+    const quantity = allocationQuantity(newStock, policy, count);
+    if (disabled) {
+      await logStockPush(account.id, mapping.channelSku, quantity, "skipped_disabled", disabled);
+      return done(true, true, "disabled", disabled);
+    }
+    if (options?.dryRun) {
+      await logStockPush(account.id, mapping.channelSku, quantity, "dry_run", `Pratinjau ${account.platform}: ${quantity} unit; tidak dikirim ke marketplace.`);
+      return done(true, false, "dry_run");
+    }
+    if (account.platform === "TIKTOK_SHOP") {
+      if (!account.accessToken || !account.shopCipher) {
+        const error = !account.accessToken ? "Toko belum punya access token TikTok; hubungkan ulang toko." : "Toko belum punya shop_cipher TikTok; hubungkan ulang toko.";
+        await logStockPush(account.id, mapping.channelSku, quantity, "skipped", error, error);
+        return done(false, true, "failed", error);
+      }
+      if (options?.waitForDelivery) return { ...mapping, ...await pushStockAndWait(account.id, mapping.channelSku, quantity) };
+      scheduleStockPush(account.id, mapping.channelSku, quantity, true);
+      return done(true, false, "deferred");
+    }
+    if (account.platform === "SHOPEE") {
+      const result = await pushStockToShopee({ accountId: account.id, accountLabel: account.label, channelSku: mapping.channelSku, newStock: quantity });
+      return { ...result, outcome: result.outcome ?? (result.success ? "success" : "failed") };
+    }
+    return fail(`Platform ${account.platform} belum mendukung push stok.`);
+  }));
+  return Promise.all(settled.map(async (result, index): Promise<SyncPushItemResult> => {
+    if (result.status === "fulfilled") return result.value;
+    const error = safeStockPushMessage(result.reason);
+    await logStockPush(mappings[index].accountId, mappings[index].channelSku, newStock, "error", "Push stok gagal sebelum diterima marketplace.", error);
+    return { ...mappings[index], success: false, skipped: false, outcome: "failed", error };
+  }));
 }
 
 /**

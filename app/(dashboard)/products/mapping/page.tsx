@@ -4,9 +4,32 @@ import { ErrorFeedback } from "@/components/ui/feedback";
 import { SkuReviewPanel } from "@/components/inventory/sku-review-panel";
 import { notify } from "@/components/ui/notify";
 import { confirmAction } from "@/components/ui/confirm-action";
-import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { authFetch } from "@/lib/utils/api-client";
-import { Plus, Trash2, RefreshCw, History, Save, X, Link2, Boxes, SlidersHorizontal, AlertTriangle, PackagePlus, Link as LinkIcon } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  History,
+  Save,
+  X,
+  Link2,
+  Boxes,
+  SlidersHorizontal,
+  AlertTriangle,
+  PackagePlus,
+  Link as LinkIcon,
+  Info,
+  Search,
+  Store as StoreIcon,
+  ArrowLeft,
+  ChevronRight,
+  MousePointerClick,
+  type LucideIcon,
+} from "lucide-react";
 
 type Store = { id: string; name: string; platform: string; status: string };
 type Variant = {
@@ -84,6 +107,216 @@ const emptyForm = {
   safetyStock: "",
 };
 
+type Selection =
+  | { kind: "mapping"; id: string }
+  | { kind: "orphan"; key: string }
+  | { kind: "variant"; id: string }
+  | { kind: "new" }
+  | null;
+
+const PAGE_STEP = 200;
+
+/* ───────────────────────── Komponen UI kecil ───────────────────────── */
+
+const field =
+  "h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors hover:border-ring focus-visible:ring-2 focus-visible:ring-ring/40";
+
+function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <label className="mb-1.5 block text-xs font-semibold text-foreground">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<{ id: T; label: string; icon?: LucideIcon }>;
+}) {
+  return (
+    <div role="group" className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+      {options.map(({ id, label, icon: Icon }) => {
+        const active = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(id)}
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {Icon && <Icon size={13} aria-hidden="true" />}
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <label className="relative block w-full">
+      <Search className="absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden="true" />
+      <input className={`${field} pl-9`} aria-label={placeholder} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+function EmptyState({ icon: Icon, children, action }: { icon: LucideIcon; children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center px-4 py-14 text-center">
+      <span className="mb-3 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Icon size={20} aria-hidden="true" />
+      </span>
+      <p className="max-w-xs text-sm text-muted-foreground">{children}</p>
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+function StockPill({ value }: { value: number }) {
+  return (
+    <span
+      className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-sm font-bold tabular-nums ${
+        value === 0 ? "bg-destructive-subtle text-destructive" : "bg-muted/60 text-foreground"
+      }`}
+    >
+      {value}
+    </span>
+  );
+}
+
+function PlatformChip({ platform }: { platform: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground">
+      <StoreIcon size={10} className="text-muted-foreground" aria-hidden="true" />
+      {formatPlatform(platform)}
+    </span>
+  );
+}
+
+function StatBox({ label, value, danger }: { label: string; value: ReactNode; danger?: boolean }) {
+  return (
+    <div className={`rounded-xl px-4 py-3 ${danger ? "bg-destructive-subtle" : "bg-muted"}`}>
+      <p className={`text-[11px] ${danger ? "text-destructive" : "text-muted-foreground"}`}>{label}</p>
+      <p className={`mt-1 text-xl font-bold tabular-nums ${danger ? "text-destructive" : "text-foreground"}`}>{value}</p>
+    </div>
+  );
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ListRow({
+  active,
+  onClick,
+  avatar,
+  title,
+  mono,
+  subtitle,
+  trailing,
+  testId,
+}: {
+  active: boolean;
+  onClick: () => void;
+  avatar: ReactNode;
+  title: string;
+  mono?: boolean;
+  subtitle: ReactNode;
+  trailing?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-current={active ? "true" : undefined}
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 border-l-2 px-3 py-3 text-left transition-colors ${
+        active ? "border-primary bg-primary/5" : "border-transparent hover:bg-muted/50"
+      }`}
+    >
+      {avatar}
+      <div className="min-w-0 flex-1">
+        <p className={`truncate text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`}>{title}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      {trailing}
+      <ChevronRight size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
+  );
+}
+
+function Avatar({ children, alert }: { children: ReactNode; alert?: boolean }) {
+  return (
+    <span
+      className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+        alert ? "bg-destructive-subtle text-destructive" : "bg-muted text-foreground"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailHeader({
+  avatar,
+  title,
+  mono,
+  subtitle,
+  onBack,
+  actions,
+}: {
+  avatar: ReactNode;
+  title: string;
+  mono?: boolean;
+  subtitle?: ReactNode;
+  onBack: () => void;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3.5 md:px-6">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Kembali ke daftar"
+        className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted lg:hidden"
+      >
+        <ArrowLeft size={18} />
+      </button>
+      {avatar}
+      <div className="min-w-0 flex-1">
+        <h2 className={`truncate text-base font-semibold text-foreground ${mono ? "font-mono" : ""}`}>{title}</h2>
+        {subtitle && <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{subtitle}</div>}
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+const th = "whitespace-nowrap px-4 py-3 font-semibold md:px-6";
+const td = "px-4 py-3.5 md:px-6";
+
+/* ───────────────────────── Halaman ───────────────────────── */
+
 export default function ProductMappingPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
@@ -108,6 +341,11 @@ export default function ProductMappingPage() {
   const [stockInVariant, setStockInVariant] = useState<Variant | null>(null);
   const [stockInForm, setStockInForm] = useState({ qty: "", note: "" });
   const [stockInSaving, setStockInSaving] = useState(false);
+  const [mapQuery, setMapQuery] = useState("");
+  const [variantQuery, setVariantQuery] = useState("");
+  const [listFilter, setListFilter] = useState<"all" | "linked" | "orphan">("all");
+  const [selection, setSelection] = useState<Selection>(null);
+  const [shown, setShown] = useState(PAGE_STEP);
 
   const loadAll = useCallback(async () => {
     const [m, v, storesRes] = await Promise.all([
@@ -136,8 +374,11 @@ export default function ProductMappingPage() {
       try {
         await loadAll();
         const params = new URLSearchParams(window.location.search);
-        if (params.get("accountId")) setForm((previous) => ({ ...previous,
-          accountId: params.get("accountId") ?? "", channelSku: params.get("channelSku") ?? "" }));
+        if (params.get("accountId")) {
+          setForm((previous) => ({ ...previous,
+            accountId: params.get("accountId") ?? "", channelSku: params.get("channelSku") ?? "" }));
+          setSelection({ kind: "new" });
+        }
         await loadLedger();
         await loadOrphans();
       } catch (e) {
@@ -211,6 +452,7 @@ export default function ProductMappingPage() {
     setError(null);
     try {
       await api(`/api/inventory/mappings/${id}`, { method: "DELETE" });
+      setSelection(null);
       await loadAll();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menghapus mapping.");
@@ -313,121 +555,95 @@ export default function ProductMappingPage() {
     }
   }
 
-  return (
-    <div className="p-4 md:p-8 space-y-6">
-      <SkuReviewPanel />
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground">Hubungkan Produk &amp; Stok (Mapping Stok Terpusat)</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Hubungkan produk di tiap toko ke satu variasi stok pusat (sku_master). Produk yang belum
-            dihubungkan tetap berdiri sendiri. Stok yang bisa dijual (Stok Efektif) =
-            stok total − stok cadangan (Stok Aman).
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button
-            onClick={() => { setTab("riwayat"); loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat.")); }}
-            className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-          >
-            <History size={16} /> Riwayat Stok
-          </button>
-          <button
-            onClick={() => { Promise.all([loadAll(), loadLedger(), loadOrphans()]).catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat ulang.")); }}
-            className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-          >
-            <RefreshCw size={16} /> Muat Ulang
-          </button>
-        </div>
-      </div>
+  function changeTab(id: "mapping" | "varian" | "riwayat") {
+    setTab(id);
+    setSelection(null);
+    setShown(PAGE_STEP);
+    if (id === "riwayat") loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat."));
+  }
 
-      {error && <ErrorFeedback error={error} className="mb-4" />}
+  /* ── Data turunan ── */
+  const mq = mapQuery.trim().toLowerCase();
+  const filteredMappings = mq
+    ? mappings.filter((m) => [m.channelSku, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq)))
+    : mappings;
+  const filteredOrphans = mq
+    ? orphans.filter((o) => [o.channelSku, o.accountLabel, o.sampleProductName].some((x) => x?.toLowerCase().includes(mq)))
+    : orphans;
+  const vq = variantQuery.trim().toLowerCase();
+  const filteredVariants = vq ? variants.filter((v) => [v.sku, v.masterProduct.name].some((x) => x.toLowerCase().includes(vq))) : variants;
+  const totalEffective = variants.reduce((sum, v) => sum + effectiveStock(v), 0);
+  const orphanAlert = orphansLoaded && orphans.length > 0;
+  const visibleOrphans = listFilter === "linked" ? [] : filteredOrphans;
+  const visibleMappings = listFilter === "orphan" ? [] : filteredMappings;
 
-      {/* Tab — daftar panjang (ribuan baris) dipisah jadi 3 tampilan */}
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="flex items-center overflow-x-auto px-4">
-          {(
-            [
-              { id: "mapping", label: "Hubungan Produk (Mapping)", count: mappings.length },
-              { id: "varian", label: "Variasi Pusat (sku_master)", count: variants.length },
-              { id: "riwayat", label: "Riwayat Stok", count: ledger.length },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              data-testid={`mapping-tab-${t.id}`}
-              onClick={() => { setTab(t.id); if (t.id === "riwayat") loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat.")); }}
-              className={`whitespace-nowrap px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
-                tab === t.id ? "border-primary text-foreground" : "border-transparent text-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-              {t.count > 0 && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    tab === t.id ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                  }`}
-                >
-                  {t.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+  const selMapping = selection?.kind === "mapping" ? mappings.find((m) => m.id === selection.id) : undefined;
+  const selOrphan = selection?.kind === "orphan" ? orphans.find((o) => orphanKey(o) === selection.key) : undefined;
+  const selVariant = selection?.kind === "variant" ? variants.find((v) => v.id === selection.id) : undefined;
+  const detailActive = selection?.kind === "new" || !!selMapping || !!selOrphan || !!selVariant;
+  const back = () => setSelection(null);
 
-      {tab === "mapping" && (
-        <>
-      {/* Tambah Mapping */}
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-          <Plus size={16} className="text-foreground" />
-          <h2 className="font-semibold text-foreground">Hubungkan Produk (Tambah Mapping)</h2>
-        </div>
-        <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 [&>div]:min-w-0">
-          <div>
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Toko</label>
-            <select
-              value={form.accountId}
-              onChange={(e) => setForm((f) => ({ ...f, accountId: e.target.value }))}
-              className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-            >
+  const kpis: Array<{ label: string; value: string; icon: LucideIcon; alert?: boolean }> = [
+    { label: "Mapping aktif", value: loading ? "…" : mappings.length.toLocaleString("id-ID"), icon: Link2 },
+    { label: "Variasi pusat", value: loading ? "…" : variants.length.toLocaleString("id-ID"), icon: Boxes },
+    { label: "SKU belum terhubung", value: orphansLoaded ? orphans.length.toLocaleString("id-ID") : "…", icon: AlertTriangle, alert: orphanAlert },
+    { label: "Total stok efektif", value: loading ? "…" : totalEffective.toLocaleString("id-ID"), icon: PackagePlus },
+  ];
+
+  const tabs = [
+    { id: "mapping", label: "Hubungan Produk (Mapping)", count: mappings.length },
+    { id: "varian", label: "Variasi Pusat (sku_master)", count: variants.length },
+    { id: "riwayat", label: "Riwayat Stok", count: ledger.length },
+  ] as const;
+
+  /* ───────────────────────── Panel detail ───────────────────────── */
+
+  function renderNewForm() {
+    return (
+      <>
+        <DetailHeader
+          avatar={<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Plus size={18} aria-hidden="true" /></span>}
+          title="Hubungkan Produk (Tambah Mapping)"
+          subtitle="Pilih toko dan kode produk di marketplace, lalu arahkan ke variasi stok pusat."
+          onBack={back}
+          actions={
+            <Button size="sm" variant="ghost" onClick={back} aria-label="Tutup formulir" className="hidden lg:inline-flex">
+              <X size={14} /> Tutup
+            </Button>
+          }
+        />
+        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 md:p-6">
+          <Field label="Toko">
+            <select value={form.accountId} onChange={(e) => setForm((f) => ({ ...f, accountId: e.target.value }))} className={field}>
               <option value="">— pilih toko —</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name} ({formatPlatform(s.platform)})</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Kode Produk di Toko (Channel SKU)</label>
+          </Field>
+          <Field label="Kode Produk di Toko (Channel SKU)">
             <input
               type="text"
               value={form.channelSku}
               onChange={(e) => setForm((f) => ({ ...f, channelSku: e.target.value }))}
               placeholder="mis. TTS3-BLK-A"
-              className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
+              className={field}
             />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!form.useNewVariant}
-                onChange={() => setForm((f) => ({ ...f, useNewVariant: !f.useNewVariant }))}
-                className="accent-primary"
-              />
-              Pakai varian yang sudah ada
-            </label>
-          </div>
+          </Field>
+          <Field label="Tujuan stok" className="md:col-span-2">
+            <Segmented
+              value={form.useNewVariant ? "new" : "existing"}
+              onChange={(next) => setForm((f) => ({ ...f, useNewVariant: next === "new" }))}
+              options={[
+                { id: "existing", label: "Varian yang sudah ada" },
+                { id: "new", label: "Varian baru" },
+              ]}
+            />
+          </Field>
 
           {!form.useNewVariant ? (
-            <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Variasi Pusat Tujuan (Varian Target)</label>
-              <select
-                value={form.variantId}
-                onChange={(e) => setForm((f) => ({ ...f, variantId: e.target.value }))}
-                className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-              >
+            <Field label="Variasi Pusat Tujuan (Varian Target)" className="md:col-span-2">
+              <select value={form.variantId} onChange={(e) => setForm((f) => ({ ...f, variantId: e.target.value }))} className={field}>
                 <option value="">— pilih varian —</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -435,483 +651,696 @@ export default function ProductMappingPage() {
                   </option>
                 ))}
               </select>
-            </div>
+            </Field>
           ) : (
             <>
-              <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Nama Produk Baru</label>
+              <Field label="Nama Produk Baru">
                 <input
                   type="text"
                   value={form.newProductName}
                   onChange={(e) => setForm((f) => ({ ...f, newProductName: e.target.value }))}
                   placeholder="mis. Kaos kaki polos hitam"
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
+                  className={field}
                 />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Kode Variasi (SKU)</label>
+              </Field>
+              <Field label="Kode Variasi (SKU)">
                 <input
                   type="text"
                   value={form.sku}
                   onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
                   placeholder="pakai channel SKU bila kosong"
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
+                  className={field}
                 />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Stok Awal</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.stock}
-                    onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-                    className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Stok Cadangan (Stok Aman)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.safetyStock}
-                    onChange={(e) => setForm((f) => ({ ...f, safetyStock: e.target.value }))}
-                    className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-                  />
-                </div>
-              </div>
+              </Field>
+              <Field label="Stok Awal">
+                <input type="number" min="0" value={form.stock} onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))} className={field} />
+              </Field>
+              <Field label="Stok Cadangan (Stok Aman)">
+                <input type="number" min="0" value={form.safetyStock} onChange={(e) => setForm((f) => ({ ...f, safetyStock: e.target.value }))} className={field} />
+              </Field>
             </>
           )}
 
-          <div className="md:col-span-3 flex justify-end">
-            <button
-              onClick={handleCreateMapping}
-              disabled={saving}
-              className="flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60 transition-colors"
-            >
+          <div className="flex justify-end gap-2 md:col-span-2">
+            <Button variant="outline" onClick={() => setForm(emptyForm)} disabled={saving}>
+              Kosongkan
+            </Button>
+            <Button onClick={handleCreateMapping} disabled={saving}>
               <Link2 size={16} /> {saving ? "Menyimpan..." : "Simpan Hubungan (Mapping)"}
-            </button>
+            </Button>
           </div>
         </div>
+      </>
+    );
+  }
+
+  function renderMappingDetail(m: Mapping) {
+    const v = m.variant;
+    return (
+      <>
+        <DetailHeader
+          avatar={<Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>}
+          title={m.channelSku}
+          mono
+          subtitle={
+            <>
+              <span>{m.account?.label ?? "-"}</span>
+              {m.account?.platform && <PlatformChip platform={m.account.platform} />}
+            </>
+          }
+          onBack={back}
+          actions={
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Hapus mapping ${m.channelSku}`}
+              className="text-destructive hover:text-destructive"
+              onClick={() => handleDelete(m.id, m.channelSku)}
+            >
+              <Trash2 size={14} /> Hapus
+            </Button>
+          }
+        />
+        <div className="space-y-6 p-4 md:p-6">
+          <Section title="Terhubung ke stok pusat" hint="Stok yang dijual di toko ini diambil dari variasi pusat berikut.">
+            {v ? (
+              <div className="space-y-3 rounded-xl border border-border p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{v.masterProduct.name}</p>
+                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">varian {v.sku}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => { setTab("varian"); setSelection({ kind: "variant", id: v.id }); }}>
+                    Lihat variasi pusat <ChevronRight size={13} />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <StatBox label="Stok total" value={v.stock} />
+                  <StatBox label="Stok aman" value={v.safetyStock} />
+                  <StatBox label="Stok efektif" value={effectiveStock(v)} danger={effectiveStock(v) === 0} />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive-subtle px-4 py-3">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0 text-destructive" aria-hidden="true" />
+                <p className="text-sm text-destructive">belum ter-mapping — pilih varian target di bawah.</p>
+              </div>
+            )}
+          </Section>
+
+          <Section title="Ganti varian target" hint="Arahkan kode produk toko ini ke variasi pusat lain.">
+            {repoint[m.id] !== undefined ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={repoint[m.id]}
+                  onChange={(e) => setRepoint((p) => ({ ...p, [m.id]: e.target.value }))}
+                  className={`${field} sm:max-w-[360px]`}
+                >
+                  <option value="">— pilih —</option>
+                  {variants.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      {variant.masterProduct.name} / {variant.sku}
+                    </option>
+                  ))}
+                </select>
+                <Button onClick={() => handleRepoint(m.id, repoint[m.id])} disabled={!repoint[m.id] || repointSaving === m.id}>
+                  <Save size={14} /> {repointSaving === m.id ? "Menyimpan..." : "Simpan"}
+                </Button>
+                <Button variant="outline" onClick={() => setRepoint((p) => { const n = { ...p }; delete n[m.id]; return n; })}>
+                  <X size={14} /> Batal
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setRepoint((p) => ({ ...p, [m.id]: variants[0]?.id ?? "" }))}
+                title="Ganti variasi pusat yang dihubungkan (Varian Target)"
+              >
+                Ganti Varian
+              </Button>
+            )}
+          </Section>
+
+          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Menghapus mapping membuat listing ini berdiri sendiri (tidak lagi gabung stok).
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  function renderOrphanDetail(o: OrphanSku) {
+    const key = orphanKey(o);
+    const mode = mapMode[key] ?? "existing";
+    return (
+      <>
+        <DetailHeader
+          avatar={<Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>}
+          title={o.channelSku}
+          mono
+          subtitle={
+            <>
+              <span>{o.accountLabel ?? "-"}</span>
+              {o.platform && <PlatformChip platform={o.platform} />}
+            </>
+          }
+          onBack={back}
+        />
+        <div className="space-y-6 p-4 md:p-6">
+          <div className="grid grid-cols-3 gap-3">
+            <StatBox label="Terjual di order" value={`${o.qty} pcs`} />
+            <StatBox label="Jumlah order" value={o.orderCount} />
+            <StatBox label="Terakhir muncul" value={<span className="text-sm">{o.lastSeenAt ? new Date(o.lastSeenAt).toLocaleDateString("id-ID", { dateStyle: "medium" }) : "-"}</span>} />
+          </div>
+          <div className="rounded-xl border border-border p-4 text-sm">
+            <p className="text-xs text-muted-foreground">Nama listing di marketplace</p>
+            <p className="mt-0.5 font-medium text-foreground">{o.sampleProductName ?? "(nama listing tidak tersedia)"}</p>
+            {o.existingMappingId && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Hubungan sudah ada — gunakan Ganti Varian/aksi di bawah untuk melengkapi data pesanan lama (Backfill)
+              </p>
+            )}
+          </div>
+
+          <Section title="Hubungkan SKU ini" hint="Muncul di order tapi belum punya varian stok pusat. Analytics belum menampilkan nama produknya.">
+            <Segmented
+              value={mode}
+              onChange={(next) => {
+                setMapMode((p) => ({ ...p, [key]: next }));
+                if (next === "new") setNewName((p) => ({ ...p, [key]: p[key] ?? o.sampleProductName ?? "" }));
+              }}
+              options={[
+                { id: "existing", label: "Ke varian ada", icon: LinkIcon },
+                { id: "new", label: "Buat master baru", icon: PackagePlus },
+              ]}
+            />
+            {mode === "existing" ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <select value={mapTarget[key] ?? ""} onChange={(e) => setMapTarget((p) => ({ ...p, [key]: e.target.value }))} className={`${field} sm:max-w-[360px]`}>
+                  <option value="">— pilih varian —</option>
+                  {variants.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.masterProduct.name} / {v.sku} (stok {v.stock})
+                    </option>
+                  ))}
+                </select>
+                <Button onClick={() => handleMapOrphan(o)} disabled={mapSaving !== null || !mapTarget[key]}>
+                  {mapSaving === key ? "Menyimpan..." : "Hubungkan & Lengkapi Pesanan Lama (Mapping + Backfill)"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={newName[key] ?? ""}
+                    onChange={(e) => setNewName((p) => ({ ...p, [key]: e.target.value }))}
+                    placeholder="Nama produk master baru"
+                    className={`${field} sm:max-w-[360px]`}
+                  />
+                  <Button onClick={() => handleMapOrphan(o)} disabled={mapSaving !== null || !newName[key]?.trim()}>
+                    {mapSaving === key ? "Menyimpan..." : "Buat Produk Pusat & Hubungkan (Master + Mapping)"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Stok awal 0 — isi lewat “Sesuaikan Stok” setelah ini.</p>
+              </div>
+            )}
+          </Section>
+        </div>
+      </>
+    );
+  }
+
+  function renderVariantDetail(v: Variant) {
+    const linked = mappings.filter((m) => m.variant?.id === v.id);
+    const recent = ledger.filter((e) => e.variant?.sku === v.sku && e.variant?.masterProduct.name === v.masterProduct.name).slice(0, 5);
+    return (
+      <>
+        <DetailHeader
+          avatar={<Avatar><Boxes size={16} aria-hidden="true" /></Avatar>}
+          title={v.masterProduct.name}
+          subtitle={<span className="font-mono">{v.sku}</span>}
+          onBack={back}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setAdjustVariant(null); setStockInVariant(v); setStockInForm({ qty: "", note: "" }); }}
+                title="Catat barang masuk (restock fisik) — +qty, bukan angka absolut"
+              >
+                <PackagePlus size={14} /> Barang Masuk
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setStockInVariant(null); openAdjust(v); }}
+                title="Set stok fisik hasil pengecekan"
+              >
+                <SlidersHorizontal size={14} /> Sesuaikan Stok
+              </Button>
+            </div>
+          }
+        />
+        <div className="space-y-6 p-4 md:p-6">
+          <div className="grid grid-cols-3 gap-3">
+            <StatBox label="Stok" value={v.stock} />
+            <StatBox label="Stok Aman" value={v.safetyStock} />
+            <StatBox label="Stok Efektif" value={effectiveStock(v)} danger={effectiveStock(v) === 0} />
+          </div>
+
+          {stockInVariant?.id === v.id && (
+            <div className="rounded-xl border border-primary/40 bg-muted/40 p-4">
+              <h3 className="text-sm font-semibold text-foreground">Barang Masuk: {v.masterProduct.name} / {v.sku}</h3>
+              <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
+                Stok sekarang {v.stock}. Isi JUMLAH MASUK (bukan stok total) — stok baru
+                = stok sekarang + qty, tercatat di Riwayat Stok dengan alasan STOCK_IN.
+              </p>
+              <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[140px_1fr_auto]">
+                <Field label="Jumlah Masuk">
+                  <input type="number" min="1" value={stockInForm.qty} onChange={(e) => setStockInForm((f) => ({ ...f, qty: e.target.value }))} className={field} />
+                </Field>
+                <Field label="Catatan">
+                  <input type="text" value={stockInForm.note} onChange={(e) => setStockInForm((f) => ({ ...f, note: e.target.value }))} placeholder="mis. PO-2026-091, terima 2 lusin" className={field} />
+                </Field>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleStockIn} disabled={stockInSaving}>
+                    <Save size={15} /> {stockInSaving ? "Menyimpan..." : "Catat"}
+                  </Button>
+                  <Button variant="outline" aria-label="Batal barang masuk" onClick={() => setStockInVariant(null)}>
+                    <X size={15} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {adjustVariant?.id === v.id && (
+            <div className="rounded-xl border border-primary/40 bg-muted/40 p-4">
+              <h3 className="text-sm font-semibold text-foreground">Sesuaikan Stok: {v.masterProduct.name} / {v.sku}</h3>
+              <p className="mb-3 mt-0.5 text-xs text-muted-foreground">
+                Stok sekarang {v.stock} (efektif {effectiveStock(v)}). Isi
+                angka stok fisik hasil pengecekan — selisih akan dicatat otomatis di Riwayat Stok.
+              </p>
+              <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[140px_1fr_auto]">
+                <Field label="Stok Baru">
+                  <input type="number" min="0" value={adjustForm.newStock} onChange={(e) => setAdjustForm((f) => ({ ...f, newStock: e.target.value }))} className={field} />
+                </Field>
+                <Field label="Catatan">
+                  <input type="text" value={adjustForm.note} onChange={(e) => setAdjustForm((f) => ({ ...f, note: e.target.value }))} placeholder="mis. hasil stock opname gudang" className={field} />
+                </Field>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleAdjust} disabled={adjustSaving}>
+                    <Save size={15} /> {adjustSaving ? "Menyimpan..." : "Simpan"}
+                  </Button>
+                  <Button variant="outline" aria-label="Batal sesuaikan stok" onClick={() => setAdjustVariant(null)}>
+                    <X size={15} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Section title={`Listing terhubung (${linked.length})`} hint="Toko yang berbagi stok dari variasi pusat ini.">
+            {linked.length === 0 ? (
+              <p className="rounded-lg bg-muted px-3 py-3 text-sm text-muted-foreground">Belum ada listing toko yang terhubung ke variasi ini.</p>
+            ) : (
+              <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+                {linked.map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => { setTab("mapping"); setSelection({ kind: "mapping", id: m.id }); }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                    >
+                      <Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-sm font-medium text-foreground">{m.channelSku}</p>
+                        <p className="truncate text-xs text-muted-foreground">{m.account?.label ?? "-"}</p>
+                      </div>
+                      {m.account?.platform && <PlatformChip platform={m.account.platform} />}
+                      <ChevronRight size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <Section title="Mutasi terakhir" hint="Dari 50 riwayat stok terbaru.">
+            {recent.length === 0 ? (
+              <p className="rounded-lg bg-muted px-3 py-3 text-sm text-muted-foreground">Belum ada mutasi untuk variasi ini.</p>
+            ) : (
+              <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+                {recent.map((e) => (
+                  <li key={e.id} className="flex items-center gap-3 px-4 py-3">
+                    <span
+                      className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-xs font-bold tabular-nums ${
+                        e.changeQty < 0 ? "bg-destructive-subtle text-destructive" : "bg-success-subtle text-success"
+                      }`}
+                    >
+                      {e.changeQty > 0 ? "+" : ""}{e.changeQty}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-foreground">{e.reason ?? "-"}{e.note ? ` · ${e.note}` : ""}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(e.createdAt).toLocaleString("id-ID")} · {e.user?.username ?? "-"}</p>
+                    </div>
+                    <span className="text-xs tabular-nums text-muted-foreground">→ {e.stockAfter}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </div>
+      </>
+    );
+  }
+
+  function renderDetail() {
+    if (selection?.kind === "new") return renderNewForm();
+    if (selMapping) return renderMappingDetail(selMapping);
+    if (selOrphan) return renderOrphanDetail(selOrphan);
+    if (selVariant) return renderVariantDetail(selVariant);
+    return (
+      <EmptyState
+        icon={MousePointerClick}
+        action={
+          tab === "mapping" ? (
+            <Button onClick={() => setSelection({ kind: "new" })}>
+              <Plus size={16} /> Tambah Mapping
+            </Button>
+          ) : undefined
+        }
+      >
+        {tab === "mapping"
+          ? "Pilih kode produk di daftar kiri untuk melihat rincian dan mengatur hubungannya, atau tambah mapping baru."
+          : "Pilih variasi pusat di daftar kiri untuk melihat stok, listing terhubung, dan mencatat barang masuk."}
+      </EmptyState>
+    );
+  }
+
+  /* ───────────────────────── Render ───────────────────────── */
+
+  return (
+    <div className="mx-auto max-w-[1600px] space-y-4 p-4 md:p-6">
+      <SkuReviewPanel />
+
+      {/* ───────── Header ───────── */}
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Hubungkan Produk &amp; Stok (Mapping Stok Terpusat)</h1>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" aria-label="Cara stok efektif dihitung" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  <Info className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm p-3 text-xs leading-relaxed">
+                <strong>Stok Efektif = stok total − stok cadangan (Stok Aman).</strong> Itulah jumlah yang bisa dijual ke semua toko yang terhubung.
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Hubungkan produk di tiap toko ke satu variasi stok pusat (sku_master). Produk yang belum dihubungkan tetap berdiri sendiri.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => changeTab("riwayat")}>
+            <History size={16} /> Riwayat Stok
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => { Promise.all([loadAll(), loadLedger(), loadOrphans()]).catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat ulang.")); }}
+          >
+            <RefreshCw size={16} /> Muat Ulang
+          </Button>
+          <Button onClick={() => { setTab("mapping"); setSelection({ kind: "new" }); }}>
+            <Plus size={16} /> Tambah Mapping
+          </Button>
+        </div>
+      </header>
+
+      {error && <ErrorFeedback error={error} className="mb-4" />}
+
+      {/* ───────── Strip ringkasan ───────── */}
+      <section aria-label="Ringkasan mapping" className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:grid-cols-4 lg:divide-x lg:divide-border">
+        {kpis.map(({ label, value, icon: Icon, alert }) => (
+          <div key={label} className={`flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 lg:border-b-0 ${alert ? "bg-destructive-subtle" : ""}`}>
+            <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${alert ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>
+              <Icon size={16} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className={`truncate text-xs ${alert ? "font-medium text-destructive" : "text-muted-foreground"}`}>{label}</p>
+              <p className={`text-lg font-bold leading-tight tabular-nums ${alert ? "text-destructive" : "text-foreground"}`}>{value}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* ───────── Tab ───────── */}
+      <div role="tablist" aria-label="Tampilan mapping stok" className="flex items-center gap-1 overflow-x-auto border-b border-border">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              data-testid={`mapping-tab-${t.id}`}
+              onClick={() => changeTab(t.id)}
+              className={`relative inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap px-4 text-sm font-medium transition-colors ${
+                active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+              {t.count > 0 && (
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                  {t.count}
+                </span>
+              )}
+              {active && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-t-full bg-primary" />}
+            </button>
+          );
+        })}
       </div>
 
-      {/* SKU Order Belum Ter-mapping (orphan) — detect & tag saja, aksi manual */}
-      {orphansLoaded && orphans.length > 0 && (
-        <div className="bg-muted border border-border rounded-xl shadow-sm" data-testid="orphan-panel">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            <AlertTriangle size={16} className="text-foreground" />
-            <h2 className="font-semibold text-foreground">
-              Kode Produk Pesanan Belum Terhubung (SKU) ({orphans.length})
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              — muncul di order ({orphans.reduce((s, o) => s + o.qty, 0)} pcs) tapi belum punya varian stok pusat. Analytics belum menampilkan nama produknya.
-            </span>
-          </div>
-          <div className="divide-y divide-border">
-            {orphans.map((o) => {
-              const key = orphanKey(o);
-              const mode = mapMode[key] ?? "existing";
-              return (
-                <div key={`${o.accountId}|${o.channelSku}`} className="p-4" data-testid={`orphan-row-${o.channelSku}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-foreground">{o.channelSku}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-foreground font-semibold">{o.qty} pcs</span>
-                        <span className="text-xs text-muted-foreground">{o.orderCount} order</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1 truncate max-w-[480px]">
-                        {o.sampleProductName ?? "(nama listing tidak tersedia)"} · {o.accountLabel ?? "-"}
-                        {o.existingMappingId ? " · hubungan sudah ada — gunakan Ganti Varian/aksi di bawah untuk melengkapi data pesanan lama (Backfill)" : ""}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => setMapMode((p) => ({ ...p, [key]: "existing" }))}
-                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "existing" ? "border-primary bg-card text-foreground" : "border-border bg-card text-foreground"}`}
-                      >
-                        <LinkIcon size={13} /> Ke varian ada
-                      </button>
-                      <button
-                        onClick={() => {
-                          setMapMode((p) => ({ ...p, [key]: "new" }));
-                          setNewName((p) => ({ ...p, [key]: p[key] ?? o.sampleProductName ?? "" }));
-                        }}
-                        className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${mode === "new" ? "border-primary bg-card text-foreground" : "border-border bg-card text-foreground"}`}
-                      >
-                        <PackagePlus size={13} /> Buat master baru
-                      </button>
-                    </div>
-                  </div>
+      {/* ───────── Master-detail ───────── */}
+      {tab !== "riwayat" && (
+        <div className="grid grid-cols-1 gap-4 lg:h-[calc(100vh-17rem)] lg:min-h-[520px] lg:grid-cols-[minmax(300px,390px)_minmax(0,1fr)]">
+          {/* Daftar (master) */}
+          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="space-y-3 border-b border-border p-3">
+              {tab === "mapping" ? (
+                <>
+                  <SearchBox value={mapQuery} onChange={(v) => { setMapQuery(v); setShown(PAGE_STEP); }} placeholder="Cari toko, channel SKU, atau produk" />
+                  <Segmented
+                    value={listFilter}
+                    onChange={(next) => { setListFilter(next); setShown(PAGE_STEP); }}
+                    options={[
+                      { id: "all", label: "Semua" },
+                      { id: "linked", label: `Terhubung (${filteredMappings.length})` },
+                      { id: "orphan", label: `Belum terhubung (${filteredOrphans.length})` },
+                    ]}
+                  />
+                </>
+              ) : (
+                <SearchBox value={variantQuery} onChange={(v) => { setVariantQuery(v); setShown(PAGE_STEP); }} placeholder="Cari produk atau SKU" />
+              )}
+            </div>
 
-                  {mode === "existing" ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <select
-                        value={mapTarget[key] ?? ""}
-                        onChange={(e) => setMapTarget((p) => ({ ...p, [key]: e.target.value }))}
-                        className="min-w-0 w-full border border-border rounded-md px-3 py-1.5 text-sm outline-none sm:max-w-[320px]"
-                      >
-                        <option value="">— pilih varian —</option>
-                        {variants.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.masterProduct.name} / {v.sku} (stok {v.stock})
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => handleMapOrphan(o)}
-                        disabled={mapSaving !== null || !mapTarget[key]}
-                        className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
-                      >
-                        {mapSaving === key ? "Menyimpan..." : "Hubungkan & Lengkapi Pesanan Lama (Mapping + Backfill)"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <input
-                        type="text"
-                        value={newName[key] ?? ""}
-                        onChange={(e) => setNewName((p) => ({ ...p, [key]: e.target.value }))}
-                        placeholder="Nama produk master baru"
-                        className="min-w-0 w-full border border-border rounded-md px-3 py-1.5 text-sm outline-none sm:max-w-[360px]"
-                      />
-                      <button
-                        onClick={() => handleMapOrphan(o)}
-                        disabled={mapSaving !== null || !newName[key]?.trim()}
-                        className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary disabled:opacity-50"
-                      >
-                        {mapSaving === key ? "Menyimpan..." : "Buat Produk Pusat & Hubungkan (Master + Mapping)"}
-                      </button>
-                      <span className="text-xs text-muted-foreground">Stok awal 0 — isi lewat “Sesuaikan Stok” setelah ini.</span>
+            <div className="max-h-[70vh] min-h-0 flex-1 overflow-y-auto lg:max-h-none">
+              {loading ? (
+                <div className="space-y-3 p-3">
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : tab === "mapping" ? (
+                <>
+                  {orphansLoaded && visibleOrphans.length > 0 && (
+                    <div data-testid="orphan-panel">
+                      <p className="sticky top-0 z-[1] flex items-center gap-2 bg-destructive-subtle px-3 py-2 text-xs font-semibold text-destructive">
+                        <AlertTriangle size={13} aria-hidden="true" />
+                        Kode Produk Pesanan Belum Terhubung (SKU) ({visibleOrphans.length})
+                      </p>
+                      <div className="divide-y divide-border">
+                        {visibleOrphans.slice(0, shown).map((o) => {
+                          const key = orphanKey(o);
+                          return (
+                            <ListRow
+                              key={`${o.accountId}|${o.channelSku}`}
+                              testId={`orphan-row-${o.channelSku}`}
+                              active={selection?.kind === "orphan" && selection.key === key}
+                              onClick={() => setSelection({ kind: "orphan", key })}
+                              avatar={<Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>}
+                              title={o.channelSku}
+                              mono
+                              subtitle={`${o.sampleProductName ?? "(nama listing tidak tersedia)"} · ${o.accountLabel ?? "-"}`}
+                              trailing={<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">{o.qty} pcs</span>}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {/* Daftar Mapping */}
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-          <Boxes size={16} className="text-foreground" />
-          <h2 className="font-semibold text-foreground">Daftar Hubungan Produk (Mapping) ({mappings.length})</h2>
-        </div>
-        {loading ? (
-          <div className="p-4 md:p-8 text-center text-muted-foreground">Memuat mapping...</div>
-        ) : mappings.length === 0 ? (
-          <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada hubungan produk (Mapping). Pilih toko dan variasi pusat melalui formulir di atas.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <th className="px-6 py-3">Toko</th>
-                  <th className="px-6 py-3">Kode Produk di Toko (Channel SKU)</th>
-                  <th className="px-6 py-3">Produk / Variasi Pusat (sku_master)</th>
-                  <th className="px-6 py-3">Stok</th>
-                  <th className="px-6 py-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mappings.map((m) => (
-                  <tr key={m.id} className="border-t border-border">
-                    <td className="px-6 py-3">
-                      <div className="font-medium text-foreground">{m.account?.label ?? "-"}</div>
-                      <div className="text-xs text-muted-foreground">{formatPlatform(m.account?.platform ?? "")}</div>
-                    </td>
-                    <td className="px-6 py-3 font-mono text-foreground">{m.channelSku}</td>
-                    <td className="px-6 py-3">
-                      {m.variant ? (
-                        <>
-                          <div className="font-medium text-foreground">{m.variant.masterProduct.name}</div>
-                          <div className="text-xs text-muted-foreground">varian {m.variant.sku}</div>
-                        </>
-                      ) : (
-                        <span className="text-xs text-foreground">belum ter-mapping</span>
+                  {visibleMappings.length > 0 && (
+                    <div>
+                      {visibleOrphans.length > 0 && (
+                        <p className="sticky top-0 z-[1] bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">
+                          Daftar Hubungan Produk (Mapping) ({visibleMappings.length})
+                        </p>
                       )}
-                    </td>
-                    <td className="px-6 py-3">
-                      {m.variant ? (
-                        <>
-                          <div className="text-foreground">{effectiveStock(m.variant)}</div>
-                          {m.variant.safetyStock > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                              total {m.variant.stock} − aman {m.variant.safetyStock}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-right whitespace-nowrap">
-                      {repoint[m.id] !== undefined ? (
-                        <span className="inline-flex items-center gap-2">
-                          <select
-                            value={repoint[m.id]}
-                            onChange={(e) => setRepoint((p) => ({ ...p, [m.id]: e.target.value }))}
-                            className="border border-border rounded-md px-2 py-1.5 text-xs outline-none max-w-[220px]"
-                          >
-                            <option value="">— pilih —</option>
-                            {variants.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.masterProduct.name} / {v.sku}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => handleRepoint(m.id, repoint[m.id])}
-                            disabled={!repoint[m.id] || repointSaving === m.id}
-                            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
-                          >
-                            <Save size={14} />
-                          </button>
-                          <button
-                            onClick={() => setRepoint((p) => { const n = { ...p }; delete n[m.id]; return n; })}
-                            className="rounded-md border border-border px-2 py-1.5 text-xs text-foreground"
-                          >
-                            <X size={14} />
-                          </button>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          <button
-                            onClick={() => setRepoint((p) => ({ ...p, [m.id]: variants[0]?.id ?? "" }))}
-                            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-                            title="Ganti variasi pusat yang dihubungkan (Varian Target)"
-                          >
-                            Ganti Varian
-                          </button>
-                          <button
-                            onClick={() => handleDelete(m.id, m.channelSku)}
-                            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-        </>
-      )}
-
-      {tab === "varian" && (
-        <>
-      {/* Daftar Varian (sku_master) + Sesuaikan Stok */}
-      <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-          <Boxes size={16} className="text-foreground" />
-          <h2 className="font-semibold text-foreground">Daftar Variasi Pusat (sku_master)</h2>
-        </div>
-        {stockInVariant && (
-          <div className="p-6 border-b border-border bg-muted/50">
-            <h3 className="text-sm font-semibold text-foreground mb-1">
-              Barang Masuk: {stockInVariant.masterProduct.name} / {stockInVariant.sku}
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Stok sekarang {stockInVariant.stock}. Isi JUMLAH MASUK (bukan stok total) — stok baru
-              = stok sekarang + qty, tercatat di Riwayat Stok dengan alasan STOCK_IN.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-[160px_1fr_auto] gap-3 items-end">
-              <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Jumlah Masuk</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={stockInForm.qty}
-                  onChange={(e) => setStockInForm((f) => ({ ...f, qty: e.target.value }))}
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Catatan</label>
-                <input
-                  type="text"
-                  value={stockInForm.note}
-                  onChange={(e) => setStockInForm((f) => ({ ...f, note: e.target.value }))}
-                  placeholder="mis. PO-2026-091, terima 2 lusin"
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleStockIn}
-                  disabled={stockInSaving}
-                  className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60 transition-colors"
-                >
-                  <Save size={15} /> {stockInSaving ? "Menyimpan..." : "Catat"}
-                </button>
-                <button
-                  onClick={() => setStockInVariant(null)}
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {adjustVariant && (
-          <div className="p-6 border-b border-border bg-muted/50">
-            <h3 className="text-sm font-semibold text-foreground mb-1">
-              Sesuaikan Stok: {adjustVariant.masterProduct.name} / {adjustVariant.sku}
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Stok sekarang {adjustVariant.stock} (efektif {effectiveStock(adjustVariant)}). Isi
-              angka stok fisik hasil pengecekan — selisih akan dicatat otomatis di Riwayat Stok.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_auto] gap-3 items-end">
-              <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Stok Baru</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={adjustForm.newStock}
-                  onChange={(e) => setAdjustForm((f) => ({ ...f, newStock: e.target.value }))}
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">Catatan</label>
-                <input
-                  type="text"
-                  value={adjustForm.note}
-                  onChange={(e) => setAdjustForm((f) => ({ ...f, note: e.target.value }))}
-                  placeholder="mis. hasil stock opname gudang"
-                  className="w-full border border-border rounded-md px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleAdjust}
-                  disabled={adjustSaving}
-                  className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60 transition-colors"
-                >
-                  <Save size={15} /> {adjustSaving ? "Menyimpan..." : "Simpan"}
-                </button>
-                <button
-                  onClick={() => setAdjustVariant(null)}
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {loading ? (
-          <div className="p-4 md:p-8 text-center text-muted-foreground">Memuat varian...</div>
-        ) : variants.length === 0 ? (
-          <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada variasi stok pusat. Buat melalui Produk Master atau pilih mode variasi baru pada formulir Hubungkan Produk.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <th className="px-6 py-3">Produk</th>
-                  <th className="px-6 py-3">SKU</th>
-                  <th className="px-6 py-3">Stok</th>
-                  <th className="px-6 py-3">Stok Aman</th>
-                  <th className="px-6 py-3">Stok Efektif</th>
-                  <th className="px-6 py-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {variants.map((v) => (
-                  <tr key={v.id} className="border-t border-border">
-                    <td className="px-6 py-3 font-medium text-foreground">{v.masterProduct.name}</td>
-                    <td className="px-6 py-3 font-mono text-foreground">{v.sku}</td>
-                    <td className="px-6 py-3 text-foreground">{v.stock}</td>
-                    <td className="px-6 py-3 text-foreground">{v.safetyStock}</td>
-                    <td className="px-6 py-3 text-foreground">{effectiveStock(v)}</td>
-                    <td className="px-6 py-3 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          onClick={() => { setStockInVariant(v); setStockInForm({ qty: "", note: "" }); }}
-                          className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-                          title="Catat barang masuk (restock fisik) — +qty, bukan angka absolut"
-                        >
-                          <PackagePlus size={14} /> Barang Masuk
-                        </button>
-                        <button
-                          onClick={() => openAdjust(v)}
-                          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-                          title="Set stok fisik hasil pengecekan"
-                        >
-                          <SlidersHorizontal size={14} /> Sesuaikan Stok
-                        </button>
+                      <div className="divide-y divide-border">
+                        {visibleMappings.slice(0, shown).map((m) => (
+                          <ListRow
+                            key={m.id}
+                            active={selection?.kind === "mapping" && selection.id === m.id}
+                            onClick={() => setSelection({ kind: "mapping", id: m.id })}
+                            avatar={<Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>}
+                            title={m.channelSku}
+                            mono
+                            subtitle={
+                              m.variant
+                                ? `${m.variant.masterProduct.name} · ${m.account?.label ?? "-"}`
+                                : `belum ter-mapping · ${m.account?.label ?? "-"}`
+                            }
+                            trailing={m.variant ? <StockPill value={effectiveStock(m.variant)} /> : undefined}
+                          />
+                        ))}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  )}
+
+                  {visibleMappings.length === 0 && visibleOrphans.length === 0 && (
+                    <EmptyState icon={mq ? Search : Link2}>
+                      {mq
+                        ? `Tidak ada hasil untuk “${mapQuery}”.`
+                        : "Belum ada hubungan produk (Mapping). Pilih toko dan variasi pusat melalui formulir Tambah Mapping."}
+                    </EmptyState>
+                  )}
+
+                  {Math.max(visibleMappings.length, visibleOrphans.length) > shown && (
+                    <div className="p-3">
+                      <Button variant="outline" className="w-full" onClick={() => setShown((n) => n + PAGE_STEP)}>
+                        Tampilkan {PAGE_STEP} lagi
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : filteredVariants.length === 0 ? (
+                <EmptyState icon={vq ? Search : Boxes}>
+                  {vq
+                    ? `Tidak ada variasi yang cocok dengan “${variantQuery}”.`
+                    : "Belum ada variasi stok pusat. Buat melalui Produk Master atau pilih mode variasi baru pada formulir Hubungkan Produk."}
+                </EmptyState>
+              ) : (
+                <>
+                  <div className="divide-y divide-border">
+                    {filteredVariants.slice(0, shown).map((v) => (
+                      <ListRow
+                        key={v.id}
+                        active={selection?.kind === "variant" && selection.id === v.id}
+                        onClick={() => setSelection({ kind: "variant", id: v.id })}
+                        avatar={<Avatar><Boxes size={15} aria-hidden="true" /></Avatar>}
+                        title={v.masterProduct.name}
+                        subtitle={<span className="font-mono">{v.sku}</span>}
+                        trailing={<StockPill value={effectiveStock(v)} />}
+                      />
+                    ))}
+                  </div>
+                  {filteredVariants.length > shown && (
+                    <div className="p-3">
+                      <Button variant="outline" className="w-full" onClick={() => setShown((n) => n + PAGE_STEP)}>
+                        Tampilkan {PAGE_STEP} lagi
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Rincian (detail) — di layar kecil tampil sebagai layar penuh */}
+          <div
+            className={
+              detailActive
+                ? "fixed inset-0 z-40 overflow-y-auto bg-background p-4 lg:static lg:z-auto lg:min-h-0 lg:overflow-visible lg:bg-transparent lg:p-0"
+                : "hidden min-h-0 lg:block"
+            }
+          >
+            <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:h-full lg:overflow-y-auto">
+              {renderDetail()}
+            </section>
           </div>
-        )}
-      </div>
-        </>
+        </div>
       )}
 
       {/* Riwayat Stok */}
       {tab === "riwayat" && (
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <History size={16} className="text-foreground" />
-              <h2 className="font-semibold text-foreground">Riwayat Perubahan Stok (stock_ledger)</h2>
+        <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3.5 md:px-6">
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <History size={16} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Riwayat Perubahan Stok (stock_ledger)</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">50 mutasi terakhir</p>
+              </div>
             </div>
-            <button onClick={() => loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat."))} className="text-xs font-medium text-foreground hover:underline">
-              Muat ulang
-            </button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => loadLedger().catch((e: unknown) => setError(e instanceof Error ? e.message : "Gagal memuat riwayat."))}
+            >
+              <RefreshCw size={14} /> Muat ulang
+            </Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <th className="px-6 py-3">Waktu</th>
-                  <th className="px-6 py-3">Produk / Varian</th>
-                  <th className="px-6 py-3">Perubahan</th>
-                  <th className="px-6 py-3">Alasan</th>
-                  <th className="px-6 py-3">Stok Setelah</th>
-                  <th className="px-6 py-3">Catatan</th>
-                  <th className="px-6 py-3">Oleh</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ledger.map((e) => (
-                  <tr key={e.id} className="border-t border-border">
-                    <td className="px-6 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(e.createdAt).toLocaleString("id-ID")}
-                    </td>
-                    <td className="px-6 py-3 text-foreground">
-                      {e.variant ? `${e.variant.masterProduct.name} / ${e.variant.sku}` : "-"}
-                    </td>
-                    <td className="px-6 py-3 font-medium">
-                      <span className={e.changeQty < 0 ? "text-foreground" : "text-foreground"}>
-                        {e.changeQty > 0 ? "+" : ""}{e.changeQty}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-foreground">{e.reason ?? "-"}</td>
-                    <td className="px-6 py-3 text-foreground">{e.stockAfter}</td>
-                    <td className="px-6 py-3 text-xs text-muted-foreground">{e.note ?? "-"}</td>
-                    <td className="px-6 py-3 text-xs text-muted-foreground">{e.user?.username ?? "-"}</td>
+          {ledger.length === 0 ? (
+            <EmptyState icon={History}>Belum ada mutasi stok.</EmptyState>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="bg-muted text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className={th}>Waktu</th>
+                    <th className={th}>Produk / Varian</th>
+                    <th className={`${th} text-right`}>Perubahan</th>
+                    <th className={th}>Alasan</th>
+                    <th className={`${th} text-right`}>Stok Setelah</th>
+                    <th className={th}>Catatan</th>
+                    <th className={th}>Oleh</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {ledger.length === 0 && (
-              <div className="p-4 md:p-8 text-center text-muted-foreground">Belum ada mutasi stok.</div>
-            )}
-          </div>
-        </div>
+                </thead>
+                <tbody>
+                  {ledger.map((e) => (
+                    <tr key={e.id} className="border-t border-border transition-colors hover:bg-muted/40">
+                      <td className={`${td} whitespace-nowrap text-xs text-muted-foreground`}>{new Date(e.createdAt).toLocaleString("id-ID")}</td>
+                      <td className={`${td} text-foreground`}>{e.variant ? `${e.variant.masterProduct.name} / ${e.variant.sku}` : "-"}</td>
+                      <td className={`${td} text-right`}>
+                        <span
+                          className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-xs font-bold tabular-nums ${
+                            e.changeQty < 0 ? "bg-destructive-subtle text-destructive" : "bg-success-subtle text-success"
+                          }`}
+                        >
+                          {e.changeQty > 0 ? "+" : ""}{e.changeQty}
+                        </span>
+                      </td>
+                      <td className={td}>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">{e.reason ?? "-"}</span>
+                      </td>
+                      <td className={`${td} text-right font-medium tabular-nums text-foreground`}>{e.stockAfter}</td>
+                      <td className={`${td} text-xs text-muted-foreground`}>{e.note ?? "-"}</td>
+                      <td className={`${td} text-xs text-muted-foreground`}>{e.user?.username ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       )}
     </div>
   );

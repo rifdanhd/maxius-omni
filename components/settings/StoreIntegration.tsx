@@ -23,6 +23,7 @@ type StoreItem = {
   scope?: string | null;
   authorizePath?: string | null;
   isFrozen?: boolean;
+  stockPushEnabled?: boolean;
   frozenReason?: string | null;
   lastSyncAt?: string | null;
 };
@@ -61,6 +62,7 @@ export default function StoreIntegration() {
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [pushSavingId, setPushSavingId] = useState<string | null>(null);
   const [failedSyncIds, setFailedSyncIds] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Pick<StoreItem, "id" | "name"> | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -136,6 +138,20 @@ export default function StoreIntegration() {
       setFailedSyncIds((ids) => ids.includes(id) ? ids : [...ids, id]);
       setNotice({ ok: false, text: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
     } finally { setSyncingId(null); }
+  };
+
+  const handlePushSetting = async (store: StoreItem) => {
+    if (pushSavingId) return;
+    setPushSavingId(store.id);
+    setNotice(null);
+    try {
+      const response = await authFetch(`/api/stores/${store.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stockPushEnabled: !store.stockPushEnabled }) });
+      const result = await response.json();
+      if (!response.ok || result.success !== true) throw new Error(result.error ?? "Pengaturan push stok belum tersimpan.");
+      setStores((current) => current.map((item) => item.id === store.id ? { ...item, stockPushEnabled: result.stockPushEnabled } : item));
+      setNotice({ ok: true, text: "Pengaturan push stok toko tersimpan. Status pengiriman dapat diperiksa di Stok Varian." });
+    } catch (error) { setNotice({ ok: false, text: error instanceof Error ? error.message : "Pengaturan push stok belum tersimpan." }); }
+    finally { setPushSavingId(null); }
   };
 
   const handleDelete = async () => {
@@ -253,6 +269,12 @@ export default function StoreIntegration() {
                     )}
                     {store.businessName && (
                       <div className="text-xs text-muted-foreground mt-0.5">{store.businessName}</div>
+                    )}
+                    {store.stockPushEnabled !== undefined && ["SHOPEE", "TIKTOK_SHOP"].includes(store.platform ?? "") && (
+                      <button type="button" role="switch" aria-checked={store.stockPushEnabled} aria-label={`Push stok ${store.name}`} disabled={pushSavingId !== null || store.isFrozen}
+                        onClick={() => { void handlePushSetting(store); }} className="mt-2 rounded-md border px-2 py-1 text-xs disabled:opacity-50">
+                        {pushSavingId === store.id ? "Menyimpan…" : store.stockPushEnabled ? "Push stok aktif" : "Push stok nonaktif"}
+                      </button>
                     )}
                   </td>
                   <td className="px-6 py-4">

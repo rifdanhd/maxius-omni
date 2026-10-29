@@ -131,6 +131,7 @@ async function postShopApi(
   });
   const raw = await res.text();
   const data = parseShopeeEnvelope(res.status, raw, apiPath);
+  if (apiPath === "/api/v2/product/update_stock" && data.error) throw new ShopeeApiError(data.error, data.message ?? "Update stok ditolak.", data.request_id ?? "-");
   return (data.response ?? {}) as Record<string, unknown>;
 }
 
@@ -831,9 +832,10 @@ export async function getModelList(
 export type ResolvedModel = { itemId: number; modelId: number };
 
 function parseDirectId(channelSku: string): ResolvedModel | null {
-  const m = channelSku.trim().match(/^(\d+)\s*[:#_/-]\s*(\d+)$/);
+  const m = channelSku.trim().match(/^(\d+)\s*:\s*(\d+)$/);
   if (!m) return null;
-  return { itemId: Number(m[1]), modelId: Number(m[2]) };
+  const itemId = Number(m[1]), modelId = Number(m[2]);
+  return Number.isSafeInteger(itemId) && itemId > 0 && Number.isSafeInteger(modelId) && modelId >= 0 ? { itemId, modelId } : null;
 }
 
 export async function resolveModel(
@@ -842,93 +844,41 @@ export async function resolveModel(
   channelSku: string,
   creds?: ShopeeCreds
 ): Promise<ResolvedModel> {
-  const direct = parseDirectId(channelSku);
-  if (direct) return direct;
-  const wanted = channelSku.trim();
-  let offset = 0;
-  const pageSize = 50;
-  for (let page = 0; page < 200; page++) {
-    const { items, hasNextPage, nextOffset } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
-    if (items.length === 0) break;
-    const baseInfos = await getItemBaseInfo(
-      accessToken,
-      shopId,
-      items.map((i) => i.item_id),
-      creds
-    );
-    for (const info of baseInfos) {
-      const itemId = Number(info.item_id);
-      if ((info.item_sku as string | undefined) === wanted) {
-        return { itemId, modelId: 0 };
-      }
-    }
-    for (const item of items) {
-      const { models } = await getModelList(accessToken, shopId, item.item_id, creds);
-      const hit = models.find((m) => m.model_sku === wanted);
-      if (hit) return { itemId: item.item_id, modelId: hit.model_id };
-    }
-    if (!hasNextPage || nextOffset <= offset) break;
-    offset = nextOffset;
-  }
-  throw new Error(
-    `[Shopee] SKU "${channelSku}" tidak ditemukan di shop ${shopId}. ` +
-      `Format cepat "item_id:model_id" (mis. "123456:789") atau samakan model_sku Shopee dengan channelSku mapping.`
-  );
+  const result = await resolveModelsBatch(accessToken, shopId, [channelSku], creds);
+  const hit = result.resolved.get(channelSku);
+  if (!hit) throw new Error(`[Shopee] SKU_NOT_FOUND_OR_AMBIGUOUS: "${channelSku}"; tinjau item_id:model_id atau seller SKU toko.`);
+  return hit;
 }
 
-export async function resolveModelsBatch(
-  accessToken: string,
-  shopId: string | number,
-  channelSkus: string[],
-  creds?: ShopeeCreds
-): Promise<{
-  resolved: Map<string, ResolvedModel>;
-  missing: string[];
-}> {
+export async function resolveModelsBatch(accessToken: string, shopId: string | number, channelSkus: string[], creds?: ShopeeCreds): Promise<{ resolved: Map<string, ResolvedModel>; missing: string[] }> {
   const resolved = new Map<string, ResolvedModel>();
-  const needScan: string[] = [];
-  for (const sku of channelSkus) {
-    const direct = parseDirectId(sku);
-    if (direct) resolved.set(sku, direct);
-    else needScan.push(sku);
-  }
-  const missing: string[] = [];
-  if (needScan.length > 0) {
-    const wanted = new Set(needScan);
-    let offset = 0;
-    const pageSize = 50;
-    for (let page = 0; page < 200 && wanted.size > 0; page++) {
-      const { items, hasNextPage, nextOffset } = await getItemList(accessToken, shopId, { offset, pageSize }, creds);
-      if (items.length === 0) break;
-      const baseInfos = await getItemBaseInfo(
-        accessToken,
-        shopId,
-        items.map((i) => i.item_id),
-        creds
-      );
-      for (const info of baseInfos) {
-        const sku = info.item_sku as string | undefined;
-        if (sku && wanted.has(sku)) {
-          resolved.set(sku, { itemId: Number(info.item_id), modelId: 0 });
-          wanted.delete(sku);
-        }
-      }
-      for (const item of items) {
-        if (wanted.size === 0) break;
+  const wanted = new Set<string>();
+  const candidates = new Map<string, Map<string, ResolvedModel>>();
+  for (const sku of channelSkus) { const direct = parseDirectId(sku); if (direct) resolved.set(sku, direct); else wanted.add(sku); }
+  if (wanted.size) {
+    let offset = 0; let complete = false;
+    for (let page = 0; page < 200; page++) {
+      const list = await getItemList(accessToken, shopId, { offset, pageSize: 50 }, creds);
+      if (!list.items.length) { complete = true; break; }
+      const infos = await getItemBaseInfo(accessToken, shopId, list.items.map((item) => item.item_id), creds);
+      const add = (sellerSku: string | undefined, model: ResolvedModel) => {
+        if (!sellerSku || !wanted.has(sellerSku)) return;
+        const hits = candidates.get(sellerSku) ?? new Map<string, ResolvedModel>();
+        hits.set(`${model.itemId}:${model.modelId}`, model); candidates.set(sellerSku, hits);
+      };
+      for (const item of list.items) {
         const { models } = await getModelList(accessToken, shopId, item.item_id, creds);
-        for (const m of models) {
-          if (m.model_sku && wanted.has(m.model_sku)) {
-            resolved.set(m.model_sku, { itemId: item.item_id, modelId: m.model_id });
-            wanted.delete(m.model_sku);
-          }
-        }
+        if (models.length) for (const model of models) add(model.model_sku, { itemId: item.item_id, modelId: model.model_id });
+        else add(infos.find((info) => Number(info.item_id) === item.item_id)?.item_sku as string | undefined, { itemId: item.item_id, modelId: 0 });
       }
-      if (!hasNextPage || nextOffset <= offset) break;
-      offset = nextOffset;
+      if (!list.hasNextPage) { complete = true; break; }
+      if (list.nextOffset <= offset) throw new Error("[Shopee] Pagination berulang; keunikan seller SKU belum terverifikasi.");
+      offset = list.nextOffset;
     }
-    for (const sku of wanted) missing.push(sku);
+    if (!complete) throw new Error("[Shopee] Pencarian belum tuntas; gunakan mapping item_id:model_id yang terverifikasi.");
+    for (const sku of wanted) { const hits = [...(candidates.get(sku)?.values() ?? [])]; if (hits.length === 1) resolved.set(sku, hits[0]); }
   }
-  return { resolved, missing };
+  return { resolved, missing: channelSkus.filter((sku) => !resolved.has(sku)) };
 }
 
 export async function updateStock(
@@ -938,11 +888,9 @@ export async function updateStock(
   newStock: number,
   creds?: ShopeeCreds
 ) {
-  const { itemId, modelId } = await resolveModel(accessToken, shopId, channelSku, creds);
-  return postShopApi("/api/v2/product/update_stock", accessToken, shopId, {
-    item_id: itemId,
-    stock_list: [{ model_id: modelId, seller_stock: [{ stock: Math.max(0, Math.floor(newStock)) }] }],
-  }, creds);
+  const result = await updateStockBatch(accessToken, shopId, [{ channelSku, quantity: newStock }], creds);
+  if (result.failed.length) throw result.failed[0].error;
+  return { success_list: [channelSku] };
 }
 
 export type ShopeeStockBatchItem = { channelSku: string; quantity: number };
@@ -959,14 +907,18 @@ export async function updateStockBatch(
 ): Promise<ShopeeStockBatchResult> {
   const result: ShopeeStockBatchResult = { ok: [], failed: [] };
   if (items.length === 0) return result;
+  const valid = items.filter((item) => {
+    if (!Number.isInteger(item.quantity) || item.quantity < 0 || item.quantity > 2147483647) { result.failed.push({ item, error: new Error("[Shopee] Quantity tidak valid.") }); return false; }
+    return true;
+  });
   const { resolved, missing } = await resolveModelsBatch(
     accessToken,
     shopId,
-    items.map((i) => i.channelSku),
+    valid.map((i) => i.channelSku),
     creds
   );
   const missingSet = new Set(missing);
-  for (const item of items) {
+  for (const item of valid) {
     if (missingSet.has(item.channelSku)) {
       result.failed.push({
         item,
@@ -975,7 +927,7 @@ export async function updateStockBatch(
     }
   }
   const byItem = new Map<number, Array<{ modelId: number; item: ShopeeStockBatchItem }>>();
-  for (const item of items) {
+  for (const item of valid) {
     if (missingSet.has(item.channelSku)) continue;
     const hit = resolved.get(item.channelSku);
     if (!hit) {
@@ -988,14 +940,24 @@ export async function updateStockBatch(
   }
   for (const [itemId, skus] of byItem) {
     try {
-      await postShopApi("/api/v2/product/update_stock", accessToken, shopId, {
+      const response = await postShopApi("/api/v2/product/update_stock", accessToken, shopId, {
         item_id: itemId,
         stock_list: skus.map((s) => ({
           model_id: s.modelId,
           seller_stock: [{ stock: Math.max(0, Math.floor(s.item.quantity)) }],
         })),
       }, creds);
-      result.ok.push(...skus.map((s) => s.item));
+      const failures = response.failure_list as Array<{ model_id?: number; failed_reason?: string }> | undefined;
+      const successes = response.success_list as Array<{ model_id?: number }> | undefined;
+      if (!Array.isArray(failures) && !Array.isArray(successes)) throw new Error("[Shopee] Respons update stok tidak lengkap; keberhasilan belum dapat dipastikan.");
+      if (response.failure_list !== undefined && !Array.isArray(failures)) throw new Error("[Shopee] Respons failure_list tidak lengkap.");
+      if (failures?.some((failure) => failure.model_id !== undefined && !skus.some((sku) => sku.modelId === failure.model_id))) throw new Error("[Shopee] Respons menolak model yang tidak dikenal; keberhasilan batch belum dapat dipastikan.");
+      for (const sku of skus) {
+        const failure = failures?.find((entry) => entry.model_id === undefined || entry.model_id === sku.modelId);
+        if (failure) result.failed.push({ item: sku.item, error: new Error(`[Shopee] API_REJECTED model ${sku.modelId}: ${failure.failed_reason ?? "stok ditolak"}`) });
+        else if (Array.isArray(successes) && !successes.some((entry) => entry.model_id === sku.modelId)) result.failed.push({ item: sku.item, error: new Error("[Shopee] Model tidak tercantum pada success_list; stok belum terverifikasi.") });
+        else result.ok.push(sku.item);
+      }
     } catch (err) {
       for (const s of skus) result.failed.push({ item: s.item, error: err });
     }

@@ -10,7 +10,7 @@ import {
 // pertama — tanpa seed terpisah).
 export const GET = withAuth(async (req) => {
   const settings = await getInventorySettings(req.businessId);
-  return NextResponse.json({ settings });
+  return NextResponse.json({ settings, pushRuntime: { globalEnabled: process.env.STOCK_PUSH_ENABLED === "true" } });
 });
 
 // PUT /api/inventory/settings — patch parsial dgn validasi ketat (field salah

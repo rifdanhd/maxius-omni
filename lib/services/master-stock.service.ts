@@ -1,3 +1,5 @@
+import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { allocationQuantity, resolveAllocation } from "@/lib/services/stock-allocation.policy";
@@ -7,6 +9,9 @@ export const UNFULFILLED_ORDER_STATUSES = ["UNPAID", "ON_HOLD", "AWAITING_SHIPME
 const ARCHIVED_STATUSES = ["INACTIVE", "ARCHIVED", "DELETED", "UNLIST", "BANNED", "SELLER_DELETE", "PLATFORM_DELETE", "SELLER_DEACTIVATED", "PLATFORM_DEACTIVATED", "FREEZE", "FROZEN", "SUSPENDED", "DRAFT", "DEACTIVATED"];
 
 export async function getMasterStock(businessId: string, params: URLSearchParams): Promise<MasterStockResult> {
+  const settings = await getCachedInventorySettings(businessId);
+  const enabledPlatforms = [settings.syncPushShopee ? "SHOPEE" : "", settings.syncPushTiktok ? "TIKTOK_SHOP" : "", settings.syncPushTokopedia ? "TOKOPEDIA" : ""].filter(Boolean);
+  const globalEnabled = process.env.STOCK_PUSH_ENABLED === "true" && settings.stockPushEnabled;
   const page = Math.max(1, Math.min(1_000_000, Math.floor(Number(params.get("page")) || 1)));
   const pageSize = Math.max(1, Math.min(200, Math.floor(Number(params.get("limit")) || 50)));
   const q = params.get("q")?.trim();
@@ -51,6 +56,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
         EXISTS (SELECT 1 FROM "ProductMapping" pm JOIN "PlatformAccount" a ON a.id = pm."accountId"
           LEFT JOIN latest_jobs j ON j."variantId" = pm."variantId" AND j."accountId" = pm."accountId" AND j."channelSku" = pm."channelSku"
           WHERE pm."variantId" = pv.id AND a."businessId" = ${businessId}
+            AND ${globalEnabled} AND a."stockPushEnabled" AND NOT a."isFrozen" AND a.platform IN (${Prisma.join(enabledPlatforms.length ? enabledPlatforms : ["__DISABLED__"])})
             AND COALESCE(CASE WHEN j.status = 'PENDING' AND j."retryCount" > 0 THEN pm."lastStockPushStatus" ELSE j.status END, pm."lastStockPushStatus") = 'FAILED')
           AND NOT EXISTS (SELECT 1 FROM "StockOutbox" e WHERE e."variantId" = pv.id AND e."businessId" = ${businessId} AND e.status = 'PENDING') AS failed,
         NOT EXISTS (SELECT 1 FROM "ProductMapping" pm JOIN "PlatformAccount" a ON a.id = pm."accountId"
@@ -94,7 +100,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       warehouseStock: { where: { warehouse: { businessId } }, include: { warehouse: true } },
       productMapping: {
         where: { account: { businessId } },
-        include: { account: { select: { id: true, label: true, platform: true, stockAllocationMode: true, stockAllocationValue: true, stockBuffer: true } },
+        include: { account: { select: { id: true, label: true, platform: true, stockPushEnabled: true, isFrozen: true, stockAllocationMode: true, stockAllocationValue: true, stockBuffer: true } },
           promotionActivityItem: { where: { activity: { startsAt: { lte: now }, endsAt: { gte: now }, status: { notIn: ["DEACTIVATED", "EXPIRED", "ENDED", "CANCELLED"] } } }, select: { activityId: true } } },
       },
     },
@@ -117,13 +123,14 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       const job = jobs.find((item) => item.variantId === variant.id && item.accountId === mapping.accountId && item.channelSku === mapping.channelSku);
       const allocation = resolveAllocation(mapping, mapping.account);
       const quantity = allocationQuantity(available, allocation, variant.productMapping.length);
-      const status = pendingEvents.has(variant.id) || job?.status === "PROCESSING" || (job?.status === "PENDING" && job.retryCount === 0) ? "PENDING" as const
+      const blockedReason = stockPushDisabledReason(mapping.account, settings);
+      const status = blockedReason ? "DISABLED" as const : pendingEvents.has(variant.id) || job?.status === "PROCESSING" || (job?.status === "PENDING" && job.retryCount === 0) ? "PENDING" as const
         : mapping.lastStockPushStatus === "FAILED" || job?.status === "FAILED" ? "FAILED" as const
           : mapping.lastStockPushStatus === "PENDING" || mapping.platformStock !== quantity
             ? "PENDING" as const : mapping.lastSyncedAt ? "SUCCESS" as const : "PENDING" as const;
       return { id: mapping.id, accountId: mapping.accountId, store: mapping.account.label, platform: mapping.account.platform,
         channelSku: mapping.channelSku, sellerSku: mapping.sellerSku, platformSkuId: mapping.platformSkuId,
-        platformStock: mapping.platformStock, status, error: mapping.lastStockPushError ?? job?.lastError ?? null,
+        platformStock: mapping.platformStock, status, blockedReason, error: blockedReason ? null : mapping.lastStockPushError ?? job?.lastError ?? null,
         lastSyncedAt: mapping.lastSyncedAt?.toISOString() ?? null,
         allocation, quantity, inheritsAllocation: mapping.stockAllocationMode === null && mapping.stockAllocationValue === null && mapping.stockBuffer === null,
         defaultAllocation: resolveAllocation({}, mapping.account) };
@@ -136,7 +143,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       archived: variant.isArchived || !variant.masterProduct.isActive || ARCHIVED_STATUSES.includes(variant.masterProduct.status.toUpperCase()) ||
         (variant.productMapping.length > 0 && variant.productMapping.every((mapping) => ARCHIVED_STATUSES.includes(mapping.platformStatus?.toUpperCase() ?? "ACTIVE"))),
       promoActive: new Set(variant.productMapping.flatMap((mapping) => mapping.promotionActivityItem.map((item) => item.activityId))).size,
-      status: listings.some((listing) => listing.status === "FAILED") ? "FAILED" : listings.some((listing) => listing.status === "PENDING") ? "PENDING" : "SUCCESS",
+      status: listings.some((listing) => listing.status === "FAILED") ? "FAILED" : listings.some((listing) => listing.status === "PENDING") ? "PENDING" : listings.some((listing) => listing.status === "DISABLED") ? "DISABLED" : "SUCCESS",
       allocationWarning: listings.reduce((sum, listing) => sum + listing.quantity, 0) > available,
       listings, warehouses: variant.warehouseStock.map((balance) => ({ id: balance.warehouseId, name: balance.warehouse.name, stock: balance.stock, safetyStock: balance.safetyStock })) }];
   });
