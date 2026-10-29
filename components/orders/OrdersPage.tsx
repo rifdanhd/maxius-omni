@@ -6,8 +6,7 @@ import { friendlyError } from "@/lib/ui/feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Download, Filter, Info, MoreHorizontal, PackageCheck, Printer, RefreshCw, Search, X } from "lucide-react";
-import { type PrintType } from "./OrderCard";
-import OrderRow, { ORDER_GRID } from "@/components/orders/OrderRow";
+import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
 import { ordersToCsv, downloadCsv, type ExportOrderRow } from "./exportOrders";
@@ -93,6 +92,7 @@ type Order = {
 };
 
 type OrderDetail = {
+
   orderNo: string;
   storeName: string;
   platform: string | null;
@@ -167,6 +167,13 @@ function toCardOrder(o: Order) {
     totalPrice: formatPrice(o.amount),
     paymentMethod: o.currency ?? "IDR",
     buyerName: o.buyerName ?? "-",
+    buyerPhone: "-",
+    address: "-",
+    orderDate,
+    sellerNote: null,
+    buyerNote: null,
+    pickupLocation: null,
+    fulfillmentStage: null,
     courier: shipment?.carrier ?? "-",
     trackingNumber: shipment?.trackingNo ?? "-",
     shippingDueTime: o.shippingDueTime,
@@ -1176,15 +1183,11 @@ export default function OrdersPage() {
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto">Batal pilih</Button>
           </div>
         ) : (
-          <div className={`hidden items-center border-b border-border bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground ${ORDER_GRID}`}>
+          <div className="flex items-center border-b border-border bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
             <label className="flex items-center gap-3">
               <input type="checkbox" className="h-4 w-4 rounded border-border" checked={allSelected} onChange={toggleSelectAll} aria-label="Pilih semua pesanan" />
-              Produk
+              Pilih semua pesanan pada halaman ini
             </label>
-            <span>Total pesanan</span>
-            <span>Status</span>
-            <span>Pengiriman</span>
-            <span>Aksi</span>
           </div>
         )}
 
@@ -1223,13 +1226,14 @@ export default function OrdersPage() {
             />
           </div>
         ) : (
-          <div>
+          <div className="space-y-4 bg-muted/20 p-3 sm:p-4">
             {orders.map((order) => (
-              <OrderRow
+              <OrderCard
                 key={order.id}
                 order={toCardOrder(order)}
                 checked={selected.has(order.id)}
                 onToggleChecked={() => toggleSelect(order.id)}
+                onSync={() => void handleSync()}
                 onPrint={(type: PrintType) => printOrder(order, type)}
                 onPickup={() => openShipModal([order])}
                 shipping={false}

@@ -63,6 +63,7 @@ export default function StoreIntegration() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [pushSavingId, setPushSavingId] = useState<string | null>(null);
+  const pushInFlight = useRef(false);
   const [failedSyncIds, setFailedSyncIds] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Pick<StoreItem, "id" | "name"> | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -140,18 +141,21 @@ export default function StoreIntegration() {
     } finally { setSyncingId(null); }
   };
 
-  const handlePushSetting = async (store: StoreItem) => {
-    if (pushSavingId) return;
+  const handlePushSetting = async (store: StoreItem, enabled: boolean) => {
+    if (pushInFlight.current) return;
+    pushInFlight.current = true;
     setPushSavingId(store.id);
     setNotice(null);
     try {
-      const response = await authFetch(`/api/stores/${store.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stockPushEnabled: !store.stockPushEnabled }) });
-      const result = await response.json();
-      if (!response.ok || result.success !== true) throw new Error(result.error ?? "Pengaturan push stok belum tersimpan.");
+      const response = await authFetch(`/api/stores/${encodeURIComponent(store.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stockPushEnabled: enabled }) });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true || result.id !== store.id || result.stockPushEnabled !== enabled) throw new Error(result?.error ?? `Pengaturan push stok ${store.name} belum terkonfirmasi. Muat ulang daftar toko.`);
       setStores((current) => current.map((item) => item.id === store.id ? { ...item, stockPushEnabled: result.stockPushEnabled } : item));
-      setNotice({ ok: true, text: "Pengaturan push stok toko tersimpan. Status pengiriman dapat diperiksa di Stok Varian." });
+      const text = `Push stok ${store.name} ${enabled ? "diaktifkan" : "dinonaktifkan"}. Periksa hasil pengiriman di Stok Pusat.`;
+      setNotice({ ok: true, text });
+      notify("success", text);
     } catch (error) { setNotice({ ok: false, text: error instanceof Error ? error.message : "Pengaturan push stok belum tersimpan." }); }
-    finally { setPushSavingId(null); }
+    finally { pushInFlight.current = false; setPushSavingId(null); }
   };
 
   const handleDelete = async () => {
@@ -271,10 +275,16 @@ export default function StoreIntegration() {
                       <div className="text-xs text-muted-foreground mt-0.5">{store.businessName}</div>
                     )}
                     {store.stockPushEnabled !== undefined && ["SHOPEE", "TIKTOK_SHOP"].includes(store.platform ?? "") && (
-                      <button type="button" role="switch" aria-checked={store.stockPushEnabled} aria-label={`Push stok ${store.name}`} disabled={pushSavingId !== null || store.isFrozen}
-                        onClick={() => { void handlePushSetting(store); }} className="mt-2 rounded-md border px-2 py-1 text-xs disabled:opacity-50">
-                        {pushSavingId === store.id ? "Menyimpan…" : store.stockPushEnabled ? "Push stok aktif" : "Push stok nonaktif"}
-                      </button>
+                      <div className="mt-2 space-y-1.5">
+                        <p className={`text-xs font-medium ${store.stockPushEnabled ? "text-success" : "text-muted-foreground"}`}>
+                          Push stok {store.stockPushEnabled ? "aktif" : "nonaktif"}
+                        </p>
+                        <Button type="button" variant="outline" size="sm" aria-label={`${store.stockPushEnabled ? "Nonaktifkan" : "Aktifkan"} push stok ${store.name}`} disabled={pushSavingId !== null || store.isFrozen}
+                          onClick={() => { void handlePushSetting(store, !store.stockPushEnabled); }}>
+                          {pushSavingId === store.id ? "Menyimpan…" : `${store.stockPushEnabled ? "Nonaktifkan" : "Aktifkan"} push stok`}
+                        </Button>
+                        <p className="max-w-60 text-xs text-muted-foreground">{store.stockPushEnabled ? "Pengiriman tetap mengikuti pengaturan server, brand, dan marketplace." : "Stok pusat tidak dikirim ke toko ini."}</p>
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-4">

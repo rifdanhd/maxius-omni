@@ -9,7 +9,9 @@ export const PATCH = withAuth(async (req, ctx) => {
   const { id } = (await ctx?.params) as { id: string };
   const input = z.object({ stockPushEnabled: z.boolean() }).strict().parse(await req.json());
   const changed = await prisma.platformAccount.updateMany({ where: { id, businessId: req.businessId }, data: input });
-  return changed.count ? NextResponse.json({ success: true, stockPushEnabled: input.stockPushEnabled }) : NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 404 });
+  if (!changed.count) return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 404 });
+  const saved = await prisma.platformAccount.findFirst({ where: { id, businessId: req.businessId }, select: { id: true, stockPushEnabled: true } });
+  return saved ? NextResponse.json({ success: true, ...saved }) : NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 404 });
 });
 
 export const DELETE = withAuth(async (req, ctx) => {
