@@ -175,7 +175,7 @@ export default function ReturnsPage() {
       if (!res.ok || !data || !Array.isArray(data.results)) throw new Error(data?.error ?? "Gagal memperbarui pengembalian. Coba lagi.");
       const failures = [...new Set([...(data.errors ?? []), ...data.results.filter((result) => result.error).map((result) => `${result.label ?? "Toko"}: ${result.error}`)])];
       if (failures.length) {
-        setSyncMessage({ variant: "error", text: "Sebagian pengembalian belum berhasil diperbarui. Periksa koneksi toko, lalu coba lagi.", details: failures.join(" · ") });
+        setSyncMessage({ variant: "error", text: "Sebagian pengembalian belum berhasil diperbarui. Buka detail untuk melihat penyebabnya, lalu coba lagi.", details: failures.join(" · ") });
       } else {
         setSyncMessage(data.results.length
           ? { variant: "success", text: "Data pengembalian selesai diperbarui." }

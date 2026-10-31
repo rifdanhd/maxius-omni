@@ -361,10 +361,7 @@ export async function deactivatePromotionActivity(
  * Kirim body kosong untuk return semua order; shop_cipher inject via callApi sebelum sign.
  */
 /**
- * searchReturns — daftar retur/refund buyer (Return & Refund API 202309).
- * POST /return/202309/returns/search — butuh scope seller.return_refund.basic.
- * Filter: return_id (satu), order_id_list, return_status list, create_time range.
- * Response: data.returns[] + next_page_token (paging kursor).
+ * Search Returns 202602 — seller.return_refund.basic.
  */
 export async function searchReturns(
   accessToken: string,
@@ -377,29 +374,35 @@ export async function searchReturns(
     createTimeTo?: number;
     pageSize?: number;
     pageToken?: string;
-  } = {}
+  } = {},
+  creds?: TiktokCreds,
 ) {
   const body: Record<string, unknown> = {};
-  if (opts.returnId) body.return_id = opts.returnId;
-  if (opts.orderIdList?.length) body.order_id_list = opts.orderIdList;
+  if (opts.returnId) body.return_ids = [opts.returnId];
+  if (opts.orderIdList?.length) body.order_ids = opts.orderIdList;
   if (opts.returnStatus?.length) body.return_status = opts.returnStatus;
-  if (opts.createTimeFrom) body.create_time_from = opts.createTimeFrom;
-  if (opts.createTimeTo) body.create_time_to = opts.createTimeTo;
-  if (opts.pageToken) body.page_token = opts.pageToken;
+  if (opts.createTimeFrom !== undefined) body.create_time_ge = opts.createTimeFrom;
+  if (opts.createTimeTo !== undefined) body.create_time_lt = opts.createTimeTo;
   const result = await callApi(
     "POST",
-    "/return/202309/returns/search",
+    "/return_refund/202602/returns/search",
     accessToken,
-    { page_size: opts.pageSize ?? 20 },
+    { page_size: opts.pageSize ?? 20, sort_field: "create_time", sort_order: "ASC", ...(opts.pageToken ? { page_token: opts.pageToken } : {}) },
     Object.keys(body).length > 0 ? body : null,
-    shopCipher
+    shopCipher,
+    creds,
   );
   const data = result.data as
-    | { returns?: Array<Record<string, unknown>>; next_page_token?: string }
+    | { return_orders?: Array<Record<string, unknown>>; next_page_token?: string; simulated?: boolean }
     | undefined;
+  if (data?.simulated === true) return { returns: [], nextPageToken: null };
+  if (!Array.isArray(data?.return_orders) || data.return_orders.some((row) => !row || typeof row !== "object" || Array.isArray(row)) ||
+      (data.next_page_token !== undefined && typeof data.next_page_token !== "string")) {
+    throw new Error("[TikTok] Respons Search Returns tidak lengkap; pengambilan pengembalian belum dapat dipastikan.");
+  }
   return {
-    returns: data?.returns ?? [],
-    nextPageToken: data?.next_page_token ?? null,
+    returns: data.return_orders,
+    nextPageToken: data.next_page_token || null,
   };
 }
 

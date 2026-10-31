@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
-import { searchReturns } from "@/lib/integrations/tiktokShop";
+import { searchReturns, TikTokApiError } from "@/lib/integrations/tiktokShop";
 import { upsertTikTokReturn, syncShopeeReturnsForAccount } from "@/lib/services/return-ingest.service";
+import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
 
 /**
  * POST /api/returns/sync — tarik retur manual:
@@ -23,6 +24,8 @@ export const POST = withAuth(async (req) => {
       platform: true,
       label: true,
       accessToken: true,
+      refreshToken: true,
+      tokenExpiresAt: true,
       shopCipher: true,
       externalShopId: true,
     },
@@ -39,26 +42,37 @@ export const POST = withAuth(async (req) => {
       }
       try {
         // Retur 90 hari terakhir, paging sampai habis.
+        const createTimeTo = Math.floor(Date.now() / 1000);
+        const createTimeFrom = createTimeTo - 90 * 86400;
+        const seenTokens = new Set<string>();
         let pageToken: string | undefined;
         let fetched = 0;
         let upserted = 0;
         for (let i = 0; i < 20; i++) {
-          const { returns, nextPageToken } = await searchReturns(acc.accessToken, acc.shopCipher, {
-            createTimeFrom: Math.floor(Date.now() / 1000) - 90 * 86400,
+          const { returns, nextPageToken } = await withRefreshedTiktokToken(acc, (token, creds) => searchReturns(token, acc.shopCipher ?? undefined, {
+            createTimeFrom,
+            createTimeTo,
             pageSize: 50,
             pageToken,
-          });
+          }, creds));
           fetched += returns.length;
           for (const raw of returns) {
             const id = await upsertTikTokReturn(acc.id, raw);
-            if (id) upserted += 1;
+            if (!id) throw new Error("[TikTok] Data pengembalian tidak memiliki return_id; sinkronisasi belum lengkap.");
+            upserted += 1;
           }
           if (!nextPageToken) break;
+          if (seenTokens.has(nextPageToken) || i === 19) {
+            throw new Error(`[TikTok] Sinkronisasi pengembalian belum lengkap (${fetched} data terbaca); pagination berulang atau mencapai batas. Persempit periode pengambilan melalui dukungan teknis.`);
+          }
+          seenTokens.add(nextPageToken);
           pageToken = nextPageToken;
         }
         results.push({ accountId: acc.id, label: acc.label, platform: "TIKTOK_SHOP", fetched, upserted });
       } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
+        const message = e instanceof TikTokApiError && e.kind === "SCOPE"
+          ? "Izin pengembalian TikTok belum tersedia (105005). Aktifkan Return & Refund Basic (seller.return_refund.basic) pada aplikasi di TikTok Partner Center, lalu hubungkan ulang toko."
+          : e instanceof Error ? e.message : String(e);
         results.push({ accountId: acc.id, label: acc.label, platform: "TIKTOK_SHOP", error: message });
         errors.push(`${acc.label}: ${message}`);
       }

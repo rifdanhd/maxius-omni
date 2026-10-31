@@ -34,15 +34,22 @@ export type ReturnStatus = (typeof RETURN_STATUSES)[number];
  */
 export function mapTikTokReturnStatus(raw: string): ReturnStatus {
   switch (raw) {
+    case "RETURN_OR_REFUND_REQUEST_PENDING":
+      return "PENDING_SELLER";
     case "REFUND_OR_RETURN_REQUEST_REJECT":
+    case "REJECT_RECEIVE_PACKAGE":
       return "REJECTED";
     case "AWAITING_BUYER_SHIP":
+    case "RETURN_OR_REFUND_REQUEST_SUCCESS":
       return "APPROVED";
     case "BUYER_SHIPPED_ITEM":
       return "IN_TRANSIT";
     case "REFUND_OR_RETURN_REQUEST_CLOSED":
+    case "RETURN_OR_REFUND_REQUEST_CANCEL":
     case "CLOSED":
       return "CANCELLED";
+    case "RETURN_OR_REFUND_REQUEST_COMPLETE":
+      return "REFUNDED";
     default:
       return "UNKNOWN";
   }
@@ -79,7 +86,17 @@ type TikTokSlaRaw = { needed_action?: { sla_due_time?: unknown }; sla_due_time?:
 
 function tikTokSlaDueTime(raw: Record<string, unknown>): unknown {
   const sla = raw as TikTokSlaRaw;
-  return sla.needed_action?.sla_due_time ?? sla.sla_due_time;
+  const deadlines = Array.isArray(raw.seller_next_action_response)
+    ? raw.seller_next_action_response.flatMap((action) => {
+        const deadline = objectValue(action)?.deadline;
+        return typeof deadline === "number" && deadline > 0 ? [deadline] : [];
+      })
+    : [];
+  return sla.needed_action?.sla_due_time ?? sla.sla_due_time ?? (deadlines.length ? Math.min(...deadlines) : undefined);
+}
+
+function objectValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
 /** Resolve varian via ProductMapping akun ini; null = orphan. */
@@ -147,6 +164,11 @@ export async function upsertTikTokReturn(
     raw.order_id !== undefined && raw.order_id !== null ? String(raw.order_id) : null;
   const rawStatus = raw.return_status !== undefined ? String(raw.return_status) : "UNKNOWN";
   const status = mapTikTokReturnStatus(rawStatus);
+  const refund = objectValue(raw.refund_amount);
+  const refundAmount = toNumber(refund?.refund_total ?? raw.refund_amount ?? raw.refund_amount_value);
+  const currency = typeof refund?.currency === "string" ? refund.currency : (raw.refund_currency as string | undefined);
+  const reason = (raw.return_reason ?? raw.reason) as string | undefined;
+  const reasonText = (raw.return_reason_text ?? raw.reason_text) as string | undefined;
 
   const order = externalOrderId
     ? await prisma.platformOrderMapping.findUnique({
@@ -161,74 +183,83 @@ export async function upsertTikTokReturn(
     itemVariants.set(it.channelSku, await resolveVariantId(accountId, it.channelSku));
   }
 
-  const existing = await prisma.returnRequest.findUnique({
-    where: { accountId_externalReturnId: { accountId, externalReturnId } },
-    select: { id: true, status: true, isPlatformAutoApproved: true },
-  });
-
-  const statusChanged =
-    !existing || shouldReplaceStatus(existing.status, status);
-
-  const request = await prisma.returnRequest.upsert({
-    where: { accountId_externalReturnId: { accountId, externalReturnId } },
-    create: {
-      accountId,
-      externalReturnId,
-      externalOrderId,
-      orderId: order?.orderId ?? null,
-      status,
-      rawStatus,
-      rawPayload: jsonOrNull(raw),
-      type: (raw.return_type as string) ?? null,
-      reason: (raw.reason as string) ?? null,
-      reasonText: (raw.reason_text as string) ?? null,
-      refundAmount: toNumber(raw.refund_amount ?? raw.refund_amount_value),
-      currency: (raw.refund_currency as string) ?? null,
-      buyerEvidence: jsonOrNull(extractTikTokEvidence(raw)),
-      slaDueDate: toDate(tikTokSlaDueTime(raw)),
-      isPlatformAutoApproved: raw.request_user === "PLATFORM",
-      firstSeenAt: toDate(raw.create_time) ?? new Date(),
-      lastSyncedAt: new Date(),
-      statusChangedAt: statusChanged ? new Date() : null,
-      returnItem: {
-        create: items.map((it) => ({
-          externalSkuId: it.externalSkuId,
-          channelSku: it.channelSku,
-          productName: it.productName,
-          skuName: it.skuName,
-          imageUrl: it.imageUrl,
-          qty: it.qty,
-          price: it.price,
-          variantId: itemVariants.get(it.channelSku) ?? null,
-        })),
-      },
-    },
-    update: {
-      status: statusChanged ? status : existing!.status,
-      rawStatus,
-      rawPayload: jsonOrNull(raw),
-      orderId: order?.orderId ?? undefined,
-      refundAmount: toNumber(raw.refund_amount ?? raw.refund_amount_value) ?? undefined,
-      buyerEvidence: jsonOrNull(extractTikTokEvidence(raw)) ?? undefined,
-      slaDueDate: toDate(tikTokSlaDueTime(raw)) ?? undefined,
-      isPlatformAutoApproved: existing!.isPlatformAutoApproved || raw.request_user === "PLATFORM",
-      lastSyncedAt: new Date(),
-      statusChangedAt: statusChanged ? new Date() : undefined,
-    },
-  });
-
-  // Resolve/re-resolve varian item (mapping bisa baru dibuat setelah retur
-  // masuk; item baru di-upsert terpisah agar tidak menimpa restock).
-  for (const it of items) {
-    const variantId = itemVariants.get(it.channelSku);
-    if (!variantId) continue;
-    await prisma.returnItem.updateMany({
-      where: { returnId: request.id, channelSku: it.channelSku, variantId: null },
-      data: { variantId },
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`return:${accountId}:${externalReturnId}`}, 0))`;
+    const existing = await tx.returnRequest.findUnique({
+      where: { accountId_externalReturnId: { accountId, externalReturnId } },
+      select: { id: true, status: true, isPlatformAutoApproved: true, returnItem: { select: { id: true }, take: 1 } },
     });
-  }
+    const itemData = items.map((it) => ({
+      externalSkuId: it.externalSkuId,
+      channelSku: it.channelSku,
+      productName: it.productName,
+      skuName: it.skuName,
+      imageUrl: it.imageUrl,
+      qty: it.qty,
+      price: it.price,
+      variantId: itemVariants.get(it.channelSku) ?? null,
+    }));
 
-  return request.id;
+    const statusChanged =
+      !existing || shouldReplaceStatus(existing.status, status);
+
+    const request = await tx.returnRequest.upsert({
+      where: { accountId_externalReturnId: { accountId, externalReturnId } },
+      create: {
+        accountId,
+        externalReturnId,
+        externalOrderId,
+        orderId: order?.orderId ?? null,
+        status,
+        rawStatus,
+        rawPayload: jsonOrNull(raw),
+        type: (raw.return_type as string) ?? null,
+        reason: reason ?? null,
+        reasonText: reasonText ?? null,
+        refundAmount,
+        currency: currency ?? null,
+        buyerEvidence: jsonOrNull(extractTikTokEvidence(raw)),
+        slaDueDate: toDate(tikTokSlaDueTime(raw)),
+        isPlatformAutoApproved: raw.request_user === "PLATFORM",
+        firstSeenAt: toDate(raw.create_time) ?? new Date(),
+        lastSyncedAt: new Date(),
+        statusChangedAt: statusChanged ? new Date() : null,
+        returnItem: {
+          create: itemData,
+        },
+      },
+      update: {
+        status: statusChanged ? status : existing!.status,
+        rawStatus,
+        type: raw.return_type as string | undefined,
+        rawPayload: jsonOrNull(raw),
+        orderId: order?.orderId ?? undefined,
+        reason,
+        reasonText,
+        refundAmount: refundAmount ?? undefined,
+        currency,
+        returnItem: existing && existing.returnItem.length === 0 && itemData.length ? { create: itemData } : undefined,
+        buyerEvidence: jsonOrNull(extractTikTokEvidence(raw)) ?? undefined,
+        slaDueDate: toDate(tikTokSlaDueTime(raw)) ?? undefined,
+        isPlatformAutoApproved: Boolean(existing?.isPlatformAutoApproved) || raw.request_user === "PLATFORM",
+        lastSyncedAt: new Date(),
+        statusChangedAt: statusChanged ? new Date() : undefined,
+      },
+    });
+
+    // Resolve/re-resolve varian item (mapping bisa baru dibuat setelah retur
+    // masuk; item baru di-upsert terpisah agar tidak menimpa restock).
+    for (const it of items) {
+      const variantId = itemVariants.get(it.channelSku);
+      if (!variantId) continue;
+      await tx.returnItem.updateMany({
+        where: { returnId: request.id, channelSku: it.channelSku, variantId: null },
+        data: { variantId },
+      });
+    }
+
+    return request.id;
+  });
 }
 
 function toNumber(v: unknown): number | null {
@@ -248,8 +279,9 @@ function normalizeTikTokItems(
   qty: number;
   price: number | null;
 }> {
-  const list = (raw.item_list as Array<Record<string, unknown>> | undefined) ?? [];
-  return list
+  const list = (Array.isArray(raw.return_line_items) ? raw.return_line_items : Array.isArray(raw.item_list) ? raw.item_list : []) as Array<Record<string, unknown>>;
+  const normalized = list
+    .filter((li) => Boolean(objectValue(li)))
     .map((li) => {
       const externalSkuId = li.sku_id !== undefined && li.sku_id !== null ? String(li.sku_id) : null;
       const channelSku = externalSkuId ?? (li.seller_sku as string) ?? "";
@@ -258,12 +290,25 @@ function normalizeTikTokItems(
         channelSku,
         productName: (li.product_name as string) ?? null,
         skuName: (li.sku_name as string) ?? null,
-        imageUrl: (li.sku_image as string) ?? null,
+        imageUrl: (objectValue(li.product_image)?.url as string | undefined) ?? (li.sku_image as string) ?? null,
         qty: Math.max(1, Math.trunc(Number(li.return_qty ?? li.qty ?? 1)) || 1),
-        price: toNumber(li.sale_price ?? li.item_price),
+        price: toNumber(li.sale_price ?? li.item_price ?? objectValue(li.refund_amount)?.refund_subtotal),
       };
     })
     .filter((it) => it.channelSku);
+  const grouped = new Map<string, (typeof normalized)[number]>();
+  for (const item of normalized) {
+    const existing = grouped.get(item.channelSku);
+    if (!existing) {
+      grouped.set(item.channelSku, { ...item });
+      continue;
+    }
+    existing.price = existing.price !== null && item.price !== null
+      ? (existing.price * existing.qty + item.price * item.qty) / (existing.qty + item.qty)
+      : null;
+    existing.qty += item.qty;
+  }
+  return [...grouped.values()];
 }
 
 function extractTikTokEvidence(raw: Record<string, unknown>): unknown {
