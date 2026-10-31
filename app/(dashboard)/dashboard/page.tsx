@@ -28,6 +28,15 @@ import { authFetch } from "@/lib/utils/api-client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageState } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DASHBOARD_TIME_ZONE, DAY_MS, dashboardPeriod, dashboardPreset, jakartaDateKey } from "@/lib/utils/dashboard-period";
+
+const CHART_TABS = {
+  potensi: { title: "Tren Potensi Penjualan", currency: true },
+  terjual: { title: "Tren Produk Terjual", currency: false },
+  penjualan: { title: "Tren Penjualan Selesai", currency: true },
+  pesanan: { title: "Tren Pesanan Selesai", currency: false },
+};
 
 type Summary = {
   accountsConnected: number;
@@ -40,6 +49,7 @@ type Summary = {
 };
 
 type AnalyticsData = {
+  generatedAt: string;
   window: {
     current: { start: string; end: string };
     previous: { start: string; end: string };
@@ -50,7 +60,14 @@ type AnalyticsData = {
     completedRevenue: { current: number; previous: number; changePct: number | null };
     completedOrders: { current: number; previous: number; changePct: number | null };
   };
-  chart: { date: string; current: number | null; previous: number | null }[];
+  chart: {
+    date: string;
+    current: number | null;
+    previous: number | null;
+    units: { current: number; previous: number };
+    completedRevenue: { current: number; previous: number };
+    completedOrders: { current: number; previous: number };
+  }[];
   topStores: { id: string; label: string; platform: string; value: number; units: number }[];
   topProducts: { key: string; name: string; sku: string | null; channelSku: string | null; qty: number; value: number }[];
 };
@@ -91,7 +108,7 @@ function formatRp(n: number): string {
 }
 
 function formatDateRange(isoStart: string, isoEnd: string): string {
-  const fmt = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const fmt = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: DASHBOARD_TIME_ZONE });
   return `${fmt.format(new Date(isoStart))} - ${fmt.format(new Date(isoEnd))}`;
 }
 
@@ -109,15 +126,21 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [opsKpi, setOpsKpi] = useState<OpsKpi | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<Array<{ id: string; platform: string; label: string }>>([]);
+  const [filters, setFilters] = useState(() => ({ ...dashboardPreset(7), accountId: "" }));
+  const [draftFilters, setDraftFilters] = useState(filters);
+  const [periodPreset, setPeriodPreset] = useState("7");
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [activeTab, setActiveTab] = useState("potensi"); // potensi, terjual, penjualan, pesanan
+  const [activeTab, setActiveTab] = useState<keyof typeof CHART_TABS>("potensi");
+  const [syncErrorsOpen, setSyncErrorsOpen] = useState(false);
   const [panduanAwalOpen, setPanduanAwalOpen] = useState(true);
   const [greet, setGreet] = useState<{ name: string | null; salam: string; date: string } | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => {
-      const h = new Date().getHours();
+      const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: DASHBOARD_TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(new Date()));
       setGreet({
         name: localStorage.getItem("username"),
         salam: h < 11 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam",
@@ -133,27 +156,43 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadAll() {
       try {
-        const headers = {};
-        const [summaryRes, analyticsRes, kpiRes] = await Promise.all([
-          authFetch("/api/summary", { headers }),
-          authFetch("/api/analytics", { headers }),
-          authFetch("/api/dashboard/kpi", { headers }),
+        const options = { signal: controller.signal };
+        const query = new URLSearchParams(filters);
+        const [summaryRes, analyticsRes, kpiRes, accountsRes] = await Promise.all([
+          authFetch("/api/summary", options),
+          authFetch(`/api/analytics?${query}`, options),
+          authFetch("/api/dashboard/kpi", options),
+          authFetch("/api/accounts", options),
         ]);
-        setLoadError(!summaryRes.ok || !analyticsRes.ok || !kpiRes.ok);
-        if (summaryRes.ok) setSummary(await summaryRes.json());
-        if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
-        if (kpiRes.ok) setOpsKpi(await kpiRes.json());
+        for (const response of [summaryRes, analyticsRes, kpiRes, accountsRes]) {
+          if (!response.ok) {
+            const body = await response.json().catch(() => null);
+            throw new Error(typeof body?.error === "string" ? body.error : "Data dashboard gagal dimuat.");
+          }
+        }
+        const [summaryData, analyticsData, kpiData, accountsData] = await Promise.all([
+          summaryRes.json(), analyticsRes.json(), kpiRes.json(), accountsRes.json(),
+        ]);
+        if (controller.signal.aborted) return;
+        setSummary(summaryData);
+        setAnalytics(analyticsData);
+        setOpsKpi(kpiData);
+        setAccounts(accountsData.accounts);
+        setLoadError(null);
       } catch (e) {
+        if (controller.signal.aborted) return;
         console.error(e);
-        setLoadError(true);
+        setLoadError(e instanceof Error ? e.message : "Data dashboard gagal dimuat.");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
-    loadAll();
-  }, [reloadKey]);
+    void loadAll();
+    return () => controller.abort();
+  }, [reloadKey, filters]);
 
   if (loading) {
     return (
@@ -185,9 +224,9 @@ export default function DashboardPage() {
       <PageState
         variant="error"
         title="Ringkasan belum dapat dimuat"
-        description="Data toko belum lengkap. Coba muat ulang untuk melihat angka terbaru."
+        description={loadError}
         action={
-          <Button
+          <div className="flex flex-wrap gap-2"><Button
             variant="outline"
             onClick={() => {
               setLoading(true);
@@ -196,15 +235,33 @@ export default function DashboardPage() {
           >
             Coba lagi
           </Button>
+          <Button variant="outline" onClick={() => {
+            const next = { ...dashboardPreset(7), accountId: "" };
+            setDraftFilters(next);
+            setPeriodPreset("7");
+            setFilters(next);
+            setLoading(true);
+          }}>Reset filter</Button></div>
         }
       />
     );
 
   const m = analytics?.metrics;
-  const chartData = analytics?.chart ?? [];
+  const chartMetric = CHART_TABS[activeTab];
+  const chartData = (analytics?.chart ?? []).map((point) => ({
+    date: point.date,
+    ...(activeTab === "terjual" ? point.units
+      : activeTab === "penjualan" ? point.completedRevenue
+      : activeTab === "pesanan" ? point.completedOrders
+      : { current: point.current, previous: point.previous }),
+  }));
   const potentialOrders = m?.revenue.orders ?? 0;
-  const avgDailyUnits = m ? m.units.current / 7 : 0;
-  const avgDailyCompletedOrders = m ? m.completedOrders.current / 7 : 0;
+  const periodDays = analytics ? Math.round((new Date(analytics.window.current.end).getTime() - new Date(analytics.window.current.start).getTime()) / DAY_MS) + 1 : 7;
+  const avgDailyUnits = m ? m.units.current / periodDays : 0;
+  const avgDailyCompletedOrders = m ? m.completedOrders.current / periodDays : 0;
+  const selectedAccount = accounts.find((account) => account.id === filters.accountId);
+  const accountLabel = selectedAccount ? `${selectedAccount.label} (${selectedAccount.platform})` : "Semua akun toko";
+  const periodLabel = analytics ? `${formatDateRange(analytics.window.current.start, analytics.window.current.end)} WIB` : "Periode berjalan";
 
   // Panduan Awal: progres dihitung dari data asli (summary + KPI), bukan hardcoded.
   const onboardingSteps = [
@@ -242,7 +299,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm">
             <CalendarDays size={15} className="text-muted-foreground" />
-            {analytics ? formatDateRange(analytics.window.current.start, analytics.window.current.end) : "Periode berjalan"}
+            {periodLabel}
           </span>
           <Button
             variant="outline"
@@ -256,6 +313,48 @@ export default function DashboardPage() {
           </Button>
         </div>
       </header>
+
+      <form className="space-y-3 rounded-2xl border border-border bg-card p-4" onSubmit={(event) => {
+        event.preventDefault();
+        try {
+          dashboardPeriod(draftFilters.start, draftFilters.end);
+          setFilterError(null);
+          setLoading(true);
+          setFilters({ ...draftFilters });
+        } catch (error) {
+          setFilterError(error instanceof Error ? error.message : "Periode tidak valid.");
+        }
+      }}>
+        <p className="text-sm font-semibold">Filter performa penjualan</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">Akun toko
+            <select aria-label="Akun toko" className="h-10 max-w-full rounded-lg border border-input bg-background px-3 text-sm" value={draftFilters.accountId} onChange={(event) => setDraftFilters({ ...draftFilters, accountId: event.target.value })}>
+              <option value="">Semua akun toko</option>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.label} ({account.platform})</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium">Periode
+            <select aria-label="Periode penjualan" className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={periodPreset} onChange={(event) => {
+              setPeriodPreset(event.target.value);
+              if (event.target.value !== "custom") setDraftFilters({ ...draftFilters, ...dashboardPreset(Number(event.target.value)) });
+            }}>
+              <option value="7">7 hari terakhir</option>
+              <option value="1">Hari ini</option>
+              <option value="30">30 hari terakhir</option>
+              <option value="custom">Tanggal khusus</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium">Dari (WIB)
+            <input aria-label="Tanggal awal" type="date" required max={jakartaDateKey()} className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={draftFilters.start} onChange={(event) => { setPeriodPreset("custom"); setDraftFilters({ ...draftFilters, start: event.target.value }); }} />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium">Sampai (WIB)
+            <input aria-label="Tanggal akhir" type="date" required min={draftFilters.start} max={jakartaDateKey()} className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={draftFilters.end} onChange={(event) => { setPeriodPreset("custom"); setDraftFilters({ ...draftFilters, end: event.target.value }); }} />
+          </label>
+          <Button type="submit">Terapkan</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Aktif: {accountLabel} · {periodLabel}. Maksimal 90 hari; dibandingkan dengan periode sebelumnya yang sama panjang.</p>
+        {filterError && <p role="alert" className="text-sm text-destructive">{filterError}</p>}
+      </form>
 
       {/* ───────── KPI utama (juga berfungsi sebagai tab chart) ───────── */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -287,7 +386,7 @@ export default function DashboardPage() {
           value={m ? formatRp(m.completedRevenue.current) : "Rp0"}
           trend={m ? trendLabel(m.completedRevenue.changePct) : undefined}
           trendUp={m ? trendUp(m.completedRevenue.changePct) : false}
-          subtext={`Rata-rata harian: ${m ? formatRp(m.completedRevenue.current / 7) : "Rp0"}`}
+          subtext={`Rata-rata harian: ${m ? formatRp(m.completedRevenue.current / periodDays) : "Rp0"}`}
         />
         <KpiCard
           icon={ShoppingCart}
@@ -305,11 +404,11 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Panel
           className="xl:col-span-2"
-          title="Tren Penjualan"
-          subtitle={`Pembaruan terakhir ${new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}`}
+          title={chartMetric.title}
+          subtitle={`Data dimuat ${analytics ? new Date(analytics.generatedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: DASHBOARD_TIME_ZONE }) : "—"} WIB`}
           action={
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-              <span className="rounded-md border border-border bg-muted px-2.5 py-1 text-foreground">Semua Marketplace</span>
+              <span className="rounded-md border border-border bg-muted px-2.5 py-1 text-foreground">{accountLabel}</span>
               <span className="rounded-md border border-border px-2.5 py-1 text-muted-foreground">
                 vs {analytics ? formatDateRange(analytics.window.previous.start, analytics.window.previous.end) : "-"}
               </span>
@@ -321,8 +420,9 @@ export default function DashboardPage() {
               <LineChart data={chartData} margin={{ top: 5, right: 8, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dx={-10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} dx={-10} allowDecimals={chartMetric.currency} />
                 <Tooltip
+                  formatter={(value) => chartMetric.currency ? formatRp(Number(value)) : `${Number(value).toLocaleString("id-ID")} ${activeTab === "terjual" ? "pcs" : "pesanan"}`}
                   labelStyle={{ color: "var(--popover-foreground)" }}
                   itemStyle={{ color: "var(--popover-foreground)" }}
                   contentStyle={{ borderRadius: "12px", border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)", boxShadow: "var(--chart-tooltip-shadow)" }}
@@ -335,23 +435,23 @@ export default function DashboardPage() {
           </div>
         </Panel>
 
-        <Panel title="Yang Perlu Dilakukan" subtitle="Tindakan prioritas hari ini">
+        <Panel title="Yang Perlu Dilakukan" subtitle="Seluruh toko · kondisi terkini; pesanan baru dihitung sejak 00.00 WIB">
           <div className="space-y-2.5">
             <TaskRow icon={ShoppingCart} label="Pesanan Baru" value={summary.newOrders} href="/orders" />
             <TaskRow icon={Truck} label="Siap Dikirim" value={summary.readyToShip} href="/orders" />
-            <TaskRow icon={Boxes} label="Stok Menipis" value={summary.criticalStock} href="/inventory" critical />
-            <TaskRow icon={AlertTriangle} label="Oversell" value={summary.oversell} href="/inventory" critical />
+            <TaskRow icon={Boxes} label="Stok Menipis" value={summary.criticalStock} href="/inventory?tab=low" critical />
+            <TaskRow icon={AlertTriangle} label="Oversell" value={summary.oversell} href="/inventory?tab=oversells" critical />
           </div>
         </Panel>
       </section>
 
       {/* ───────── Kesehatan operasional ───────── */}
-      <Panel title="Kesehatan Operasional" subtitle="Stok central & sinkronisasi marketplace">
+      <Panel title="Kesehatan Operasional" subtitle="Seluruh toko · stok gudang terkini; error sinkronisasi 7 hari terakhir. Tidak mengikuti filter performa penjualan.">
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <StatCard icon={Boxes} title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} />
-          <StatCard icon={AlertTriangle} title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} critical />
+          <StatCard icon={Boxes} title="Stok Central (Siap Jual)" value={opsKpi ? opsKpi.centralStock.totalSellable.toLocaleString("id-ID") : "…"} href="/inventory" />
+          <StatCard icon={AlertTriangle} title="Stok Kritis" value={opsKpi ? opsKpi.lowStock.count.toLocaleString("id-ID") : "…"} href="/inventory" critical />
           <StatCard icon={Info} title="Stok Mismatch" value={opsKpi ? opsKpi.mismatch.total.toLocaleString("id-ID") : "…"} href="/inventory/mismatch" critical />
-          <StatCard icon={RefreshCw} title="Gagal Sinkron (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} critical />
+          <StatCard icon={RefreshCw} title="Gagal Sinkron (7 hari)" value={opsKpi ? opsKpi.syncErrors.count7d.toLocaleString("id-ID") : "…"} onClick={() => setSyncErrorsOpen(true)} critical />
         </div>
 
         {opsKpi && opsKpi.storeHealth.length > 0 && (
@@ -372,7 +472,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {opsKpi.storeHealth.map((s) => {
-                    const lastActive = s.lastOrderAt ?? s.lastSyncAt;
+                    const lastActive = [s.lastOrderAt, s.lastSyncAt].filter((value): value is string => Boolean(value)).sort().at(-1);
                     const unhealthy = !s.hasToken || s.errors7d > 0 || s.mismatch > 0 || s.orphanSkus > 0;
                     return (
                       <tr key={s.accountId} className="border-t border-border transition-colors hover:bg-muted/40">
@@ -403,7 +503,7 @@ export default function DashboardPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">
-                          {lastActive ? new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+                          {lastActive ? `${new Date(lastActive).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: DASHBOARD_TIME_ZONE })} WIB` : "—"}
                         </td>
                       </tr>
                     );
@@ -414,6 +514,28 @@ export default function DashboardPage() {
           </div>
         )}
       </Panel>
+
+      <Dialog open={syncErrorsOpen} onOpenChange={setSyncErrorsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gagal Sinkron (7 hari)</DialogTitle>
+            <DialogDescription>Ringkasan error sinkronisasi marketplace dalam 7 hari terakhir.</DialogDescription>
+          </DialogHeader>
+          {(opsKpi?.syncErrors.byKind.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">Tidak ada error sinkronisasi dalam periode ini.</p>
+          ) : (
+            <ul className="space-y-2">
+              {opsKpi!.syncErrors.byKind.map((error) => (
+                <li key={error.kind} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+                  <span className="break-all">{error.kind}</span>
+                  <span className="font-semibold">{error.count.toLocaleString("id-ID")}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button asChild variant="outline"><Link href="/settings/accounts">Periksa koneksi toko</Link></Button>
+        </DialogContent>
+      </Dialog>
 
       {/* ───────── Panduan Awal (auto-hidden saat semua langkah selesai) ───────── */}
       {onboardingDone < onboardingSteps.length && (
@@ -478,11 +600,11 @@ export default function DashboardPage() {
 
       {/* ───────── Top lists ───────── */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Panel title="Toko Teratas" subtitle="Berdasarkan potensi penjualan">
+        <Panel title="Toko Teratas" subtitle={`${accountLabel} · ${periodLabel}`}>
           {(analytics?.topStores ?? []).length === 0 ? (
             <EmptyState
               title="Belum Ada Data Penjualan"
-              description="Pesanan akan muncul setelah toko Anda terhubung dan menerima pesanan."
+              description="Tidak ada penjualan untuk akun dan periode yang dipilih. Coba ubah filter atau periksa koneksi toko."
               href="/settings/accounts"
               cta="Hubungkan Toko"
             />
@@ -514,11 +636,11 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        <Panel title="Produk Terjual Teratas" subtitle="3 produk dengan kuantitas tertinggi">
+        <Panel title="Produk Terjual Teratas" subtitle={`3 produk dengan kuantitas tertinggi · ${periodLabel}`}>
           {(analytics?.topProducts ?? []).length === 0 ? (
             <EmptyState
               title="Belum Ada Produk Terjual"
-              description="Data produk terlaris akan muncul saat ada pesanan masuk dalam periode ini."
+              description="Tidak ada produk terjual untuk akun dan periode yang dipilih. Coba ubah filter untuk melihat periode lain."
               href="/products"
               cta="Lihat Produk Master"
             />
@@ -670,12 +792,14 @@ function StatCard({
   title,
   value,
   href,
+  onClick,
   critical,
 }: {
   icon: LucideIcon;
   title: string;
   value: string;
   href?: string;
+  onClick?: () => void;
   critical?: boolean;
 }) {
   const alert = !!critical && value !== "0" && value !== "…";
@@ -695,6 +819,10 @@ function StatCard({
     <Link href={href} className={cls}>
       {body}
     </Link>
+  ) : onClick ? (
+    <button type="button" onClick={onClick} className={`${cls} w-full text-left`}>
+      {body}
+    </button>
   ) : (
     <div className={cls}>{body}</div>
   );

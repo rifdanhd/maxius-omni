@@ -5,13 +5,12 @@ import { cached } from "@/lib/utils/ttl-cache";
 import { isLowStock } from "@/lib/services/central-stock.service";
 import { Prisma } from "@prisma/client";
 import { UNFULFILLED_ORDER_STATUSES } from "@/lib/services/master-stock.service";
+import { DAY_MS, jakartaDateKey } from "@/lib/utils/dashboard-period";
 
 const CACHE_TTL_MS = 60_000;
 
 function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(`${jakartaDateKey()}T00:00:00+07:00`);
 }
 
 /**
@@ -29,7 +28,7 @@ function startOfToday(): Date {
  */
 export const GET = withAuth(async (req) => {
   const businessId = req.businessId;
-  const data = await cached(`summary:${businessId}`, CACHE_TTL_MS, async () => {
+  const data = await cached(`summary:${businessId}:${jakartaDateKey()}`, CACHE_TTL_MS, async () => {
     const startToday = startOfToday();
 
     const [accountsCount, activeSku, criticalCount, newOrders, readyToShip, completedOrders, committed, variantsStock] =
@@ -56,7 +55,7 @@ export const GET = withAuth(async (req) => {
         prisma.order.count({
           where: {
             account: { businessId },
-            createTime: { gte: startToday },
+            createTime: { gte: startToday, lt: new Date(startToday.getTime() + DAY_MS) },
             status: { not: "CANCELLED" },
           },
         }),
