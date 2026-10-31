@@ -23,7 +23,7 @@ export const GET = withAuth(
           variant: {
             select: {
               sku: true,
-              masterProduct: { select: { name: true, imageUrl: true } },
+              masterProduct: { select: { name: true, imageUrl: true, category: true } },
             },
           },
         },
@@ -108,7 +108,7 @@ export const GET = withAuth(
       variantLabel: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,
       masterSku: it.variant?.sku ?? null,
       channelSku: it.channelSku,
-      category: categoriesBySku.get(it.channelSku) ?? null,
+      category: categoriesBySku.get(it.channelSku) ?? it.variant?.masterProduct?.category ?? null,
       qty: it.qty,
       price: it.price,
       subTotal: it.price != null ? it.price * it.qty : null,

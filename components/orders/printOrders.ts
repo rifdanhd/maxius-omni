@@ -543,36 +543,28 @@ export function pdfBlobFromBase64(base64: string): Blob {
  */
 export function fillPrintPdfWindow(win: Window, url: string, title = "Label Pengiriman") {
   if (win.closed) return;
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>${escapeHtml(title)}</title>
-        <style>
-          ${printThemeStyles()}
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: var(--background); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 16px; font-family: ui-sans-serif, system-ui, sans-serif; }
-          iframe { border: 0; width: 100vw; height: 100vh; }
-        </style>
-      </head>
-      <body><iframe id="pdf" src="${escapeHtml(url)}"></iframe></body>
-    </html>`);
-  win.document.close();
+  // Langsung arahkan window ke URL blob PDF agar browser menggunakan PDF viewer bawaannya.
+  // Ini menghindari layout blank/margin HTML wrapper saat browser print dialog terbuka.
+  try {
+    win.location.href = url;
+  } catch {
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${escapeHtml(title)}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            html, body { width: 100%; height: 100%; overflow: hidden; background: #525659; }
+            iframe { border: 0; width: 100vw; height: 100vh; display: block; }
+          </style>
+        </head>
+        <body><iframe id="pdf" src="${escapeHtml(url)}"></iframe></body>
+      </html>`);
+    win.document.close();
+  }
+
   win.focus();
-  // Tunggu PDF termuat (reader bawaan browser) sebelum memicu dialog print.
-  const frame = win.document.getElementById("pdf") as HTMLIFrameElement | null;
-  let printed = false;
-  const trigger = () => {
-    if (printed) return;
-    printed = true;
-    try {
-      win.print();
-    } catch {
-      /* abaikan */
-    }
-  };
-  frame?.addEventListener("load", trigger);
-  setTimeout(trigger, 800);
   if (url.startsWith("blob:")) {
     setTimeout(() => {
       try {
@@ -580,7 +572,7 @@ export function fillPrintPdfWindow(win: Window, url: string, title = "Label Peng
       } catch {
         /* abaikan */
       }
-    }, 60000);
+    }, 120000);
   }
 }
 
