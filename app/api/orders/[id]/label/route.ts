@@ -7,6 +7,7 @@ import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 import { createShippingDocument, downloadShippingDocument, getShippingDocumentParameter, getShippingDocumentResult } from "@/lib/integrations/shopee";
 import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
 import { downloadValidatedPdf } from "@/lib/security/validate-upload";
+import { stampProductVariantOnLabel, type LabelMergeProductRow } from "@/lib/services/label-merge.service";
 
 /**
  * Label pengiriman RESMI dari TikTok (GetPackageShippingDocument).
@@ -24,13 +25,19 @@ export const GET = withAuth(
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
+        items: {
+          include: {
+            variant: {
+              select: { sku: true },
+            },
+          },
+        },
         account: {
           select: { accessToken: true, shopCipher: true, businessId: true, platform: true },
         },
         shipments: {
           select: { externalId: true, trackingNo: true, status: true },
         },
-
       },
     });
 
@@ -94,6 +101,21 @@ export const GET = withAuth(
         if (pdf[0] !== 0x25 || pdf[1] !== 0x50 || pdf[2] !== 0x44 || pdf[3] !== 0x46) {
           throw new Error("Format dokumen Shopee tidak valid.");
         }
+
+        const productRows: LabelMergeProductRow[] = (order.items ?? []).map((it) => ({
+          productName: it.productName ?? it.channelSku ?? "-",
+          variant: it.skuName ?? it.variant?.sku ?? "-",
+          sellerSku: it.channelSku ?? "-",
+          qty: it.qty,
+        }));
+
+        let stampedPdf: Uint8Array = new Uint8Array(pdf);
+        try {
+          stampedPdf = await stampProductVariantOnLabel(new Uint8Array(pdf), productRows, order.orderNo);
+        } catch (e) {
+          console.warn("[Label/Shopee] Gagal menempelkan rincian produk ke PDF Shopee:", e);
+        }
+
         await prisma.piiAccessLog.create({
           data: {
             id: crypto.randomUUID(),
@@ -105,7 +127,7 @@ export const GET = withAuth(
         });
         return NextResponse.json({
           docUrl: null,
-          pdfBase64: Buffer.from(pdf).toString("base64"),
+          pdfBase64: Buffer.from(stampedPdf).toString("base64"),
           trackingNumber: shipment?.trackingNo ?? order.shipments[0]?.trackingNo ?? null,
           packageId: packageNumber ?? order.orderNo,
           status: shipment?.status ?? order.shipments[0]?.status ?? null,
@@ -147,7 +169,20 @@ export const GET = withAuth(
 
     let pdfBase64: string | null = null;
     try {
-      pdfBase64 = (await downloadValidatedPdf(docUrl)).toString("base64");
+      const downloadedBytes = new Uint8Array(await downloadValidatedPdf(docUrl));
+      const productRows: LabelMergeProductRow[] = (order.items ?? []).map((it) => ({
+        productName: it.productName ?? it.channelSku ?? "-",
+        variant: it.skuName ?? it.variant?.sku ?? "-",
+        sellerSku: it.channelSku ?? "-",
+        qty: it.qty,
+      }));
+      let finalBytes: Uint8Array = downloadedBytes;
+      try {
+        finalBytes = await stampProductVariantOnLabel(downloadedBytes, productRows, order.orderNo);
+      } catch (stampErr) {
+        console.warn("[Label/TikTok] Gagal menempelkan rincian produk ke PDF TikTok:", stampErr);
+      }
+      pdfBase64 = Buffer.from(finalBytes).toString("base64");
     } catch (e) {
       console.error("[Label] Gagal mengunduh label resmi:", e);
       return NextResponse.json({ error: "Dokumen label tidak valid atau tidak tersedia." }, { status: 502 });
