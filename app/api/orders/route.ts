@@ -133,6 +133,16 @@ export const GET = withAuth(async (req) => {
     ],
   };
 
+  const countsWhere = {
+    AND: [
+      { account: { businessId: req.businessId } },
+      whereSearch,
+      whereDate,
+      whereChannel,
+      whereCategory,
+    ],
+  };
+
   const [orders, total, statusGroups, accounts, categoryRows] = await Promise.all([
     prisma.order.findMany({
       where,
@@ -153,7 +163,7 @@ export const GET = withAuth(async (req) => {
     prisma.order.count({ where }),
     prisma.order.groupBy({
       by: ["status"],
-      where: { account: { businessId: req.businessId } },
+      where: countsWhere,
       _count: true,
     }),
     prisma.platformAccount.findMany({

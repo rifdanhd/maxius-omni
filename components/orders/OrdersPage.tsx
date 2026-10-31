@@ -1153,12 +1153,12 @@ export default function OrdersPage() {
 
           {(q || platformFilter !== "all" || accountFilter !== "all" || categoryFilter !== "all" || from || to) && (
             <div className="flex flex-wrap gap-2" aria-label="Filter pesanan aktif">
-              {q && <button onClick={() => { setSearchInput(""); setQ(""); }} className={CHIP_CLASS}>Cari: {q} <X size={12} /></button>}
-              {platformFilter !== "all" && <button onClick={() => setPlatformFilter("all")} className={CHIP_CLASS}>Marketplace: {PLATFORM[platformFilter] ?? platformFilter} <X size={12} /></button>}
-              {accountFilter !== "all" && <button onClick={() => setAccountFilter("all")} className={CHIP_CLASS}>Toko: {filterOptions.accounts.find((account) => account.id === accountFilter)?.label ?? accountFilter} <X size={12} /></button>}
-              {categoryFilter !== "all" && <button onClick={() => setCategoryFilter("all")} className={CHIP_CLASS}>Kategori: {categoryFilter} <X size={12} /></button>}
-              {from && <button onClick={() => setFrom("")} className={CHIP_CLASS}>Mulai: {from} <X size={12} /></button>}
-              {to && <button onClick={() => setTo("")} className={CHIP_CLASS}>Sampai: {to} <X size={12} /></button>}
+              {q && <button onClick={() => { setSearchInput(""); setQ(""); setPage(1); }} className={CHIP_CLASS}>Cari: {q} <X size={12} /></button>}
+              {platformFilter !== "all" && <button onClick={() => { setPlatformFilter("all"); setAccountFilter("all"); setPage(1); }} className={CHIP_CLASS}>Marketplace: {PLATFORM[platformFilter] ?? platformFilter} <X size={12} /></button>}
+              {accountFilter !== "all" && <button onClick={() => { setAccountFilter("all"); setPage(1); }} className={CHIP_CLASS}>Toko: {filterOptions.accounts.find((account) => account.id === accountFilter)?.label ?? accountFilter} <X size={12} /></button>}
+              {categoryFilter !== "all" && <button onClick={() => { setCategoryFilter("all"); setPage(1); }} className={CHIP_CLASS}>Kategori: {categoryFilter} <X size={12} /></button>}
+              {from && <button onClick={() => { setFrom(""); setPage(1); }} className={CHIP_CLASS}>Mulai: {from} <X size={12} /></button>}
+              {to && <button onClick={() => { setTo(""); setPage(1); }} className={CHIP_CLASS}>Sampai: {to} <X size={12} /></button>}
             </div>
           )}
         </div>
