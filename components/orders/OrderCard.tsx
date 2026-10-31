@@ -313,8 +313,8 @@ export default function OrderCard({
                <div
                   className={`px-3 py-1 text-xs font-bold rounded-md ${
                      sla.tone === "urgent"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-primary text-primary-foreground"
+                        ? "bg-destructive text-destructive-foreground"
+                        : "bg-warning-subtle text-warning border border-warning/30"
                   }`}
                >
                   {sla.label}

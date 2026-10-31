@@ -181,7 +181,7 @@ export const POST = withAuth(async (req) => {
         data: {
           trackingNo: trackingNumber,
           carrier: providerName,
-          status: handoverMethod === "PICKUP" ? "AWAITING_COLLECTION" : "AWAITING_COLLECTION",
+          status: handoverMethod === "PICKUP" ? "AWAITING_COLLECTION" : "READY_TO_SHIP",
           shippedAt: new Date(),
         },
       }),

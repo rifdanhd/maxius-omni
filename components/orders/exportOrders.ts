@@ -27,7 +27,7 @@ export function ordersToCsv(rows: ExportOrderRow[]): string {
     "Pembeli",
     "Email",
     "Total",
-    "Kurasi",
+    "Mata Uang",
     "Tanggal",
     "Qty",
     "Produk",

@@ -141,7 +141,7 @@ export default function OrderRow({ order, checked, onToggleChecked, onPrint, onP
   const due = dueInfo(order.shippingDueTime, order.status);
   const extraItems = order.items.length - 1;
   const needsShipping = order.status === "AWAITING_SHIPMENT";
-  const hasTracking = order.trackingNumber !== "-";
+  const hasTracking = !!order.trackingNumber && order.trackingNumber.trim() !== "" && order.trackingNumber.trim() !== "-";
 
   const copyOrderNo = async () => {
     try {

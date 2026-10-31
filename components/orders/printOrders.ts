@@ -573,6 +573,15 @@ export function fillPrintPdfWindow(win: Window, url: string, title = "Label Peng
   };
   frame?.addEventListener("load", trigger);
   setTimeout(trigger, 800);
+  if (url.startsWith("blob:")) {
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        /* abaikan */
+      }
+    }, 60000);
+  }
 }
 
 /**

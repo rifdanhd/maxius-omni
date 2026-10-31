@@ -92,12 +92,12 @@ type Order = {
 };
 
 type OrderDetail = {
-
   orderNo: string;
   storeName: string;
   platform: string | null;
   orderDate: string | null;
   buyerNote: string | null;
+  sellerNote?: string | null;
   paymentMethodName: string | null;
   currency: string | null;
   amount: number | null;
@@ -268,7 +268,7 @@ function toPrintableFromDetail(o: OrderDetail): PrintableOrder {
       : "-",
     courier: shipment?.carrier ?? undefined,
     trackingNumber: shipment?.trackingNo ?? undefined,
-    sellerNote: o.buyerNote,
+    sellerNote: o.sellerNote ?? o.buyerNote ?? undefined,
     items: o.items.map((it) => ({
       name: it.productName,
       variant: it.variantLabel,
@@ -619,13 +619,13 @@ export default function OrdersPage() {
     }
   };
 
-  // Polling tiap 4 dtk (query ringan, take 10) — progres terlihat bahkan
-  // setelah kembali dari menu lain / dibuka di tab lain.
+  // Polling tiap 4 dtk (query ringan, take 10) saat bgActive aktif
   const runStatusRef = useRef<() => Promise<void>>(async () => { });
   useEffect(() => {
     runStatusRef.current = refreshRunStatus; // closure terbaru tiap render
   });
   useEffect(() => {
+    if (!bgActive) return;
     void runStatusRef.current();
     const t = setInterval(() => void runStatusRef.current(), 4000);
     return () => clearInterval(t);
@@ -651,6 +651,9 @@ export default function OrdersPage() {
       if (started === 0 && stillRunning === 0) {
         setError(guardErrors.join("\n") || "Belum ada toko terhubung yang dapat disinkronkan.");
         return false;
+      }
+      if (guardErrors.length > 0 && (started > 0 || stillRunning > 0)) {
+        notify("warning", `Sebagian akun gagal disinkronkan:\n${guardErrors.join("\n")}`);
       }
       if (started > 0 || stillRunning > 0) {
         bgWasActive.current = true; // alert penutup muncul saat run selesai
@@ -693,6 +696,7 @@ export default function OrdersPage() {
       setOrders(refreshed.orders ?? []);
       setTotal(refreshed.total ?? 0);
       setPageCount(refreshed.pageCount ?? 1);
+      setCounts(refreshed.counts ?? counts);
       setSelected(new Set());
     } catch (e) {
       console.error(e);
@@ -773,20 +777,20 @@ export default function OrdersPage() {
     const win = openPrintWindow("Cetak Label");
     if (!win) return;
     const details = await Promise.all(targets.map((o) => fetchOrderDetail(o.id)));
-    const printable = details
-      .filter((d): d is OrderDetail => d !== null)
-      .map((d, index) => {
-        const p = toPrintableFromDetail(d);
-        const orig = targets[index];
-        const origShip = orig?.shipments?.[0];
-        if (!p.trackingNumber && origShip?.trackingNo) {
-          p.trackingNumber = origShip.trackingNo;
-        }
-        if (!p.courier && origShip?.carrier) {
-          p.courier = origShip.carrier;
-        }
-        return p;
-      });
+    const printable: PrintableOrder[] = [];
+    details.forEach((d, index) => {
+      if (!d) return;
+      const p = toPrintableFromDetail(d);
+      const orig = targets[index];
+      const origShip = orig?.shipments?.[0];
+      if (!p.trackingNumber && origShip?.trackingNo) {
+        p.trackingNumber = origShip.trackingNo;
+      }
+      if (!p.courier && origShip?.carrier) {
+        p.courier = origShip.carrier;
+      }
+      printable.push(p);
+    });
     if (printable.length === 0) {
       win.close();
       notify("error", "Gagal memuat data penerima untuk label.");
@@ -922,17 +926,19 @@ export default function OrdersPage() {
   const handleOpenPrintLabels = (successfulOrderIds: string[]) => {
     setPickupResult(null);
     const targetOrders = orders.filter((o) => successfulOrderIds.includes(o.id));
-    const hasShopee = targetOrders.some((o) => o.account?.platform === "SHOPEE");
-    if (hasShopee && targetOrders.length > 0) {
-      for (const o of targetOrders) {
-        if (o.account?.platform === "SHOPEE") {
-          void printOrder(o, "Label");
-        }
+    const shopeeOrders = targetOrders.filter((o) => o.account?.platform === "SHOPEE");
+    const otherOrderIds = targetOrders.filter((o) => o.account?.platform !== "SHOPEE").map((o) => o.id);
+
+    if (shopeeOrders.length > 0) {
+      for (const o of shopeeOrders) {
+        void printOrder(o, "Label");
       }
-      return;
     }
-    setPrintOrderIds(successfulOrderIds);
-    setShowPrintModal(true);
+
+    if (otherOrderIds.length > 0) {
+      setPrintOrderIds(otherOrderIds);
+      setShowPrintModal(true);
+    }
   };
 
   const handlePrintDone = async () => {

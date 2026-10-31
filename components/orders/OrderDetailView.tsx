@@ -89,7 +89,8 @@ function formatPrice(value: number | string | null | undefined, currency?: strin
   if (value == null) return "-";
   const n = typeof value === "string" ? Number(value) : value;
   if (!Number.isFinite(n)) return "-";
-  return currency ? `Rp ${n.toLocaleString("id-ID")}` : `Rp ${n.toLocaleString("id-ID")}`;
+  const curr = currency?.trim() || "Rp";
+  return curr === "IDR" || curr === "Rp" ? `Rp ${n.toLocaleString("id-ID")}` : `${curr} ${n.toLocaleString("id-ID")}`;
 }
 
 function num(value: number | string | null | undefined): number {
@@ -213,10 +214,28 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      await load();
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await authFetch(`/api/orders/${orderId}`, {
+          headers: {},
+        });
+        if (cancelled) return;
+        if (!res.ok) throw new Error(`Terjadi kesalahan saat memuat detail (${res.status})`);
+        const data = (await res.json()) as DetailData;
+        if (!cancelled) setDetail(data);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Terjadi kesalahan saat memuat detail.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
-  }, [load]);
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId]);
 
   // Tutup drawer dengan tombol Esc.
   useEffect(() => {

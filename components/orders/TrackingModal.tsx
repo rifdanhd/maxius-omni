@@ -68,11 +68,16 @@ export default function TrackingModal({
     order.trackingNumber !== "-" &&
     order.trackingNumber.trim() !== "";
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!hasTracking) return;
-    navigator.clipboard.writeText(order.trackingNumber);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(order.trackingNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback bila clipboard API diblokir
+      setCopied(false);
+    }
   };
 
   const hasRealEvents = !!trackingEvents && trackingEvents.length > 0;

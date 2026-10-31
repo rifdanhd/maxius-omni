@@ -240,7 +240,7 @@ export default function ShopeeShipModal({
                   <button
                     type="button"
                     disabled={!canPickup}
-                    onClick={() => setMode("PICKUP")}
+                    onClick={() => { setMode("PICKUP"); setActionError(null); }}
                     className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
                       mode === "PICKUP"
                         ? "border-primary bg-primary text-primary-foreground shadow-xs"
@@ -252,7 +252,7 @@ export default function ShopeeShipModal({
                   <button
                     type="button"
                     disabled={!canDropoff}
-                    onClick={() => setMode("DROPOFF")}
+                    onClick={() => { setMode("DROPOFF"); setActionError(null); }}
                     className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${
                       mode === "DROPOFF"
                         ? "border-primary bg-primary text-primary-foreground shadow-xs"
