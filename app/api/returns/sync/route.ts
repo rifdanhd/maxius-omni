@@ -26,6 +26,7 @@ export const POST = withAuth(async (req) => {
       accessToken: true,
       refreshToken: true,
       tokenExpiresAt: true,
+      scope: true,
       shopCipher: true,
       externalShopId: true,
     },
@@ -71,7 +72,9 @@ export const POST = withAuth(async (req) => {
         results.push({ accountId: acc.id, label: acc.label, platform: "TIKTOK_SHOP", fetched, upserted });
       } catch (e) {
         const message = e instanceof TikTokApiError && e.kind === "SCOPE"
-          ? "Izin pengembalian TikTok belum tersedia (105005). Aktifkan Return & Refund Basic (seller.return_refund.basic) pada aplikasi di TikTok Partner Center, lalu hubungkan ulang toko."
+          ? acc.scope?.split(",").includes("seller.return_refund.basic")
+            ? "Izin pengembalian sudah tercatat, tetapi TikTok masih menolak akses Search Returns (105005). Periksa akses API aplikasi di TikTok Partner Center dan coba lagi; jika tetap ditolak, hubungi dukungan TikTok."
+            : "Izin pengembalian TikTok belum tersedia (105005). Aktifkan Return & Refund Basic (seller.return_refund.basic) pada aplikasi di TikTok Partner Center, lalu hubungkan ulang toko."
           : e instanceof Error ? e.message : String(e);
         results.push({ accountId: acc.id, label: acc.label, platform: "TIKTOK_SHOP", error: message });
         errors.push(`${acc.label}: ${message}`);

@@ -393,16 +393,17 @@ export async function searchReturns(
     creds,
   );
   const data = result.data as
-    | { return_orders?: Array<Record<string, unknown>>; next_page_token?: string; simulated?: boolean }
+    | { return_orders?: Array<Record<string, unknown>>; next_page_token?: string; total_count?: number; simulated?: boolean }
     | undefined;
   if (data?.simulated === true) return { returns: [], nextPageToken: null };
-  if (!Array.isArray(data?.return_orders) || data.return_orders.some((row) => !row || typeof row !== "object" || Array.isArray(row)) ||
-      (data.next_page_token !== undefined && typeof data.next_page_token !== "string")) {
+  const returns = data?.return_orders ?? (data?.total_count === 0 && !data.next_page_token ? [] : undefined);
+  if (!Array.isArray(returns) || returns.some((row) => !row || typeof row !== "object" || Array.isArray(row)) ||
+      (data?.next_page_token !== undefined && typeof data.next_page_token !== "string")) {
     throw new Error("[TikTok] Respons Search Returns tidak lengkap; pengambilan pengembalian belum dapat dipastikan.");
   }
   return {
-    returns: data.return_orders,
-    nextPageToken: data.next_page_token || null,
+    returns,
+    nextPageToken: data?.next_page_token || null,
   };
 }
 
