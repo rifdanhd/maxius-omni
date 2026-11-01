@@ -290,7 +290,7 @@ export default function ShopeeMarketplacePage() {
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <DialogHeader className="pr-6 text-left">
                 <DialogTitle>Impor produk dari Shopee</DialogTitle>
-                <DialogDescription>Tambahkan produk dan varian baru ke katalog pusat.</DialogDescription>
+                <DialogDescription>Tambahkan listing aktif yang dibuat dalam 30 hari terakhir ke katalog pusat. Produk lama yang sudah terhubung tetap diperbarui.</DialogDescription>
               </DialogHeader>
             </div>
 

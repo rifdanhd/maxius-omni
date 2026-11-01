@@ -16,6 +16,7 @@ export const GET = withAuth(async (req) => {
     },
     include: {
       productVariant: {
+        where: includeInactive ? {} : { isArchived: false },
         include: {
           productMapping: {
             include: {

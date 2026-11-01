@@ -822,7 +822,7 @@ export async function updatePrice(
 
 /**
  * searchProducts — daftar produk TikTok Shop (pagination).
- * POST /product/202309/products/search
+ * POST /product/202312/products/search
  *
  * Query: `page_size` (s.d. 100) + `page_token` (dari response next_page_token).
  * Body opsional: `status` (ALL/DRAFT/PENDING/FAILED/ACTIVATE/SELLER_DEACTIVATED/
@@ -836,7 +836,10 @@ export async function searchProducts(
     pageSize?: number;
     status?: string;
     sellerSkus?: string[];
+    skuIds?: string[];
     pageToken?: string;
+    createTimeFrom?: number;
+    createTimeTo?: number;
   } = {},
   creds?: TiktokCreds,
 ): Promise<{
@@ -851,11 +854,14 @@ export async function searchProducts(
   const body: Record<string, unknown> = {};
   if (status) body.status = status;
   if (sellerSkus && sellerSkus.length > 0) body.seller_skus = sellerSkus;
+  if (opts.skuIds?.length) body.sku_ids = opts.skuIds;
+  if (opts.createTimeFrom !== undefined) body.create_time_ge = opts.createTimeFrom;
+  if (opts.createTimeTo !== undefined) body.create_time_le = opts.createTimeTo;
 
   const hasBody = Object.keys(body).length > 0;
   const result = await callApi(
     "POST",
-    "/product/202309/products/search",
+    "/product/202312/products/search",
     accessToken,
     query,
     hasBody ? body : null,
@@ -865,8 +871,13 @@ export async function searchProducts(
   const data = result.data as
     | { products?: Array<Record<string, unknown>>; total_count?: number; next_page_token?: string }
     | undefined;
+  const products = data?.products ?? (data?.total_count === 0 && !data.next_page_token ? [] : undefined);
+  if (!Array.isArray(products) || products.some(product => !product || typeof product !== "object" || Array.isArray(product)) ||
+      (data?.next_page_token !== undefined && typeof data.next_page_token !== "string")) {
+    throw new Error("[TikTok] Daftar produk belum lengkap; sinkronisasi dihentikan agar katalog lama tidak salah diubah.");
+  }
   return {
-    products: data?.products ?? [],
+    products,
     totalCount: data?.total_count ?? 0,
     nextPageToken: data?.next_page_token ?? null,
   };
@@ -950,7 +961,8 @@ export function productSkuStock(sku: Record<string, unknown>): number {
 export async function getProductDetail(
   accessToken: string,
   shopCipher: string | undefined,
-  productId: string
+  productId: string,
+  creds?: TiktokCreds,
 ): Promise<Record<string, unknown>> {
   const result = await callApi(
     "GET",
@@ -958,7 +970,8 @@ export async function getProductDetail(
     accessToken,
     {},
     null,
-    shopCipher
+    shopCipher,
+    creds,
   );
   const data = result.data as Record<string, unknown> | undefined;
   return (data?.product as Record<string, unknown> | undefined) ?? data ?? {};

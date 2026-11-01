@@ -28,6 +28,7 @@ import { getItemBaseInfo, getItemList, getModelList, itemBaseImage, readStockInf
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
+import { catalogImportSince, isRecentCatalogProduct } from "@/lib/services/catalog-import.policy";
 import {
   backfillMasterImages,
   loadShopeeAccount,
@@ -149,7 +150,7 @@ export async function importShopeeListings(params: {
 
       let offset = 0;
       for (let page = 0; page < MAX_PAGES; page += 1) {
-        if (stats.itemsScanned >= limit) {
+        if (stats.importedItems >= limit) {
           stats.hasMore = true;
           break;
         }
@@ -158,17 +159,19 @@ export async function importShopeeListings(params: {
         );
         if (items.length === 0) break;
 
-        const batch = items.slice(0, limit - stats.itemsScanned);
+        const batch = items;
         const infos = await withRefreshedToken(account, (token, shopId, creds) =>
           getItemBaseInfo(token, shopId, batch.map((i) => i.item_id), creds)
         );
         for (const info of infos) {
+          if (stats.importedItems >= limit) { stats.hasMore = true; break; }
           await importOneItem({ account, businessId: params.businessId, info, byChannelSku, threshold: settings.lowStockDefaultThreshold, stats });
           stats.itemsScanned += 1;
         }
 
         if (batch.length < items.length) stats.hasMore = true;
-        if (!hasNextPage || nextOffset <= offset) break;
+        if (!hasNextPage) break;
+        if (nextOffset <= offset || page === MAX_PAGES - 1) { stats.hasMore = true; break; }
         offset = nextOffset;
       }
     } catch (e) {
@@ -253,6 +256,9 @@ async function importOneItem(params: {
     }
     return;
   }
+
+  const until = Math.floor(Date.now() / 1000);
+  if (itemStatus?.toUpperCase() !== "NORMAL" || !isRecentCatalogProduct(info.create_time, catalogImportSince(until), until)) return;
 
   try {
     const delta = await prisma.$transaction(async (tx) => {
@@ -356,6 +362,7 @@ function buildDescriptors(params: {
     // Status lain (contoh: EXPIRED, DRAFT) dianggap non-aktif dan diabaikan
     return !modelStatus || modelStatus === "NORMAL";
   });
+  if (models.length > 0 && activeModels.length === 0) return [];
   const realModels = activeModels.filter((m) => Number(m.model_id) !== 0);
   const out: Descriptor[] = [];
 
@@ -381,7 +388,7 @@ function buildDescriptors(params: {
   }
 
   // Single-variant: seller SKU-level didahulukan supaya match dengan isi order.
-  const sole = models[0];
+  const sole = activeModels[0];
   const sku = trimmed(sole?.model_sku) ?? trimmed(itemSku) ?? trimmed(info.item_sku as string | undefined);
   add(sku ?? `${itemId}:0`, sole ?? info, null);
   return out;

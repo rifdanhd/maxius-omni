@@ -56,6 +56,7 @@ type ListingRow = {
   priceMin: number | null;
   priceMax: number | null;
   stockTotal: number;
+  sharedStock?: boolean;
   lastSyncedAt: string | null;
   variants: VariantRow[];
 };
@@ -593,6 +594,7 @@ export default function TikTokMarketplacePage() {
           </p>
           <h1 className="text-xl font-bold text-foreground">Produk TikTok Shop</h1>
           <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Periksa produk yang dijual di TikTok Shop dan hubungannya dengan katalog pusat; mulai dengan menghubungkan toko di Pengaturan Toko, lalu Perbarui Data dan periksa produk Belum Terhubung untuk memilih variasi stok pusat.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Produk baru dibatasi pada listing aktif yang dibuat dalam 30 hari terakhir. Produk lama yang sudah terhubung tetap diperbarui; draf dan arsip tidak ditambahkan otomatis.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-muted-foreground">
@@ -1278,7 +1280,8 @@ function FragmentRow({
   const statusText = STATUS_LABEL[row.status ?? ""] ?? "Belum di-sync";
   const lastSync = row.lastSyncedAt ? fmtDate(row.lastSyncedAt) : "belum sync";
   const stockTitle =
-    row.variants[0].platformStock !== null
+    row.sharedStock ? "Varian yang memakai stok pusat sama dihitung sekali. Buka rincian untuk melihat stok tayang masing-masing SKU."
+    : row.variants[0].platformStock !== null
       ? "Stok tayang TikTok (hasil sinkronisasi dari Stok Gudang Pusat)."
       : "Belum ada stok tayang dari platform; atur stok di Stok Gudang (Pusat).";
 
@@ -1362,6 +1365,7 @@ function FragmentRow({
             {fmtNumber(row.stockTotal)}
           </span>
           {row.stockTotal === 0 && <StatusBadge status="out" className="ml-2" />}
+          {row.sharedStock && <span className="block text-[10px] font-normal text-muted-foreground">Stok bersama, dihitung sekali</span>}
           <span className="block text-[10px] text-muted-foreground font-normal">{row.accountLabel}</span>
         </td>
 

@@ -3,9 +3,11 @@ import crypto from "node:crypto";
 import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
 import { applyMarketplaceCover } from "@/lib/services/gallery.service";
 import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
+import { catalogImportSince, isActiveTikTokProduct, isRecentCatalogProduct } from "@/lib/services/catalog-import.policy";
 import {
   searchProducts,
   getProduct,
+  getProductDetail,
   updateProductStatus,
   productSkuStock,
   productMainImage,
@@ -138,6 +140,7 @@ export interface TikTokListingRow {
   priceMin: number | null;
   priceMax: number | null;
   stockTotal: number;
+  sharedStock: boolean;
   lastSyncedAt: Date | null;
   variants: TikTokVariantRow[];
 }
@@ -209,24 +212,56 @@ async function enumerateAccountProducts(account: {
   refreshToken: string | null;
   tokenExpiresAt: Date | null;
   shopCipher: string | null;
-}): Promise<Map<string, Record<string, unknown>>> {
+}, discoveryOnly = false): Promise<Map<string, Record<string, unknown>>> {
   const byId = new Map<string, Record<string, unknown>>();
+  const until = Math.floor(Date.now() / 1000);
+  const since = catalogImportSince(until);
+  const seenTokens = new Set<string>();
   let token: string | null = null;
   for (let page = 0; page < 100; page++) {
     const res = await withRefreshedTiktokToken(account, (accessToken, creds) =>
       searchProducts(accessToken, account.shopCipher ?? undefined, {
         pageSize: 100,
         pageToken: token ?? undefined,
+        ...(discoveryOnly ? { status: "ACTIVATE", createTimeFrom: since, createTimeTo: until } : {}),
       }, creds)
     );
     for (const p of res.products) {
+      if (discoveryOnly && (!isActiveTikTokProduct(p.status) || !isRecentCatalogProduct(p.create_time, since, until))) continue;
       const id = String(p.id ?? "");
       if (id) byId.set(id, p);
     }
     if (!res.nextPageToken) break;
+    if (seenTokens.has(res.nextPageToken) || page === 99) throw new Error("Daftar produk TikTok belum lengkap. Coba lagi atau persempit periode katalog.");
+    seenTokens.add(res.nextPageToken);
     token = res.nextPageToken;
   }
   return byId;
+}
+
+async function refreshKnownProducts(
+  account: Parameters<typeof enumerateAccountProducts>[0],
+  mappings: Array<{ platformSkuId: string | null; platformProductId: string | null; sellerSku: string | null; channelSku: string }>,
+  products: Map<string, Record<string, unknown>>,
+) {
+  const missing = mappings.filter(mapping => !mapping.platformProductId || !products.has(mapping.platformProductId));
+  for (const field of ["skuIds", "sellerSkus"] as const) {
+    const values = [...new Set(missing.filter(mapping => field === "skuIds" ? !!mapping.platformSkuId : !mapping.platformSkuId && !mapping.platformProductId)
+      .map(mapping => field === "skuIds" ? mapping.platformSkuId! : mapping.sellerSku || mapping.channelSku))];
+    for (let offset = 0; offset < values.length; offset += 10) {
+      const result = await withRefreshedTiktokToken(account, (token, creds) => searchProducts(token, account.shopCipher ?? undefined,
+        { pageSize: 100, [field]: values.slice(offset, offset + 10) }, creds));
+      if (result.nextPageToken) throw new Error("Katalog SKU terhubung belum lengkap. Sinkronisasi dihentikan agar mapping tidak salah ditandai hilang.");
+      for (const product of result.products) if (product.id) products.set(String(product.id), product);
+    }
+  }
+  const productIds = [...new Set(missing.filter(mapping => !mapping.platformSkuId && mapping.platformProductId).map(mapping => mapping.platformProductId!))];
+  for (const productId of productIds) {
+    if (products.has(productId)) continue;
+    const product = await withRefreshedTiktokToken(account, (token, creds) => getProductDetail(token, account.shopCipher ?? undefined, productId, creds));
+    if (String(product.id ?? "") !== productId) throw new Error("Identitas produk TikTok terhubung belum dapat diverifikasi.");
+    products.set(productId, product);
+  }
 }
 
 /** Enumerasi via search lalu cocokkan channelSku ke sku.id/seller_sku/product.id. */
@@ -299,11 +334,6 @@ function toUnmappedProduct(product: Record<string, unknown>): TikTokUnmappedProd
  * Status yang disembunyikan dari panel "Belum Terhubung": produk terhapus /
  * diarsipkan di Seller Center tidak lagi layak ditawarkan untuk mapping.
  */
-const UNMAPPED_HIDDEN_STATUSES = new Set(["DELETED", "ARCHIVED"]);
-function isUnmappedVisible(p: Record<string, unknown>): boolean {
-  return !UNMAPPED_HIDDEN_STATUSES.has(String(p.status ?? "").toUpperCase());
-}
-
 /**
  * findUnmappedProducts — produk TikTok yang tidak match mapping lokal mana pun.
  * Setiap SKU diperiksa terpisah melalui sku.id / seller_sku. Murni discovery (tanpa
@@ -314,8 +344,10 @@ function findUnmappedProducts(
   channelSkus: string[]
 ): TikTokUnmappedProduct[] {
   const mapped = new Set(channelSkus);
+  const until = Math.floor(Date.now() / 1000);
+  const since = catalogImportSince(until);
   return [...products.values()]
-    .filter(isUnmappedVisible)
+    .filter(product => isActiveTikTokProduct(product.status) && isRecentCatalogProduct(product.create_time, since, until))
     .map(toUnmappedProduct)
     .map((product) => ({
       ...product,
@@ -444,7 +476,8 @@ include: {
      }
 
      try {
-     const products = await enumerateAccountProducts(account);
+     const products = await enumerateAccountProducts(account, true);
+     await refreshKnownProducts(account, account.productMapping, products);
      const skuKeys = buildSkuKeyMap(products);
      let synced = 0;
      let notFound = 0;
@@ -476,26 +509,12 @@ include: {
       if (productStatusUpper === "DELETED") {
         deleted += 1;
         if (m.variantId) deletedVariantIds.add(m.variantId);
-        // Set master product isActive: false jika produk terhapus
-        if (m.variant?.masterProductId) {
-          await prisma.masterProduct.update({
-            where: { id: m.variant.masterProductId },
-            data: { isActive: false },
-          });
-        }
       } else if (
         productStatusUpper === "SELLER_DEACTIVATED" ||
         productStatusUpper === "PLATFORM_DEACTIVATED"
       ) {
         // Non-aktifkan varian dan master product agar tidak tampil di halaman Produk
         if (m.variantId) deletedVariantIds.add(m.variantId);
-        // Set master product isActive: false jika ada mapping dengan status non-aktif
-        if (m.variant?.masterProductId) {
-          await prisma.masterProduct.update({
-            where: { id: m.variant.masterProductId },
-            data: { isActive: false },
-          });
-        }
       }
       await prisma.productMapping.update({ where: { id: m.id }, data: upd });
       if (upd.sellerSku) await prisma.$transaction((tx) => registerSellerSku(tx, { businessId, mappingId: m.id, sellerSku: upd.sellerSku! }));
@@ -550,7 +569,7 @@ include: {
        out.push({ accountId: account.id, label: account.label, unmapped: [] });
        continue;
      }
-     const products = await enumerateAccountProducts(account);
+     const products = await enumerateAccountProducts(account, true);
      out.push({
        accountId: account.id,
        label: account.label,
@@ -768,6 +787,7 @@ export async function listTikTokProducts(
         priceMin: null,
         priceMax: null,
         stockTotal: 0,
+        sharedStock: false,
         lastSyncedAt: m.lastSyncedAt,
         variants: [],
       };
@@ -815,7 +835,18 @@ export async function listTikTokProducts(
     }
   }
 
+  const centralStocks = new Map(mappings.flatMap(mapping => mapping.variantId && mapping.variant ? [[mapping.variantId, mapping.variant.stock] as const] : []));
   const rows: TikTokListingRow[] = [...listingMap.values()].map((row) => {
+    const uniqueVariants = new Map<string, number>();
+    for (const variant of row.variants) {
+      const key = variant.variantId ?? `unmapped:${variant.mappingId}`;
+      uniqueVariants.set(key, Math.max(uniqueVariants.get(key) ?? 0, variant.stock));
+    }
+    row.sharedStock = uniqueVariants.size < row.variants.length;
+    if (row.sharedStock) {
+      for (const [key] of uniqueVariants) if (centralStocks.has(key)) uniqueVariants.set(key, centralStocks.get(key)!);
+    }
+    row.stockTotal = [...uniqueVariants.values()].reduce((sum, stock) => sum + stock, 0);
     const prices = row.variants
       .map((v) => v.price)
       .filter((v): v is number => v !== null);
