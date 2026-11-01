@@ -299,6 +299,32 @@ export interface TikTokUnmappedSku {
   sellerSku: string | null;
   stock: number;
   price: number | null;
+  imageUrl: string | null;
+}
+
+/** Ekstrak URL gambar dari objek SKU TikTok (sku_img / image / sales_attributes). */
+function extractSkuImage(sku: Record<string, unknown>): string | null {
+  const tryImg = (img: unknown): string | null => {
+    if (typeof img === "string" && img) return img;
+    if (img && typeof img === "object") {
+      const u = img as { url?: unknown; urls?: unknown; thumb_urls?: unknown };
+      if (typeof u.url === "string" && u.url) return u.url;
+      if (Array.isArray(u.urls) && typeof u.urls[0] === "string") return u.urls[0];
+      if (Array.isArray(u.thumb_urls) && typeof u.thumb_urls[0] === "string") return u.thumb_urls[0];
+    }
+    return null;
+  };
+  const direct = tryImg(sku.sku_img) ?? tryImg(sku.image);
+  if (direct) return direct;
+  // Coba dari sales_attributes
+  const attrs = sku.sales_attributes as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(attrs)) {
+    for (const a of attrs) {
+      const hit = tryImg(a.sku_img) ?? tryImg(a.image);
+      if (hit) return hit;
+    }
+  }
+  return null;
 }
 
 export interface TikTokUnmappedProduct {
@@ -318,6 +344,7 @@ function toUnmappedProduct(product: Record<string, unknown>): TikTokUnmappedProd
     sellerSku: ((s.seller_sku as string | undefined) || null) as string | null,
     stock: productSkuStock(s),
     price: skuPrice(s),
+    imageUrl: extractSkuImage(s),
   }));
   return {
     platformProductId: String(product.id ?? ""),
@@ -555,32 +582,42 @@ async function enrichUnmappedImages(products: TikTokUnmappedProduct[]): Promise<
       }
     }
   }
-  if (missingProductSkus.size === 0) return;
 
-  const skuArray = Array.from(missingProductSkus);
-  const imageMap = new Map<string, string>();
-  for (let i = 0; i < skuArray.length; i += 500) {
-    const chunk = skuArray.slice(i, i + 500);
-    const items = await prisma.orderItem.findMany({
-      where: { channelSku: { in: chunk }, imageUrl: { not: null } },
-      select: { channelSku: true, imageUrl: true },
-      orderBy: { order: { createTime: "desc" } },
-    });
-    for (const it of items) {
-      if (it.imageUrl && !imageMap.has(it.channelSku)) {
-        imageMap.set(it.channelSku, it.imageUrl);
+  if (missingProductSkus.size > 0) {
+    const skuArray = Array.from(missingProductSkus);
+    const imageMap = new Map<string, string>();
+    for (let i = 0; i < skuArray.length; i += 500) {
+      const chunk = skuArray.slice(i, i + 500);
+      const items = await prisma.orderItem.findMany({
+        where: { channelSku: { in: chunk }, imageUrl: { not: null } },
+        select: { channelSku: true, imageUrl: true },
+        orderBy: { order: { createTime: "desc" } },
+      });
+      for (const it of items) {
+        if (it.imageUrl && !imageMap.has(it.channelSku)) {
+          imageMap.set(it.channelSku, it.imageUrl);
+        }
+      }
+    }
+
+    for (const p of products) {
+      if (!p.imageUrl) {
+        for (const s of p.skus) {
+          const hit = imageMap.get(s.skuId) ?? (s.sellerSku ? imageMap.get(s.sellerSku) : undefined);
+          if (hit) {
+            p.imageUrl = hit;
+            break;
+          }
+        }
       }
     }
   }
 
+  // Fallback: untuk varian yang tidak punya gambar sendiri, gunakan gambar produk
   for (const p of products) {
-    if (!p.imageUrl) {
+    if (p.imageUrl) {
       for (const s of p.skus) {
-        const hit = imageMap.get(s.skuId) ?? (s.sellerSku ? imageMap.get(s.sellerSku) : undefined);
-        if (hit) {
-          p.imageUrl = hit;
-          break;
-        }
+        if (!s.imageUrl) s.imageUrl = p.imageUrl;
       }
     }
   }

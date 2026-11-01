@@ -77,6 +77,7 @@ type UnmappedSku = {
   sellerSku: string | null;
   stock: number;
   price: number | null;
+  imageUrl: string | null;
 };
 
 type UnmappedProduct = {
@@ -720,9 +721,15 @@ export default function TikTokMarketplacePage() {
                             const channelSku = s.skuId || s.sellerSku || "";
                             return (
                               <div key={s.skuId || channelSku} className="flex items-center justify-between gap-2 text-xs bg-muted rounded-md px-2 py-1.5 flex-wrap">
-                                <span className="text-foreground">
-                                  <span className="font-mono font-semibold">{channelSku}</span>
-                                  <span className="text-muted-foreground"> · stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}</span>
+                                <span className="flex items-center gap-2 text-foreground min-w-0">
+                                  {s.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={s.imageUrl} alt={s.sellerSku ?? s.skuId} className="w-8 h-8 rounded object-cover bg-muted shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 bg-muted-foreground/10 rounded shrink-0" />
+                                  )}
+                                  <span className="font-mono font-semibold truncate">{channelSku}</span>
+                                  <span className="text-muted-foreground shrink-0">· stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}</span>
                                 </span>
                                 <button
                                   onClick={() => setMapTarget({ accountId: a.accountId, accountLabel: a.label, product: p, sku: s })}
