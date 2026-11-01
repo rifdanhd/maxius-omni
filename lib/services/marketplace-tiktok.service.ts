@@ -536,12 +536,54 @@ include: {
     });
     const connected = await prisma.productMapping.findMany({ where: { accountId: account.id, account: { businessId }, variantId: { not: null } }, select: { channelSku: true } });
     const unmapped = findUnmappedProducts(products, connected.map((mapping) => mapping.channelSku));
+    await enrichUnmappedImages(unmapped);
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
     } catch (e) {
       results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
     }
   }
   return results;
+}
+
+async function enrichUnmappedImages(products: TikTokUnmappedProduct[]): Promise<void> {
+  const missingProductSkus = new Set<string>();
+  for (const p of products) {
+    if (!p.imageUrl) {
+      for (const s of p.skus) {
+        if (s.skuId) missingProductSkus.add(s.skuId);
+        if (s.sellerSku) missingProductSkus.add(s.sellerSku);
+      }
+    }
+  }
+  if (missingProductSkus.size === 0) return;
+
+  const skuArray = Array.from(missingProductSkus);
+  const imageMap = new Map<string, string>();
+  for (let i = 0; i < skuArray.length; i += 500) {
+    const chunk = skuArray.slice(i, i + 500);
+    const items = await prisma.orderItem.findMany({
+      where: { channelSku: { in: chunk }, imageUrl: { not: null } },
+      select: { channelSku: true, imageUrl: true },
+      orderBy: { order: { createTime: "desc" } },
+    });
+    for (const it of items) {
+      if (it.imageUrl && !imageMap.has(it.channelSku)) {
+        imageMap.set(it.channelSku, it.imageUrl);
+      }
+    }
+  }
+
+  for (const p of products) {
+    if (!p.imageUrl) {
+      for (const s of p.skus) {
+        const hit = imageMap.get(s.skuId) ?? (s.sellerSku ? imageMap.get(s.sellerSku) : undefined);
+        if (hit) {
+          p.imageUrl = hit;
+          break;
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -555,24 +597,26 @@ export async function getTikTokUnmapped(
 ): Promise<Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }>> {
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: "TIKTOK_SHOP", businessId, ...(accountId ? { id: accountId } : {}) },
-include: {
-       productMapping: { where: { variantId: { not: null } }, select: { channelSku: true } },
-     },
-   });
-   const out: Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }> = [];
-   for (const account of accounts) {
-     if (!account.accessToken || !account.shopCipher) {
-       out.push({ accountId: account.id, label: account.label, unmapped: [] });
-       continue;
-     }
-     const products = await enumerateAccountProducts(account, true);
-     out.push({
-       accountId: account.id,
-       label: account.label,
-       unmapped: findUnmappedProducts(
-         products,
-         account.productMapping.map((m) => m.channelSku)
-       ),
+    include: {
+      productMapping: { where: { variantId: { not: null } }, select: { channelSku: true } },
+    },
+  });
+  const out: Array<{ accountId: string; label: string; unmapped: TikTokUnmappedProduct[] }> = [];
+  for (const account of accounts) {
+    if (!account.accessToken || !account.shopCipher) {
+      out.push({ accountId: account.id, label: account.label, unmapped: [] });
+      continue;
+    }
+    const products = await enumerateAccountProducts(account, true);
+    const unmapped = findUnmappedProducts(
+      products,
+      account.productMapping.map((m) => m.channelSku)
+    );
+    await enrichUnmappedImages(unmapped);
+    out.push({
+      accountId: account.id,
+      label: account.label,
+      unmapped,
     });
   }
   return out;

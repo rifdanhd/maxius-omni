@@ -797,21 +797,19 @@ export default function ProductMappingPage() {
       <>
         <DetailHeader
           avatar={
-            <div className="flex size-10 shrink-0 items-center gap-2">
-              {o.imageUrl ? (
-                <img
-                  src={o.imageUrl}
-                  alt={o.channelSku}
-                  className="size-10 rounded-md object-cover"
-                  loading="lazy"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    e.currentTarget.src = "/placeholder-product.svg";
-                  }}
-                />
-              ) : (
-                <Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>
-              )}
-            </div>
+            o.imageUrl ? (
+              <img
+                src={o.imageUrl}
+                alt={o.channelSku}
+                className="size-10 shrink-0 rounded-md object-cover"
+                loading="lazy"
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  e.currentTarget.src = "/placeholder-product.svg";
+                }}
+              />
+            ) : (
+              <Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>
+            )
           }
           title={o.channelSku}
           mono
@@ -1191,22 +1189,19 @@ export default function ProductMappingPage() {
                               active={selection?.kind === "orphan" && selection.key === key}
                               onClick={() => setSelection({ kind: "orphan", key })}
                               avatar={
-                                <div className="flex size-9 shrink-0 items-center gap-2">
-                                  {o.imageUrl ? (
-                                    <img
-                                      src={o.imageUrl}
-                                      alt={o.channelSku}
-                                      className="size-9 rounded-md object-cover"
-                                      loading="lazy"
-                                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                        e.currentTarget.src = "/placeholder-product.svg";
-                                      }}
-                                    />
-                                  ) : (
-                                    <Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>
-                                  )}
-                                  <span className="text-xs font-medium text-foreground">{o.channelSku?.substring(0, 8) ?? "-"}</span>
-                                </div>
+                                o.imageUrl ? (
+                                  <img
+                                    src={o.imageUrl}
+                                    alt={o.channelSku}
+                                    className="size-9 shrink-0 rounded-md object-cover"
+                                    loading="lazy"
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                      e.currentTarget.src = "/placeholder-product.svg";
+                                    }}
+                                  />
+                                ) : (
+                                  <Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>
+                                )
                               }
                               title={o.channelSku}
                               mono

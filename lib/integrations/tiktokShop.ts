@@ -926,17 +926,54 @@ export function productMainImage(product: Record<string, unknown>): string | nul
       if (typeof url === "string" && url) return url;
     }
   }
+  const direct = product.main_image_url ?? product.product_main_image ?? product.cover_image ?? product.thumbnail;
+  if (typeof direct === "string" && direct) return direct;
+
   const images = product.main_image ?? product.sku_images ?? product.images ?? [];
   if (typeof images === "string") return images || null;
   if (!Array.isArray(images)) {
     const url = (images as { url?: unknown })?.url;
-    return typeof url === "string" && url ? url : null;
-  }
-  for (const img of images) {
-    if (typeof img === "string" && img) return img;
-    const url = (img as { url?: unknown })?.url;
     if (typeof url === "string" && url) return url;
+  } else {
+    for (const img of images) {
+      if (typeof img === "string" && img) return img;
+      const url = (img as { url?: unknown })?.url;
+      if (typeof url === "string" && url) return url;
+      const urls = (img as { urls?: unknown })?.urls;
+      if (Array.isArray(urls) && typeof urls[0] === "string" && urls[0]) return urls[0];
+    }
   }
+
+  // Cek pada varian / skus produk
+  const skus = product.skus;
+  if (Array.isArray(skus)) {
+    for (const sku of skus) {
+      if (!sku || typeof sku !== "object") continue;
+      const s = sku as Record<string, unknown>;
+      const skuImg = s.sku_img ?? s.image ?? s.product_main_image;
+      if (typeof skuImg === "string" && skuImg) return skuImg;
+      if (skuImg && typeof skuImg === "object") {
+        const u = skuImg as { url?: unknown; urls?: unknown; thumb_urls?: unknown };
+        if (typeof u.url === "string" && u.url) return u.url;
+        if (Array.isArray(u.urls) && typeof u.urls[0] === "string" && u.urls[0]) return u.urls[0];
+        if (Array.isArray(u.thumb_urls) && typeof u.thumb_urls[0] === "string" && u.thumb_urls[0]) return u.thumb_urls[0];
+      }
+      const attrs = s.sales_attributes;
+      if (Array.isArray(attrs)) {
+        for (const attr of attrs) {
+          const img = (attr as { sku_img?: unknown })?.sku_img;
+          if (typeof img === "string" && img) return img;
+          if (img && typeof img === "object") {
+            const u = img as { url?: unknown; urls?: unknown; thumb_urls?: unknown };
+            if (typeof u.url === "string" && u.url) return u.url;
+            if (Array.isArray(u.urls) && typeof u.urls[0] === "string" && u.urls[0]) return u.urls[0];
+            if (Array.isArray(u.thumb_urls) && typeof u.thumb_urls[0] === "string" && u.thumb_urls[0]) return u.thumb_urls[0];
+          }
+        }
+      }
+    }
+  }
+
   return null;
 }
 
