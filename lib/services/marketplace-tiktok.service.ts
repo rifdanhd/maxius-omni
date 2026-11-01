@@ -411,32 +411,94 @@ type SyncAccountResult = {
 async function autoLinkKnownTikTokSkus(businessId: string, accountId: string, products: TikTokUnmappedProduct[]) {
   let linked = 0;
   for (const product of products) for (const sku of product.skus) {
-    if (!sku.sellerSku?.trim() || !sku.skuId) continue;
+    if (!sku.skuId) continue;
     const added = await prisma.$transaction(async (tx) => {
-      const sellerSku = sku.sellerSku!.trim();
-      await lockSellerSkus(tx, businessId, [sellerSku]);
-      const resolution = await findMasterSku(tx, businessId, sellerSku);
-      if (!resolution.variantId && !resolution.ambiguous) return false;
-      const duplicate = product.skus.filter((item) => item.sellerSku?.trim() === sellerSku).length > 1;
-      const variantId = duplicate ? null : resolution.variantId;
+      let variantId: string | null = null;
+      let sellerSku = sku.sellerSku?.trim() || null;
+
+      // 1. Coba cocokkan via sellerSku ke master SKU
+      if (sellerSku) {
+        await lockSellerSkus(tx, businessId, [sellerSku]);
+        const resolution = await findMasterSku(tx, businessId, sellerSku);
+        if (resolution.variantId && !resolution.ambiguous) {
+          const duplicate = product.skus.filter((item) => item.sellerSku?.trim() === sellerSku).length > 1;
+          if (!duplicate) {
+            variantId = resolution.variantId;
+          }
+        }
+      }
+
+      // 2. Jika belum ketemu, coba cari dari riwayat pesanan (OrderItem) toko/brand ini
+      if (!variantId) {
+        const pastOrderItem = await tx.orderItem.findFirst({
+          where: { channelSku: sku.skuId, variantId: { not: null }, order: { account: { businessId } } },
+          select: { variantId: true, channelSku: true },
+        });
+        if (pastOrderItem?.variantId) {
+          variantId = pastOrderItem.variantId;
+        }
+      }
+
+      // 3. Jika belum ketemu, coba cari dari mapping akun lain dalam brand ini
+      if (!variantId) {
+        const otherMapping = await tx.productMapping.findFirst({
+          where: { channelSku: sku.skuId, variantId: { not: null }, account: { businessId } },
+          select: { variantId: true },
+        });
+        if (otherMapping?.variantId) {
+          variantId = otherMapping.variantId;
+        }
+      }
+
+      if (!variantId) return false;
+
       const old = await tx.productMapping.findUnique({ where: { accountId_channelSku: { accountId, channelSku: sku.skuId } } });
       if (old?.variantId) return false;
-      const values = { variantId, sellerSku, platformSkuId: sku.skuId, platformProductId: product.platformProductId,
-        platformTitle: product.title, platformStatus: product.status, platformStock: sku.stock, lastSyncedAt: new Date() };
-      const mapping = old ? await tx.productMapping.update({ where: { id: old.id }, data: values })
+
+      const values = {
+        variantId,
+        sellerSku,
+        platformSkuId: sku.skuId,
+        platformProductId: product.platformProductId,
+        platformTitle: product.title,
+        platformStatus: product.status,
+        platformStock: sku.stock,
+        lastSyncedAt: new Date(),
+      };
+
+      const mapping = old
+        ? await tx.productMapping.update({ where: { id: old.id }, data: values })
         : await tx.productMapping.create({ data: { accountId, channelSku: sku.skuId, ...values, updatedAt: new Date() } });
-      if (!variantId) {
-        await queueSkuReview(tx, { businessId, mappingId: mapping.id, sellerSku, candidateIds: resolution.candidates,
-          reason: duplicate ? "SKU seller ganda pada varian produk TikTok." : "SKU seller memiliki beberapa stok pusat." });
-        return false;
-      }
-      await tx.stockOutbox.create({ data: { id: crypto.randomUUID(), businessId, variantId,
-        eventKey: `auto-map:${mapping.id}:${crypto.randomUUID()}` } });
+
+      await tx.stockOutbox.create({
+        data: {
+          id: crypto.randomUUID(),
+          businessId,
+          variantId,
+          eventKey: `auto-map:${mapping.id}:${crypto.randomUUID()}`,
+        },
+      });
       return true;
     });
     if (added) linked++;
   }
   return linked;
+}
+
+/**
+ * autoLinkTikTokUnmapped — jalankan auto-link massal untuk semua produk unmapped
+ * yang bisa dicocokkan otomatis (dari sellerSku, orderItem, atau mapping akun lain).
+ */
+export async function autoLinkTikTokUnmapped(businessId: string, accountId?: string): Promise<{ linkedCount: number }> {
+  const unmappedAccounts = await getTikTokUnmapped(businessId, accountId);
+  let totalLinked = 0;
+  for (const acc of unmappedAccounts) {
+    if (acc.unmapped.length > 0) {
+      const count = await autoLinkKnownTikTokSkus(businessId, acc.accountId, acc.unmapped);
+      totalLinked += count;
+    }
+  }
+  return { linkedCount: totalLinked };
 }
 
 /**

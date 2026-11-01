@@ -6,7 +6,7 @@ import { notify } from "@/components/ui/notify";
 import { useEffect, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import Link from "next/link";
-import { Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Loader2, ChevronUp, ExternalLink, Filter, PackageOpen, MoreVertical } from "lucide-react";
+import { Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Loader2, ChevronUp, ExternalLink, Filter, PackageOpen, MoreVertical, Sparkles } from "lucide-react";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -424,6 +424,53 @@ export default function TikTokMarketplacePage() {
     });
   }
 
+  const [autoLinking, setAutoLinking] = useState(false);
+  const [bulkImportingId, setBulkImportingId] = useState<string | null>(null);
+
+  async function handleAutoLink(accountId?: string) {
+    setAutoLinking(true);
+    try {
+      const res = await authFetch("/api/marketplace/tiktok/products/unmapped/auto-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Gagal menjalankan auto-link.");
+      notify(data?.linkedCount > 0 ? "success" : "info", data?.message ?? "Auto-link selesai.");
+      await loadUnmapped();
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      notify("error", e instanceof Error ? e.message : "Gagal auto-link.");
+    } finally {
+      setAutoLinking(false);
+    }
+  }
+
+  async function handleBulkImportProduct(accountId: string, product: UnmappedProduct) {
+    setBulkImportingId(product.platformProductId);
+    try {
+      const res = await authFetch("/api/inventory/mappings/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId,
+          mode: "create-master",
+          products: [product],
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Gagal mengimpor produk.");
+      notify("success", data?.message ?? `Berhasil membuat produk master dan menghubungkan semua varian.`);
+      await loadUnmapped();
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      notify("error", e instanceof Error ? e.message : "Gagal impor massal varian produk.");
+    } finally {
+      setBulkImportingId(null);
+    }
+  }
+
   function removeMappedSku(accountId: string, platformProductId: string, channelSku: string) {
     setUnmapped((prev) =>
       prev
@@ -667,17 +714,33 @@ export default function TikTokMarketplacePage() {
       {/* Produk belum ter-mapping (discovery, bukan auto-import) */}
       {unmappedChecked && unmappedTotal > 0 && (
         <div className="mb-4 bg-muted border border-border rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-3 flex items-center justify-between flex-wrap gap-2">
-            <p className="text-sm font-bold text-foreground">
-              {unmappedTotal} produk di TikTok Shop belum ter-mapping ke stok pusat
-            </p>
-            <button
-              onClick={loadUnmapped}
-              disabled={unmappedLoading}
-              className="text-xs font-semibold text-foreground underline hover:text-foreground disabled:opacity-50"
-            >
-              {unmappedLoading ? "Memeriksa..." : "Periksa ulang"}
-            </button>
+          <div className="px-5 py-3 flex items-center justify-between flex-wrap gap-2.5">
+            <div>
+              <p className="text-sm font-bold text-foreground">
+                {unmappedTotal} produk di TikTok Shop belum ter-mapping ke stok pusat
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Hubungkan otomatis SKU yang cocok atau petakan sekaligus seluruh varian per produk.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleAutoLink()}
+                disabled={autoLinking || unmappedLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-xs transition-colors"
+                title="Cari kecocokan otomatis dari Seller SKU dan riwayat pesanan untuk semua produk unmapped"
+              >
+                {autoLinking ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                {autoLinking ? "Mencocokkan..." : "Hubungkan Otomatis Semua Yang Cocok"}
+              </button>
+              <button
+                onClick={loadUnmapped}
+                disabled={unmappedLoading}
+                className="text-xs font-semibold text-muted-foreground hover:text-foreground underline disabled:opacity-50"
+              >
+                {unmappedLoading ? "Memeriksa..." : "Periksa ulang"}
+              </button>
+            </div>
           </div>
           <div className="divide-y divide-border">
             {unmapped.filter((a) => a.unmapped.length > 0).map((a) => (
@@ -689,7 +752,7 @@ export default function TikTokMarketplacePage() {
                   <span className="font-semibold text-foreground">
                     {a.label}
                     <span className="ml-2 px-1.5 py-0.5 rounded-full bg-muted-foreground text-primary-foreground text-[10px] font-bold">
-                      {a.unmapped.length}
+                      {a.unmapped.length} produk
                     </span>
                   </span>
                   {unmappedOpen.has(a.accountId) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -698,24 +761,43 @@ export default function TikTokMarketplacePage() {
                   <div className="px-5 pb-3 flex flex-col gap-2">
                     {a.unmapped.map((p) => (
                       <div key={p.platformProductId} className="bg-card border border-border rounded-lg p-3">
-                        <div className="flex gap-3">
-                          {p.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.imageUrl} alt={p.title ?? p.platformProductId} className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
-                          ) : (
-                            <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
-                              <PackageOpen size={18} />
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="flex gap-3 min-w-0 flex-1">
+                            {p.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.imageUrl} alt={p.title ?? p.platformProductId} className="w-12 h-12 rounded object-cover bg-muted shrink-0" />
+                            ) : (
+                              <div className="w-12 h-12 bg-muted rounded flex items-center justify-center text-muted-foreground shrink-0">
+                                <PackageOpen size={18} />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-foreground leading-tight" title={p.title ?? undefined}>
+                                {p.title ?? p.platformProductId}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                ID {p.platformProductId}
+                                {p.status ? ` · ${STATUS_LABEL[p.status] ?? p.status}` : ""}
+                                <span className="font-semibold text-foreground ml-1.5">({p.skus.length} varian)</span>
+                              </p>
                             </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-foreground leading-tight" title={p.title ?? undefined}>
-                              {p.title ?? p.platformProductId}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              ID {p.platformProductId}
-                              {p.status ? ` · ${STATUS_LABEL[p.status] ?? p.status}` : ""}
-                            </p>
                           </div>
+                          <button
+                            onClick={() => handleBulkImportProduct(a.accountId, p)}
+                            disabled={bulkImportingId === p.platformProductId}
+                            title="Buat Produk Master baru di stok pusat dan langsung hubungkan seluruh varian produk ini"
+                            className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 shadow-xs transition-colors"
+                          >
+                            {bulkImportingId === p.platformProductId ? (
+                              <>
+                                <Loader2 size={13} className="animate-spin" /> Memetakan...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles size={13} /> Petakan Semua Varian ({p.skus.length})
+                              </>
+                            )}
+                          </button>
                         </div>
                         <div className="mt-2 flex flex-col gap-1">
                           {p.skus.map((s) => {
