@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFFont, StandardFonts, rgb } from "pdf-lib";
 import { getShippingDocument } from "@/lib/integrations/tiktokShop";
 import { NON_TIKTOK_LABEL_REASON } from "@/lib/utils/platform-guard";
 import { downloadValidatedPdf } from "@/lib/security/validate-upload";
@@ -23,6 +23,7 @@ const GRAY = rgb(0.5, 0.5, 0.5);
 const NAVY = rgb(0.13, 0.13, 0.32);
 const WHITE = rgb(1, 1, 1);
 const PURPLE = rgb(0.46, 0.3, 0.9);
+const INK = rgb(0, 0, 0);
 
 export type LabelMergeProductRow = {
   productName: string;
@@ -202,7 +203,39 @@ function wrapText(text: string, maxCharsPerLine = 32, maxLines = 2): string[] {
   return lines.length > 0 ? lines : ["-"];
 }
 
-/** Menempelkan tabel rincian produk & varian langsung pada area putih bagian bawah label resmi TikTok (halaman 1) dengan layout minimalis dan bersih standar resmi TikTok Shop / Tokopedia. */
+/** Potong teks dengan "…" sesuai lebar sebenarnya. */
+function fitText(text: string, font: PDFFont, size: number, maxW: number): string {
+  let t = text;
+  if (font.widthOfTextAtSize(t, size) <= maxW) return t;
+  while (t.length > 1 && font.widthOfTextAtSize(t + "…", size) > maxW) t = t.slice(0, -1);
+  return t + "…";
+}
+
+/** Word-wrap berdasarkan lebar sebenarnya. */
+function wrapByWidth(text: string, font: PDFFont, size: number, maxW: number, maxLines: number): string[] {
+  const words = String(text ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return ["-"];
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w;
+    if (font.widthOfTextAtSize(test, size) <= maxW) {
+      cur = test;
+    } else {
+      if (cur) lines.push(cur);
+      cur = w;
+    }
+  }
+  if (cur) lines.push(cur);
+  let out = lines;
+  if (lines.length > maxLines) {
+    out = lines.slice(0, maxLines);
+    out[maxLines - 1] += "…";
+  }
+  return out.map((l) => fitText(l, font, size, maxW));
+}
+
+/** Tabel rincian produk di bawah label resmi TikTok, meniru tata letak aslinya. */
 export async function stampProductVariantOnLabel(
   pdfBytes: Uint8Array,
   rows: LabelMergeProductRow[],
@@ -216,197 +249,93 @@ export async function stampProductVariantOnLabel(
 
   const page = pages[0];
   const { width, height } = page.getSize();
+  if (height < 300) return pdfBytes;
+
   const font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedStandardFont(StandardFonts.HelveticaBold);
 
-  // Label resmi A6 (tinggi ~420pt). Area kurir berakhir di sekitar y ≈ 142pt.
-  const margin = 12;
-  const boxWidth = width - margin * 2;
-  const boxTop = Math.min(142, height * 0.36);
-  const boxBottom = 8;
-  const boxHeight = boxTop - boxBottom;
+  const L = 5.8;
+  const R = width - 4.4;
+  const LABEL_BOTTOM = 130;
+  const colX = { prod: L, sku: 130, sellerSku: 172.7, qtyHead: 265, qtyMid: 271 };
+  const LEAD = 8.5;
+  const TAIL = 38.5;
 
-  if (boxHeight < 50) {
-    return pdfBytes;
-  }
+  page.drawRectangle({ x: 0, y: 0, width, height: LABEL_BOTTOM, color: WHITE });
 
-  // 1. Bersihkan area bawah dengan latar putih bersih
-  page.drawRectangle({
-    x: margin,
-    y: boxBottom,
-    width: boxWidth,
-    height: boxHeight,
-    color: WHITE,
-  });
-
-  // Garis luar pembatas (kiri, kanan, bawah) agar menyatu dengan border resi
-  page.drawLine({ start: { x: margin, y: boxBottom }, end: { x: margin + boxWidth, y: boxBottom }, thickness: 1, color: DARK });
-  page.drawLine({ start: { x: margin, y: boxBottom }, end: { x: margin, y: boxTop }, thickness: 1, color: DARK });
-  page.drawLine({ start: { x: margin + boxWidth, y: boxBottom }, end: { x: margin + boxWidth, y: boxTop }, thickness: 1, color: DARK });
-  page.drawLine({ start: { x: margin, y: boxTop }, end: { x: margin + boxWidth, y: boxTop }, thickness: 1, color: DARK });
-
-  // 2. Sub-header tanggal transit (standar TikTok Shop)
-  const transitDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const pad = (n: number) => String(n).padStart(2, "0");
-  const transitStr = `${pad(transitDate.getDate())}/${pad(transitDate.getMonth() + 1)}/${transitDate.getFullYear()} 23:59`;
-  page.drawText(`In transit by: ${transitStr}`, {
-    x: margin + 3,
-    y: boxTop - 10,
-    size: 6.5,
-    font,
-    color: DARK,
+  page.drawText(`In transit by: ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} 23:59`, {
+    x: L, y: 121, size: 7, font, color: INK,
   });
 
-  // 3. Header Tabel Bersih (Product Name | SKU | Seller SKU | Qty)
-  const headerY = boxTop - 21;
-  const colX = {
-    prod: margin + 3,
-    sku: margin + 116,
-    sellerSku: margin + 160,
-    qty: margin + boxWidth - 18,
-  };
+  const headerY = 109;
+  page.drawText("Product Name", { x: colX.prod, y: headerY, size: 7, font: bold, color: INK });
+  page.drawText("SKU", { x: colX.sku, y: headerY, size: 7, font: bold, color: INK });
+  page.drawText("Seller SKU", { x: colX.sellerSku, y: headerY, size: 7, font: bold, color: INK });
+  page.drawText("Qty", { x: colX.qtyHead, y: headerY, size: 7, font: bold, color: INK });
+  let cursor = 105;
+  page.drawLine({ start: { x: L, y: cursor }, end: { x: R, y: cursor }, thickness: 0.6, color: INK });
 
-  page.drawText("Product Name", { x: colX.prod, y: headerY, size: 6.5, font: bold, color: DARK });
-  page.drawText("SKU", { x: colX.sku, y: headerY, size: 6.5, font: bold, color: DARK });
-  page.drawText("Seller SKU", { x: colX.sellerSku, y: headerY, size: 6.5, font: bold, color: DARK });
-  page.drawText("Qty", { x: colX.qty, y: headerY, size: 6.5, font: bold, color: DARK });
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const prodLines = wrapByWidth(safeText(r.productName), font, 7, colX.sku - colX.prod - 6, 3);
+    const varName = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
+    const skuLines = wrapByWidth(varName, font, 6.5, colX.sellerSku - colX.sku - 4, 2);
+    const nLines = Math.max(prodLines.length, skuLines.length);
+    const itemH = 9 + (nLines - 1) * LEAD + 4;
+    const isLast = i === rows.length - 1;
 
-  const headerLineY = headerY - 3;
-  page.drawLine({ start: { x: margin, y: headerLineY }, end: { x: margin + boxWidth, y: headerLineY }, thickness: 0.6, color: DARK });
-
-  // 4. Baris Produk — hitung berapa baris muat di area (tiap item: 1-3 baris teks)
-  let curY = headerLineY - 9;
-  // Estimasi berapa item muat: setiap item butuh min 11pt (1 baris), maks 24pt (3 baris).
-  // Ambil semua item, tapi berhenti render jika curY sudah habis.
-  const displayRows = rows;
-
-  for (let i = 0; i < displayRows.length; i++) {
-    const r = displayRows[i];
-    const safeProd = safeText(r.productName);
-    // Nama produk bisa sampai 3 baris agar tidak terpotong
-    const prodLines = wrapText(safeProd, 30, 3);
-
-    // Hitung tinggi baris saat ini sebelum render, hentikan jika tidak cukup ruang
-    const rowHeight = prodLines.length === 1 ? 11 : prodLines.length === 2 ? 17 : 24;
-    if (curY - rowHeight < boxBottom + 36) {
-      // Tidak cukup ruang — tampilkan indikator sisa item
-      const remaining = rows.length - i;
-      if (remaining > 0) {
-        page.drawText(`+ ${remaining} item lainnya`, {
-          x: margin + 3,
-          y: curY - 1,
-          size: 5.5,
-          font: bold,
-          color: GRAY,
-        });
-      }
-      curY -= 8;
+    if (cursor - itemH - TAIL < 5 + (isLast ? 0 : 9)) {
+      page.drawText(`+ ${rows.length - i} item lainnya`, { x: L, y: cursor - 7, size: 6, font: bold, color: INK });
+      cursor -= 9;
       break;
     }
 
-    // Cetak nama produk (hingga 3 baris agar tidak terpotong)
-    for (let li = 0; li < prodLines.length; li++) {
-      page.drawText(prodLines[li], {
-        x: colX.prod,
-        y: curY - li * 7.5,
-        size: 6,
-        font,
-        color: DARK,
-        maxWidth: 110,
-      });
-    }
+    const base = cursor - 9;
+    prodLines.forEach((t, li) => page.drawText(t, { x: colX.prod, y: base - li * LEAD, size: 7, font, color: INK }));
+    skuLines.forEach((t, li) => page.drawText(t, { x: colX.sku, y: base - li * LEAD, size: 6.5, font, color: INK }));
 
-    // SKU (nama varian) — sejajar baris pertama
-    const varName = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
-    page.drawText(clip(varName, 18), {
-      x: colX.sku,
-      y: curY,
-      size: 6,
-      font,
-      color: DARK,
-      maxWidth: 42,
-    });
+    const seller = fitText(safeText(r.sellerSku && r.sellerSku !== "-" ? r.sellerSku : "-"), font, 6.5, 262 - colX.sellerSku);
+    page.drawText(seller, { x: colX.sellerSku, y: base, size: 6.5, font, color: INK });
 
-    // Seller SKU — sejajar baris pertama
-    const sellerSkuText = safeText(r.sellerSku && r.sellerSku !== "-" ? r.sellerSku : "-");
-    page.drawText(clip(sellerSkuText, 18), {
-      x: colX.sellerSku,
-      y: curY,
-      size: 6,
-      font,
-      color: DARK,
-      maxWidth: 45,
-    });
+    const q = String(r.qty);
+    page.drawText(q, { x: colX.qtyMid - font.widthOfTextAtSize(q, 7) / 2, y: base, size: 7, font, color: INK });
 
-    // Qty — sejajar baris pertama
-    page.drawText(String(r.qty), {
-      x: colX.qty + 2,
-      y: curY,
-      size: 6.5,
-      font,
-      color: DARK,
-    });
-
-    curY -= rowHeight;
-    if (i < displayRows.length - 1) {
-      page.drawLine({ start: { x: margin, y: curY + 2 }, end: { x: margin + boxWidth, y: curY + 2 }, thickness: 0.3, color: LIGHT });
+    cursor -= itemH;
+    if (!isLast) {
+      page.drawLine({ start: { x: L, y: cursor }, end: { x: R, y: cursor }, thickness: 0.3, color: LIGHT });
     }
   }
 
-  // 5. Total Qty
-  const totalQtyLineY = boxBottom + 25;
-  page.drawLine({ start: { x: margin, y: totalQtyLineY + 11 }, end: { x: margin + boxWidth, y: totalQtyLineY + 11 }, thickness: 0.6, color: DARK });
+  page.drawLine({ start: { x: L, y: cursor }, end: { x: R, y: cursor }, thickness: 0.6, color: INK });
+  const totalQty = rows.reduce((s, r) => s + (Number(r.qty) || 0), 0);
+  const totalNum = ` ${totalQty}`;
+  const numW = font.widthOfTextAtSize(totalNum, 7);
+  const labW = bold.widthOfTextAtSize("Qty Total:", 7);
+  page.drawText("Qty Total:", { x: R - numW - labW, y: cursor - 9, size: 7, font: bold, color: INK });
+  page.drawText(totalNum, { x: R - numW, y: cursor - 9, size: 7, font, color: INK });
 
-  const totalQty = rows.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
-  page.drawText(`Qty Total: ${totalQty}`, {
-    x: margin + boxWidth - 58,
-    y: totalQtyLineY + 2,
-    size: 6.8,
-    font: bold,
-    color: DARK,
+  const line2 = cursor - 13;
+  page.drawLine({ start: { x: L, y: line2 }, end: { x: R, y: line2 }, thickness: 0.6, color: INK });
+
+  const logoY = line2 - 19.3;
+  page.drawText("tokopedia", { x: L, y: logoY, size: 13, font: bold, color: INK });
+  page.drawLine({ start: { x: 87, y: line2 - 1 }, end: { x: 87, y: line2 - 20.5 }, thickness: 0.5, color: GRAY });
+
+  page.drawRectangle({ x: 102, y: logoY - 1, width: 11, height: 9.5, color: INK });
+  page.drawSvgPath("M 0 0 V -2 C 0 -6.5 6.5 -6.5 6.5 -2 V 0", {
+    x: 104.2, y: logoY + 12.5, borderWidth: 0.9, borderColor: INK,
   });
+  page.drawCircle({ x: 107.5, y: logoY + 3.7, size: 1.9, color: WHITE });
 
-  // 6. Garis Pemisah Footer
-  page.drawLine({ start: { x: margin, y: totalQtyLineY }, end: { x: margin + boxWidth, y: totalQtyLineY }, thickness: 0.6, color: DARK });
+  page.drawText("Shop", { x: 119, y: logoY, size: 13, font: bold, color: INK });
 
-  // 7. Footer: tokopedia | Shop & Order ID
-  const footerY = boxBottom + 6;
+  const oid = `Order ID: ${orderNo ? safeText(orderNo) : "-"}`;
+  page.drawText(oid, { x: R - font.widthOfTextAtSize(oid, 5.8), y: logoY + 9.5, size: 5.8, font, color: INK });
 
-  // tokopedia logo / text
-  page.drawText("tokopedia", {
-    x: margin + 4,
-    y: footerY,
-    size: 7.5,
-    font: bold,
-    color: DARK,
-  });
-
-  // Divider vertical
-  page.drawLine({
-    start: { x: margin + 44, y: footerY - 1 },
-    end: { x: margin + 44, y: footerY + 8 },
-    thickness: 0.5,
-    color: GRAY,
-  });
-
-  // Shop text
-  page.drawText("Shop", {
-    x: margin + 50,
-    y: footerY,
-    size: 7.5,
-    font: bold,
-    color: DARK,
-  });
-
-  // Order ID di kanan
-  const safeOrderNo = orderNo ? safeText(orderNo) : "-";
-  page.drawText(`Order ID: ${safeOrderNo}`, {
-    x: margin + boxWidth - 110,
-    y: footerY + 0.5,
-    size: 6,
-    font,
-    color: DARK,
-  });
+  const bottomY = line2 - 25.5;
+  page.drawLine({ start: { x: L, y: bottomY }, end: { x: R, y: bottomY }, thickness: 0.6, color: INK });
 
   return await pdfDoc.save();
 }
