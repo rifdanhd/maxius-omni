@@ -103,9 +103,15 @@ export function withAuth(
       }
       if (!["GET", "HEAD"].includes(req.method) && req.headers.get("content-type")?.includes("application/json")) {
         if (Number(req.headers.get("content-length")) > 1024 * 1024) return Response.json({ error: "Body terlalu besar." }, { status: 413 });
-        const bytes = await readLimitedStream(req.body, 1024 * 1024);
-        let value: unknown;
-        try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); } catch { throw new InputError("JSON tidak valid."); }
+        const bytes = await readLimitedStream(req.body, 1024 * 1024, { allowEmpty: true });
+        let value: unknown = {};
+        if (bytes.byteLength > 0) {
+          try {
+            value = JSON.parse(Buffer.from(bytes).toString("utf8"));
+          } catch {
+            throw new InputError("JSON tidak valid.");
+          }
+        }
         validateApiJson(value);
         req.json = async () => value;
       }
