@@ -694,7 +694,6 @@ include: {
     const connected = await prisma.productMapping.findMany({ where: { accountId: account.id, account: { businessId }, variantId: { not: null } }, select: { channelSku: true } });
     const unmapped = findUnmappedProducts(products, connected.map((mapping) => mapping.channelSku));
     await enrichUnmappedImages(unmapped);
-    await enrichUnmappedFromTikTokDetail(account, unmapped);
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
     } catch (e) {
       console.error(`[syncTikTokListings] Error sync akun ${account.label} (${account.id}):`, e);
@@ -787,9 +786,9 @@ async function enrichUnmappedFromTikTokDetail(
   account: { id: string; label: string; accessToken: string | null; refreshToken: string | null; tokenExpiresAt: Date | null; shopCipher: string | null },
   products: TikTokUnmappedProduct[]
 ): Promise<void> {
-  const candidates = products.filter(
-    (p) => !p.imageUrl || p.skus.some((s) => !s.imageUrl || !s.skuName)
-  );
+  const candidates = products
+    .filter((p) => !p.imageUrl || p.skus.some((s) => !s.imageUrl || !s.skuName))
+    .slice(0, 10);
   if (candidates.length === 0) return;
 
   const BATCH_SIZE = 5;
