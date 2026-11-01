@@ -180,7 +180,29 @@ function safeText(str: string): string {
     .trim();
 }
 
-/** Menempelkan tabel rincian produk & varian langsung pada area putih bagian bawah label resmi TikTok (halaman 1), sehingga label tetap 100% ASLI (barcode, logo TikTok & J&T, alamat kurir) dan sekaligus memuat varian untuk staf packing gudang. */
+/** Memecah teks panjang menjadi beberapa baris (word-wrap) untuk PDF. */
+function wrapText(text: string, maxCharsPerLine = 32, maxLines = 2): string[] {
+  const words = String(text ?? "").trim().replace(/\s+/g, " ").split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const w of words) {
+    if (!current) {
+      current = w;
+    } else if ((current + " " + w).length <= maxCharsPerLine) {
+      current += " " + w;
+    } else {
+      lines.push(current);
+      current = w;
+      if (lines.length >= maxLines) break;
+    }
+  }
+  if (current && lines.length < maxLines) {
+    lines.push(current);
+  }
+  return lines.length > 0 ? lines : ["-"];
+}
+
+/** Menempelkan tabel rincian produk & varian langsung pada area putih bagian bawah label resmi TikTok (halaman 1) dengan layout minimalis dan bersih standar resmi TikTok Shop / Tokopedia. */
 export async function stampProductVariantOnLabel(
   pdfBytes: Uint8Array,
   rows: LabelMergeProductRow[],
@@ -197,159 +219,194 @@ export async function stampProductVariantOnLabel(
   const font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedStandardFont(StandardFonts.HelveticaBold);
 
-  // Label resmi A6 (tinggi ~420pt). Area kurir berakhir di sekitar y ≈ 145pt.
-  // Area bawah yang kosong ada di rentang y = 10pt s.d. y = 142pt.
+  // Label resmi A6 (tinggi ~420pt). Area kurir berakhir di sekitar y ≈ 142pt.
   const margin = 12;
   const boxWidth = width - margin * 2;
   const boxTop = Math.min(142, height * 0.36);
-  const boxBottom = 10;
+  const boxBottom = 8;
   const boxHeight = boxTop - boxBottom;
 
   if (boxHeight < 50) {
-    // Ruang di bawah tidak cukup, kembalikan dokumen asli
     return pdfBytes;
   }
 
-  // 1. Kotak bingkai pembatas
+  // 1. Bersihkan area bawah dengan latar putih bersih
   page.drawRectangle({
     x: margin,
     y: boxBottom,
     width: boxWidth,
     height: boxHeight,
-    borderWidth: 1,
-    borderColor: DARK,
     color: WHITE,
   });
 
-  // 2. Baris Header Gelap
-  const headerHeight = 13;
-  const headerY = boxTop - headerHeight;
-  page.drawRectangle({
-    x: margin,
-    y: headerY,
-    width: boxWidth,
-    height: headerHeight,
-    color: NAVY,
-  });
+  // Garis luar pembatas (kiri, kanan, bawah) agar menyatu dengan border resi
+  page.drawLine({ start: { x: margin, y: boxBottom }, end: { x: margin + boxWidth, y: boxBottom }, thickness: 1, color: DARK });
+  page.drawLine({ start: { x: margin, y: boxBottom }, end: { x: margin, y: boxTop }, thickness: 1, color: DARK });
+  page.drawLine({ start: { x: margin + boxWidth, y: boxBottom }, end: { x: margin + boxWidth, y: boxTop }, thickness: 1, color: DARK });
+  page.drawLine({ start: { x: margin, y: boxTop }, end: { x: margin + boxWidth, y: boxTop }, thickness: 1, color: DARK });
 
-  page.drawText("RINCIAN PRODUK & VARIAN", {
-    x: margin + 6,
-    y: headerY + 3.5,
-    size: 7,
-    font: bold,
-    color: WHITE,
-  });
-
-  const totalQty = rows.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
-  page.drawText(`Total: ${totalQty} pcs`, {
-    x: margin + boxWidth - 55,
-    y: headerY + 3.5,
+  // 2. Sub-header tanggal transit (standar TikTok Shop)
+  const transitDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const transitStr = `${pad(transitDate.getDate())}/${pad(transitDate.getMonth() + 1)}/${transitDate.getFullYear()} 23:59`;
+  page.drawText(`In transit by: ${transitStr}`, {
+    x: margin + 3,
+    y: boxTop - 10,
     size: 6.5,
-    font: bold,
-    color: WHITE,
+    font,
+    color: DARK,
   });
 
-  // 3. Kolom Tabel
-  const cols = [
-    { label: "No", w: 18 },
-    { label: "Nama Produk", w: Math.floor(boxWidth * 0.44) },
-    { label: "Varian / SKU", w: Math.floor(boxWidth * 0.40) },
-    { label: "Qty", w: boxWidth - 18 - Math.floor(boxWidth * 0.44) - Math.floor(boxWidth * 0.40) },
-  ];
+  // 3. Header Tabel Bersih (Product Name | SKU | Seller SKU | Qty)
+  const headerY = boxTop - 21;
+  const colX = {
+    prod: margin + 3,
+    sku: margin + 116,
+    sellerSku: margin + 160,
+    qty: margin + boxWidth - 18,
+  };
 
-  const colHeaderY = headerY - 11;
-  let cx = margin;
-  for (const c of cols) {
-    page.drawText(c.label, {
-      x: cx + 3,
-      y: colHeaderY + 2.5,
-      size: 6.5,
-      font: bold,
-      color: DARK,
-    });
-    cx += c.w;
-  }
-  page.drawLine({
-    start: { x: margin, y: colHeaderY },
-    end: { x: margin + boxWidth, y: colHeaderY },
-    thickness: 0.5,
-    color: LIGHT,
-  });
+  page.drawText("Product Name", { x: colX.prod, y: headerY, size: 6.5, font: bold, color: DARK });
+  page.drawText("SKU", { x: colX.sku, y: headerY, size: 6.5, font: bold, color: DARK });
+  page.drawText("Seller SKU", { x: colX.sellerSku, y: headerY, size: 6.5, font: bold, color: DARK });
+  page.drawText("Qty", { x: colX.qty, y: headerY, size: 6.5, font: bold, color: DARK });
 
-  // 4. Data Baris Produk & Varian
-  const rowHeight = 12.5;
-  let currentY = colHeaderY - rowHeight;
-  const maxRows = Math.floor((colHeaderY - boxBottom - 4) / rowHeight);
+  const headerLineY = headerY - 3;
+  page.drawLine({ start: { x: margin, y: headerLineY }, end: { x: margin + boxWidth, y: headerLineY }, thickness: 0.6, color: DARK });
+
+  // 4. Baris Produk
+  let curY = headerLineY - 9;
+  const maxRows = Math.min(rows.length, 3);
   const displayRows = rows.slice(0, maxRows);
 
   for (let i = 0; i < displayRows.length; i++) {
     const r = displayRows[i];
-    cx = margin;
+    const safeProd = safeText(r.productName);
+    const prodLines = wrapText(safeProd, 32, 2);
 
-    // No
-    page.drawText(String(i + 1), {
-      x: cx + 4,
-      y: currentY + 3,
+    // Cetak nama produk (bisa 2 baris agar tidak terpotong)
+    page.drawText(prodLines[0], {
+      x: colX.prod,
+      y: curY,
+      size: 6,
+      font,
+      color: DARK,
+      maxWidth: 110,
+    });
+    if (prodLines[1]) {
+      page.drawText(prodLines[1], {
+        x: colX.prod,
+        y: curY - 7.5,
+        size: 6,
+        font,
+        color: DARK,
+        maxWidth: 110,
+      });
+    }
+
+    // SKU (nama varian)
+    const varName = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
+    page.drawText(clip(varName, 18), {
+      x: colX.sku,
+      y: curY,
+      size: 6,
+      font,
+      color: DARK,
+      maxWidth: 42,
+    });
+
+    // Seller SKU
+    const sellerSkuText = safeText(r.sellerSku && r.sellerSku !== "-" ? r.sellerSku : "-");
+    page.drawText(clip(sellerSkuText, 18), {
+      x: colX.sellerSku,
+      y: curY,
+      size: 6,
+      font,
+      color: DARK,
+      maxWidth: 45,
+    });
+
+    // Qty
+    page.drawText(String(r.qty), {
+      x: colX.qty + 2,
+      y: curY,
       size: 6.5,
       font,
       color: DARK,
     });
-    cx += cols[0].w;
 
-    // Nama Produk
-    const safeProd = safeText(r.productName);
-    page.drawText(clip(safeProd, 40), {
-      x: cx + 3,
-      y: currentY + 3,
-      size: 6.5,
-      font: bold,
-      color: DARK,
-      maxWidth: cols[1].w - 6,
-    });
-    cx += cols[1].w;
-
-    // Varian
-    const variantStr = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
-    page.drawText(clip(variantStr, 36), {
-      x: cx + 3,
-      y: currentY + 3,
-      size: 6.5,
-      font: bold,
-      color: DARK,
-      maxWidth: cols[2].w - 6,
-    });
-    cx += cols[2].w;
-
-    // Qty
-    page.drawText(String(r.qty), {
-      x: cx + 6,
-      y: currentY + 3,
-      size: 7,
-      font: bold,
-      color: DARK,
-    });
-
-    // Divider
-    page.drawLine({
-      start: { x: margin, y: currentY },
-      end: { x: margin + boxWidth, y: currentY },
-      thickness: 0.4,
-      color: LIGHT,
-    });
-
-    currentY -= rowHeight;
+    curY -= prodLines.length > 1 ? 16 : 11;
+    if (i < displayRows.length - 1) {
+      page.drawLine({ start: { x: margin, y: curY + 2 }, end: { x: margin + boxWidth, y: curY + 2 }, thickness: 0.3, color: LIGHT });
+    }
   }
 
-  // Jika produk melebihi kapasitas baris
+  // Jika item lebih banyak dari kapasitas tampil
   if (rows.length > maxRows) {
     page.drawText(`+ ${rows.length - maxRows} produk lainnya`, {
-      x: margin + 6,
-      y: boxBottom + 2.5,
-      size: 6,
+      x: margin + 3,
+      y: curY + 1,
+      size: 5.5,
       font: bold,
       color: GRAY,
     });
+    curY -= 7;
   }
+
+  // 5. Total Qty
+  const totalQtyLineY = boxBottom + 25;
+  page.drawLine({ start: { x: margin, y: totalQtyLineY + 11 }, end: { x: margin + boxWidth, y: totalQtyLineY + 11 }, thickness: 0.6, color: DARK });
+
+  const totalQty = rows.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
+  page.drawText(`Qty Total: ${totalQty}`, {
+    x: margin + boxWidth - 58,
+    y: totalQtyLineY + 2,
+    size: 6.8,
+    font: bold,
+    color: DARK,
+  });
+
+  // 6. Garis Pemisah Footer
+  page.drawLine({ start: { x: margin, y: totalQtyLineY }, end: { x: margin + boxWidth, y: totalQtyLineY }, thickness: 0.6, color: DARK });
+
+  // 7. Footer: tokopedia | Shop & Order ID
+  const footerY = boxBottom + 6;
+
+  // tokopedia logo / text
+  page.drawText("tokopedia", {
+    x: margin + 4,
+    y: footerY,
+    size: 7.5,
+    font: bold,
+    color: DARK,
+  });
+
+  // Divider vertical
+  page.drawLine({
+    start: { x: margin + 44, y: footerY - 1 },
+    end: { x: margin + 44, y: footerY + 8 },
+    thickness: 0.5,
+    color: GRAY,
+  });
+
+  // Shop text
+  page.drawText("Shop", {
+    x: margin + 50,
+    y: footerY,
+    size: 7.5,
+    font: bold,
+    color: DARK,
+  });
+
+  // Order ID di kanan
+  const safeOrderNo = orderNo ? safeText(orderNo) : "-";
+  page.drawText(`Order ID: ${safeOrderNo}`, {
+    x: margin + boxWidth - 110,
+    y: footerY + 0.5,
+    size: 6,
+    font,
+    color: DARK,
+  });
 
   return await pdfDoc.save();
 }
