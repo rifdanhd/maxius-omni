@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
 import { applyMarketplaceCover } from "@/lib/services/gallery.service";
 import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
-import { catalogImportSince, isActiveTikTokProduct, isRecentCatalogProduct } from "@/lib/services/catalog-import.policy";
+import { isActiveTikTokProduct } from "@/lib/services/catalog-import.policy";
 import {
   searchProducts,
   getProduct,
@@ -214,8 +214,6 @@ async function enumerateAccountProducts(account: {
   shopCipher: string | null;
 }, discoveryOnly = false): Promise<Map<string, Record<string, unknown>>> {
   const byId = new Map<string, Record<string, unknown>>();
-  const until = Math.floor(Date.now() / 1000);
-  const since = catalogImportSince(until);
   const seenTokens = new Set<string>();
   let token: string | null = null;
   for (let page = 0; page < 100; page++) {
@@ -223,16 +221,16 @@ async function enumerateAccountProducts(account: {
       searchProducts(accessToken, account.shopCipher ?? undefined, {
         pageSize: 100,
         pageToken: token ?? undefined,
-        ...(discoveryOnly ? { status: "ACTIVATE", createTimeFrom: since, createTimeTo: until } : {}),
+        ...(discoveryOnly ? { status: "ACTIVATE" } : {}),
       }, creds)
     );
     for (const p of res.products) {
-      if (discoveryOnly && (!isActiveTikTokProduct(p.status) || !isRecentCatalogProduct(p.create_time, since, until))) continue;
+      if (discoveryOnly && !isActiveTikTokProduct(p.status)) continue;
       const id = String(p.id ?? "");
       if (id) byId.set(id, p);
     }
     if (!res.nextPageToken) break;
-    if (seenTokens.has(res.nextPageToken) || page === 99) throw new Error("Daftar produk TikTok belum lengkap. Coba lagi atau persempit periode katalog.");
+    if (seenTokens.has(res.nextPageToken) || page === 99) throw new Error("Daftar produk TikTok belum lengkap. Coba lagi atau perbarui koneksi toko.");
     seenTokens.add(res.nextPageToken);
     token = res.nextPageToken;
   }
@@ -344,10 +342,8 @@ function findUnmappedProducts(
   channelSkus: string[]
 ): TikTokUnmappedProduct[] {
   const mapped = new Set(channelSkus);
-  const until = Math.floor(Date.now() / 1000);
-  const since = catalogImportSince(until);
   return [...products.values()]
-    .filter(product => isActiveTikTokProduct(product.status) && isRecentCatalogProduct(product.create_time, since, until))
+    .filter((product) => isActiveTikTokProduct(product.status))
     .map(toUnmappedProduct)
     .map((product) => ({
       ...product,

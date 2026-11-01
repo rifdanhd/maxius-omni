@@ -86,6 +86,7 @@ type OrphanSku = {
   qty: number;
   orderCount: number;
   sampleProductName: string | null;
+  imageUrl: string | null;
   lastSeenAt: string | null;
   existingMappingId: string | null;
 };
@@ -795,7 +796,23 @@ export default function ProductMappingPage() {
     return (
       <>
         <DetailHeader
-          avatar={<Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>}
+          avatar={
+            <div className="flex size-10 shrink-0 items-center gap-2">
+              {o.imageUrl ? (
+                <img
+                  src={o.imageUrl}
+                  alt={o.channelSku}
+                  className="size-10 rounded-md object-cover"
+                  loading="lazy"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    e.currentTarget.src = "/placeholder-product.svg";
+                  }}
+                />
+              ) : (
+                <Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>
+              )}
+            </div>
+          }
           title={o.channelSku}
           mono
           subtitle={
@@ -1173,7 +1190,24 @@ export default function ProductMappingPage() {
                               testId={`orphan-row-${o.channelSku}`}
                               active={selection?.kind === "orphan" && selection.key === key}
                               onClick={() => setSelection({ kind: "orphan", key })}
-                              avatar={<Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>}
+                              avatar={
+                                <div className="flex size-9 shrink-0 items-center gap-2">
+                                  {o.imageUrl ? (
+                                    <img
+                                      src={o.imageUrl}
+                                      alt={o.channelSku}
+                                      className="size-9 rounded-md object-cover"
+                                      loading="lazy"
+                                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                        e.currentTarget.src = "/placeholder-product.svg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>
+                                  )}
+                                  <span className="text-xs font-medium text-foreground">{o.channelSku?.substring(0, 8) ?? "-"}</span>
+                                </div>
+                              }
                               title={o.channelSku}
                               mono
                               subtitle={`${o.sampleProductName ?? "(nama listing tidak tersedia)"} · ${o.accountLabel ?? "-"}`}

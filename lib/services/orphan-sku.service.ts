@@ -34,6 +34,8 @@ export type OrphanSku = {
   orderCount: number;
   /** Judul listing dari payload platform (contoh terbaru yang punya nama). */
   sampleProductName: string | null;
+  /** URL gambar produk dari marketplace (dari OrderItem atau variant gambar). */
+  imageUrl: string | null;
   /** SKU master (varian) bila OrderItem menyertakan varian — selalu null utk orphan. */
   firstSeenAt: Date | null;
   lastSeenAt: Date | null;
@@ -83,6 +85,7 @@ export async function findOrphanSkus(businessId: string): Promise<OrphanSku[]> {
           orderBy: [{ order: { createTime: "desc" } }, { id: "desc" }],
           select: {
             productName: true,
+            imageUrl: true,
             order: {
               select: {
                 accountId: true,
@@ -107,6 +110,7 @@ export async function findOrphanSkus(businessId: string): Promise<OrphanSku[]> {
           qty: r.qty,
           orderCount: r.orderCount,
           sampleProductName: sample?.productName ?? null,
+          imageUrl: sample?.imageUrl ?? null,
           firstSeenAt: null,
           lastSeenAt: sample?.order.createTime ?? null,
           existingMappingId: existing?.id ?? null,

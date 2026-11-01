@@ -594,7 +594,7 @@ export default function TikTokMarketplacePage() {
           </p>
           <h1 className="text-xl font-bold text-foreground">Produk TikTok Shop</h1>
           <p className="mt-1 text-sm text-muted-foreground max-w-2xl">Periksa produk yang dijual di TikTok Shop dan hubungannya dengan katalog pusat; mulai dengan menghubungkan toko di Pengaturan Toko, lalu Perbarui Data dan periksa produk Belum Terhubung untuk memilih variasi stok pusat.</p>
-          <p className="mt-1 text-xs text-muted-foreground">Produk baru dibatasi pada listing aktif yang dibuat dalam 30 hari terakhir. Produk lama yang sudah terhubung tetap diperbarui; draf dan arsip tidak ditambahkan otomatis.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Menampilkan listing aktif di TikTok Shop. Produk belum terhubung dapat dipetakan ke katalog pusat; draf dan arsip tidak ditambahkan otomatis.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-muted-foreground">

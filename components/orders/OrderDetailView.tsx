@@ -263,8 +263,9 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
       ]
     : [];
 
-  const totalQty = detail?.items.reduce((acc, it) => acc + it.qty, 0) ?? 0;
-  const itemsSubtotal = detail?.items.reduce((acc, it) => acc + num(it.subTotal), 0) ?? 0;
+  const activeItems = detail?.items.filter(it => it.qty > 0) ?? [];
+  const totalQty = activeItems.reduce((acc, it) => acc + it.qty, 0) ?? 0;
+  const itemsSubtotal = activeItems.reduce((acc, it) => acc + num(it.subTotal), 0) ?? 0;
   const [currentTime] = useState(() => Date.now());
   const dueMs = detail?.shippingDueTime ? new Date(detail.shippingDueTime).getTime() : NaN;
   const overdue = Number.isFinite(dueMs) && dueMs < currentTime && !(steps[2]?.done ?? false);
@@ -473,7 +474,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
               {tab === "produk" && (
                 <div>
                   <ul className="divide-y divide-border">
-                    {detail.items.map((it) => (
+                    {activeItems.map((it) => (
                       <li key={it.id}>
                         <button
                           type="button"

@@ -4,9 +4,13 @@ export function catalogImportSince(nowSeconds = Math.floor(Date.now() / 1000)): 
   return nowSeconds - CATALOG_IMPORT_DAYS * 86400;
 }
 
-export function isRecentCatalogProduct(createdAt: unknown, since: number, until: number): boolean {
-  const created = Number(createdAt);
-  return Number.isSafeInteger(created) && created >= since && created <= until;
+/**
+ * isRecentCatalogProduct — cek apakah produk memenuhi kriteria katalog.
+ * Tanpa batasan waktu pembuatan: semua produk aktif diizinkan disinkronkan & dipetakan.
+ */
+export function isRecentCatalogProduct(..._args: unknown[]): boolean {
+  void _args;
+  return true;
 }
 
 export function isActiveTikTokProduct(status: unknown): boolean {

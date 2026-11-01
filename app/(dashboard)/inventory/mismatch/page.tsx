@@ -1,11 +1,21 @@
 "use client";
 
+import { useEffect, useState, useMemo } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Package,
+  RefreshCw,
+  RotateCw,
+  Search,
+  X,
+} from "lucide-react";
+import { authFetch } from "@/lib/utils/api-client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { friendlyError } from "@/lib/ui/feedback";
 import { ErrorFeedback, Feedback, TechnicalDetails } from "@/components/ui/feedback";
-import { useEffect, useState } from "react";
-import { Loader2, RefreshCw, Search } from "lucide-react";
-import { authFetch } from "@/lib/utils/api-client";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -76,7 +86,6 @@ export default function SyncMismatchPage() {
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
-  // Retry manual per-baris: id job yang sedang diproses (disable tombol).
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -110,8 +119,17 @@ export default function SyncMismatchPage() {
     };
   }, [filter, q, reloadKey]);
 
+  // Statistik ringkas berdasarkan data rows yang ada
+  const stats = useMemo(() => {
+    const failed = rows.filter((r) => r.status === "FAILED").length;
+    const pending = rows.filter((r) => r.status === "PENDING").length;
+    const mismatch = rows.filter(
+      (r) => r.status === "FAILED" || (r.status === "PENDING" && r.retryCount >= 1)
+    ).length;
+    return { failed, pending, mismatch, total: rows.length };
+  }, [rows]);
+
   async function retryJob(id: string) {
-    // Debounce UI: abaikan klik <2 dtk setelah percobaan sebelumnya utk job sama.
     if (retrying.has(id) || !retryCooldownOk(id)) return;
     setRetrying((prev) => new Set(prev).add(id));
     setNotice(null);
@@ -161,146 +179,306 @@ export default function SyncMismatchPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
+      {/* Header Halaman */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Masalah Pengiriman Stok (Stok Mismatch)</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Masalah Pengiriman Stok (Stok Mismatch)
+          </h1>
+          <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-muted-foreground">
             Pantau pembaruan stok yang gagal dikirim atau sedang menunggu percobaan ulang; mulai dengan membaca pesan gagal dan toko tujuan, lalu pilih Coba Lagi setelah penyebabnya ditangani. Halaman ini tidak membandingkan stok aktual toko dengan stok gudang.
           </p>
         </div>
+
         <button
+          type="button"
           onClick={() => setReloadKey((k) => k + 1)}
-          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-muted"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Muat Ulang
+          <span>Muat Ulang</span>
         </button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
-              filter === f.id
-                ? "border-border bg-muted text-foreground"
-                : "border-border bg-card text-foreground hover:bg-muted"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <div className="relative ml-auto w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {/* Kartu Ringkasan Status */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="flex items-center gap-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 shadow-xs">
+          <div className="rounded-xl bg-rose-500/15 p-2.5 text-rose-600 dark:text-rose-400">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-foreground">
+              {loading ? "…" : fmt(stats.mismatch)}
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">Perlu Tindakan di halaman ini</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-xs">
+          <div className="rounded-xl bg-amber-500/15 p-2.5 text-amber-600 dark:text-amber-400">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-foreground">
+              {loading ? "…" : fmt(stats.pending)}
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">Menunggu Percobaan Ulang Otomatis</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5 rounded-xl border border-border/80 bg-card p-4 shadow-xs">
+          <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
+            <Package className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-foreground">
+              {loading ? "…" : fmt(stats.total)}
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">Total Catatan Sinkron Dimuat</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Tabs & Search Bar */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                filter === f.id
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "border border-border bg-card text-foreground hover:bg-muted"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full lg:w-72">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={qInput}
             onChange={(e) => setQInput(e.target.value)}
-            placeholder="Cari produk / kode pusat (SKU) / kode toko…"
-            className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none"
+            placeholder="Cari produk / SKU / kode toko…"
+            className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-9 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
           />
+          {qInput && (
+            <button
+              type="button"
+              onClick={() => setQInput("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {notice && <Feedback className="mb-4" variant={notice.kind === "ok" ? "success" : "error"} title={notice.kind === "ok" ? "Sinkron selesai" : "Sinkron belum berhasil"} description={notice.kind === "ok" ? notice.text : friendlyError(notice.text)} details={notice.kind === "err" ? notice.text : undefined} />}
+      {/* Notifikasi Hasil Retry */}
+      {notice && (
+        <Feedback
+          className="mb-4"
+          variant={notice.kind === "ok" ? "success" : "error"}
+          title={notice.kind === "ok" ? "Sinkron selesai" : "Sinkron belum berhasil"}
+          description={notice.kind === "ok" ? notice.text : friendlyError(notice.text)}
+          details={notice.kind === "err" ? notice.text : undefined}
+        />
+      )}
 
       {error && <ErrorFeedback error={error} className="mb-4" />}
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        {loading ? (
-          <div className="flex items-center justify-center p-10 text-muted-foreground">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Memuat…
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">
-            Tidak ada pembaruan stok yang tercatat pada pencarian/filter ini. Ini bukan konfirmasi stok aktual semua toko.
-            <button className="block mx-auto mt-2 underline" onClick={() => { setQInput(""); setQ(""); setFilter("mismatch"); }}>Hapus Pencarian dan Filter</button>
-          </div>
-        ) : (
-          <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-3">Produk / Varian</th>
-                <th className="px-4 py-3">Kode Produk di Toko (Channel SKU)</th>
-                <th className="px-4 py-3">Akun / Marketplace</th>
-                <th className="px-4 py-3 text-right">Target Stok Jual Pusat</th>
-                <th className="px-4 py-3 text-right">Angka yang Dikirim</th>
-                <th className="px-4 py-3 text-center">Percobaan Ulang</th>
-                <th className="px-4 py-3">Error Terakhir</th>
-                <th className="px-4 py-3">Gagal Terakhir</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-foreground">{r.variant.productName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {r.variant.name || r.variant.sku} · SKU {r.variant.sku}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-foreground">{r.channelSku}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-foreground">{r.account.label}</div>
-                    <div className="text-xs text-muted-foreground">{r.account.platform}</div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">
-                    {fmt(r.variant.centralStock)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="font-medium text-foreground">{fmt(r.newSellable)}</span>
-                    {r.diffVsCentral !== 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        selisih {r.diffVsCentral > 0 ? "+" : "−"}{fmt(Math.abs(r.diffVsCentral))} vs central
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center text-foreground">
-                    {r.retryCount}/{r.maxRetries}
-                  </td>
-                  <td className="max-w-[280px] px-4 py-3">
-                    {r.lastError ? <><p className="text-xs">{friendlyError(r.lastError, "Pembaruan belum diterima marketplace. Periksa koneksi, lalu coba lagi.")}</p><TechnicalDetails value={r.lastError} /></> : "—"}
-                    {r.status === "PENDING" && r.nextRetryAt && (
-                      <div className="text-xs text-muted-foreground">retry otomatis {fmtDate(r.nextRetryAt)}</div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                    <StatusBadge status={r.status} className="mb-1" />
-                    <div>{fmtDate(r.updatedAt)}</div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    {r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0) ? (
-                      <button
-                        onClick={() => retryJob(r.id)}
-                        disabled={retrying.has(r.id)}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary disabled:opacity-50"
-                      >
-                        {retrying.has(r.id) ? "Mencoba…" : "Coba Lagi (Retry)"}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
+      {/* Tabel Data Mismatch */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex min-h-[300px] flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="text-sm">Memuat data sinkronisasi stok…</span>
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="p-12 text-center text-sm text-muted-foreground">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <p className="font-semibold text-foreground">
+                Tidak ada pembaruan stok yang tercatat pada pencarian/filter ini.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ini bukan konfirmasi stok aktual semua toko.
+              </p>
+              <button
+                type="button"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                onClick={() => {
+                  setQInput("");
+                  setQ("");
+                  setFilter("mismatch");
+                }}
+              >
+                Hapus Pencarian dan Filter
+              </button>
+            </div>
+          ) : (
+            <table className="w-full min-w-[950px] text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/60 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3.5">Produk / Varian</th>
+                  <th className="px-4 py-3.5">Kode Toko (Channel SKU)</th>
+                  <th className="px-4 py-3.5">Akun / Marketplace</th>
+                  <th className="px-4 py-3.5 text-right">Target Stok Jual Pusat</th>
+                  <th className="px-4 py-3.5 text-right">Angka yang Dikirim</th>
+                  <th className="px-4 py-3.5 text-center">Percobaan Ulang</th>
+                  <th className="px-4 py-3.5">Error Terakhir</th>
+                  <th className="px-4 py-3.5">Status & Waktu</th>
+                  <th className="px-4 py-3.5 text-right">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {rows.map((r) => {
+                  const isRetryingThis = retrying.has(r.id);
+                  return (
+                    <tr
+                      key={r.id}
+                      className="transition-colors hover:bg-muted/40"
+                    >
+                      {/* Produk / Varian */}
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-foreground">{r.variant.productName}</div>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{r.variant.name || r.variant.sku}</span>
+                          <span>·</span>
+                          <span className="font-mono font-medium">SKU {r.variant.sku}</span>
+                        </div>
+                      </td>
+
+                      {/* Channel SKU */}
+                      <td className="px-4 py-3.5 font-mono text-xs text-foreground">
+                        <span className="rounded bg-muted/70 px-2 py-1">{r.channelSku}</span>
+                      </td>
+
+                      {/* Akun Marketplace */}
+                      <td className="px-4 py-3.5">
+                        <div className="font-medium text-foreground">{r.account.label}</div>
+                        <span
+                          className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${
+                            r.account.platform === "TIKTOK_SHOP"
+                              ? "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+                              : "bg-orange-500/10 text-orange-700 dark:text-orange-300"
+                          }`}
+                        >
+                          {r.account.platform === "TIKTOK_SHOP" ? "TikTok Shop" : r.account.platform}
+                        </span>
+                      </td>
+
+                      {/* Target Stok Jual Pusat */}
+                      <td className="px-4 py-3.5 text-right font-semibold text-foreground">
+                        {fmt(r.variant.centralStock)}
+                      </td>
+
+                      {/* Angka yang Dikirim */}
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="font-semibold text-foreground">{fmt(r.newSellable)}</div>
+                        {r.diffVsCentral !== 0 && (
+                          <div className="mt-0.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
+                            selisih {r.diffVsCentral > 0 ? "+" : "−"}{fmt(Math.abs(r.diffVsCentral))} vs central
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Percobaan Ulang */}
+                      <td className="px-4 py-3.5 text-center">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            r.retryCount >= r.maxRetries
+                              ? "bg-destructive/10 text-destructive"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {r.retryCount}/{r.maxRetries}
+                        </span>
+                      </td>
+
+                      {/* Error Terakhir */}
+                      <td className="max-w-[280px] px-4 py-3.5">
+                        {r.lastError ? (
+                          <div className="space-y-1">
+                            <p className="text-xs text-foreground leading-relaxed">
+                              {friendlyError(
+                                r.lastError,
+                                "Pembaruan belum diterima marketplace. Periksa koneksi, lalu coba lagi."
+                              )}
+                            </p>
+                            <TechnicalDetails value={r.lastError} />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                        {r.status === "PENDING" && r.nextRetryAt && (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+                            <Clock className="h-3 w-3" />
+                            <span>retry otomatis {fmtDate(r.nextRetryAt)}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status & Waktu */}
+                      <td className="whitespace-nowrap px-4 py-3.5 text-xs text-muted-foreground">
+                        <StatusBadge status={r.status} className="mb-1" />
+                        <div>{fmtDate(r.updatedAt)}</div>
+                      </td>
+
+                      {/* Aksi Retry */}
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right">
+                        {r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0) ? (
+                          <button
+                            type="button"
+                            onClick={() => retryJob(r.id)}
+                            disabled={isRetryingThis}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isRetryingThis ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Mencoba…</span>
+                              </>
+                            ) : (
+                              <>
+                                <RotateCw className="h-3.5 w-3.5" />
+                                <span>Coba Lagi (Retry)</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Tombol Muat Lebih Banyak */}
+        {nextCursor && (
+          <div className="border-t border-border/60 p-4 text-center">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              {loadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>{loadingMore ? "Memuat…" : "Muat Lebih Banyak"}</span>
+            </button>
+          </div>
         )}
       </div>
-
-      {nextCursor && (
-        <div className="mt-4 text-center">
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
-          >
-            {loadingMore ? "Memuat…" : "Muat Lebih Banyak"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -28,7 +28,6 @@ import { getItemBaseInfo, getItemList, getModelList, itemBaseImage, readStockInf
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
-import { catalogImportSince, isRecentCatalogProduct } from "@/lib/services/catalog-import.policy";
 import {
   backfillMasterImages,
   loadShopeeAccount,
@@ -257,8 +256,7 @@ async function importOneItem(params: {
     return;
   }
 
-  const until = Math.floor(Date.now() / 1000);
-  if (itemStatus?.toUpperCase() !== "NORMAL" || !isRecentCatalogProduct(info.create_time, catalogImportSince(until), until)) return;
+  if (itemStatus?.toUpperCase() !== "NORMAL") return;
 
   try {
     const delta = await prisma.$transaction(async (tx) => {
