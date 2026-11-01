@@ -69,6 +69,34 @@ function generateSign(
     .digest("hex");
 }
 
+/** Fetch dengan mekanisme retry otomatis untuk mengantisipasi rate limit (429) & gangguan koneksi sementara. */
+async function fetchTikTokWithRetry(
+  url: string,
+  init: RequestInit,
+  maxAttempts = 3
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(35_000),
+      });
+      if ((res.status === 429 || res.status >= 502) && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 1200));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 1000));
+      }
+    }
+  }
+  throw lastError;
+}
+
 async function callApi(
   method: "GET" | "POST" | "PUT",
   apiPath: string,
@@ -112,7 +140,7 @@ async function callApi(
 
   const url = `${TIKTOK_API_BASE}${apiPath}?${qs.toString()}`;
 
-  const res = await fetch(url, {
+  const res = await fetchTikTokWithRetry(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -120,7 +148,6 @@ async function callApi(
       "User-Agent": "maxius-platform/1.0.0",
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(30_000),
   });
 
   // Body bisa non-JSON (HTML error page dsb.) — parse aman supaya HTTP error
@@ -193,7 +220,7 @@ export async function refreshAccessToken(refreshToken: string, creds?: TiktokCre
   url.searchParams.set("app_secret", c.appSecret);
   url.searchParams.set("refresh_token", refreshToken);
   url.searchParams.set("grant_type", "refresh_token");
-  const res = await fetch(url.toString());
+  const res = await fetchTikTokWithRetry(url.toString(), { method: "GET" });
   const data = (await res.json().catch(() => null)) as {
     code?: number;
     message?: string;
@@ -1097,7 +1124,7 @@ async function callApiMultipart(
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(queryParams)) qs.set(k, String(v));
 
-  const res = await fetch(`${TIKTOK_API_BASE}${apiPath}?${qs.toString()}`, {
+  const res = await fetchTikTokWithRetry(`${TIKTOK_API_BASE}${apiPath}?${qs.toString()}`, {
     method: "POST",
     headers: { "x-tts-access-token": accessToken, "User-Agent": "maxius-platform/1.0.0" },
     body: form,

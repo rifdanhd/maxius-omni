@@ -251,21 +251,34 @@ async function refreshKnownProducts(
       let pageToken: string | null = null;
       let pageCount = 0;
       do {
-        const result = await withRefreshedTiktokToken(account, (token, creds) =>
-          searchProducts(token, account.shopCipher ?? undefined,
-            { pageSize: 100, [field]: values.slice(offset, offset + 10), ...(pageToken ? { pageToken } : {}) }, creds));
-        for (const product of result.products) if (product.id) products.set(String(product.id), product);
-        pageToken = result.nextPageToken ?? null;
+        try {
+          const result = await withRefreshedTiktokToken(account, (token, creds) =>
+            searchProducts(token, account.shopCipher ?? undefined,
+              { pageSize: 100, [field]: values.slice(offset, offset + 10), ...(pageToken ? { pageToken } : {}) }, creds));
+          for (const product of result.products) if (product.id) products.set(String(product.id), product);
+          pageToken = result.nextPageToken ?? null;
+        } catch (searchErr) {
+          console.warn(`[refreshKnownProducts] Gagal batch ${field} offset ${offset}:`, searchErr);
+          break;
+        }
         if (++pageCount > 20) break; // batas keamanan: maks 20 halaman per batch
+        if (pageToken) await new Promise((r) => setTimeout(r, 150));
       } while (pageToken);
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
   const productIds = [...new Set(missing.filter(mapping => !mapping.platformSkuId && mapping.platformProductId).map(mapping => mapping.platformProductId!))];
   for (const productId of productIds) {
     if (products.has(productId)) continue;
-    const product = await withRefreshedTiktokToken(account, (token, creds) => getProductDetail(token, account.shopCipher ?? undefined, productId, creds));
-    if (String(product.id ?? "") !== productId) throw new Error("Identitas produk TikTok terhubung belum dapat diverifikasi.");
-    products.set(productId, product);
+    try {
+      const product = await withRefreshedTiktokToken(account, (token, creds) => getProductDetail(token, account.shopCipher ?? undefined, productId, creds));
+      if (String(product.id ?? "") === productId) {
+        products.set(productId, product);
+      }
+    } catch (detailErr) {
+      console.warn(`[refreshKnownProducts] Gagal verifikasi produk TikTok ${productId}:`, detailErr);
+    }
+    await new Promise((r) => setTimeout(r, 100));
   }
 }
 
@@ -675,7 +688,12 @@ include: {
     await enrichUnmappedImages(unmapped);
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
     } catch (e) {
-      results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: e instanceof Error ? e.message : "Gagal memperbarui data toko." });
+      console.error(`[syncTikTokListings] Error sync akun ${account.label} (${account.id}):`, e);
+      const rawMsg = e instanceof Error ? e.message : "Gagal memperbarui data toko.";
+      const friendlyMsg = rawMsg.includes("fetch failed")
+        ? "Koneksi ke TikTok terputus sementara (fetch timeout). Coba sinkronisasi lagi."
+        : rawMsg;
+      results.push({ ...base, productsOnPlatform: 0, synced: 0, notFound: 0, deleted: 0, unmapped: [], error: friendlyMsg });
     }
   }
   return results;
