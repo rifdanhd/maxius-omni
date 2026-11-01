@@ -454,13 +454,27 @@ export default function TikTokMarketplacePage() {
   async function handleBulkImportProduct(accountId: string, product: UnmappedProduct) {
     setBulkImportingId(product.platformProductId);
     try {
+      const sanitizedProduct = {
+        platformProductId: String(product.platformProductId || ""),
+        title: String(product.title || "").trim(),
+        imageUrl: product.imageUrl || null,
+        skus: (product.skus || []).map((s) => ({
+          skuId: String(s.skuId || ""),
+          sellerSku: s.sellerSku ? String(s.sellerSku).trim() : null,
+          skuName: s.skuName ? String(s.skuName).trim() : null,
+          stock: Math.max(0, Math.floor(Number(s.stock) || 0)),
+          price: Number(s.price) > 0 ? Number(s.price) : null,
+          imageUrl: s.imageUrl || null,
+        })),
+      };
+
       const res = await authFetch("/api/inventory/mappings/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accountId,
           mode: "create-master",
-          products: [product],
+          products: [sanitizedProduct],
         }),
       });
       const data = await res.json().catch(() => null);

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import crypto from "node:crypto";
 import { verifyToken, verifiedTokenUser, SESSION_COOKIE } from "@/lib/services/auth.service";
 import { prisma } from "@/lib/db/prisma";
 import { allowedRole, isSameOriginRequest } from "@/lib/security/session";
@@ -68,7 +69,11 @@ export function withAuth(
 
     let dbUser;
     try { dbUser = await verifiedTokenUser(payload); }
-    catch (error) { console.error("[withAuth] session lookup failed", error); return Response.json({ error: "Terjadi kesalahan server." }, { status: 503 }); }
+    catch (error) {
+      console.error("[withAuth] session lookup failed", error);
+      const msg = error instanceof Error && error.message ? error.message : "Terjadi kesalahan server.";
+      return Response.json({ error: msg }, { status: 503 });
+    }
     if (!dbUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const user = {
       id: dbUser.id,
@@ -91,7 +96,8 @@ export function withAuth(
         return Response.json({ error: e.message }, { status: 403 });
       }
       console.error("[withAuth] resolveRequestBusiness error:", e);
-      return Response.json({ error: "Terjadi kesalahan server." }, { status: 500 });
+      const msg = e instanceof Error && e.message ? e.message : "Terjadi kesalahan server.";
+      return Response.json({ error: msg }, { status: 500 });
     }
 
     try {
@@ -128,10 +134,18 @@ export function withAuth(
       }
       return response;
     } catch (e) {
-      if (e instanceof InputError || e instanceof ZodError) return Response.json({ error: e instanceof InputError ? e.message : "Input tidak valid." }, { status: 400 });
-      if (e instanceof UploadValidationError) return Response.json({ error: e.message }, { status: e.status });
+      const isInput =
+        e instanceof InputError ||
+        (e instanceof Error && e.name === "InputError") ||
+        e instanceof ZodError;
+      if (isInput) return Response.json({ error: e instanceof Error ? e.message : "Input tidak valid." }, { status: 400 });
+      const isUpload =
+        e instanceof UploadValidationError ||
+        (e instanceof Error && e.name === "UploadValidationError");
+      if (isUpload) return Response.json({ error: (e as Error).message }, { status: (e as UploadValidationError).status || 400 });
       console.error("[withAuth] handler error:", e);
-      return Response.json({ error: "Terjadi kesalahan server." }, { status: 500 });
+      const msg = e instanceof Error && e.message ? e.message : "Terjadi kesalahan server.";
+      return Response.json({ error: msg }, { status: 500 });
     }
   };
 }

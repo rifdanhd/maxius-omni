@@ -1,7 +1,11 @@
 import { safeFetch } from "./safe-fetch";
 
 export class UploadValidationError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  constructor(message: string, public status = 400) {
+    super(message);
+    this.name = "UploadValidationError";
+    Object.setPrototypeOf(this, UploadValidationError.prototype);
+  }
 }
 export const IMAGE_LIMIT = 5 * 1024 * 1024;
 export const DOCUMENT_LIMIT = 10 * 1024 * 1024;

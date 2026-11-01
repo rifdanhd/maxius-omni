@@ -26,11 +26,23 @@ export function validateApiJson(value: unknown, depth = 0): void {
   } else if (value && typeof value === "object") {
     for (const [key, v] of Object.entries(value)) {
       if (["__proto__", "prototype", "constructor"].includes(key)) throw new InputError("Field tidak valid.");
-      if (quantityKeys.has(key) && !(v === null && ["stock", "minStock", "countedStock"].includes(key))) {
-        if (!stockQuantity.safeParse(v).success) throw new InputError(`${key} harus bilangan bulat >= 0.`);
+      if (quantityKeys.has(key)) {
+        if (v === null || v === undefined) {
+          continue;
+        }
+        const parsedNum = typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : v;
+        if (!stockQuantity.safeParse(parsedNum).success) {
+          throw new InputError(`${key} harus bilangan bulat >= 0.`);
+        }
       }
       validateApiJson(v, depth + 1);
     }
   }
 }
-export class InputError extends Error {}
+export class InputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InputError";
+    Object.setPrototypeOf(this, InputError.prototype);
+  }
+}
