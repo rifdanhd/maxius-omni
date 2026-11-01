@@ -247,10 +247,17 @@ async function refreshKnownProducts(
     const values = [...new Set(missing.filter(mapping => field === "skuIds" ? !!mapping.platformSkuId : !mapping.platformSkuId && !mapping.platformProductId)
       .map(mapping => field === "skuIds" ? mapping.platformSkuId! : mapping.sellerSku || mapping.channelSku))];
     for (let offset = 0; offset < values.length; offset += 10) {
-      const result = await withRefreshedTiktokToken(account, (token, creds) => searchProducts(token, account.shopCipher ?? undefined,
-        { pageSize: 100, [field]: values.slice(offset, offset + 10) }, creds));
-      if (result.nextPageToken) throw new Error("Katalog SKU terhubung belum lengkap. Sinkronisasi dihentikan agar mapping tidak salah ditandai hilang.");
-      for (const product of result.products) if (product.id) products.set(String(product.id), product);
+      // Paginate penuh agar tidak melempar error saat katalog besar menghasilkan nextPageToken.
+      let pageToken: string | null = null;
+      let pageCount = 0;
+      do {
+        const result = await withRefreshedTiktokToken(account, (token, creds) =>
+          searchProducts(token, account.shopCipher ?? undefined,
+            { pageSize: 100, [field]: values.slice(offset, offset + 10), ...(pageToken ? { pageToken } : {}) }, creds));
+        for (const product of result.products) if (product.id) products.set(String(product.id), product);
+        pageToken = result.nextPageToken ?? null;
+        if (++pageCount > 20) break; // batas keamanan: maks 20 halaman per batch
+      } while (pageToken);
     }
   }
   const productIds = [...new Set(missing.filter(mapping => !mapping.platformSkuId && mapping.platformProductId).map(mapping => mapping.platformProductId!))];

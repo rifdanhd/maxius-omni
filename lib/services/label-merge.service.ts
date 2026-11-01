@@ -274,29 +274,41 @@ export async function stampProductVariantOnLabel(
   const headerLineY = headerY - 3;
   page.drawLine({ start: { x: margin, y: headerLineY }, end: { x: margin + boxWidth, y: headerLineY }, thickness: 0.6, color: DARK });
 
-  // 4. Baris Produk
+  // 4. Baris Produk — hitung berapa baris muat di area (tiap item: 1-3 baris teks)
   let curY = headerLineY - 9;
-  const maxRows = Math.min(rows.length, 3);
-  const displayRows = rows.slice(0, maxRows);
+  // Estimasi berapa item muat: setiap item butuh min 11pt (1 baris), maks 24pt (3 baris).
+  // Ambil semua item, tapi berhenti render jika curY sudah habis.
+  const displayRows = rows;
 
   for (let i = 0; i < displayRows.length; i++) {
     const r = displayRows[i];
     const safeProd = safeText(r.productName);
-    const prodLines = wrapText(safeProd, 32, 2);
+    // Nama produk bisa sampai 3 baris agar tidak terpotong
+    const prodLines = wrapText(safeProd, 30, 3);
 
-    // Cetak nama produk (bisa 2 baris agar tidak terpotong)
-    page.drawText(prodLines[0], {
-      x: colX.prod,
-      y: curY,
-      size: 6,
-      font,
-      color: DARK,
-      maxWidth: 110,
-    });
-    if (prodLines[1]) {
-      page.drawText(prodLines[1], {
+    // Hitung tinggi baris saat ini sebelum render, hentikan jika tidak cukup ruang
+    const rowHeight = prodLines.length === 1 ? 11 : prodLines.length === 2 ? 17 : 24;
+    if (curY - rowHeight < boxBottom + 36) {
+      // Tidak cukup ruang — tampilkan indikator sisa item
+      const remaining = rows.length - i;
+      if (remaining > 0) {
+        page.drawText(`+ ${remaining} item lainnya`, {
+          x: margin + 3,
+          y: curY - 1,
+          size: 5.5,
+          font: bold,
+          color: GRAY,
+        });
+      }
+      curY -= 8;
+      break;
+    }
+
+    // Cetak nama produk (hingga 3 baris agar tidak terpotong)
+    for (let li = 0; li < prodLines.length; li++) {
+      page.drawText(prodLines[li], {
         x: colX.prod,
-        y: curY - 7.5,
+        y: curY - li * 7.5,
         size: 6,
         font,
         color: DARK,
@@ -304,7 +316,7 @@ export async function stampProductVariantOnLabel(
       });
     }
 
-    // SKU (nama varian)
+    // SKU (nama varian) — sejajar baris pertama
     const varName = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
     page.drawText(clip(varName, 18), {
       x: colX.sku,
@@ -315,7 +327,7 @@ export async function stampProductVariantOnLabel(
       maxWidth: 42,
     });
 
-    // Seller SKU
+    // Seller SKU — sejajar baris pertama
     const sellerSkuText = safeText(r.sellerSku && r.sellerSku !== "-" ? r.sellerSku : "-");
     page.drawText(clip(sellerSkuText, 18), {
       x: colX.sellerSku,
@@ -326,7 +338,7 @@ export async function stampProductVariantOnLabel(
       maxWidth: 45,
     });
 
-    // Qty
+    // Qty — sejajar baris pertama
     page.drawText(String(r.qty), {
       x: colX.qty + 2,
       y: curY,
@@ -335,22 +347,10 @@ export async function stampProductVariantOnLabel(
       color: DARK,
     });
 
-    curY -= prodLines.length > 1 ? 16 : 11;
+    curY -= rowHeight;
     if (i < displayRows.length - 1) {
       page.drawLine({ start: { x: margin, y: curY + 2 }, end: { x: margin + boxWidth, y: curY + 2 }, thickness: 0.3, color: LIGHT });
     }
-  }
-
-  // Jika item lebih banyak dari kapasitas tampil
-  if (rows.length > maxRows) {
-    page.drawText(`+ ${rows.length - maxRows} produk lainnya`, {
-      x: margin + 3,
-      y: curY + 1,
-      size: 5.5,
-      font: bold,
-      color: GRAY,
-    });
-    curY -= 7;
   }
 
   // 5. Total Qty
