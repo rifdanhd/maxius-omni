@@ -464,7 +464,7 @@ export default function TikTokMarketplacePage() {
           skuName: s.skuName ? String(s.skuName).trim() : null,
           stock: Math.max(0, Math.floor(Number(s.stock) || 0)),
           price: Number(s.price) > 0 ? Number(s.price) : null,
-          imageUrl: s.imageUrl || null,
+          imageUrl: s.imageUrl || product.imageUrl || null,
         })),
       };
 
@@ -822,24 +822,32 @@ export default function TikTokMarketplacePage() {
                             const channelSku = s.skuId || s.sellerSku || "";
                             return (
                               <div key={s.skuId || channelSku} className="flex items-center justify-between gap-2 text-xs bg-muted rounded-md px-2 py-1.5 flex-wrap">
-                                <span className="flex items-center gap-2 text-foreground min-w-0">
-                                  {s.imageUrl ? (
+                                <span className="flex items-center gap-2.5 text-foreground min-w-0">
+                                  {s.imageUrl || p.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={s.imageUrl} alt={s.skuName ?? s.sellerSku ?? s.skuId} className="w-8 h-8 rounded object-cover bg-muted shrink-0" />
+                                    <img
+                                      src={s.imageUrl || p.imageUrl || ""}
+                                      alt={s.skuName ?? s.sellerSku ?? s.skuId}
+                                      className="w-9 h-9 rounded-md object-cover border border-border bg-muted shrink-0"
+                                    />
                                   ) : (
-                                    <div className="w-8 h-8 bg-muted-foreground/10 rounded flex items-center justify-center text-muted-foreground shrink-0">
-                                      <PackageOpen size={14} />
+                                    <div className="w-9 h-9 bg-muted-foreground/10 rounded-md flex items-center justify-center text-muted-foreground shrink-0 border border-border">
+                                      <PackageOpen size={16} />
                                     </div>
                                   )}
-                                  {s.skuName ? (
-                                    <span className="flex items-center gap-1.5 min-w-0">
-                                      <span className="font-semibold text-foreground truncate">{s.skuName}</span>
-                                      <span className="font-mono text-[11px] text-muted-foreground shrink-0">({channelSku})</span>
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                      <span className="font-semibold text-foreground truncate">
+                                        {s.skuName || s.sellerSku || `${p.title ? p.title.slice(0, 35) : "Varian"} #${channelSku.slice(-6)}`}
+                                      </span>
+                                      <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+                                        ({channelSku})
+                                      </span>
+                                    </div>
+                                    <span className="text-[11px] text-muted-foreground">
+                                      stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}
                                     </span>
-                                  ) : (
-                                    <span className="font-mono font-semibold truncate">{channelSku}</span>
-                                  )}
-                                  <span className="text-muted-foreground shrink-0">· stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}</span>
+                                  </div>
                                 </span>
                                 <button
                                   onClick={() => setMapTarget({ accountId: a.accountId, accountLabel: a.label, product: p, sku: s })}
@@ -1120,11 +1128,13 @@ function MapUnmappedModal({
   const [mode, setMode] = useState<"existing" | "new-master" | "new-variant">("existing");
   const [variantId, setVariantId] = useState("");
   const [masterId, setMasterId] = useState("");
-  const [name, setName] = useState(target.product.title ?? "");
+  const [name, setName] = useState(
+    target.sku.skuName || target.sku.sellerSku || target.product.title || ""
+  );
   const [sku, setSku] = useState(target.sku.sellerSku ?? target.sku.skuId);
   const [stock, setStock] = useState(String(target.sku.stock));
   const [price, setPrice] = useState(target.sku.price !== null ? String(target.sku.price) : "");
-  const [imageUrl, setImageUrl] = useState(target.product.imageUrl ?? "");
+  const [imageUrl, setImageUrl] = useState(target.sku.imageUrl || target.product.imageUrl || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1211,13 +1221,29 @@ function MapUnmappedModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-bold text-foreground">Hubungkan Produk TikTok (Mapping)</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          {target.product.title ?? target.product.platformProductId} · {target.accountLabel}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Kode Produk di Toko (Channel SKU): <span className="font-mono font-semibold text-foreground">{channelSku}</span>
-          <span className="text-muted-foreground"> · stok TikTok {fmtNumber(target.sku.stock)} · {fmtPrice(target.sku.price)}</span>
-        </p>
+        <div className="flex items-center gap-3 mt-2.5 p-2 rounded-lg bg-muted border border-border">
+          {target.sku.imageUrl || target.product.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={target.sku.imageUrl || target.product.imageUrl || ""}
+              alt={target.product.title ?? ""}
+              className="w-12 h-12 rounded-md object-cover border border-border shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-md bg-muted-foreground/10 flex items-center justify-center text-muted-foreground shrink-0 border border-border">
+              <PackageOpen size={20} />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-xs font-bold text-foreground truncate">
+              {target.sku.skuName || target.sku.sellerSku || target.product.title || "Varian TikTok"}
+            </h3>
+            <p className="text-[11px] text-muted-foreground truncate">{target.product.title} · {target.accountLabel}</p>
+            <p className="text-[11px] text-muted-foreground">
+              SKU: <span className="font-mono font-semibold text-foreground">{channelSku}</span> · stok {fmtNumber(target.sku.stock)} · {fmtPrice(target.sku.price)}
+            </p>
+          </div>
+        </div>
 
         <div className="mt-3 flex gap-2 text-xs font-semibold">
           {(

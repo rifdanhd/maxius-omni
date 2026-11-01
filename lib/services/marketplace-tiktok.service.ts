@@ -370,22 +370,30 @@ export interface TikTokUnmappedProduct {
 }
 
 function toUnmappedProduct(product: Record<string, unknown>): TikTokUnmappedProduct {
-  const skus = ((product.skus as Array<Record<string, unknown>>) ?? []).map((s) => ({
-    skuId: String(s.id ?? ""),
-    // TikTok kadang mengembalikan seller_sku berupa string kosong — normalkan
-    // ke null agar konsumen (?? skuId) jatuh ke sku.id. Tanpa ini channelSku
-    // jadi "" dan POST /api/inventory/mappings menolak dengan 400.
-    sellerSku: ((s.seller_sku as string | undefined) || null) as string | null,
-    skuName: extractSkuName(s),
-    stock: productSkuStock(s),
-    price: skuPrice(s),
-    imageUrl: extractSkuImage(s),
-  }));
+  const mainImage = productMainImage(product);
+  const title = (product.title as string | undefined) ?? null;
+  const skus = ((product.skus as Array<Record<string, unknown>>) ?? []).map((s) => {
+    const skuImg = extractSkuImage(s);
+    const skuId = String(s.id ?? "");
+    const sellerSku = ((s.seller_sku as string | undefined) || null) as string | null;
+    const extractedName = extractSkuName(s);
+    return {
+      skuId,
+      // TikTok kadang mengembalikan seller_sku berupa string kosong — normalkan
+      // ke null agar konsumen (?? skuId) jatuh ke sku.id. Tanpa ini channelSku
+      // jadi "" dan POST /api/inventory/mappings menolak dengan 400.
+      sellerSku,
+      skuName: extractedName || (sellerSku ? sellerSku : (title ? `${title} (#${skuId.slice(-4)})` : null)),
+      stock: productSkuStock(s),
+      price: skuPrice(s),
+      imageUrl: skuImg || mainImage || null,
+    };
+  });
   return {
     platformProductId: String(product.id ?? ""),
-    title: (product.title as string | undefined) ?? null,
+    title,
     status: (product.status as string | undefined) ?? null,
-    imageUrl: productMainImage(product),
+    imageUrl: mainImage,
     skus,
   };
 }
@@ -686,6 +694,7 @@ include: {
     const connected = await prisma.productMapping.findMany({ where: { accountId: account.id, account: { businessId }, variantId: { not: null } }, select: { channelSku: true } });
     const unmapped = findUnmappedProducts(products, connected.map((mapping) => mapping.channelSku));
     await enrichUnmappedImages(unmapped);
+    await enrichUnmappedFromTikTokDetail(account, unmapped);
     results.push({ ...base, productsOnPlatform: products.size, synced, notFound, deleted, unmapped });
     } catch (e) {
       console.error(`[syncTikTokListings] Error sync akun ${account.label} (${account.id}):`, e);
@@ -757,12 +766,14 @@ async function enrichUnmappedImages(products: TikTokUnmappedProduct[]): Promise<
     }
   }
 
-  // Fallback HANYA untuk produk single SKU (1 varian saja).
-  // Untuk produk multi-varian, JANGAN duplikasi gambar produk utama ke semua varian,
-  // agar varian tidak tampak duplikat jika belum memiliki foto spesifik.
+  // Pastikan SEMUA varian memiliki foto (fallback ke gambar cover produk jika varian tidak punya foto spesifik)
   for (const p of products) {
-    if (p.imageUrl && p.skus.length === 1 && !p.skus[0].imageUrl) {
-      p.skus[0].imageUrl = p.imageUrl;
+    if (p.imageUrl) {
+      for (const s of p.skus) {
+        if (!s.imageUrl) {
+          s.imageUrl = p.imageUrl;
+        }
+      }
     }
   }
 }
