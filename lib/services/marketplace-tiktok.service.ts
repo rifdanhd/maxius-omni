@@ -476,6 +476,13 @@ include: {
       if (productStatusUpper === "DELETED") {
         deleted += 1;
         if (m.variantId) deletedVariantIds.add(m.variantId);
+        // Set master product isActive: false jika produk terhapus
+        if (m.variant?.masterProductId) {
+          await prisma.masterProduct.update({
+            where: { id: m.variant.masterProductId },
+            data: { isActive: false },
+          });
+        }
       } else if (
         productStatusUpper === "SELLER_DEACTIVATED" ||
         productStatusUpper === "PLATFORM_DEACTIVATED"

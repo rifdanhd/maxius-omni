@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import {
   getInventorySettings,
@@ -6,11 +7,28 @@ import {
   validateInventorySettingsUpdate,
 } from "@/lib/services/inventory-settings.service";
 
-// GET /api/inventory/settings — baca baris brand aktif (auto-create bila
-// pertama — tanpa seed terpisah).
+// GET /api/inventory/settings — baca baris brand aktif & ringkasan toko terhubung
 export const GET = withAuth(async (req) => {
-  const settings = await getInventorySettings(req.businessId);
-  return NextResponse.json({ settings, pushRuntime: { globalEnabled: process.env.STOCK_PUSH_ENABLED === "true" } });
+  const [settings, accounts] = await Promise.all([
+    getInventorySettings(req.businessId),
+    prisma.platformAccount.findMany({
+      where: { businessId: req.businessId },
+      select: { platform: true, stockPushEnabled: true, isFrozen: true },
+    }),
+  ]);
+
+  const tiktokCount = accounts.filter((a) => a.platform === "TIKTOK_SHOP").length;
+  const shopeeCount = accounts.filter((a) => a.platform === "SHOPEE").length;
+
+  return NextResponse.json({
+    settings,
+    pushRuntime: { globalEnabled: process.env.STOCK_PUSH_ENABLED === "true" },
+    storeSummary: {
+      tiktok: tiktokCount,
+      shopee: shopeeCount,
+      total: accounts.length,
+    },
+  });
 });
 
 // PUT /api/inventory/settings — patch parsial dgn validasi ketat (field salah
