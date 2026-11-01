@@ -507,7 +507,8 @@ export default function OrdersPage() {
   const handleTab = (id: string) => {
     if (id === "returned") { router.push("/orders/returns"); return; }
     setActiveTab(id);
-    setActiveSubTab("all");
+    // Tab "Telah Diproses" default ke sub-tab "Menunggu Diambil Kurir"
+    setActiveSubTab(id === "shipped" ? "delivered" : "all");
     setPage(1);
   };
 

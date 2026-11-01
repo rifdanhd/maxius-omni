@@ -91,7 +91,7 @@ async function embedLabelImage(
 
 const MAX_ROWS_PER_PAGE = 18;
 
-function clip(text: string, max = 28): string {
+function clip(text: string, max = 48): string {
   const t = String(text ?? "").trim().replace(/\s+/g, " ");
   return t.length > max ? `${t.slice(0, max - 1)}…` : t || "-";
 }
@@ -144,7 +144,7 @@ export function addProductSummaryPage(
     if (cy < 24) break;
     page.drawLine({ start: { x: margin, y: cy - 3 }, end: { x: margin + tableW, y: cy - 3 }, thickness: 0.4, color: LIGHT });
     let x = margin;
-    const vals = [clip(r.productName, 30), clip(r.variant, 18), clip(r.sellerSku, 14), String(r.qty)];
+    const vals = [clip(r.productName, 48), clip(r.variant, 36), clip(r.sellerSku, 14), String(r.qty)];
     for (let i = 0; i < cols.length; i++) {
       page.drawText(vals[i], {
         x,
@@ -298,7 +298,7 @@ export async function stampProductVariantOnLabel(
 
     // Nama Produk
     const safeProd = safeText(r.productName);
-    page.drawText(clip(safeProd, 28), {
+    page.drawText(clip(safeProd, 40), {
       x: cx + 3,
       y: currentY + 3,
       size: 6.5,
@@ -310,7 +310,7 @@ export async function stampProductVariantOnLabel(
 
     // Varian
     const variantStr = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
-    page.drawText(clip(variantStr, 24), {
+    page.drawText(clip(variantStr, 36), {
       x: cx + 3,
       y: currentY + 3,
       size: 6.5,
@@ -429,7 +429,15 @@ export async function mergeShippingDocuments(
       continue;
     }
     try {
-      const { bytes } = r.value;
+      let { bytes } = r.value;
+      // Stamp rincian produk & varian langsung ke label resmi (sama dengan cetak 1)
+      if (isPdf(bytes) && item.rows && item.rows.length > 0) {
+        try {
+          bytes = await stampProductVariantOnLabel(bytes, item.rows, item.orderNo);
+        } catch (stampErr) {
+          console.warn(`[LabelMerge] Gagal stamp rincian produk untuk ${item.orderNo}:`, stampErr);
+        }
+      }
       if (isPdf(bytes)) {
         await mergePdfs(merged, bytes);
       } else if (isPng(bytes) || isJpeg(bytes)) {

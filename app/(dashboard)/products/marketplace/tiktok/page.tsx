@@ -75,6 +75,7 @@ type ListResponse = {
 type UnmappedSku = {
   skuId: string;
   sellerSku: string | null;
+  skuName?: string | null;
   stock: number;
   price: number | null;
   imageUrl: string | null;
@@ -724,11 +725,20 @@ export default function TikTokMarketplacePage() {
                                 <span className="flex items-center gap-2 text-foreground min-w-0">
                                   {s.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={s.imageUrl} alt={s.sellerSku ?? s.skuId} className="w-8 h-8 rounded object-cover bg-muted shrink-0" />
+                                    <img src={s.imageUrl} alt={s.skuName ?? s.sellerSku ?? s.skuId} className="w-8 h-8 rounded object-cover bg-muted shrink-0" />
                                   ) : (
-                                    <div className="w-8 h-8 bg-muted-foreground/10 rounded shrink-0" />
+                                    <div className="w-8 h-8 bg-muted-foreground/10 rounded flex items-center justify-center text-muted-foreground shrink-0">
+                                      <PackageOpen size={14} />
+                                    </div>
                                   )}
-                                  <span className="font-mono font-semibold truncate">{channelSku}</span>
+                                  {s.skuName ? (
+                                    <span className="flex items-center gap-1.5 min-w-0">
+                                      <span className="font-semibold text-foreground truncate">{s.skuName}</span>
+                                      <span className="font-mono text-[11px] text-muted-foreground shrink-0">({channelSku})</span>
+                                    </span>
+                                  ) : (
+                                    <span className="font-mono font-semibold truncate">{channelSku}</span>
+                                  )}
                                   <span className="text-muted-foreground shrink-0">· stok {fmtNumber(s.stock)} · {fmtPrice(s.price)}</span>
                                 </span>
                                 <button

@@ -126,7 +126,7 @@ export default function RequestPickupModal({
   const { loading, pickupLocation, sellerNote, setSellerNote, slots, canPickup, canDropOff, slotsError } =
     useFetchSlots(representativeId);
 
-  const [mode, setMode] = useState<"PICKUP" | "DROP_OFF">("PICKUP");
+  const [mode, setMode] = useState<"PICKUP" | "DROP_OFF">("DROP_OFF");
   const [flexible, setFlexible] = useState(true);
   const [pickedSlot, setPickedSlot] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

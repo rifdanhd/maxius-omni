@@ -297,9 +297,23 @@ function skuPrice(sku: Record<string, unknown>): number | null {
 export interface TikTokUnmappedSku {
   skuId: string;
   sellerSku: string | null;
+  skuName?: string | null;
   stock: number;
   price: number | null;
   imageUrl: string | null;
+}
+
+/** Ekstrak nama varian dari objek SKU TikTok (sales_attributes / sku_name). */
+function extractSkuName(sku: Record<string, unknown>): string | null {
+  if (typeof sku.sku_name === "string" && sku.sku_name.trim()) return sku.sku_name.trim();
+  const attrs = sku.sales_attributes as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(attrs) && attrs.length > 0) {
+    const names = attrs
+      .map((a) => (a.value_name as string) ?? (a.custom_value as string) ?? "")
+      .filter(Boolean);
+    if (names.length > 0) return names.join(", ");
+  }
+  return null;
 }
 
 /** Ekstrak URL gambar dari objek SKU TikTok (sku_img / image / sales_attributes). */
@@ -342,6 +356,7 @@ function toUnmappedProduct(product: Record<string, unknown>): TikTokUnmappedProd
     // ke null agar konsumen (?? skuId) jatuh ke sku.id. Tanpa ini channelSku
     // jadi "" dan POST /api/inventory/mappings menolak dengan 400.
     sellerSku: ((s.seller_sku as string | undefined) || null) as string | null,
+    skuName: extractSkuName(s),
     stock: productSkuStock(s),
     price: skuPrice(s),
     imageUrl: extractSkuImage(s),
@@ -573,52 +588,69 @@ include: {
 }
 
 async function enrichUnmappedImages(products: TikTokUnmappedProduct[]): Promise<void> {
-  const missingProductSkus = new Set<string>();
+  const skusToEnrich = new Set<string>();
   for (const p of products) {
-    if (!p.imageUrl) {
-      for (const s of p.skus) {
-        if (s.skuId) missingProductSkus.add(s.skuId);
-        if (s.sellerSku) missingProductSkus.add(s.sellerSku);
+    for (const s of p.skus) {
+      if (!s.imageUrl || !s.skuName) {
+        if (s.skuId) skusToEnrich.add(s.skuId);
+        if (s.sellerSku) skusToEnrich.add(s.sellerSku);
       }
     }
   }
 
-  if (missingProductSkus.size > 0) {
-    const skuArray = Array.from(missingProductSkus);
+  if (skusToEnrich.size > 0) {
+    const skuArray = Array.from(skusToEnrich);
     const imageMap = new Map<string, string>();
+    const nameMap = new Map<string, string>();
+
     for (let i = 0; i < skuArray.length; i += 500) {
       const chunk = skuArray.slice(i, i + 500);
       const items = await prisma.orderItem.findMany({
-        where: { channelSku: { in: chunk }, imageUrl: { not: null } },
-        select: { channelSku: true, imageUrl: true },
+        where: {
+          channelSku: { in: chunk },
+          OR: [
+            { imageUrl: { not: null } },
+            { skuName: { not: null } },
+          ],
+        },
+        select: { channelSku: true, imageUrl: true, skuName: true },
         orderBy: { order: { createTime: "desc" } },
       });
       for (const it of items) {
         if (it.imageUrl && !imageMap.has(it.channelSku)) {
           imageMap.set(it.channelSku, it.imageUrl);
         }
+        if (it.skuName && !nameMap.has(it.channelSku)) {
+          nameMap.set(it.channelSku, it.skuName);
+        }
       }
     }
 
     for (const p of products) {
-      if (!p.imageUrl) {
-        for (const s of p.skus) {
-          const hit = imageMap.get(s.skuId) ?? (s.sellerSku ? imageMap.get(s.sellerSku) : undefined);
-          if (hit) {
-            p.imageUrl = hit;
-            break;
-          }
+      for (const s of p.skus) {
+        if (!s.imageUrl) {
+          const hitImg = imageMap.get(s.skuId) ?? (s.sellerSku ? imageMap.get(s.sellerSku) : undefined);
+          if (hitImg) s.imageUrl = hitImg;
         }
+        if (!s.skuName) {
+          const hitName = nameMap.get(s.skuId) ?? (s.sellerSku ? nameMap.get(s.sellerSku) : undefined);
+          if (hitName) s.skuName = hitName;
+        }
+      }
+      // Jika produk utama belum punya gambar, ambil dari varian pertama yang punya gambar
+      if (!p.imageUrl) {
+        const withImg = p.skus.find((s) => s.imageUrl);
+        if (withImg?.imageUrl) p.imageUrl = withImg.imageUrl;
       }
     }
   }
 
-  // Fallback: untuk varian yang tidak punya gambar sendiri, gunakan gambar produk
+  // Fallback HANYA untuk produk single SKU (1 varian saja).
+  // Untuk produk multi-varian, JANGAN duplikasi gambar produk utama ke semua varian,
+  // agar varian tidak tampak duplikat jika belum memiliki foto spesifik.
   for (const p of products) {
-    if (p.imageUrl) {
-      for (const s of p.skus) {
-        if (!s.imageUrl) s.imageUrl = p.imageUrl;
-      }
+    if (p.imageUrl && p.skus.length === 1 && !p.skus[0].imageUrl) {
+      p.skus[0].imageUrl = p.imageUrl;
     }
   }
 }
