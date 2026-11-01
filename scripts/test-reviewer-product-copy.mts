@@ -4,6 +4,7 @@
  * Menguji pembatasan endpoint /api/product-copy/parse khusus untuk role reviewer.
  * Membuktikan bahwa request dari reviewer ditolak dengan status 403 Forbidden.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";

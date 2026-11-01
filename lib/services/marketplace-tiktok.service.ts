@@ -383,6 +383,46 @@ async function backfillMasterImageUrl(masterProductId: string | null, image: str
   await applyMarketplaceCover(masterProductId, image);
 }
 
+/** Status listing yang sudah tidak menjual barang (bukan sekadar beku/sementara). */
+const INACTIVE_LISTING_STATUSES = new Set([
+  "DELETED", "UNMATCHED", "ARCHIVED", "SELLER_DEACTIVATED", "PLATFORM_DEACTIVATED",
+]);
+
+/**
+ * Arsipkan varian lokal setelah listing TikTok DIHAPUS, tetapi hanya bila semua
+ * mapping varian itu (lintas toko) sudah tidak aktif. Varian yang masih hidup
+ * di Shopee tidak ikut diarsipkan. Bila seluruh varian master habis, master
+ * dinonaktifkan agar tidak tampil lagi di halaman Produk.
+ */
+async function archiveVariantWhenNoActiveListing(businessId: string, variantId: string): Promise<boolean> {
+  const mappings = await prisma.productMapping.findMany({
+    where: { variantId, account: { businessId } },
+    select: { platformStatus: true },
+  });
+  if (mappings.length === 0) return false;
+  if (!mappings.every((mapping) => INACTIVE_LISTING_STATUSES.has((mapping.platformStatus ?? "").toUpperCase()))) return false;
+
+  const variant = await prisma.productVariant.findFirst({
+    where: { id: variantId, masterProduct: { businessId }, isArchived: false },
+    select: { id: true, masterProductId: true },
+  });
+  if (!variant) return false;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.productVariant.update({ where: { id: variant.id }, data: { isArchived: true } });
+    const remaining = await tx.productVariant.count({
+      where: { masterProductId: variant.masterProductId, isArchived: false },
+    });
+    if (remaining === 0) {
+      await tx.masterProduct.updateMany({
+        where: { id: variant.masterProductId, businessId },
+        data: { isActive: false },
+      });
+    }
+  });
+  return true;
+}
+
 export async function syncTikTokListings(businessId: string, accountId?: string): Promise<SyncAccountResult[]> {
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: "TIKTOK_SHOP", businessId, ...(accountId ? { id: accountId } : {}) },
@@ -409,6 +449,8 @@ include: {
      let synced = 0;
      let notFound = 0;
      let deleted = 0;
+     let archivedVariants = 0;
+     const deletedVariantIds = new Set<string>();
 
      for (const m of account.productMapping) {
       const product = skuKeys.get(m.channelSku) ?? null;
@@ -430,11 +472,32 @@ include: {
       }
 
       const upd = applyProduct({ channelSku: m.channelSku }, product);
-      if (String(product.status ?? "").toUpperCase() === "DELETED") deleted += 1;
+      const productStatusUpper = String(product.status ?? "").toUpperCase();
+      if (productStatusUpper === "DELETED") {
+        deleted += 1;
+        if (m.variantId) deletedVariantIds.add(m.variantId);
+      } else if (
+        productStatusUpper === "SELLER_DEACTIVATED" ||
+        productStatusUpper === "PLATFORM_DEACTIVATED"
+      ) {
+        // Non-aktifkan varian dan master product agar tidak tampil di halaman Produk
+        if (m.variantId) deletedVariantIds.add(m.variantId);
+        // Set master product isActive: false jika ada mapping dengan status non-aktif
+        if (m.variant?.masterProductId) {
+          await prisma.masterProduct.update({
+            where: { id: m.variant.masterProductId },
+            data: { isActive: false },
+          });
+        }
+      }
       await prisma.productMapping.update({ where: { id: m.id }, data: upd });
       if (upd.sellerSku) await prisma.$transaction((tx) => registerSellerSku(tx, { businessId, mappingId: m.id, sellerSku: upd.sellerSku! }));
       await backfillMasterImageUrl(m.variant?.masterProductId ?? null, productMainImage(product));
       synced += 1;
+    }
+
+    for (const variantId of deletedVariantIds) {
+      if (await archiveVariantWhenNoActiveListing(businessId, variantId)) archivedVariants += 1;
     }
 
     const disconnected = findUnmappedProducts(products, account.productMapping.filter((mapping) => mapping.variantId !== null).map((mapping) => mapping.channelSku));
@@ -445,7 +508,7 @@ include: {
         kind: "listing_sync",
         status: "success",
         message: `Sync listing TikTok "${account.label}": ${synced} mapping diupdate, ${notFound} tidak ditemukan.`,
-        payload: JSON.stringify({ productsOnPlatform: products.size, synced, notFound, deleted }),
+        payload: JSON.stringify({ productsOnPlatform: products.size, synced, notFound, deleted, archivedVariants }),
         accountId: account.id,
       },
     });

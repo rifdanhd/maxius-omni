@@ -41,6 +41,9 @@ export const PATCH = withAuth(
     if (!variant) {
       return NextResponse.json({ error: "Varian target tidak ditemukan." }, { status: 400 });
     }
+    if (variant.isArchived) {
+      return NextResponse.json({ error: "Varian target sudah diarsipkan. Tidak bisa dirujuk." }, { status: 400 });
+    }
     try {
       assertSameBrand(variant.masterProduct.businessId, req.businessId);
     } catch {

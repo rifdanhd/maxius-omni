@@ -847,6 +847,45 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
         ];
 
   const settings = await getCachedInventorySettings(input.businessId);
+  // Cek apakah produk dengan nama yang sama sudah ada (idempoten)
+  const existingProduct = await prisma.masterProduct.findFirst({
+    where: {
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+      businessId: input.businessId,
+      importedFrom: input.sourceUrl ? String(input.sourceUrl).trim() : null,
+    },
+    select: { id: true, productVariant: { select: { sku: true } } },
+  });
+
+  // Jika produk sudah ada, kembalikan ID-nya tanpa membuat yang baru
+  if (existingProduct && existingProduct.productVariant.length > 0) {
+    // Varian sudah ada, cek apakah SKU sudah sesuai
+    const existingSkus = existingProduct.productVariant.map((v) => v.sku);
+    const newSkus = variantsForCreate?.map((v) => v.sku) ?? [];
+    const allSkusMatch = newSkus.every((sku) => existingSkus.includes(sku));
+    
+    if (allSkusMatch) {
+      // Update existing product images jika ada yang baru
+      if (images.length > 0) {
+        await prisma.productImage.deleteMany({ where: { masterProductId: existingProduct.id } });
+        await prisma.productImage.createMany({
+          data: images.map((url, i) => ({
+            id: crypto.randomUUID(),
+            updatedAt: new Date(),
+            url,
+            isCover: i === 0,
+            order: i,
+            masterProductId: existingProduct.id,
+          })),
+        });
+      }
+      return { id: existingProduct.id };
+    }
+  }
+
   return await prisma.$transaction(async (tx) => {
     const product = await tx.masterProduct.create({
       data: {

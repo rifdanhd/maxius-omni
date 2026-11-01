@@ -94,6 +94,13 @@ export const POST = withAuth(async (req) => {
   if (!variantId && sellerSku) {
     await lockSellerSkus(tx, req.businessId, [sellerSku]);
     const resolution = await findMasterSku(tx, req.businessId, sellerSku);
+    // Jika varian yang ditemukan adalah arsip, jangan gunakan - minta user memilih varian lain
+    if (resolution.variantId && resolution.ambiguous === false) {
+      const variant = await tx.productVariant.findUnique({ where: { id: resolution.variantId } });
+      if (variant?.isArchived) {
+        return { reviewRequired: true, reviewReason: "Varian ini sudah diarsipkan. Pilih varian aktif lain." };
+      }
+    }
     if (resolution.ambiguous) {
       const reviewMapping = await tx.productMapping.upsert({
         where: { accountId_channelSku: { accountId, channelSku } },

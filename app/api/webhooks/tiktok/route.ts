@@ -510,19 +510,20 @@ async function handleProductStatusChange(
     return;
   }
 
-  // Status produk TIDAK ditulis ke field yang tidak ada di schema.
-  // Mapping di-resolve hanya untuk konteks penggunaan; per rancangan,
-  // perubahan status cukup tercatat di SyncLog.
-  await prisma.productMapping.findUnique({
-    where: { accountId_channelSku: { accountId, channelSku: productId } },
-    select: { id: true },
+  // Update mapping platformStatus when product status changes via webhook
+  await prisma.productMapping.updateMany({
+    where: { accountId, channelSku: productId },
+    data: {
+      platformStatus: status ?? null,
+      platformStatusRaw: JSON.stringify({ updatedViaWebhook: true, statusUpdateAt: new Date().toISOString() }),
+    },
   });
 
   await logSync({
     accountId,
     kind: "product_status_change",
     status: "success",
-    message: `product ${productId}: ${status ?? "?"}`,
+    message: `product ${productId}: ${status ?? "?"} (diterupdate via webhook)`,
     payload: rawBody,
   });
 }

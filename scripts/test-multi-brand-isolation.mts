@@ -11,6 +11,7 @@
  * 2. Detail/tulis dengan ID bisnis produksi menghasilkan 403 atau 404
  * 3. Snapshot hitungan baris DB sebelum vs sesudah membuktikan data produksi tidak berubah
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";

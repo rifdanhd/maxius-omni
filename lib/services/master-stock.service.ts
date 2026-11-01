@@ -6,7 +6,7 @@ import { allocationQuantity, resolveAllocation } from "@/lib/services/stock-allo
 import type { MasterStockResult, MasterStockRow, MasterStockTab } from "@/lib/inventory/master-stock.types";
 
 export const UNFULFILLED_ORDER_STATUSES = ["UNPAID", "ON_HOLD", "AWAITING_SHIPMENT", "PARTIALLY_SHIPPING"];
-const ARCHIVED_STATUSES = ["INACTIVE", "ARCHIVED", "DELETED", "UNLIST", "BANNED", "SELLER_DELETE", "PLATFORM_DELETE", "SELLER_DEACTIVATED", "PLATFORM_DEACTIVATED", "FREEZE", "FROZEN", "SUSPENDED", "DRAFT", "DEACTIVATED"];
+const ARCHIVED_STATUSES = ["INACTIVE", "ARCHIVED", "DELETED", "UNLIST", "BANNED", "SELLER_DELETE", "PLATFORM_DELETE", "SELLER_DEACTIVATED", "PLATFORM_DEACTIVATED", "FREEZE", "FROZEN", "SUSPENDED", "DRAFT", "DEACTIVATED", "UNMATCHED", "MODEL_INACTIVE"];
 
 export async function getMasterStock(businessId: string, params: URLSearchParams): Promise<MasterStockResult> {
   const settings = await getCachedInventorySettings(businessId);

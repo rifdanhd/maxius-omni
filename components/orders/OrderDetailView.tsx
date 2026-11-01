@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
+import OrderFinancePanel from "@/components/orders/OrderFinancePanel";
 
 type DetailItem = {
   id: string;
@@ -264,8 +265,9 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
 
   const totalQty = detail?.items.reduce((acc, it) => acc + it.qty, 0) ?? 0;
   const itemsSubtotal = detail?.items.reduce((acc, it) => acc + num(it.subTotal), 0) ?? 0;
+  const [currentTime] = useState(() => Date.now());
   const dueMs = detail?.shippingDueTime ? new Date(detail.shippingDueTime).getTime() : NaN;
-  const overdue = Number.isFinite(dueMs) && dueMs < Date.now() && !(steps[2]?.done ?? false);
+  const overdue = Number.isFinite(dueMs) && dueMs < currentTime && !(steps[2]?.done ?? false);
 
   const tabs: Array<{ id: TabId; label: string; count?: number; icon: LucideIcon }> = detail
     ? [
@@ -343,7 +345,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
         {!loading && detail && (
           <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
             {/* ───────── Sidebar kiri: ringkasan tetap terlihat ───────── */}
-            <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
+            <div role="complementary" aria-label="Ringkasan pesanan" className="min-w-0 space-y-4 lg:sticky lg:top-20">
               <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 <div className="border-b border-border px-4 py-4">
                   <p className="text-xs text-muted-foreground">No. Pesanan</p>
@@ -437,7 +439,7 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
                   )}
                 </div>
               </SideCard>
-            </aside>
+            </div>
 
             {/* ───────── Konten utama bertab ───────── */}
             <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -587,27 +589,8 @@ export default function OrderDetailView({ orderId }: { orderId: string }) {
                 </div>
               )}
 
-              {/* Informasi penjualan (Finance API — belum terintegrasi) */}
               {tab === "penjualan" && (
-                <div className="p-4 md:p-6">
-                  <div className="mx-auto max-w-xl">
-                    <p className="mb-2 text-[10px] uppercase tracking-wide text-muted-foreground">Sumber: TikTok Finance API</p>
-                    <div className="divide-y divide-border">
-                      <InfoRow label="Subtotal" value="-" muted />
-                      <InfoRow label="Refund" value="-" muted />
-                      <InfoRow label="Diskon Penjual" value="-" muted />
-                      <InfoRow label="Total Faktur" value="-" muted />
-                      <InfoRow label="Biaya Pengiriman Final" value="-" muted />
-                      <InfoRow label="Biaya Layanan" value="-" muted />
-                      <InfoRow label="Biaya Affiliate" value="-" muted />
-                      <InfoRow label="Total Penjualan" value="-" muted />
-                      <InfoRow label="Penyelesaian Pembayaran" value="-" muted />
-                    </div>
-                    <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-[11px] text-muted-foreground">
-                      Data Finance belum terintegrasi — akan diambil dari API Finance TikTok (fase terpisah).
-                    </p>
-                  </div>
-                </div>
+                <OrderFinancePanel key={orderId} orderId={orderId} platform={detail.platform} />
               )}
             </section>
           </div>

@@ -42,7 +42,7 @@ export const SHOPEE_IMPORT_MAX_LIMIT = 500;
 type ShopeeAccount = NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>;
 
 /** Status mapping yang sudah kita tahu ada; `imported` = dibuat di proses ini. */
-type KnownChannel = { id: string; variantId: string | null; imported?: boolean; platformProductId?: string | null };
+type KnownChannel = { id: string; variantId: string | null; imported?: boolean; platformProductId?: string | null; channelSku?: string };
 
 type Descriptor = {
   channelSku: string;
@@ -193,11 +193,19 @@ async function importOneItem(params: {
 
   const itemName = trimmed(info.item_name as string | undefined);
   const itemStatus = trimmed(info.item_status as string | undefined);
+  // Normalisasi status Shopee: UNLISTED/BANNED/REVIEWING dianggap non-aktif
+  const normalizedItemStatus = itemStatus?.toUpperCase() ?? "";
+  const isShopeeInactive = normalizedItemStatus === "UNLISTED" || normalizedItemStatus === "BANNED" || normalizedItemStatus === "REVIEWING";
+  
   const { models, itemSku } = await withRefreshedToken(account, (token, shopId, creds) =>
     getModelList(token, shopId, itemId, creds)
   );
 
   const descriptors = buildDescriptors({ itemId, itemName, itemStatus, itemSku, info, models });
+  // Set platformStatus berdasarkan status Shopee asli untuk arsipkan nanti
+  for (const d of descriptors) {
+    d.platformStatus = isShopeeInactive ? "UNLISTED" : (d.platformStatus ?? itemStatus);
+  }
   if (descriptors.length === 0) return;
 
   const knownRefs: KnownChannel[] = [];
@@ -206,12 +214,17 @@ async function importOneItem(params: {
     const hit = byChannelSku.get(d.channelSku) ?? (legacy && (legacy.platformProductId === String(itemId) || (!legacy.platformProductId && legacy.variantId === null)) ? legacy : undefined);
     if (!hit) continue;
     byChannelSku.set(d.channelSku, hit);
+    // If Shopee product is inactive (UNLISTED/BANNED/REVIEWING), archive the variant
+    const isInactive = isShopeeInactive && (d.platformStatus === "UNLISTED" || d.platformStatus === "BANNED" || d.platformStatus === "REVIEWING");
+    if (hit.variantId && isInactive) {
+      await prisma.productVariant.update({ where: { id: hit.variantId }, data: { isArchived: true } });
+    }
     if (hit.id) await prisma.productMapping.updateMany({ where: { id: hit.id, accountId: account.id },
-      data: { sellerSku: d.sellerSku, platformSkuId: d.platformSkuId } });
+      data: { sellerSku: d.sellerSku, platformSkuId: d.platformSkuId, platformStatus: d.platformStatus } });
     if (hit.id && d.sellerSku) await prisma.$transaction((tx) => registerSellerSku(tx, { businessId, mappingId: hit.id, sellerSku: d.sellerSku! }));
     if (hit.imported || hit.variantId) stats.existing += 1;
     else stats.orphan += 1;
-    knownRefs.push(hit);
+    knownRefs.push({ ...hit, channelSku: d.channelSku });
   }
 
   // Backfill gambar ke master yang sudah ada (hanya jika imageUrl masih kosong).
@@ -230,9 +243,12 @@ async function importOneItem(params: {
 
   if (pending.length === 0) {
     for (const ref of knownRefs) {
+      // Ambil platformStatus dari descriptor yang sesuai (status terakhir dari import)
+      const matchingDesc = descriptors.find((d) => d.channelSku === ref.channelSku);
+      const platformStatus = matchingDesc?.platformStatus ?? (isShopeeInactive ? "UNLISTED" : null);
       await prisma.productMapping.updateMany({
         where: { id: ref.id },
-        data: { platformProductId: String(itemId), platformStatusRaw: statusRaw, lastSyncedAt: now },
+        data: { platformProductId: String(itemId), platformStatus, platformStatusRaw: statusRaw, lastSyncedAt: now },
       });
     }
     return;
@@ -289,6 +305,10 @@ async function importOneItem(params: {
             candidateIds: resolution?.candidates ?? [], reason: duplicate ? "SKU seller ganda pada varian listing yang sama." : "Beberapa SKU master memiliki SKU seller yang sama." });
           continue;
         }
+        // If Shopee product is inactive, mark the variant as archived
+        if (isShopeeInactive && (d.platformStatus === "UNLISTED" || d.platformStatus === "BANNED" || d.platformStatus === "REVIEWING")) {
+          await tx.productVariant.update({ where: { id: variantId }, data: { isArchived: true } });
+        }
         if (initialized) await tx.stockLedger.create({
           data: {
             id: crypto.randomUUID(),
@@ -329,7 +349,14 @@ function buildDescriptors(params: {
   models: Array<{ model_id: number; model_sku?: string; model_status?: string }>;
 }): Descriptor[] {
   const { itemId, itemName, itemStatus, itemSku, info, models } = params;
-  const realModels = models.filter((m) => Number(m.model_id) !== 0);
+  // Filter out models with inactive status (SKU_NOT_FOUND, etc.)
+  const activeModels = models.filter((m) => {
+    const modelStatus = (m.model_status ?? "").toUpperCase();
+    // Model dengan status kosong atau NORMAL dianggap aktif
+    // Status lain (contoh: EXPIRED, DRAFT) dianggap non-aktif dan diabaikan
+    return !modelStatus || modelStatus === "NORMAL";
+  });
+  const realModels = activeModels.filter((m) => Number(m.model_id) !== 0);
   const out: Descriptor[] = [];
 
   const add = (sku: string, stockRaw: unknown, status: string | null, modelId?: number) => {

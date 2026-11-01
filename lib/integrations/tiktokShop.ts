@@ -407,6 +407,24 @@ export async function searchReturns(
   };
 }
 
+export async function getOrderStatementTransactions(
+  accessToken: string,
+  shopCipher: string,
+  orderId: string,
+  creds?: TiktokCreds,
+): Promise<unknown> {
+  const result = await callApi(
+    "GET",
+    `/finance/202501/orders/${encodeURIComponent(orderId)}/statement_transactions`,
+    accessToken,
+    {},
+    null,
+    shopCipher,
+    creds,
+  );
+  return result.data;
+}
+
 export async function getOrders(
   accessToken: string,
   shopCipher?: string,
