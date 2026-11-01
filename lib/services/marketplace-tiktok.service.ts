@@ -743,6 +743,80 @@ async function enrichUnmappedImages(products: TikTokUnmappedProduct[]): Promise<
 }
 
 /**
+ * enrichUnmappedFromTikTokDetail — panggil detail TikTok API untuk melengkapi
+ * gambar cover utama produk, nama varian asli (sales_attributes), serta foto
+ * varian spesifik dari Seller Center yang tidak dikirim oleh endpoint search.
+ */
+async function enrichUnmappedFromTikTokDetail(
+  account: { id: string; label: string; accessToken: string | null; refreshToken: string | null; tokenExpiresAt: Date | null; shopCipher: string | null },
+  products: TikTokUnmappedProduct[]
+): Promise<void> {
+  const candidates = products.filter(
+    (p) => !p.imageUrl || p.skus.some((s) => !s.imageUrl || !s.skuName)
+  );
+  if (candidates.length === 0) return;
+
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const chunk = candidates.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk.map(async (prod) => {
+        try {
+          const detail = await withRefreshedTiktokToken(account, (token, creds) =>
+            getProductDetail(token, account.shopCipher ?? undefined, prod.platformProductId, creds)
+          );
+          if (!detail || typeof detail !== "object") return;
+          const detailRecord = detail as Record<string, unknown>;
+
+          // 1. Gambar utama produk
+          const mainImg = productMainImage(detailRecord);
+          if (mainImg) prod.imageUrl = mainImg;
+
+          // 2. Judul produk bila sebelumnya belum ada
+          if (!prod.title && typeof detailRecord.title === "string") {
+            prod.title = detailRecord.title;
+          }
+
+          // 3. Rincian SKU: nama varian & foto varian spesifik
+          const detailSkus = (detailRecord.skus as Array<Record<string, unknown>>) ?? [];
+          for (const s of prod.skus) {
+            const ds = detailSkus.find(
+              (item) => String(item.id ?? "") === s.skuId || (s.sellerSku && item.seller_sku === s.sellerSku)
+            );
+            if (ds) {
+              const name = extractSkuName(ds);
+              if (name && !s.skuName) s.skuName = name;
+
+              const skuImg = extractSkuImage(ds);
+              if (skuImg && !s.imageUrl) s.imageUrl = skuImg;
+
+              if (!s.sellerSku && typeof ds.seller_sku === "string" && ds.seller_sku.trim()) {
+                s.sellerSku = ds.seller_sku.trim();
+              }
+            }
+            // Fallback ke foto produk utama jika varian tidak memiliki foto khusus tersendiri
+            if (!s.imageUrl && prod.imageUrl) {
+              s.imageUrl = prod.imageUrl;
+            }
+          }
+        } catch (err) {
+          console.warn(`[enrichUnmappedDetail] Gagal mengambil detail produk ${prod.platformProductId}:`, err);
+        }
+      })
+    );
+  }
+
+  // Final check: pastikan setiap varian yang masih kosong fallback ke gambar produk
+  for (const p of products) {
+    if (p.imageUrl) {
+      for (const s of p.skus) {
+        if (!s.imageUrl) s.imageUrl = p.imageUrl;
+      }
+    }
+  }
+}
+
+/**
  * getTikTokUnmapped — discovery read-only produk TikTok yang belum punya
  * mapping lokal (per akun, opsional filter 1 akun). Tidak menulis DB —
  * dipakai endpoint unmapped + section "belum ter-mapping" di UI.
@@ -769,6 +843,7 @@ export async function getTikTokUnmapped(
       account.productMapping.map((m) => m.channelSku)
     );
     await enrichUnmappedImages(unmapped);
+    await enrichUnmappedFromTikTokDetail(account, unmapped);
     out.push({
       accountId: account.id,
       label: account.label,
