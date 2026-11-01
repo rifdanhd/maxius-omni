@@ -430,10 +430,14 @@ export default function TikTokMarketplacePage() {
   async function handleAutoLink(accountId?: string) {
     setAutoLinking(true);
     try {
+      const targetAccount = accountId ? unmapped.find((a) => a.accountId === accountId) : unmapped[0];
       const res = await authFetch("/api/marketplace/tiktok/products/unmapped/auto-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({
+          accountId: targetAccount?.accountId,
+          products: targetAccount?.unmapped ?? [],
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Gagal menjalankan auto-link.");

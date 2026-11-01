@@ -1,13 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Skip type-check & lint saat build di server dengan resource terbatas (RAM 2GB)
+  // Skip type-check saat build di server dengan resource terbatas (RAM 2GB)
   // Verifikasi tipe sudah dipastikan via 'npx tsc --noEmit' sebelum push.
   typescript: {
     ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   // Next 16 hanya mengizinkan SATU `next dev` per direktori proyek
   // (lockfile di <distDir>/dev/lock) — server e2e tidak bisa jalan berdampingan
