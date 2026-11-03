@@ -1,10 +1,20 @@
 import type { NextRequest } from "next/server";
-import { appOrigin } from "@/lib/utils/request-origin";
+import { appOrigin, isOriginAllowed } from "@/lib/utils/request-origin";
 
 export function isSameOriginRequest(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
   if (req.headers.get("sec-fetch-site") === "cross-site") return false;
   return origin === appOrigin(req);
+}
+
+/**
+ * Origin check khusus POST /api/auth/login.
+ * Tolak hanya bila header Origin ADA dan tidak cocok, atau Sec-Fetch-Site = cross-site.
+ * Origin kosong (alat non-browser / proxy yang strip header) diizinkan.
+ */
+export function isLoginOriginValid(req: NextRequest): boolean {
+  if (req.headers.get("sec-fetch-site") === "cross-site") return false;
+  return isOriginAllowed(req);
 }
 
 export function allowedRole(role: string, method: string, path: string): boolean {

@@ -4,6 +4,8 @@ import type { NextRequest } from "next/server";
 // Next membangun req.url dari hostname internal server (localhost:3000)
 // kecuali trustHostHeader — jadi redirect OAuth harus pakai header
 // x-forwarded-host/host + x-forwarded-proto agar tetap di domain asli.
+const ALLOWED_ORIGINS = ["https://maxius.id", "https://www.maxius.id"];
+
 export function appOrigin(req: NextRequest): string {
   const configured = process.env.APP_ORIGIN;
   if (configured) {
@@ -14,8 +16,22 @@ export function appOrigin(req: NextRequest): string {
     }
     return url.origin;
   }
-  if (process.env.NODE_ENV === "production") return "https://maxius.id";
+  if (process.env.NODE_ENV === "production") {
+    const forwardedHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+    if (forwardedHost) {
+      const hostname = forwardedHost.replace(/^https?:\/\//i, "").split(":")[0];
+      const match = `https://${hostname}`;
+      if (ALLOWED_ORIGINS.includes(match)) return match;
+    }
+    return "https://maxius.id";
+  }
   const url = new URL(req.url);
   if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return url.origin;
   return "http://localhost:3000";
+}
+
+export function isOriginAllowed(req: NextRequest): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.includes(origin) || origin === appOrigin(req);
 }
