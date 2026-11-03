@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { login, SESSION_COOKIE, SESSION_MAX_AGE_S } from "@/lib/services/auth.service";
+import { login, InvalidCredentialsError, SESSION_COOKIE, SESSION_MAX_AGE_S } from "@/lib/services/auth.service";
 import { isLoginOriginValid } from "@/lib/security/session";
 import { z } from "zod";
 import { limiter, rateKey, rateLimitedResponse } from "@/lib/security/rate-limit";
 import { readLimitedStream } from "@/lib/security/validate-upload";
-import { appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const REVIEWER_LOG_DIR = join(process.cwd(), "logs");
 const REVIEWER_LOG_FILE = join(REVIEWER_LOG_DIR, "reviewer-login.log");
 
-if (!existsSync(REVIEWER_LOG_DIR)) mkdirSync(REVIEWER_LOG_DIR, { recursive: true });
+function ensureLogDir(): void {
+  if (!existsSync(REVIEWER_LOG_DIR)) {
+    try {
+      appendFileSync(REVIEWER_LOG_FILE, "");
+    } catch {
+      // Direktori log tidak bisa dibuat — logging akan diam-diam dilewati.
+    }
+  }
+}
 
 function logReviewerLogin(entry: {
   username: string;
@@ -20,9 +28,15 @@ function logReviewerLogin(entry: {
   reason?: string;
 }): void {
   try {
+    ensureLogDir();
+    const userAgent = entry.userAgent ? entry.userAgent.slice(0, 200) : null;
     const line = JSON.stringify({
       ts: new Date().toISOString(),
-      ...entry,
+      username: entry.username,
+      ip: entry.ip,
+      userAgent,
+      result: entry.result,
+      reason: entry.reason,
     });
     appendFileSync(REVIEWER_LOG_FILE, line + "\n");
   } catch {
@@ -37,8 +51,6 @@ function getClientIp(req: NextRequest): string {
   if (xff) return xff.split(",")[0].trim();
   return "unknown";
 }
-
-const WRONG_CREDENTIALS_MSG = "Username atau password salah.";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -96,15 +108,14 @@ export async function POST(req: NextRequest) {
       });
       return res;
     } catch (err) {
-      console.error("[Login] failed", err instanceof Error ? err.name : "unknown");
-      const isWrongCredentials = err instanceof Error && err.message === WRONG_CREDENTIALS_MSG;
-      if (isWrongCredentials) {
+      if (err instanceof InvalidCredentialsError) {
         if (isReviewer) {
           logReviewerLogin({ username, ip, userAgent, result: "failed", reason: "kredensial_salah" });
         }
-        return NextResponse.json({ error: WRONG_CREDENTIALS_MSG }, { status: 401 });
+        return NextResponse.json({ error: "Username atau password salah." }, { status: 401 });
       }
       // Error internal (DB, JWT, dsb.) — jangan tampilkan sebagai kredensial salah.
+      console.error("[Login] failed", err instanceof Error ? err.name : "unknown");
       if (isReviewer) {
         logReviewerLogin({ username, ip, userAgent, result: "failed", reason: "error_internal" });
       }

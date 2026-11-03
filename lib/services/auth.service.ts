@@ -21,9 +21,21 @@ export interface AuthUser {
 }
 
 /**
+ * InvalidCredentialsError — dilempar HANYA untuk kredensial username/password salah.
+ * Digunakan route login untuk membedakan 401 (kredensial) dari 500 (error internal).
+ */
+export class InvalidCredentialsError extends Error {
+  constructor() {
+    super("Username atau password salah.");
+    this.name = "InvalidCredentialsError";
+  }
+}
+
+/**
  * login(username, password)
  * Verifikasi kredensial user dan kembalikan signed JWT.
- * Throws Error jika username/password salah.
+ * Throws InvalidCredentialsError jika username/password salah.
+ * Throws Error jika user tidak punya akses brand.
  */
 export async function login(
   username: string,
@@ -32,7 +44,7 @@ export async function login(
   const user = await prisma.user.findUnique({ where: { username } });
 
   if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-    throw new Error("Username atau password salah.");
+    throw new InvalidCredentialsError();
   }
 
   const ids = await getUserBusinessIds(user.id);

@@ -130,17 +130,14 @@ async function main() {
 
   const nonDemoMemberships = memberships.filter((m) => m.businessId !== DEMO_BUSINESS_ID);
   if (nonDemoMemberships.length > 0) {
-    if (!SEED_CONFIRM) {
-      console.error(
-        "\nERROR: Reviewer punya keanggotaan di business selain demo. Seed tidak boleh mengubah reviewer.",
-      );
-      for (const m of nonDemoMemberships) {
-        console.error(`  - ${m.business.id} (${m.business.name})`);
-      }
-      console.error("Berhenti. Hapus keanggautan non-demo atau set SEED_CONFIRM=yes untuk paksa melanjutkan.");
-      process.exit(1);
+    console.error(
+      "\nERROR: Reviewer punya keanggotaan di business selain demo. Seed tidak boleh mengubah reviewer.",
+    );
+    for (const m of nonDemoMemberships) {
+      console.error(`  - ${m.business.id} (${m.business.name})`);
     }
-    console.log("\nPERINGATAN: Reviewer punya keanggotaan di business non-demo, tapi SEED_CONFIRM=yes — melanjutkan.");
+    console.error("Hard stop: hapus keanggautan non-demo terlebih dahulu. Tidak ada opsi bypass.");
+    process.exit(1);
   }
 
   // ── 3. Hitung jumlah yang akan terpengaruh (info dry-run) ──
@@ -161,9 +158,11 @@ async function main() {
       where: { variant: { masterProduct: { businessId: DEMO_BUSINESS_ID } } },
     }),
     deleteStockOpnameItem: await prisma.stockOpnameItem.count({
-      where: { opname: { code: { startsWith: "DEMO-" } } },
+      where: { variant: { masterProduct: { businessId: DEMO_BUSINESS_ID } } },
     }),
-    deleteStockOpname: await prisma.stockOpname.count({ where: { code: { startsWith: "DEMO-" } } }),
+    deleteStockOpname: await prisma.stockOpname.count({
+      where: { items: { some: { variant: { masterProduct: { businessId: DEMO_BUSINESS_ID } } } } },
+    }),
     deleteProductMapping: await prisma.productMapping.count({
       where: { accountId: { in: DEMO_ACCOUNT_IDS } },
     }),
@@ -184,7 +183,6 @@ async function main() {
     }),
     deleteStockOutbox: await prisma.stockOutbox.count({ where: { businessId: DEMO_BUSINESS_ID } }),
     deleteSyncRun: await prisma.syncRun.count({ where: { businessId: DEMO_BUSINESS_ID } }),
-    deleteBusiness: await prisma.business.count({ where: { id: DEMO_BUSINESS_ID } }),
     createBusiness: 1,
     createAccounts: accounts.length,
     createMasterProducts: products.length,
@@ -214,7 +212,6 @@ async function main() {
   console.log(`  inventorySetting: ${counts.deleteInventorySetting}`);
   console.log(`  stockOutbox: ${counts.deleteStockOutbox}`);
   console.log(`  syncRun: ${counts.deleteSyncRun}`);
-  console.log(`  business: ${counts.deleteBusiness}`);
   console.log("Create:");
   console.log(`  business: ${counts.createBusiness}`);
   console.log(`  platformAccount: ${counts.createAccounts}`);
@@ -236,12 +233,15 @@ async function main() {
   }
 
   // ── 4. Eksekusi dalam satu transaksi ──
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(
+    async (tx) => {
     // --- Cleanup (urutan FK-safe) ---
     await tx.stockOpnameItem.deleteMany({
-      where: { opname: { code: { startsWith: "DEMO-" } } },
+      where: { variant: { masterProduct: { businessId: DEMO_BUSINESS_ID } } },
     });
-    await tx.stockOpname.deleteMany({ where: { code: { startsWith: "DEMO-" } } });
+    await tx.stockOpname.deleteMany({
+      where: { items: { some: { variant: { masterProduct: { businessId: DEMO_BUSINESS_ID } } } } },
+    });
     await tx.orderItem.deleteMany({ where: { orderId: { in: demoOrderIds } } });
     await tx.shipment.deleteMany({ where: { orderId: { in: demoOrderIds } } });
     await tx.platformOrderMapping.deleteMany({ where: { orderId: { in: demoOrderIds } } });
@@ -259,13 +259,19 @@ async function main() {
     await tx.inventorySetting.deleteMany({ where: { businessId: DEMO_BUSINESS_ID } });
     await tx.stockOutbox.deleteMany({ where: { businessId: DEMO_BUSINESS_ID } });
     await tx.syncRun.deleteMany({ where: { businessId: DEMO_BUSINESS_ID } });
-    await tx.business.delete({ where: { id: DEMO_BUSINESS_ID } });
 
-    // --- Create business demo (upsert) ---
+    // --- Upsert business demo (tidak ada delete business) ---
     await tx.business.upsert({
       where: { id: DEMO_BUSINESS_ID },
       update: { name: "Maxius Demo (Reviewer)", isDemo: true },
       create: { id: DEMO_BUSINESS_ID, name: "Maxius Demo (Reviewer)", isDemo: true },
+    });
+
+    // --- Upsert UserBusiness reviewer → business demo, role reviewer ---
+    await tx.userBusiness.upsert({
+      where: { userId_businessId: { userId: reviewer.id, businessId: DEMO_BUSINESS_ID } },
+      update: { role: "reviewer" },
+      create: { userId: reviewer.id, businessId: DEMO_BUSINESS_ID, role: "reviewer" },
     });
 
     // --- Create akun toko (upsert) ---
@@ -518,14 +524,25 @@ async function main() {
                 id: crypto.randomUUID(),
                 variantId: mismatchVariant.id,
                 systemStock: current,
-                countedStock: current - 2,
+                countedStock: Math.max(0, current - 2),
               },
             ],
           },
         },
       });
     }
-  });
+
+    // --- Sinkronkan ProductVariant.stock dengan saldo ledger akhir ---
+    for (const variant of createdVariants) {
+      const finalStock = runningBalance.get(variant.id) ?? 0;
+      await tx.productVariant.update({
+        where: { id: variant.id },
+        data: { stock: finalStock },
+      });
+    }
+  },
+  { timeout: 120_000, maxWait: 10_000 }
+);
 
   console.log("\n=== SEED SELESAI ===");
 }
