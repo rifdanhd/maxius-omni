@@ -16,15 +16,7 @@ export function appOrigin(req: NextRequest): string {
     }
     return url.origin;
   }
-  if (process.env.NODE_ENV === "production") {
-    const forwardedHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-    if (forwardedHost) {
-      const hostname = forwardedHost.replace(/^https?:\/\//i, "").split(":")[0];
-      const match = `https://${hostname}`;
-      if (ALLOWED_ORIGINS.includes(match)) return match;
-    }
-    return "https://maxius.id";
-  }
+  if (process.env.NODE_ENV === "production") return "https://maxius.id";
   const url = new URL(req.url);
   if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return url.origin;
   return "http://localhost:3000";

@@ -32,10 +32,21 @@ export class InvalidCredentialsError extends Error {
 }
 
 /**
+ * NoBrandAccessError — dilempar saat user login berhasil tetapi tidak memiliki
+ * akses ke brand/business mana pun. Route login memetakan ini ke 403.
+ */
+export class NoBrandAccessError extends Error {
+  constructor() {
+    super("User tidak punya akses brand.");
+    this.name = "NoBrandAccessError";
+  }
+}
+
+/**
  * login(username, password)
  * Verifikasi kredensial user dan kembalikan signed JWT.
  * Throws InvalidCredentialsError jika username/password salah.
- * Throws Error jika user tidak punya akses brand.
+ * Throws NoBrandAccessError jika user tidak punya akses brand/business.
  */
 export async function login(
   username: string,
@@ -49,7 +60,7 @@ export async function login(
 
   const ids = await getUserBusinessIds(user.id);
   const businessId = ids.includes(DEFAULT_BUSINESS_ID) ? DEFAULT_BUSINESS_ID : ids[0];
-  if (!businessId) throw new Error("User tidak punya akses brand.");
+  if (!businessId) throw new NoBrandAccessError();
   const token = createSessionToken(user, businessId);
 
   return {

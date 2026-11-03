@@ -1,24 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { login, InvalidCredentialsError, SESSION_COOKIE, SESSION_MAX_AGE_S } from "@/lib/services/auth.service";
+import {
+  login,
+  InvalidCredentialsError,
+  NoBrandAccessError,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_S,
+} from "@/lib/services/auth.service";
 import { isLoginOriginValid } from "@/lib/security/session";
 import { z } from "zod";
 import { limiter, rateKey, rateLimitedResponse } from "@/lib/security/rate-limit";
 import { readLimitedStream } from "@/lib/security/validate-upload";
-import { appendFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
-
-const REVIEWER_LOG_DIR = join(process.cwd(), "logs");
-const REVIEWER_LOG_FILE = join(REVIEWER_LOG_DIR, "reviewer-login.log");
-
-function ensureLogDir(): void {
-  if (!existsSync(REVIEWER_LOG_DIR)) {
-    try {
-      appendFileSync(REVIEWER_LOG_FILE, "");
-    } catch {
-      // Direktori log tidak bisa dibuat — logging akan diam-diam dilewati.
-    }
-  }
-}
 
 function logReviewerLogin(entry: {
   username: string;
@@ -27,21 +18,18 @@ function logReviewerLogin(entry: {
   result: string;
   reason?: string;
 }): void {
-  try {
-    ensureLogDir();
-    const userAgent = entry.userAgent ? entry.userAgent.slice(0, 200) : null;
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
-      username: entry.username,
-      ip: entry.ip,
-      userAgent,
-      result: entry.result,
-      reason: entry.reason,
-    });
-    appendFileSync(REVIEWER_LOG_FILE, line + "\n");
-  } catch {
-    // Kegagalan logging TIDAK BOLEH memengaruhi respons login.
-  }
+  const userAgent = entry.userAgent ? entry.userAgent.slice(0, 200) : null;
+  console.log(
+    "[reviewer-login] " +
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        username: entry.username,
+        ip: entry.ip,
+        userAgent,
+        result: entry.result,
+        reason: entry.reason,
+      }),
+  );
 }
 
 function getClientIp(req: NextRequest): string {
@@ -113,6 +101,12 @@ export async function POST(req: NextRequest) {
           logReviewerLogin({ username, ip, userAgent, result: "failed", reason: "kredensial_salah" });
         }
         return NextResponse.json({ error: "Username atau password salah." }, { status: 401 });
+      }
+      if (err instanceof NoBrandAccessError) {
+        if (isReviewer) {
+          logReviewerLogin({ username, ip, userAgent, result: "failed", reason: "tanpa_akses_brand" });
+        }
+        return NextResponse.json({ error: "User tidak punya akses brand." }, { status: 403 });
       }
       // Error internal (DB, JWT, dsb.) — jangan tampilkan sebagai kredensial salah.
       console.error("[Login] failed", err instanceof Error ? err.name : "unknown");

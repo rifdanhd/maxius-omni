@@ -66,4 +66,3 @@ docs/*-results.json
 # artefak deploy & tool lokal
 backups/
 /ngrok
-/logs/
