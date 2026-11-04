@@ -2,6 +2,7 @@
 
 import { ErrorFeedback } from "@/components/ui/feedback";
 import { SkuReviewPanel } from "@/components/inventory/sku-review-panel";
+import { AutoMatchPanel } from "@/components/inventory/auto-match-panel";
 import { notify } from "@/components/ui/notify";
 import { confirmAction } from "@/components/ui/confirm-action";
 import { Button } from "@/components/ui/button";
@@ -1095,6 +1096,8 @@ export default function ProductMappingPage() {
           </Button>
         </div>
       </header>
+
+      <AutoMatchPanel />
 
       {error && <ErrorFeedback error={error} className="mb-4" />}
 
