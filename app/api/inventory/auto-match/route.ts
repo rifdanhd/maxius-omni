@@ -11,6 +11,7 @@ const decision = z.object({
 export const GET = withAuth(async (req) => {
   try {
     const accountId = req.nextUrl.searchParams.get("accountId")?.trim() || undefined;
+    if (!accountId) return NextResponse.json({ ok: false, error: "Pilih satu akun marketplace. Auto-match diproses satu toko per kali." }, { status: 400 });
     return NextResponse.json({ ok: true, ...(await previewAutoMatch(req.businessId, accountId)) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Gagal membuat preview auto-match.";

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authFetch } from "@/lib/utils/api-client";
 import { Check, Eye, Link2, RefreshCw, Sparkles } from "lucide-react";
 
 type Row = { accountId: string; accountLabel: string; platformProductId: string; channelSku: string; sellerSku: string | null; title: string | null; variantName: string | null; imageUrl: string | null; stock: number; bucket: "exact" | "suggested" | "review" | "new"; score: number; candidate: { id: string; sku: string; name: string; imageUrl: string | null; stock: number } | null };
 type Preview = { rows: Row[]; counts: Record<Row["bucket"], number> };
+type Account = { id: string; label: string; platform: string };
 const labels = { exact: "Sudah cocok", suggested: "Disarankan", review: "Perlu dicek", new: "Usulkan master baru" } as const;
 async function readApiResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
@@ -27,7 +28,11 @@ export function AutoMatchPanel() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const key = (row: Row) => `${row.accountId}:${row.channelSku}`;
+  useEffect(() => {
+    authFetch("/api/accounts").then((response) => readApiResponse<{ accounts: Account[] }>(response)).then((data) => setAccounts(data.accounts.filter((account) => account.platform === "TIKTOK_SHOP"))).catch(() => setMessage("Daftar akun marketplace belum dapat dimuat."));
+  }, []);
   async function runPreview() {
     setLoading(true); setMessage(null);
     try {
@@ -52,7 +57,7 @@ export function AutoMatchPanel() {
   return <section className="rounded-xl border border-primary/30 bg-primary/5 p-4 md:p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="flex items-center gap-2 text-base font-semibold"><Sparkles size={17} /> Auto-match lintas toko</h2><p className="mt-1 text-xs text-muted-foreground">Preview read-only: SKU seller, nama, warna, dan ukuran dinormalisasi. Hanya baris yang Anda pilih yang disimpan.</p></div>
-      <div className="flex flex-wrap gap-2"><input value={accountId} onChange={(event) => setAccountId(event.target.value)} placeholder="ID akun TikTok (opsional)" className="h-9 rounded-md border bg-background px-3 text-xs" /><Button size="sm" variant="outline" onClick={runPreview} disabled={loading}>{loading ? <RefreshCw className="animate-spin" size={14} /> : <Eye size={14} />} Preview</Button></div>
+      <div className="flex flex-wrap gap-2"><select aria-label="Pilih akun TikTok" value={accountId} onChange={(event) => setAccountId(event.target.value)} className="h-9 rounded-md border bg-background px-3 text-xs"><option value="">Pilih satu akun TikTok…</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}</select><Button size="sm" variant="outline" onClick={runPreview} disabled={loading || !accountId}>{loading ? <RefreshCw className="animate-spin" size={14} /> : <Eye size={14} />} Preview</Button></div>
     </div>
     {message && <p className="mt-3 rounded-md bg-background px-3 py-2 text-xs">{message}</p>}
     {preview && <>
