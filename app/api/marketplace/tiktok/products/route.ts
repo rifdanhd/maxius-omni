@@ -23,7 +23,7 @@ const SORTS = [
 //   search, sort, accountIds (csv), tab, page, pageSize
 export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const sp = req.nextUrl.searchParams;
-  const tab = sp.get("tab") ?? "all";
+  const tab = sp.get("tab") ?? "active";
   if (tab !== "all" && !(TIKTOK_TABS as readonly string[]).includes(tab)) {
     return NextResponse.json({ error: "Tab tidak dikenali." }, { status: 400 });
   }

@@ -257,7 +257,7 @@ async function refreshKnownProducts(
         try {
           const result = await withRefreshedTiktokToken(account, (token, creds) =>
             searchProducts(token, account.shopCipher ?? undefined,
-              { pageSize: 100, [field]: values.slice(offset, offset + 10), ...(pageToken ? { pageToken } : {}) }, creds));
+              { pageSize: 100, status: "ACTIVATE", [field]: values.slice(offset, offset + 10), ...(pageToken ? { pageToken } : {}) }, creds));
           for (const product of result.products) if (product.id) products.set(String(product.id), product);
           pageToken = result.nextPageToken ?? null;
         } catch (searchErr) {
@@ -447,7 +447,7 @@ async function autoLinkKnownTikTokSkus(businessId: string, accountId: string, pr
       try {
         const added = await prisma.$transaction(async (tx) => {
           let variantId: string | null = null;
-          let sellerSku = sku.sellerSku?.trim() || null;
+          const sellerSku = sku.sellerSku?.trim() || null;
 
           // 1. Coba cocokkan via sellerSku ke master SKU
           if (sellerSku) {

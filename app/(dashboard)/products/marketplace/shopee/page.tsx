@@ -102,7 +102,7 @@ export default function ShopeeMarketplacePage() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState("name_asc");
-  const [tab, setTab] = useState("all");
+  const [tab, setTab] = useState("active");
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [refreshKey, setRefreshKey] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);

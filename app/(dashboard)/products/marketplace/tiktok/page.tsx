@@ -178,7 +178,7 @@ export default function TikTokMarketplacePage() {
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState<TabKey>("all");
+  const [tab, setTab] = useState<TabKey>("active");
   const [sort, setSort] = useState<string>("name_asc");
   const [refreshKey, setRefreshKey] = useState(0);
 
