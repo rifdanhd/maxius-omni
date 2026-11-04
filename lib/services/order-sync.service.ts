@@ -166,6 +166,12 @@ async function syncShipments(
   }
 }
 
+function shipmentPayloadFromOrder(raw: OrderRaw): Array<Record<string, unknown>> {
+  if (raw.packages?.length) return raw.packages;
+  const packageIds = [...new Set((raw.line_items ?? []).map((item) => item.package_id).filter((id): id is string => typeof id === "string" && id.trim().length > 0))];
+  return packageIds.map((id) => ({ id, package_status: "PACKAGED" }));
+}
+
 /** Hasil akumulasi sync order TikTok (dipakai inner & background SyncRun). */
 export type TikTokOrderSyncResult = {
   fetched: number;
@@ -288,7 +294,7 @@ export async function ingestTikTokOrdersPage(
             recommendedShippingTime: toDate(raw.recommended_shipping_time),
           },
         });
-        await syncShipments(prisma, existing.orderId, accountId, raw.packages);
+        await syncShipments(prisma, existing.orderId, accountId, shipmentPayloadFromOrder(raw));
         for (const li of raw.line_items ?? []) {
           const keys = [li.sku_id, li.seller_sku].filter((key): key is string => Boolean(key));
           const channelSku = keys[0] || li.product_id || "";
@@ -416,7 +422,7 @@ export async function ingestTikTokOrdersPage(
             accountId,
           },
         });
-        await syncShipments(tx, order.id, accountId, raw.packages);
+        await syncShipments(tx, order.id, accountId, shipmentPayloadFromOrder(raw));
       });
 
       // Backfill gambar produk master dari gambar line item platform
