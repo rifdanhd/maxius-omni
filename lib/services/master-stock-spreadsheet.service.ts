@@ -96,7 +96,7 @@ export async function previewMasterStockImport(businessId: string, warehouseId: 
     used.add(variant.id);
     if (row.version !== undefined && row.version !== variant.version) throw new InventoryConflict(`Baris ${row.line}: stok sudah berubah sejak file diekspor. Ekspor ulang sebelum mengimpor.`, 409);
     return { variantId: variant.id, sku: row.sku, name: variant.masterProduct.name, expectedVersion: variant.version,
-      warehouseId, kind: "CORRECTION" as const, quantity: row.quantity,
+      warehouseId, kind: "INITIAL" as const, quantity: row.quantity,
       ...(row.safetyStock !== undefined ? { safetyStock: row.safetyStock } : {}), before: variant.warehouseStock[0]?.stock ?? 0,
       listings: variant.productMapping.length, storeIds: variant.productMapping.map((mapping) => mapping.accountId) };
   });

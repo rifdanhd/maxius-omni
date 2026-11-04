@@ -36,6 +36,7 @@ export const STOCK_REASONS = {
   // Barang masuk (restock fisik). Dipakai endpoint /api/inventory/stock-in.
   // Data lama yang tercatat MANUAL_ADJUSTMENT dibiarkan historis.
   STOCK_IN: "STOCK_IN",
+  INITIAL_STOCK: "INITIAL_STOCK",
   STOCK_OUT: "STOCK_OUT",
   MANUAL_ADJUSTMENT: "MANUAL_ADJUSTMENT",
   SYNC_CORRECTION: "SYNC_CORRECTION",

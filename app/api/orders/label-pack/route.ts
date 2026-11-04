@@ -41,7 +41,7 @@ export const POST = withAuth(async (req) => {
       id: true,
       orderNo: true,
       sellerNote: true,
-      account: { select: { accessToken: true, shopCipher: true, platform: true } },
+      account: { select: { id: true, accessToken: true, shopCipher: true, platform: true } },
       shipments: { select: { externalId: true } },
       items: {
         select: {
@@ -52,6 +52,7 @@ export const POST = withAuth(async (req) => {
           variant: {
             select: {
               sku: true,
+                productMapping: { select: { accountId: true, sellerSku: true } },
               masterProduct: { select: { name: true } },
             },
           },
@@ -89,7 +90,7 @@ export const POST = withAuth(async (req) => {
       rows: order.items.map((it) => ({
         productName: it.variant?.masterProduct?.name ?? it.productName ?? it.channelSku,
         variant: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,
-        sellerSku: it.variant?.sku ?? it.channelSku,
+        sellerSku: it.variant?.productMapping.find((mapping) => mapping.accountId === order.account.id)?.sellerSku ?? it.variant?.sku ?? it.channelSku,
         qty: it.qty,
       })),
     });

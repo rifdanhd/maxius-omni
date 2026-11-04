@@ -111,6 +111,7 @@ type OrderDetail = {
     qty: number;
     price: number | null;
     subTotal: number | null;
+    imageUrl: string | null;
   }[];
 };
 
@@ -128,10 +129,13 @@ const PLATFORM: Record<string, string> = {
 function labelMenuDescription(orders: Order[], selected: Set<string>): string {
   const sel = orders.filter((o) => selected.has(o.id));
   const hasTikTok = sel.some((o) => o.account?.platform === "TIKTOK_SHOP");
-  const hasLocal = sel.some((o) => o.account?.platform !== "TIKTOK_SHOP");
-  if (hasTikTok && hasLocal) return "Label resmi TikTok (PDF) + label lokal utk non-TikTok";
-  if (hasTikTok) return "Label resmi TikTok gabungan (PDF)";
-  return "Label pengiriman lokal (alamat & resi)";
+  const hasShopee = sel.some((o) => o.account?.platform === "SHOPEE");
+  const hasLocal = sel.some((o) => o.account?.platform !== "TIKTOK_SHOP" && o.account?.platform !== "SHOPEE");
+  const parts: string[] = [];
+  if (hasTikTok) parts.push("Label resmi TikTok gabungan (PDF)");
+  if (hasShopee) parts.push("Label resmi Shopee (per pesanan)");
+  if (hasLocal) parts.push("Label lokal utk non-TikTok/Shopee");
+  return parts.join(" + ");
 }
 
 function formatPrice(value: number | null | undefined, fallback = "-") {
@@ -275,6 +279,7 @@ function toPrintableFromDetail(o: OrderDetail): PrintableOrder {
       category: it.category ?? undefined,
       qty: it.qty,
       price: it.price != null ? formatPrice(it.price, "Rp 0") : "Rp 0",
+      imageUrl: it.imageUrl ?? undefined,
     })),
   };
 }
@@ -808,11 +813,19 @@ export default function OrdersPage() {
     if (targets.length === 0) return;
     if (type === "Label") {
       // Label resmi digabung jadi 1 PDF multi-halaman di server (sudah bertempel varian produk).
-      // Order non-TikTok dicetak label lokal dari data pesanan.
+      // Order Shopee dicetak lewat endpoint resmi Shopee (sama seperti cetak 1 per 1)
+      // agar tampilan PDF konsisten antara cetak serentak dan cetak per 1 pesanan.
+      // Order non-TikTok/non-Shopee dicetak label lokal dari data pesanan.
       const tt = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
-      const local = targets.filter((o) => o.account?.platform !== "TIKTOK_SHOP");
-      if (tt.length > 0) await printSelectedBulkLabel(tt);
-      if (local.length > 0) await printLocalLabels(local);
+      const shopee = targets.filter((o) => o.account?.platform === "SHOPEE");
+      const local = targets.filter((o) => o.account?.platform !== "TIKTOK_SHOP" && o.account?.platform !== "SHOPEE");
+      if (tt.length > 0) void printSelectedBulkLabel(tt);
+      if (shopee.length > 0) {
+        for (const o of shopee) {
+          void printOrder(o, "Label");
+        }
+      }
+      if (local.length > 0) void printLocalLabels(local);
       return;
     }
     printOrders(targets.map(toPrintable), type);

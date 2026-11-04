@@ -23,6 +23,7 @@
  *    bisa dilanjutkan tanpa menarik ulang listing yang sudah diproses.
  */
 import crypto from "crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getItemBaseInfo, getItemList, getModelList, itemBaseImage, readStockInfo } from "@/lib/integrations/shopee";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
@@ -92,6 +93,27 @@ export function normalizeShopeeImportLimit(limit: unknown): number {
   const n = Math.floor(Number(limit));
   if (!Number.isFinite(n) || n <= 0) return SHOPEE_IMPORT_DEFAULT_LIMIT;
   return Math.min(SHOPEE_IMPORT_MAX_LIMIT, n);
+}
+
+function normalizeName(name: string | null | undefined): string | null {
+  const t = (name ?? "").trim().replace(/\s+/g, " ");
+  return t || null;
+}
+
+/** Cari MasterProduct yang sudah ada dengan nama sama (case-insensitive) di business ini. */
+async function findExistingMasterByName(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  name: string | null | undefined
+): Promise<string | null> {
+  const normalized = normalizeName(name);
+  if (!normalized) return null;
+  const existing = await tx.masterProduct.findFirst({
+    where: { businessId, name: { equals: normalized, mode: "insensitive" } },
+    select: { id: true },
+    take: 1,
+  });
+  return existing?.id ?? null;
 }
 
 export async function importShopeeListings(params: {
@@ -271,9 +293,14 @@ async function importOneItem(params: {
         const duplicate = d.sellerSku && descriptors.filter((item) => item.sellerSku === d.sellerSku).length > 1;
         if (!resolution?.ambiguous && !duplicate && !variantId) {
           if (!productId) {
-            const product = await tx.masterProduct.create({ data: { name: itemName ?? d.sellerSku ?? d.channelSku, businessId,
-              importedFrom: `SHOPEE:${account.externalShopId ?? ""}`, threshold, imageUrl: image } });
-            productId = product.id;
+            const existingMasterId = await findExistingMasterByName(tx, businessId, itemName ?? d.sellerSku ?? d.channelSku);
+            if (existingMasterId) {
+              productId = existingMasterId;
+            } else {
+              const product = await tx.masterProduct.create({ data: { name: itemName ?? d.sellerSku ?? d.channelSku, businessId,
+                importedFrom: `SHOPEE:${account.externalShopId ?? ""}`, threshold, imageUrl: image } });
+              productId = product.id;
+            }
           }
           const variant = await tx.productVariant.create({ data: { masterProductId: productId, sku: d.sellerSku ?? d.channelSku,
             name: pending.length > 1 ? d.sellerSku ?? d.channelSku : null, stock: d.stock } });

@@ -17,7 +17,7 @@ export type PrintableOrder = {
   trackingNumber?: string;
   sellerNote?: string | null;
   pickupLocation?: string | null;
-  items: (OrderCardItem & { category?: string })[];
+  items: (OrderCardItem & { category?: string; imageUrl?: string | null })[];
 };
 
 function printThemeStyles(): string {
@@ -214,6 +214,26 @@ const LABEL_STYLE = `
   .l-table tr:last-child td {
     border-bottom: none;
   }
+  .l-img {
+    width: 22px;
+    height: 22px;
+    object-fit: cover;
+    border: 1px solid var(--print-border);
+    border-radius: 2px;
+    background: var(--print-muted);
+  }
+  .l-img-placeholder {
+    width: 22px;
+    height: 22px;
+    background: var(--print-muted);
+    border: 1px dashed var(--print-border);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--print-muted-foreground);
+  }
   .l-prod-name {
     font-weight: 700;
     color: var(--print-foreground);
@@ -281,7 +301,7 @@ function buildLabel(o: PrintableOrder) {
   const note = o.sellerNote ? `<div class="l-note"><strong>Catatan:</strong> ${escapeHtml(o.sellerNote)}</div>` : "";
 
   let totalQty = 0;
-  const rows = o.items
+      const rows = o.items
     .map((i, idx) => {
       totalQty += i.qty;
       const variantText =
@@ -290,9 +310,13 @@ function buildLabel(o: PrintableOrder) {
           : i.category && i.category !== "-"
           ? escapeHtml(i.category)
           : "";
+      const imgHtml = i.imageUrl
+        ? `<img src="${i.imageUrl}" class="l-img" alt="" />`
+        : `<div class="l-img-placeholder">-</div>`;
       return `
         <tr>
           <td style="width: 18px; color: var(--print-muted-foreground); font-size: 8px; text-align: center;">${idx + 1}</td>
+          <td style="width: 28px; text-align: center; padding: 2px 3px;">${imgHtml}</td>
           <td>
             <div class="l-prod-name">${escapeHtml(i.name)}</div>
             ${variantText ? `<div class="l-prod-var">Varian: ${variantText}</div>` : ""}
@@ -352,6 +376,7 @@ function buildLabel(o: PrintableOrder) {
             <thead>
               <tr>
                 <th style="width: 18px; text-align: center;">No</th>
+                <th style="width: 28px; text-align: center;">Gbr</th>
                 <th>Nama Produk & Varian</th>
                 <th style="width: 32px; text-align: center;">Qty</th>
               </tr>

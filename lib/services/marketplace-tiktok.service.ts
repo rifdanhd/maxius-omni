@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import crypto from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { findMasterSku, lockSellerSkus, queueSkuReview, registerSellerSku } from "@/lib/services/master-sku.service";
 import { applyMarketplaceCover } from "@/lib/services/gallery.service";
 import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
@@ -12,6 +13,8 @@ import {
   productSkuStock,
   productMainImage,
 } from "@/lib/integrations/tiktokShop";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 
 /**
  * Marketplace Tokopedia | Shop — listing produk yang terhubung/published.
@@ -705,6 +708,260 @@ include: {
     }
   }
   return results;
+}
+
+/* ==================== TIKTOK LISTING IMPORT → MASTER CATALOG ==================== */
+
+const TIKTOK_IMPORT_DEFAULT_LIMIT = 100;
+const TIKTOK_IMPORT_MAX_LIMIT = 500;
+
+export type TikTokImportAccountResult = {
+  accountId: string;
+  label: string;
+  importedItems: number;
+  importedVariants: number;
+  existing: number;
+  orphan: number;
+  duplicate: number;
+  zeroStock: number;
+  itemsScanned: number;
+  hasMore: boolean;
+  error?: string;
+};
+
+function isPrismaUniqueErrorTikTok(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    String((e as { code?: unknown }).code) === "P2002"
+  );
+}
+
+function normalizeTikTokName(name: string | null | undefined): string | null {
+  const t = (name ?? "").trim().replace(/\s+/g, " ");
+  return t || null;
+}
+
+async function findExistingMasterByNameTikTok(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  name: string | null | undefined
+): Promise<string | null> {
+  const normalized = normalizeTikTokName(name);
+  if (!normalized) return null;
+  const existing = await tx.masterProduct.findFirst({
+    where: { businessId, name: { equals: normalized, mode: "insensitive" } },
+    select: { id: true },
+    take: 1,
+  });
+  return existing?.id ?? null;
+}
+
+export async function importTikTokListings(params: {
+  businessId: string;
+  accountIds?: string[];
+  limit?: number;
+}): Promise<TikTokImportAccountResult[]> {
+  const limit = Math.min(Math.floor(Number(params.limit ?? TIKTOK_IMPORT_DEFAULT_LIMIT)), TIKTOK_IMPORT_MAX_LIMIT);
+  const settings = await getCachedInventorySettings(params.businessId);
+
+  const accounts = await prisma.platformAccount.findMany({
+    where: {
+      platform: "TIKTOK_SHOP",
+      businessId: params.businessId,
+      ...(params.accountIds?.length ? { id: { in: params.accountIds } } : {}),
+    },
+    orderBy: { label: "asc" },
+  });
+
+  const results: TikTokImportAccountResult[] = [];
+
+  for (const summary of accounts) {
+    const stats: TikTokImportAccountResult = {
+      accountId: summary.id,
+      label: summary.label,
+      importedItems: 0,
+      importedVariants: 0,
+      existing: 0,
+      orphan: 0,
+      duplicate: 0,
+      zeroStock: 0,
+      itemsScanned: 0,
+      hasMore: false,
+    };
+    results.push(stats);
+
+    if (!summary.accessToken || !summary.shopCipher) {
+      stats.error = "Koneksi toko belum lengkap. Hubungkan ulang melalui Pengaturan Toko.";
+      continue;
+    }
+
+    try {
+      const known = await prisma.productMapping.findMany({
+        where: { accountId: summary.id },
+        select: { id: true, channelSku: true, variantId: true, platformProductId: true },
+      });
+      const byChannelSku = new Map<string, { id: string; variantId: string | null; platformProductId: string | null }>(
+        known.map((m) => [m.channelSku, { id: m.id, variantId: m.variantId, platformProductId: m.platformProductId }])
+      );
+
+      const account = {
+        id: summary.id,
+        label: summary.label,
+        accessToken: summary.accessToken ?? null,
+        refreshToken: null,
+        tokenExpiresAt: null,
+        shopCipher: summary.shopCipher ?? null,
+      };
+
+      const products = await enumerateAccountProducts(account, true);
+      const unmapped = findUnmappedProducts(products, Array.from(byChannelSku.keys()));
+
+      let scanned = 0;
+      for (const product of unmapped) {
+        if (stats.importedItems >= limit) { stats.hasMore = true; break; }
+        await importOneTikTokProduct({ account, businessId: params.businessId, product, byChannelSku, threshold: settings.lowStockDefaultThreshold, stats });
+        scanned += 1;
+      }
+      stats.itemsScanned = scanned;
+    } catch (e) {
+      stats.error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  return results;
+}
+
+async function importOneTikTokProduct(params: {
+  account: { id: string; label: string; accessToken: string | null; refreshToken: string | null; tokenExpiresAt: Date | null; shopCipher: string | null };
+  businessId: string;
+  product: TikTokUnmappedProduct;
+  byChannelSku: Map<string, { id: string; variantId: string | null; platformProductId: string | null }>;
+  threshold: number;
+  stats: TikTokImportAccountResult;
+}) {
+  const { account, businessId, product, byChannelSku, threshold, stats } = params;
+  const title = normalizeTikTokName(product.title) ?? `Produk TikTok ${product.platformProductId}`;
+  const mainImage = product.imageUrl ?? null;
+
+  try {
+    const delta = await prisma.$transaction(async (tx) => {
+      let productId: string | null = await findExistingMasterByNameTikTok(tx, businessId, title);
+      let createdMaster = false;
+      let initializedCount = 0;
+
+      for (const sku of product.skus) {
+        const channelSku = (sku.skuId || sku.sellerSku) ?? sku.skuId;
+        if (!channelSku) continue;
+
+        if (byChannelSku.has(channelSku)) {
+          stats.existing += 1;
+          continue;
+        }
+
+        let variantId: string | null = null;
+        if (sku.sellerSku) {
+          await lockSellerSkus(tx, businessId, [sku.sellerSku]);
+          const resolution = await findMasterSku(tx, businessId, sku.sellerSku);
+          if (resolution?.variantId && !resolution.ambiguous) {
+            variantId = resolution.variantId;
+          }
+        }
+
+        if (!variantId && !productId) {
+          const existingMasterId = await findExistingMasterByNameTikTok(tx, businessId, title);
+          if (existingMasterId) {
+            productId = existingMasterId;
+          } else {
+            const master = await tx.masterProduct.create({
+              data: {
+                name: title,
+                businessId,
+                importedFrom: `TIKTOK:${account.id}`,
+                threshold,
+                ...(mainImage ? { imageUrl: mainImage } : {}),
+              },
+            });
+            productId = master.id;
+            createdMaster = true;
+          }
+        }
+
+        if (!variantId && productId) {
+          const variant = await tx.productVariant.create({
+            data: {
+              masterProductId: productId,
+              sku: sku.sellerSku ?? channelSku,
+              name: sku.skuName ?? null,
+              stock: Math.max(0, Math.floor(Number(sku.stock) || 0)),
+            },
+          });
+          variantId = variant.id;
+          initializedCount++;
+
+          if (sku.sellerSku) {
+            await tx.masterSkuKey.upsert({
+              where: { businessId_sellerSku: { businessId, sellerSku: sku.sellerSku } },
+              create: { businessId, sellerSku: sku.sellerSku, variantId },
+              update: { variantId },
+            });
+          }
+
+          await tx.stockLedger.create({
+            data: {
+              id: crypto.randomUUID(),
+              variantId,
+              changeQty: Math.max(0, Math.floor(Number(sku.stock) || 0)),
+              reason: STOCK_REASONS.INIT,
+              note: `Stok awal import listing TikTok #${product.platformProductId}.`,
+              stockAfter: Math.max(0, Math.floor(Number(sku.stock) || 0)),
+            },
+          });
+        }
+
+        const mapping = await tx.productMapping.create({
+          data: {
+            id: crypto.randomUUID(),
+            accountId: account.id,
+            channelSku,
+            sellerSku: sku.sellerSku ?? null,
+            platformSkuId: sku.skuId ?? null,
+            variantId: variantId ?? null,
+            platformProductId: product.platformProductId,
+            platformTitle: title,
+            platformStatus: product.status ?? null,
+            lastSyncedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+
+        if (!variantId) {
+          stats.orphan += 1;
+          await queueSkuReview(tx, {
+            businessId,
+            mappingId: mapping.id,
+            sellerSku: sku.sellerSku ?? channelSku,
+            candidateIds: [],
+            reason: "SKU belum memiliki varian master.",
+          });
+        } else {
+          stats.importedVariants += 1;
+        }
+      }
+
+      if (createdMaster) stats.importedItems += 1;
+      return { items: createdMaster ? 1 : 0, variants: initializedCount };
+    });
+
+    stats.importedItems += delta.items;
+    stats.importedVariants += delta.variants;
+    stats.zeroStock += product.skus.filter((s) => Math.max(0, Math.floor(Number(s.stock) || 0)) === 0).length;
+
+  } catch (e) {
+    if (!isPrismaUniqueErrorTikTok(e)) throw e;
+    stats.duplicate += product.skus.length;
+  }
 }
 
 async function enrichUnmappedImages(products: TikTokUnmappedProduct[]): Promise<void> {

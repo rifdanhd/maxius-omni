@@ -23,7 +23,7 @@ import { syncOrdersTikTok } from "@/lib/services/order-sync.service";
 import { syncOrdersShopee } from "@/lib/services/shopee-order-sync.service";
 import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
 import { importShopeeListings } from "@/lib/services/marketplace-shopee-import.service";
-import { syncTikTokListings } from "@/lib/services/marketplace-tiktok.service";
+import { syncTikTokListings, importTikTokListings } from "@/lib/services/marketplace-tiktok.service";
 import { ingestPromotionActivitiesForAccount } from "@/lib/services/promotion-activity.service";
 import { ingestShopeePromotionsForAccount } from "@/lib/services/shopee-promotion.service";
 
@@ -44,6 +44,7 @@ export type ListingsAutoSummary = {
   businesses: number;
   shopeeNew: number;
   shopeeMatched: number;
+  tiktokNew: number;
   tiktokSynced: number;
   errors: number;
 };
@@ -135,7 +136,7 @@ export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
 
 export async function autoSyncListingsOnce(): Promise<ListingsAutoSummary> {
   if (listingsInFlight) {
-    return { businesses: 0, shopeeNew: 0, shopeeMatched: 0, tiktokSynced: 0, errors: 0 };
+    return { businesses: 0, shopeeNew: 0, shopeeMatched: 0, tiktokNew: 0, tiktokSynced: 0, errors: 0 };
   }
   listingsInFlight = true;
   try {
@@ -144,6 +145,7 @@ export async function autoSyncListingsOnce(): Promise<ListingsAutoSummary> {
       businesses: businesses.length,
       shopeeNew: 0,
       shopeeMatched: 0,
+      tiktokNew: 0,
       tiktokSynced: 0,
       errors: 0,
     };
@@ -194,6 +196,32 @@ export async function autoSyncListingsOnce(): Promise<ListingsAutoSummary> {
               },
             })
             .catch(() => {});
+        }
+
+        // Impor listing TikTok baru → MasterProduct (dengan dedup nama) — idempoten.
+        const ttImported = await importTikTokListings({ businessId: biz.id });
+        for (const r of ttImported) {
+          out.tiktokNew += r.importedItems;
+          if (r.importedItems > 0 || r.orphan > 0 || r.duplicate > 0) {
+            await prisma.syncLog
+              .create({
+                data: {
+                  direction: "in",
+                  kind: "listing_sync",
+                  status: "success",
+                  message: `auto import TikTok: +${r.importedItems} item, ${r.importedVariants} varian, ${r.orphan} review, ${r.duplicate} duplikat`,
+                  payload: JSON.stringify({
+                    importedItems: r.importedItems,
+                    importedVariants: r.importedVariants,
+                    existing: r.existing,
+                    orphan: r.orphan,
+                    duplicate: r.duplicate,
+                  }),
+                  accountId: r.accountId,
+                },
+              })
+              .catch(() => {});
+          }
         }
 
         // TikTok: service sudah menulis listing_sync per akun sendiri.

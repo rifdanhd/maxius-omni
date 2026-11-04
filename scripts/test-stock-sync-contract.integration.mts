@@ -72,6 +72,8 @@ try {
   const variant = await prisma.productVariant.create({ data: { masterProductId: product.id, sku: "CENTRAL", stock: 100, safetyStock: 10 } });
   const tt = await prisma.productMapping.create({ data: { accountId: "tt", variantId: variant.id, channelSku: "1736990378593650231", sellerSku: "SELLER-A", platformSkuId: "1736990378593650231", platformProductId: "product-1", platformStock: 1, lastStockPushStatus: "FAILED", lastStockPushError: "previous real error", lastStockPushAt: new Date(1000), updatedAt: new Date() } });
   await prisma.productMapping.create({ data: { accountId: "sh", variantId: variant.id, channelSku: "100:1", updatedAt: new Date() } });
+  await prisma.stockLedger.create({ data: { id: "initial-stock-fixture", variantId: variant.id, changeQty: 100, reason: "INITIAL_STOCK", referenceId: "initial-stock-fixture", stockAfter: 100, note: "Baseline stok fixture" } });
+  await updateInventorySettings("a", { stockBaselineReady: true });
   const targets = [{ accountId: "tt", channelSku: tt.channelSku }];
   for (const value of [undefined, "false", "TRUE"]) {
     if (value === undefined) delete process.env.STOCK_PUSH_ENABLED; else process.env.STOCK_PUSH_ENABLED = value;

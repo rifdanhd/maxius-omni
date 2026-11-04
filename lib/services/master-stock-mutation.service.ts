@@ -9,7 +9,7 @@ export class InventoryConflict extends Error {
 
 export type MasterStockChange = {
   variantId: string; expectedVersion: number; warehouseId: string;
-  kind: "IN" | "OUT" | "COUNT" | "CORRECTION"; quantity: number;
+  kind: "IN" | "OUT" | "INITIAL" | "COUNT" | "CORRECTION"; quantity: number;
   safetyStock?: number; reason: string; note?: string; requestId: string;
 };
 
@@ -60,12 +60,18 @@ export async function changeMasterStock(businessId: string, userId: string, chan
       if (variant.safetyStock - balance.safetyStock + nextReserved > 2_147_483_647) {
         throw new InventoryConflict("Jumlah disisihkan melampaui batas.", 400);
       }
+      const nextStock = variant.stock - balance.stock + stock;
+      const nextSafetyStock = variant.safetyStock - balance.safetyStock + nextReserved;
       await tx.variantWarehouseStock.update({ where: { variantId_warehouseId: { variantId: variant.id, warehouseId: warehouse.id } },
         data: { stock, safetyStock: nextReserved } });
-      const updated = await tx.productVariant.findUniqueOrThrow({ where: { id: variant.id } });
+      const updated = await tx.productVariant.update({ where: { id: variant.id }, data: {
+        stock: nextStock,
+        safetyStock: nextSafetyStock,
+        version: { increment: 1 },
+      } });
       await tx.stockLedger.create({ data: { id: crypto.randomUUID(), variantId: variant.id, warehouseId: warehouse.id,
-        reason: input.kind === "IN" ? "STOCK_IN" : input.kind === "OUT" ? "STOCK_OUT" : input.kind === "COUNT" ? "STOCK_OPNAME" : "MANUAL_ADJUSTMENT",
-        referenceId, requestFingerprint, changeQty: stock - balance.stock, stockAfter: updated.stock, userId,
+        reason: input.kind === "IN" ? "STOCK_IN" : input.kind === "INITIAL" ? "INITIAL_STOCK" : input.kind === "OUT" ? "STOCK_OUT" : input.kind === "COUNT" ? "STOCK_OPNAME" : "MANUAL_ADJUSTMENT",
+        referenceId, requestFingerprint, changeQty: nextStock - variant.stock, stockAfter: updated.stock, userId,
         note: `${input.reason.trim()}${input.note?.trim() ? ` — ${input.note.trim()}` : ""} · ${warehouse.name}` } });
       if (nextReserved !== balance.safetyStock) await tx.stockLedger.create({ data: { id: crypto.randomUUID(), variantId: variant.id,
         warehouseId: warehouse.id, reason: "SAFETY_STOCK_CHANGE", referenceId, requestFingerprint, changeQty: 0, stockAfter: updated.stock, userId,

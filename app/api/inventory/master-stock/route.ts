@@ -10,7 +10,7 @@ import { dispatchInventoryAfterResponse } from "@/lib/services/inventory-dispatc
 
 const id = z.string().trim().min(1).max(200);
 const change = z.object({ variantId: id, expectedVersion: stockQuantity, warehouseId: id,
-  kind: z.enum(["IN", "OUT", "COUNT", "CORRECTION"]), quantity: stockQuantity, safetyStock: stockQuantity.optional(),
+  kind: z.enum(["IN", "OUT", "INITIAL", "COUNT", "CORRECTION"]), quantity: stockQuantity, safetyStock: stockQuantity.optional(),
   reason: z.string().trim().min(1).max(120), note: z.string().trim().max(1000).optional(), requestId: id.min(8) }).strict()
   .refine((input) => !["IN", "OUT"].includes(input.kind) || input.quantity > 0, "Jumlah harus lebih dari nol.");
 const request = z.discriminatedUnion("action", [

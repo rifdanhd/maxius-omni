@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { assertSameBrand } from "@/lib/services/business-scope.service";
@@ -31,6 +32,27 @@ interface BulkMappingPayload {
     sellerSku?: string | null;
     variantId: string;
   }>;
+}
+
+function normalizeName(name: string | null | undefined): string | null {
+  const t = (name ?? "").trim().replace(/\s+/g, " ");
+  return t || null;
+}
+
+/** Cari MasterProduct yang sudah ada dengan nama sama (case-insensitive) di business ini. */
+async function findExistingMasterByName(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  name: string | null | undefined
+): Promise<string | null> {
+  const normalized = normalizeName(name);
+  if (!normalized) return null;
+  const existing = await tx.masterProduct.findFirst({
+    where: { businessId, name: { equals: normalized, mode: "insensitive" } },
+    select: { id: true },
+    take: 1,
+  });
+  return existing?.id ?? null;
 }
 
 /**
@@ -75,18 +97,21 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
           const title = prod.title?.trim() || `Produk TikTok ${prod.platformProductId}`;
           const mainImage = prod.imageUrl?.trim() || null;
 
-          // 1. Buat Master Product baru
-          const master = await tx.masterProduct.create({
-            data: {
-              name: title,
-              businessId: req.businessId,
-              threshold: settings.lowStockDefaultThreshold,
-              ...(mainImage ? { imageUrl: mainImage } : {}),
-            },
-          });
-          createdMastersCount++;
+          // 1. Buat Master Product baru (atau gunakan yang sudah ada dengan nama sama)
+          const existingMasterId = await findExistingMasterByName(tx, req.businessId, title);
+          const master = existingMasterId
+            ? { id: existingMasterId }
+            : await tx.masterProduct.create({
+                data: {
+                  name: title,
+                  businessId: req.businessId,
+                  threshold: settings.lowStockDefaultThreshold,
+                  ...(mainImage ? { imageUrl: mainImage } : {}),
+                },
+              });
+          if (!existingMasterId) createdMastersCount++;
 
-          if (mainImage) {
+          if (mainImage && !existingMasterId) {
             await tx.productImage.create({
               data: {
                 id: crypto.randomUUID(),

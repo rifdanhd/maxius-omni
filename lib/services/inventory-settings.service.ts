@@ -37,6 +37,7 @@ export type InventorySettings = {
   syncPushShopee: boolean;
   syncPushTiktok: boolean;
   stockPushEnabled: boolean;
+  stockBaselineReady: boolean;
   opnameReminderFrequency: OpnameFrequency;
 };
 
@@ -48,6 +49,7 @@ type SettingsRow = {
   syncPushShopee: boolean;
   syncPushTiktok: boolean;
   stockPushEnabled?: boolean;
+  stockBaselineReady?: boolean;
   opnameReminderFrequency: string;
 };
 
@@ -60,6 +62,7 @@ function toSettings(row: SettingsRow): InventorySettings {
     syncPushShopee: row.syncPushShopee,
     syncPushTiktok: row.syncPushTiktok,
     stockPushEnabled: row.stockPushEnabled ?? true,
+    stockBaselineReady: row.stockBaselineReady ?? false,
     // Default true untuk backward compatibility toko yang sudah aktif.
     // Schema lama tanpa kolom tetap memerlukan migrasi; error database menahan push.
     opnameReminderFrequency: (OPNAME_FREQUENCIES as readonly string[]).includes(
@@ -96,6 +99,7 @@ export async function getInventorySettings(
               syncPushShopee: template.syncPushShopee,
               syncPushTiktok: template.syncPushTiktok,
               stockPushEnabled: template.stockPushEnabled,
+              stockBaselineReady: false,
               opnameReminderFrequency: template.opnameReminderFrequency,
             }
           : {}),
@@ -156,6 +160,7 @@ export function validateInventorySettingsUpdate(
     "syncPushShopee",
     "syncPushTiktok",
     "stockPushEnabled",
+    "stockBaselineReady",
   ] as const;
   for (const key of booleanKeys) {
     if (key in b) {
@@ -185,6 +190,23 @@ export async function updateInventorySettings(
   patch: Partial<InventorySettings>
 ): Promise<InventorySettings> {
   await getInventorySettings(businessId);
+  if (patch.stockBaselineReady === true) {
+    const [counts] = await prisma.$queryRaw<Array<{ mapped: bigint; initialized: bigint }>>`
+      SELECT
+        COUNT(DISTINCT pm."variantId") FILTER (WHERE pm."variantId" IS NOT NULL) AS mapped,
+        COUNT(DISTINCT sl."variantId") FILTER (WHERE sl."reason" = 'INITIAL_STOCK') AS initialized
+      FROM "ProductMapping" pm
+      LEFT JOIN "ProductVariant" pv ON pv."id" = pm."variantId"
+      LEFT JOIN "MasterProduct" mp ON mp."id" = pv."masterProductId"
+      LEFT JOIN "StockLedger" sl ON sl."variantId" = pm."variantId"
+      WHERE mp."businessId" = ${businessId}
+    `;
+    const mapped = Number(counts?.mapped ?? 0);
+    const initialized = Number(counts?.initialized ?? 0);
+    if (mapped === 0 || initialized < mapped) {
+      throw new Error(`Baseline belum lengkap: ${initialized} dari ${mapped} varian yang sudah ter-mapping memiliki stok awal.`);
+    }
+  }
   const row = await prisma.inventorySetting.update({ where: { businessId }, data: patch });
   return toSettings(row);
 }

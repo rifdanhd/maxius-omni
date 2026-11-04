@@ -64,6 +64,7 @@ model InventorySetting {
   syncPushShopee           Boolean  @default(true)
   syncPushTiktok           Boolean  @default(true)
   stockPushEnabled         Boolean  @default(true)
+  stockBaselineReady       Boolean  @default(false)
   opnameReminderFrequency  String   @default("monthly")
   updatedAt                DateTime @updatedAt
   business                 Business @relation(fields: [businessId], references: [id])

@@ -29,6 +29,7 @@ type Settings = {
   syncPushShopee: boolean;
   syncPushTiktok: boolean;
   stockPushEnabled: boolean;
+  stockBaselineReady: boolean;
   opnameReminderFrequency: string;
 };
 
@@ -387,6 +388,13 @@ export default function InventorySettingsPage() {
               )}
 
               <div className="divide-y divide-border/60 rounded-lg border border-border/60 bg-card p-3">
+                <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-semibold text-foreground">Baseline stok sudah diisi</div>
+                    <div className="text-xs text-muted-foreground">Aktifkan hanya setelah seluruh stok awal tervalidasi. Tanpa konfirmasi ini, tidak ada stok yang dikirim ke marketplace.</div>
+                  </div>
+                  <Toggle checked={settings.stockBaselineReady} onChange={(value) => setSettings({ ...settings, stockBaselineReady: value })} aria-label="Konfirmasi baseline stok sudah diisi" />
+                </label>
                 {/* Gate Brand Utama */}
                 <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
                   <div className="space-y-0.5">

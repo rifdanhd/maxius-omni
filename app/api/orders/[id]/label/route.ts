@@ -28,7 +28,7 @@ export const GET = withAuth(
         items: {
           include: {
             variant: {
-              select: { sku: true },
+              select: { sku: true, productMapping: { select: { accountId: true, sellerSku: true } } },
             },
           },
         },
@@ -163,7 +163,7 @@ export const GET = withAuth(
       const productRows: LabelMergeProductRow[] = (order.items ?? []).map((it) => ({
         productName: it.productName ?? it.channelSku ?? "-",
         variant: it.skuName ?? it.variant?.sku ?? "-",
-        sellerSku: it.channelSku ?? "-",
+        sellerSku: it.variant?.productMapping.find((mapping) => mapping.accountId === order.accountId)?.sellerSku ?? it.variant?.sku ?? it.channelSku ?? "-",
         qty: it.qty,
       }));
       let finalBytes: Uint8Array = downloadedBytes;

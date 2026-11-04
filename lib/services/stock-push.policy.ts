@@ -1,6 +1,7 @@
-export type StockPushSettings = { stockPushEnabled: boolean; syncPushShopee: boolean; syncPushTiktok: boolean; syncPushTokopedia: boolean };
+export type StockPushSettings = { stockPushEnabled: boolean; stockBaselineReady: boolean; syncPushShopee: boolean; syncPushTiktok: boolean; syncPushTokopedia: boolean };
 export function stockPushDisabledReason(account: { platform: string; isFrozen?: boolean; stockPushEnabled?: boolean }, settings: StockPushSettings): string | null {
   if (process.env.STOCK_PUSH_ENABLED !== "true") return "Push stok dinonaktifkan global; STOCK_PUSH_ENABLED belum bernilai true.";
+  if (!settings.stockBaselineReady) return "Baseline stok belum dikonfirmasi; isi stok awal dan aktifkan konfirmasi baseline terlebih dahulu.";
   if (account.isFrozen) return "Toko dibekukan; push stok tidak diizinkan.";
   if (account.stockPushEnabled === false) return "Push stok dinonaktifkan untuk toko ini.";
   if (!settings.stockPushEnabled) return "Push stok dinonaktifkan pada pengaturan brand.";

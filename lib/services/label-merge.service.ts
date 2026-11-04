@@ -257,7 +257,7 @@ export async function stampProductVariantOnLabel(
   const L = 5.8;
   const R = width - 4.4;
   const LABEL_BOTTOM = 130;
-  const colX = { prod: L, sku: 130, sellerSku: 172.7, qtyHead: 265, qtyMid: 271 };
+  const colX = { prod: L, sku: 145, sellerSku: 190, qtyHead: 275, qtyMid: 281 };
   const LEAD = 8.5;
   const TAIL = 38.5;
 
@@ -279,7 +279,7 @@ export async function stampProductVariantOnLabel(
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const prodLines = wrapByWidth(safeText(r.productName), font, 7, colX.sku - colX.prod - 6, 3);
+    const prodLines = wrapByWidth(safeText(r.productName), font, 6.5, colX.sku - colX.prod - 6, 4);
     const varName = safeText(r.variant && r.variant !== "-" ? r.variant : r.sellerSku);
     const skuLines = wrapByWidth(varName, font, 6.5, colX.sellerSku - colX.sku - 4, 2);
     const nLines = Math.max(prodLines.length, skuLines.length);
@@ -293,8 +293,8 @@ export async function stampProductVariantOnLabel(
     }
 
     const base = cursor - 9;
-    prodLines.forEach((t, li) => page.drawText(t, { x: colX.prod, y: base - li * LEAD, size: 7, font, color: INK }));
-    skuLines.forEach((t, li) => page.drawText(t, { x: colX.sku, y: base - li * LEAD, size: 6.5, font, color: INK }));
+    prodLines.forEach((t, li) => page.drawText(t, { x: colX.prod, y: base - li * LEAD, size: 6.5, font, color: INK }));
+    skuLines.forEach((t, li) => page.drawText(t, { x: colX.sku, y: base - li * LEAD, size: 6, font, color: INK }));
 
     const seller = fitText(safeText(r.sellerSku && r.sellerSku !== "-" ? r.sellerSku : "-"), font, 6.5, 262 - colX.sellerSku);
     page.drawText(seller, { x: colX.sellerSku, y: base, size: 6.5, font, color: INK });
