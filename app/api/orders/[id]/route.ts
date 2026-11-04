@@ -49,6 +49,11 @@ export const GET = withAuth(
   // menerima versi masked — nilai asli tidak pernah keluar dari server.
   const rawPhone = decryptPii(order.recipientPhone);
   const rawAddress = decryptPii(order.recipientAddress);
+  const mappingImages = await prisma.productMapping.findMany({
+    where: { accountId: order.accountId, channelSku: { in: order.items.map((item) => item.channelSku) }, imageUrl: { not: null } },
+    select: { channelSku: true, imageUrl: true },
+  });
+  const imageByChannelSku = new Map(mappingImages.map((mapping) => [mapping.channelSku, mapping.imageUrl]));
 
   // Kategori produk: order API TikTok tidak menyediakannya, jadi resolve
   // best-effort via product API (per SKU unik). Gagal → null, tidak memblokir.
@@ -102,7 +107,7 @@ export const GET = withAuth(
     items: order.items.map((it) => ({
       id: it.id,
       // Order Shopee tidak punya gambar item dari API → fallback gambar produk master.
-      imageUrl: it.imageUrl ?? it.variant?.masterProduct?.imageUrl ?? null,
+      imageUrl: it.imageUrl ?? imageByChannelSku.get(it.channelSku) ?? it.variant?.masterProduct?.imageUrl ?? null,
       productName:
         it.productName ?? it.variant?.masterProduct?.name ?? it.productId ?? "-",
       variantLabel: it.skuName ?? it.variant?.sku ?? `SKU ${it.channelSku}`,

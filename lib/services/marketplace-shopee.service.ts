@@ -498,6 +498,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
                   platformTitle: extraTitle,
                   platformStatus: extraStatus,
                   platformStatusRaw: JSON.stringify(info).slice(0, 8000),
+                  ...(image ? { imageUrl: image } : {}),
                   // Refresh snapshot stok Shopee (tampilan "Stok" di halaman
                   // Produk) — parser stock_info_v2; null = tak diketahui →
                   // biarkan, JANGAN menulis 0.

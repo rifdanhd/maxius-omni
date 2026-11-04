@@ -183,6 +183,11 @@ export const GET = withAuth(async (req) => {
   statusGroups.forEach((g) => {
     counts[g.status] = g._count;
   });
+  const mappingImages = await prisma.productMapping.findMany({
+    where: { accountId: { in: orders.map((order) => order.accountId) }, channelSku: { in: [...new Set(orders.flatMap((order) => order.items.map((item) => item.channelSku)))] }, imageUrl: { not: null } },
+    select: { accountId: true, channelSku: true, imageUrl: true },
+  });
+  const imageByMapping = new Map(mappingImages.map((mapping) => [`${mapping.accountId}:${mapping.channelSku}`, mapping.imageUrl]));
 
   // List berarti selalu masked (keputusan PII): nama pembeli, tanpa ciphertext.
   // Reveal penuh hanya terjadi pada GET /api/orders/:id untuk user berhak.
@@ -200,7 +205,7 @@ export const GET = withAuth(async (req) => {
     rtsSlaTime: o.rtsSlaTime,
     ttsSlaTime: o.ttsSlaTime,
     isCod: o.isCod,
-    items: o.items,
+    items: o.items.map((item) => ({ ...item, imageUrl: item.imageUrl ?? imageByMapping.get(`${o.accountId}:${item.channelSku}`) ?? item.variant?.masterProduct?.imageUrl ?? null })),
     account: o.account,
     orderMappings: o.orderMappings,
     shipments: o.shipments,

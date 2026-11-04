@@ -128,6 +128,7 @@ export interface TikTokListingRow {
   accountLabel: string;
   platformProductId: string | null;
   platformTitle: string | null;
+  imageUrl: string | null;
   /** true bila judul asli di TikTok belum pernah tersinkron (platformTitle null). */
   titleUnsynced?: boolean;
   master: {
@@ -157,6 +158,7 @@ interface ListedMapping {
   platformStatusRaw: string | null;
   platformStock: number | null;
   platformTitle: string | null;
+  imageUrl: string | null;
   lastSyncedAt: Date | null;
   price: number | null;
   account: { id: string; label: string; platform: string; accessToken: string | null; shopCipher: string | null };
@@ -194,6 +196,7 @@ function applyProduct(
     platformStatusRaw: JSON.stringify(product),
     platformStock: stock,
     platformTitle: (product.title as string | undefined) ?? null,
+    imageUrl: matchingSku ? (extractSkuImage(matchingSku) ?? productMainImage(product)) : productMainImage(product),
     lastSyncedAt: new Date(),
   };
 }
@@ -1337,6 +1340,7 @@ export async function listTikTokProducts(
         accountLabel: m.account.label,
         platformProductId: m.platformProductId,
         platformTitle: m.platformTitle,
+        imageUrl: m.imageUrl,
         master: {
           id: m.variant?.masterProduct?.id ?? null,
           name: m.variant?.masterProduct?.name ?? null,
