@@ -22,6 +22,7 @@ process.env.SHOPEE_PARTNER_ID = "999888";
 process.env.SHOPEE_PARTNER_KEY = "fixture-key";
 process.env.TIKTOK_APP_KEY = "fixture-app";
 process.env.TIKTOK_APP_SECRET = "fixture-secret";
+process.env.STOCK_PUSH_ENABLED = "true";
 const { prisma } = await import("../lib/db/prisma");
 const { changeMasterStock, retryMasterStock, setStockAllocation } = await import("../lib/services/master-stock-mutation.service");
 const { getMasterStock } = await import("../lib/services/master-stock.service");
@@ -33,13 +34,14 @@ const { allocationQuantity } = await import("../lib/services/stock-allocation.po
 const { ingestTikTokOrdersPage } = await import("../lib/services/order-sync.service");
 const { syncTikTokListings } = await import("../lib/services/marketplace-tiktok.service");
 const { registerSellerSku } = await import("../lib/services/master-sku.service");
+const { updateInventorySettings } = await import("../lib/services/inventory-settings.service");
 const realFetch = globalThis.fetch;
 const calls: Array<{ shop: string | null; quantity: number }> = [];
 let failShop = "102";
 globalThis.fetch = async (input, init) => {
   const url = new URL(String(input));
   if (url.hostname === "open-api.tiktokglobalshop.com") {
-    assert.equal(url.pathname, "/product/202309/products/search");
+    assert.equal(url.pathname, "/product/202312/products/search");
     return Response.json({ code: 0, data: { total_count: 2, products: [
       { id: "tt-product", title: "Kaos kaki TikTok", status: "ACTIVATE", skus: [{ id: "tt-sku", seller_sku: "SOCK", inventory: [{ quantity: 99999 }] }] },
       { id: "tt-duplicate", title: "Konflik TikTok", status: "ACTIVATE", skus: [{ id: "tt-dup-1", seller_sku: "DUP" }, { id: "tt-dup-2", seller_sku: "DUP" }] },
@@ -67,6 +69,8 @@ try {
     await prisma.platformAccount.create({ data: { id: accountId, businessId: "tenant-a", label: `Toko ${index}`, platform: "SHOPEE", externalShopId: String(100 + index), accessToken: `fixture-${index}`, tokenExpiresAt: new Date(Date.now() + 86400000) } });
     await prisma.productMapping.create({ data: { accountId, variantId: "variant-a", channelSku: `${1000 + index}:1`, sellerSku: "SOCK", updatedAt: new Date() } });
   }
+  await prisma.stockLedger.create({ data: { id: "initial-stock-variant-a", variantId: "variant-a", changeQty: 100, reason: "INITIAL_STOCK", referenceId: "initial-stock-variant-a", stockAfter: 100, note: "Baseline stok fixture" } });
+  await updateInventorySettings("tenant-a", { stockBaselineReady: true });
   const change = { variantId: "variant-a", expectedVersion: 0, warehouseId: "warehouse-tenant-a", kind: "IN" as const,
     quantity: 10, reason: "Restok fixture", requestId: "fixture-stock-1" };
   await changeMasterStock("tenant-a", "test-user", [change]);
@@ -174,9 +178,10 @@ try {
     assert.equal(synced.error, undefined);
     const mapping = await prisma.productMapping.findUniqueOrThrow({ where: { accountId_channelSku: { accountId: account.id, channelSku: "tt-sku" } } });
     assert.equal(mapping.variantId, tenant === "tenant-a" ? "variant-a" : "variant-b");
+    assert.equal(synced.unmapped.reduce((total, product) => total + product.skus.length, 0), 2);
   }
   assert.equal((await prisma.productVariant.findUniqueOrThrow({ where: { id: "variant-a" } })).stock, stockBeforeImport);
-  assert.equal(await prisma.productMapping.count({ where: { accountId: "tiktok-tenant-a", sellerSku: "DUP", variantId: null } }), 2);
+  assert.equal(await prisma.productMapping.count({ where: { accountId: "tiktok-tenant-a", sellerSku: "DUP", variantId: null } }), 0);
   console.log("PASS: TikTok memakai SKU master sesuai customer; SKU ganda ditinjau tanpa mengubah stok fisik");
   const orphan = await prisma.productMapping.create({ data: { accountId: "shop-1", channelSku: "orphan-fixture", sellerSku: "SOCK", updatedAt: new Date() } });
   await prisma.$transaction((tx) => registerSellerSku(tx, { businessId: "tenant-a", mappingId: orphan.id, sellerSku: "SOCK" }));

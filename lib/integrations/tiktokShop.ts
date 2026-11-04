@@ -900,7 +900,7 @@ export async function searchProducts(
     | undefined;
   const products = data?.products ?? (data?.total_count === 0 && !data.next_page_token ? [] : undefined);
   if (!Array.isArray(products) || products.some(product => !product || typeof product !== "object" || Array.isArray(product)) ||
-      (data?.next_page_token !== undefined && typeof data.next_page_token !== "string")) {
+      (data?.next_page_token !== undefined && data.next_page_token !== null && typeof data.next_page_token !== "string")) {
     throw new Error("[TikTok] Daftar produk belum lengkap; sinkronisasi dihentikan agar katalog lama tidak salah diubah.");
   }
   return {

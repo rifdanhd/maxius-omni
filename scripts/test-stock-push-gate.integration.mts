@@ -4,6 +4,17 @@ import { setupTestDb } from "./lib/test-db";
 const db = setupTestDb("test-stock-push-gate");
 const { prisma } = await import("@/lib/db/prisma");
 
+async function markBaselineReady(businessId: string, variantId: string, stockPushEnabled = true) {
+  await prisma.stockLedger.create({
+    data: { id: `initial-${businessId}`, variantId, changeQty: 100, reason: "INITIAL_STOCK", referenceId: `initial-${businessId}`, stockAfter: 100, note: "Fixture baseline" },
+  });
+  await prisma.inventorySetting.upsert({
+    where: { businessId },
+    create: { id: businessId, businessId, stockPushEnabled, stockBaselineReady: true },
+    update: { stockPushEnabled, stockBaselineReady: true },
+  });
+}
+
 let stockWrites = 0;
 process.env.TIKTOK_APP_KEY = "fixture-key"; process.env.TIKTOK_APP_SECRET = "fixture-secret";
 globalThis.fetch = async (input) => {
@@ -61,6 +72,7 @@ async function main() {
   const masterB = await prisma.masterProduct.create({ data: { name: "Test Produk B", businessId: businessB.id, threshold: 5 } });
   const variantB = await prisma.productVariant.create({ data: { sku: "TEST-SKU", stock: 100, safetyStock: 10, masterProductId: masterB.id } });
   await prisma.productMapping.create({ data: { accountId: accB.id, variantId: variantB.id, channelSku: "TEST-SKU:1", sellerSku: "TEST-SKU", updatedAt: new Date() } });
+  await markBaselineReady(businessB.id, variantB.id);
 
   const resultB = await sync(
     [{ accountId: accB.id, channelSku: "TEST-SKU:1" }],
@@ -90,6 +102,7 @@ async function main() {
   const masterC = await prisma.masterProduct.create({ data: { name: "Test Produk C", businessId: businessC.id, threshold: 5 } });
   const variantC = await prisma.productVariant.create({ data: { sku: "TEST-SKU", stock: 100, safetyStock: 10, masterProductId: masterC.id } });
   await prisma.productMapping.create({ data: { accountId: accC.id, variantId: variantC.id, channelSku: "TEST-SKU:1", sellerSku: "TEST-SKU", updatedAt: new Date() } });
+  await markBaselineReady(businessC.id, variantC.id);
 
   const resultC = await sync(
     [{ accountId: accC.id, channelSku: "TEST-SKU:1" }],
@@ -121,9 +134,6 @@ async function main() {
   // Business D: test per-toko gate with stockPushEnabled=false
   const businessD = await prisma.business.create({ data: { id: "business-d", name: "Business D" } });
 
-  // Set stockPushEnabled=false in InventorySetting for this business
-  await prisma.inventorySetting.create({ data: { id: businessD.id, businessId: businessD.id, stockPushEnabled: false } });
-
   const accD = await prisma.platformAccount.create({
     data: { id: "acc-d", businessId: businessD.id, label: "Toko D", platform: "TIKTOK_SHOP",
       accessToken: "tok-d", shopCipher: "cip-d" }
@@ -132,6 +142,7 @@ async function main() {
   const masterD = await prisma.masterProduct.create({ data: { name: "Test Produk D", businessId: businessD.id, threshold: 5 } });
   const variantD = await prisma.productVariant.create({ data: { sku: "TEST-SKU", stock: 100, safetyStock: 10, masterProductId: masterD.id } });
   await prisma.productMapping.create({ data: { accountId: accD.id, variantId: variantD.id, channelSku: "TEST-SKU:1", sellerSku: "TEST-SKU", updatedAt: new Date() } });
+  await markBaselineReady(businessD.id, variantD.id, false);
 
   const resultD = await sync(
     [{ accountId: accD.id, channelSku: "TEST-SKU:1" }],

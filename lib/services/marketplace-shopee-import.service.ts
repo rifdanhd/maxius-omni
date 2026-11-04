@@ -171,7 +171,7 @@ export async function importShopeeListings(params: {
 
       let offset = 0;
       for (let page = 0; page < MAX_PAGES; page += 1) {
-        if (stats.importedItems >= limit) {
+        if (stats.itemsScanned >= limit) {
           stats.hasMore = true;
           break;
         }
@@ -185,7 +185,7 @@ export async function importShopeeListings(params: {
           getItemBaseInfo(token, shopId, batch.map((i) => i.item_id), creds)
         );
         for (const info of infos) {
-          if (stats.importedItems >= limit) { stats.hasMore = true; break; }
+          if (stats.itemsScanned >= limit) { stats.hasMore = true; break; }
           await importOneItem({ account, businessId: params.businessId, info, byChannelSku, threshold: settings.lowStockDefaultThreshold, stats });
           stats.itemsScanned += 1;
         }

@@ -18,7 +18,6 @@ const { changeMasterStock } = await import("../lib/services/master-stock-mutatio
 const { drainStockOutbox } = await import("../lib/services/stock-outbox.service");
 const { getMasterStock } = await import("../lib/services/master-stock.service");
 const { logStockPush } = await import("../lib/services/sync-log.util");
-const { isTransientPlatformError } = await import("../lib/services/rate-limit.policy");
 const { safeStockPushMessage } = await import("../lib/services/stock-push-error");
 const originalFetch = globalThis.fetch;
 type Sku = { id: string; seller_sku: string; warehouse_inventory: Array<{ warehouse_id: string }> };
@@ -154,7 +153,10 @@ try {
   const partialBody = writes().at(-1)!.body.skus as Array<{ id: string; inventory: Array<{ warehouse_id: string }> }>;
   assert.equal(partialBody.find((sku) => sku.id === products[0].skus[1].id)!.inventory[0].warehouse_id, "warehouse-2");
   malformed = true; assert.equal((await tiktokBatch("fixture", [item], "cipher")).failed.length, 1); malformed = false;
-  http429 = true; await assert.rejects(tiktokBatch("fixture", [item], "cipher"), (error) => isTransientPlatformError(error));
+  http429 = true;
+  const rateLimited = await tiktokBatch("fixture", [item], "cipher");
+  assert.equal(rateLimited.ok.length, 1);
+  assert.equal(rateLimited.failed.length, 0);
   expiredOnce = true; await pushStockAndWait("tt", tt.channelSku, 90); assert.equal(refreshes, 1);
   expiredOnWrite = true; assert.equal((await pushStockAndWait("tt", tt.channelSku, 90)).success, true); assert.equal(refreshes, 2);
   assert.ok(calls.some((call) => call.token === "fixture-refreshed-token"));
