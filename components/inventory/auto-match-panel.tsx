@@ -8,6 +8,17 @@ import { Check, Eye, Link2, RefreshCw, Sparkles } from "lucide-react";
 type Row = { accountId: string; accountLabel: string; platformProductId: string; channelSku: string; sellerSku: string | null; title: string | null; variantName: string | null; imageUrl: string | null; stock: number; bucket: "exact" | "suggested" | "review" | "new"; score: number; candidate: { id: string; sku: string; name: string; imageUrl: string | null; stock: number } | null };
 type Preview = { rows: Row[]; counts: Record<Row["bucket"], number> };
 const labels = { exact: "Sudah cocok", suggested: "Disarankan", review: "Perlu dicek", new: "Usulkan master baru" } as const;
+async function readApiResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    if (response.url.includes("/login")) throw new Error("Sesi login sudah berakhir. Silakan login kembali.");
+    throw new Error(`Server mengembalikan halaman HTML, bukan JSON (HTTP ${response.status}). Coba muat ulang halaman.`);
+  }
+  const data = await response.json().catch(() => null) as T & { error?: string } | null;
+  if (!data) throw new Error(`Respons server tidak valid (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(data.error || `Permintaan gagal (HTTP ${response.status}).`);
+  return data;
+}
 
 export function AutoMatchPanel() {
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -21,7 +32,7 @@ export function AutoMatchPanel() {
     setLoading(true); setMessage(null);
     try {
       const response = await authFetch(`/api/inventory/auto-match${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`);
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await readApiResponse<Preview>(response);
       setPreview(data); setSelected(Object.fromEntries((data.rows as Row[]).filter((row) => row.bucket === "exact").map((row) => [key(row), true])));
     } catch (error) { setMessage(error instanceof Error ? error.message : "Preview gagal."); } finally { setLoading(false); }
   }
@@ -34,7 +45,7 @@ export function AutoMatchPanel() {
     setSaving(true); setMessage(null);
     try {
       const response = await authFetch("/api/inventory/auto-match", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decisions }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await readApiResponse<{ mapped: number; created: number }>(response);
       setMessage(`${data.mapped} mapping tersimpan, ${data.created} master baru dibuat.`); await runPreview();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Penyimpanan gagal."); } finally { setSaving(false); }
   }
