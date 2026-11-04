@@ -83,12 +83,17 @@ export function withAuth(
     };
     (req as AuthenticatedRequest).user = user;
 
+    // Logout tidak bergantung pada akses brand/bisnis atau role-based method.
+    // Setiap user yang terautentikasi harus dapat keluar tanpa 403 dari
+    // allowedRole (mis. reviewer hanya GET/HEAD) atau BusinessScopeError.
     try {
-      if (typeof payload.businessId !== "string") return Response.json({ error: "Sesi perlu diperbarui." }, { status: 401 });
-      (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id, payload.businessId);
-      const member = await prisma.userBusiness.findUnique({ where: { userId_businessId: { userId: user.id, businessId: payload.businessId } } });
-      if (!member || !allowedRole(member.role, req.method, req.nextUrl.pathname)) return Response.json({ error: "Akses ditolak." }, { status: 403 });
-      user.role = member.role;
+      if (req.nextUrl.pathname !== "/api/auth/logout") {
+        if (typeof payload.businessId !== "string") return Response.json({ error: "Sesi perlu diperbarui." }, { status: 401 });
+        (req as AuthenticatedRequest).businessId = await resolveRequestBusiness(req, user.id, payload.businessId);
+        const member = await prisma.userBusiness.findUnique({ where: { userId_businessId: { userId: user.id, businessId: payload.businessId } } });
+        if (!member || !allowedRole(member.role, req.method, req.nextUrl.pathname)) return Response.json({ error: "Akses ditolak." }, { status: 403 });
+        user.role = member.role;
+      }
       const sensitive = /(?:upload|product-copy|label|promotions\/create)/.test(req.nextUrl.pathname);
       if (!limiter.allow(`${user.id}:${sensitive ? req.nextUrl.pathname : req.method}`, sensitive ? 15 : (req.method === "GET" ? 600 : 120), 60_000)) return rateLimitedResponse();
     } catch (e) {

@@ -102,19 +102,9 @@ export const GET = withAuth(
           throw new Error("Format dokumen Shopee tidak valid.");
         }
 
-        const productRows: LabelMergeProductRow[] = (order.items ?? []).map((it) => ({
-          productName: it.productName ?? it.channelSku ?? "-",
-          variant: it.skuName ?? it.variant?.sku ?? "-",
-          sellerSku: it.channelSku ?? "-",
-          qty: it.qty,
-        }));
-
-        let stampedPdf: Uint8Array = new Uint8Array(pdf);
-        try {
-          stampedPdf = await stampProductVariantOnLabel(new Uint8Array(pdf), productRows, order.orderNo);
-        } catch (e) {
-          console.warn("[Label/Shopee] Gagal menempelkan rincian produk ke PDF Shopee:", e);
-        }
+        // Label Shopee sudah memuat rincian barang dariplatform; jangan
+        // menempelkan lagi agar tidak duplikat. Hanya kembalikan PDF apa adanya.
+        const stampedPdf: Uint8Array = new Uint8Array(pdf);
 
         await prisma.piiAccessLog.create({
           data: {
