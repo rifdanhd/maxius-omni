@@ -481,7 +481,6 @@ export default function PromotionsPage() {
             <option value="ALL">Semua Marketplace</option>
             <option value="SHOPEE">Shopee</option>
             <option value="TIKTOK_SHOP">TikTok Shop</option>
-            <option value="TOKOPEDIA" disabled>Tokopedia (belum tersedia)</option>
           </select>
 
           <div className="relative">

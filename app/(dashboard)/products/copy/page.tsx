@@ -283,7 +283,7 @@ export default function ProductCopyPage() {
               <Link2 size={15} /> Tautan Halaman Produk (URL)
             </label>
             <p className="text-[11px] text-muted-foreground mb-3">
-              Tempel link produk dari Shopee, Tokopedia, Tokopedia | Shop, atau situs lainnya.
+              Tempel link produk dari Shopee, TikTok Shop, atau situs lainnya.
             </p>
             <div className="flex gap-2">
               <input

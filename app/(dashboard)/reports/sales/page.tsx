@@ -192,7 +192,6 @@ export default function SalesReportPage() {
           <option value="">Semua Marketplace</option>
           <option value="SHOPEE">Shopee</option>
           <option value="TIKTOK_SHOP">TikTok Shop</option>
-          <option value="TOKOPEDIA">Tokopedia</option>
         </select>
         <select
           value={accountId}

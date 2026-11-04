@@ -637,7 +637,6 @@ export default function MasterProductsPage() {
             <option value="all">Semua marketplace</option>
             <option value="SHOPEE">Shopee</option>
             <option value="TIKTOK_SHOP">TikTok Shop</option>
-            <option value="TOKOPEDIA">Tokopedia</option>
           </select>
           <select
             aria-label="Filter toko"

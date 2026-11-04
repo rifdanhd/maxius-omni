@@ -426,13 +426,6 @@ export default function InventorySettingsPage() {
                     note: "Perubahan stok dikirim ke item dan variasi Shopee sesuai mapping toko. Kegagalan API tercatat per listing.",
                     disabled: false,
                   },
-                  {
-                    key: "syncPushTokopedia" as const,
-                    label: "Tokopedia",
-                    storeCount: 0,
-                    note: "Integrasi push belum tersedia — preferensi disimpan untuk saat integrasi siap.",
-                    disabled: true,
-                  },
                 ].map((p) => (
                   <label
                     key={p.key}
