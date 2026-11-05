@@ -1,14 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   AlertTriangle,
-  Archive,
-  ArrowRight,
   Boxes,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -18,20 +14,19 @@ import {
   Pencil,
   RefreshCw,
   Search,
-  Store,
+  SlidersHorizontal,
   Upload,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorFeedback, Feedback, PageState } from "@/components/ui/feedback";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { authFetch } from "@/lib/utils/api-client";
 import type { ListingStock, MasterStockResult, MasterStockRow, MasterStockTab } from "@/lib/inventory/master-stock.types";
 import { AllocationDialog, inventoryRequest, numberFormat as fmt, StockChangeDialog } from "@/components/inventory/master-stock-dialogs";
-import { MasterStockListings, stockStatusLabel } from "@/components/inventory/master-stock-listings";
+import { MasterStockProduct } from "@/components/inventory/master-stock-product";
 import { StockImportDialog } from "@/components/inventory/stock-import-dialog";
 
 const TABS: Array<[MasterStockTab, string, string]> = [
@@ -45,7 +40,7 @@ const TABS: Array<[MasterStockTab, string, string]> = [
 
 // Kartu ringkasan di atas halaman (klik = pindah ke tab terkait).
 const KPI_CARDS: Array<{ id: MasterStockTab; label: string; icon: LucideIcon; danger: boolean }> = [
-  { id: "all", label: "Total SKU Master", icon: Boxes, danger: false },
+  { id: "all", label: "Total Varian", icon: Boxes, danger: false },
   { id: "empty", label: "Stok Habis", icon: Package, danger: true },
   { id: "low", label: "Stok Menipis", icon: AlertTriangle, danger: true },
   { id: "failed", label: "Sinkron Gagal", icon: RefreshCw, danger: true },
@@ -65,6 +60,7 @@ export default function MasterStockPage() {
   const [dense, setDense] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+  const [collapsedSearchProducts, setCollapsedSearchProducts] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<MasterStockRow[] | null>(null);
   const [allocation, setAllocation] = useState<{ row: MasterStockRow; listing: ListingStock } | null>(null);
@@ -104,6 +100,7 @@ export default function MasterStockPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((current) => ({ ...current, q: search.trim() }));
+      setCollapsedSearchProducts(new Set());
       setPage(1);
       setSelected(new Set());
     }, 300);
@@ -218,21 +215,7 @@ export default function MasterStockPage() {
   }, new Map<string, MasterStockRow[]>())];
   const productTotal = data?.productTotal ?? products.length;
   const chosen = rows.filter((row) => selected.has(row.id));
-  const promotion = rows.some((row) => row.promoActive > 0);
-  const columns = 10 + Number(promotion);
-  const padding = dense ? "px-3 py-2" : "px-3 py-3.5";
   const hasActiveFilters = Boolean(filters.q || filters.category || filters.platform || filters.store || filters.warehouse || filters.archives);
-  const headers: Array<{ label: string; right?: boolean }> = [
-    { label: "Produk / Varian / SKU" },
-    { label: "Toko terhubung" },
-    { label: "Di Gudang", right: true },
-    { label: "Disisihkan", right: true },
-    { label: "Menunggu diproses", right: true },
-    { label: "Bisa Dijual", right: true },
-    ...(promotion ? [{ label: "Promosi" }] : []),
-    { label: "Status sinkron" },
-    { label: "Aksi", right: true },
-  ];
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 p-4 pb-28 md:p-8 md:pb-28">
@@ -291,36 +274,21 @@ export default function MasterStockPage() {
               type="button"
               onClick={() => filter("tab", id)}
               aria-pressed={active}
-              className={`group rounded-xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                alert ? "border-destructive/40 bg-destructive-subtle" : "border-border bg-card"
-              } ${active ? "ring-2 ring-primary/40" : ""}`}
+              className={`rounded-xl border p-3 text-left transition-colors hover:bg-muted/40 sm:p-4 ${
+                alert ? "border-destructive/20 bg-destructive-subtle/40" : "border-border bg-card"
+              } ${active ? "ring-1 ring-primary/30" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-xs font-medium ${alert ? "text-destructive" : "text-muted-foreground"}`}>{label}</span>
-                <span className={`flex size-8 items-center justify-center rounded-lg ${alert ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>
+                <span className={`flex size-6 items-center justify-center rounded-lg ${alert ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>
                   <Icon className="size-4" aria-hidden="true" />
                 </span>
               </div>
-              <p className={`mt-3 text-2xl font-bold tabular-nums tracking-tight ${alert ? "text-destructive" : "text-foreground"}`}>{value === null ? "…" : fmt(value)}</p>
+              <p className={`mt-1 text-2xl font-semibold tabular-nums tracking-tight ${alert ? "text-destructive" : "text-foreground"}`}>{value === null ? "…" : fmt(value)}</p>
             </button>
           );
         })}
       </section>
-
-      {/* ───────── Banner mapping ───────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Store className="size-4" aria-hidden="true" />
-          </span>
-          <p className="text-sm text-muted-foreground">SKU seller yang ganda atau belum dikenali perlu ditinjau sebelum stok digabung.</p>
-        </div>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/products/mapping">
-            Mapping Stok <ArrowRight className="size-3.5" />
-          </Link>
-        </Button>
-      </div>
 
       {/* ───────── Kartu tabel utama ───────── */}
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -358,19 +326,30 @@ export default function MasterStockPage() {
           })}
         </div>
 
-        {/* Toolbar filter */}
         <div className="space-y-3 border-b border-border p-3 md:p-4">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-            <label className="relative sm:col-span-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative w-full sm:min-w-48 sm:flex-1">
               <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
-              <input
-                className={`${control} w-full pl-9`}
-                aria-label="Cari SKU atau nama produk"
-                placeholder="Cari SKU seller atau nama produk"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+              <input className={`${control} w-full pl-9`} aria-label="Cari SKU atau nama produk" placeholder="Cari nama produk atau SKU…"
+                value={search} onChange={(event) => setSearch(event.target.value)} />
             </label>
+              <select aria-label="Urutkan SKU" className={control} value={filters.sort} onChange={(event) => filter("sort", event.target.value)}>
+                <option value="name">Nama produk</option>
+                <option value="sku">SKU seller</option>
+                <option value="stock_asc">Stok terkecil</option>
+                <option value="stock_desc">Stok terbesar</option>
+              </select>
+            <Button variant="outline" disabled={busy} onClick={() => setRevision((value) => value + 1)} aria-label="Perbarui status stok">
+              <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            {hasActiveFilters && <Button size="sm" variant="ghost" onClick={resetFilters}><FilterX className="size-4" />Reset</Button>}
+          </div>
+          <details className="group">
+            <summary className="flex w-fit cursor-pointer list-none items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <SlidersHorizontal className="size-3.5" />Filter &amp; tampilan
+              {(filters.category || filters.platform || filters.store || filters.warehouse || filters.archives) && <span className="size-1.5 rounded-full bg-primary" />}
+            </summary>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <select aria-label="Kategori" className={control} value={filters.category} onChange={(event) => filter("category", event.target.value)}>
               <option value="">Semua kategori</option>
               {data?.filters.categories.map((category) => (
@@ -400,280 +379,78 @@ export default function MasterStockPage() {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-muted-foreground">
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-muted-foreground">
                 <input type="checkbox" checked={filters.archives} onChange={(event) => filter("archives", event.target.checked)} />
                 Tampilkan arsip{data ? ` (${fmt(data.archivedCounts.all)})` : ""}
               </label>
-              {hasActiveFilters && (
-                <Button size="sm" variant="ghost" onClick={resetFilters}>
-                  <FilterX className="size-4" />
-                  Reset filter
-                </Button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select aria-label="Urutkan SKU" className={control} value={filters.sort} onChange={(event) => filter("sort", event.target.value)}>
-                <option value="name">Nama produk</option>
-                <option value="sku">SKU seller</option>
-                <option value="stock_asc">Stok terkecil</option>
-                <option value="stock_desc">Stok terbesar</option>
-              </select>
+              <div className="flex flex-wrap items-center gap-3">
               <select aria-label="Kepadatan tabel" className={control} value={dense ? "compact" : "comfortable"} onChange={(event) => setDense(event.target.value === "compact")}>
                 <option value="comfortable">Nyaman</option>
                 <option value="compact">Ringkas</option>
               </select>
-              <Button variant="outline" disabled={busy} onClick={() => setRevision((value) => value + 1)} aria-label="Perbarui status stok">
-                <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-              </Button>
+                <Link href="/products/mapping" className="font-medium text-primary hover:underline">Mapping Stok</Link>
+              </div>
             </div>
-          </div>
-
-          {data && data.archivedCounts.empty > 0 && (
-            <p className="text-xs text-muted-foreground">{fmt(data.archivedCounts.empty)} SKU habis berada pada produk nonaktif/arsip. Hitungan tab mengikuti filter dan pilihan arsip.</p>
-          )}
+            {data && data.archivedCounts.empty > 0 && <p className="mt-2 text-xs text-muted-foreground">{fmt(data.archivedCounts.empty)} varian habis berada pada produk arsip atau nonaktif.</p>}
+          </details>
         </div>
 
-        {/* Tabel */}
-        <div className="max-h-[68vh] overflow-auto" aria-busy={loading}>
-          <table className="w-full min-w-[1100px] text-sm">
-            <thead className="sticky top-0 z-10 bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="w-10 p-3">
-                  <input
-                    type="checkbox"
-                    aria-label="Pilih semua SKU di halaman ini"
-                    checked={rows.length > 0 && rows.every((row) => selected.has(row.id))}
-                    onChange={(event) => setSelected(event.target.checked ? new Set(rows.map((row) => row.id)) : new Set())}
-                  />
-                </th>
-                <th className="w-10" aria-label="Rincian" />
-                {headers.map(({ label, right }) => (
-                  <th key={label} className={`whitespace-nowrap p-3 font-semibold ${right ? "text-right" : "text-left"}`}>
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && !data
-                ? Array.from({ length: 6 }, (_, index) => (
-                    <tr key={index}>
-                      <td className="p-3" colSpan={columns}>
-                        <Skeleton className="h-12 w-full" />
-                      </td>
-                    </tr>
-                  ))
-                : products.map(([productId, variants]) => {
-                    const product = variants[0];
-                    const productOpen = expandedProducts.has(productId) || Boolean(filters.q);
-                    const totals = variants.reduce((sum, row) => ({
-                      stock: sum.stock + row.stock,
-                      safetyStock: sum.safetyStock + row.safetyStock,
-                      pending: sum.pending + row.pending,
-                      available: sum.available + row.available,
-                    }), { stock: 0, safetyStock: 0, pending: 0, available: 0 });
-                    const stores = new Set(variants.flatMap((row) => row.listings.map((listing) => listing.accountId))).size;
-                    const productStatus = variants.some((row) => row.status === "FAILED") ? "FAILED"
-                      : variants.some((row) => row.status === "PENDING") ? "PENDING"
-                        : variants.some((row) => row.status === "DISABLED") ? "DISABLED" : "SUCCESS";
-                    return (
-                      <Fragment key={productId}>
-                        <tr data-testid="master-stock-product" className="border-t border-border bg-muted/40">
-                          <td className={padding}>
-                            <input
-                              type="checkbox"
-                              aria-label={`Pilih semua varian ${product.name}`}
-                              checked={variants.every((row) => selected.has(row.id))}
-                              ref={(element) => {
-                                if (element) element.indeterminate = variants.some((row) => selected.has(row.id)) && !variants.every((row) => selected.has(row.id));
-                              }}
-                              onChange={(event) => setSelected((current) => {
-                                const next = new Set(current);
-                                for (const row of variants) {
-                                  if (event.target.checked) next.add(row.id);
-                                  else next.delete(row.id);
-                                }
-                                return next;
-                              })}
-                            />
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted"
-                              aria-label={`Varian ${product.name}`}
-                              aria-expanded={productOpen}
-                              disabled={Boolean(filters.q)}
-                              onClick={() => setExpandedProducts((current) => {
-                                const next = new Set(current);
-                                if (next.has(productId)) next.delete(productId);
-                                else next.add(productId);
-                                return next;
-                              })}
-                            >
-                              {productOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                            </button>
-                          </td>
-                          <td className={`${padding} min-w-64 max-w-96`}>
-                            <div className="flex items-center gap-3">
-                              {product.imageUrl ? (
-                                <Image alt="" src={product.imageUrl} width={44} height={44} unoptimized className="size-11 shrink-0 rounded-lg border border-border object-cover" />
-                              ) : (
-                                <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted"><Package className="size-5 text-muted-foreground" /></div>
-                              )}
-                              <div className="min-w-0">
-                                <p className="line-clamp-2 font-semibold text-foreground">{product.name}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">{fmt(variants.length)} varian{hasActiveFilters || filters.tab !== "all" ? " sesuai filter" : ""} · Total stok varian</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className={`${padding} whitespace-nowrap text-xs`}>{stores} toko</td>
-                          <td className={`${padding} text-right font-semibold tabular-nums`}>{fmt(totals.stock)}</td>
-                          <td className={`${padding} text-right tabular-nums`}>{fmt(totals.safetyStock)}</td>
-                          <td className={`${padding} text-right tabular-nums`}>{fmt(totals.pending)}</td>
-                          <td className={`${padding} text-right font-bold tabular-nums`}>{fmt(totals.available)}</td>
-                          {promotion && <td className={padding}>—</td>}
-                          <td className={padding}>
-                            <StatusBadge status={stores ? productStatus.toLowerCase() : "unlinked"} label={stores ? stockStatusLabel(productStatus) : "Belum mapping"} />
-                          </td>
-                          <td className={`${padding} text-right text-xs text-muted-foreground`}>Ubah stok di varian</td>
-                        </tr>
-                        {productOpen && variants.map((row) => {
-                          const open = expanded.has(row.id);
-                          const isSelected = selected.has(row.id);
-                          const sku = !/^\d+(?::\d+)?$/.test(row.sku) ? row.sku : row.listings.find((listing) => listing.sellerSku)?.sellerSku ?? "SKU seller belum tersedia";
-                          const storeCount = new Set(row.listings.map((listing) => listing.accountId)).size;
-                          return (
-                            <Fragment key={row.id}>
-                              <tr data-testid="master-stock-row" className={`border-t border-border align-middle transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted/40"}`}>
-                                <td className={padding}>
-                                  <input
-                                    type="checkbox"
-                                    aria-label={`Pilih ${sku}`}
-                                    checked={isSelected}
-                                    onChange={(event) =>
-                                      setSelected((current) => {
-                                        const next = new Set(current);
-                                        if (event.target.checked) next.add(row.id);
-                                        else next.delete(row.id);
-                                        return next;
-                                      })
-                                    }
-                                  />
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    aria-label={`Rincian ${sku}`}
-                                    aria-expanded={open}
-                                    onClick={() =>
-                                      setExpanded((current) => {
-                                        const next = new Set(current);
-                                        if (next.has(row.id)) next.delete(row.id);
-                                        else next.add(row.id);
-                                        return next;
-                                      })
-                                    }
-                                  >
-                                    {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                  </button>
-                                </td>
-                                <td className={`${padding} min-w-64 max-w-96`}>
-                                  <div className="border-l-2 border-border pl-4">
-                                    <div className="min-w-0">
-                                      <p title={row.variantName ?? row.sku} className="line-clamp-2 font-semibold leading-snug text-foreground">
-                                        {row.variantName && !/^\d+(?::\d+)?$/.test(row.variantName) ? row.variantName : "Varian standar"}
-                                      </p>
-                                      {row.stockReview && <p className="text-xs text-amber-700 dark:text-amber-300" title={row.stockReview.reasons.join("; ")}>Stok perlu ditinjau · belum layak baseline</p>}
-                                      <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{sku}</p>
-                                      {row.archived && <StatusBadge status="inactive" label="Arsip / nonaktif" />}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className={padding}>
-                                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-foreground">
-                                    <Store className="size-3 text-muted-foreground" aria-hidden="true" />
-                                    {storeCount} toko
-                                  </span>
-                                </td>
-                                <td className={`${padding} text-right tabular-nums text-foreground`}>{fmt(row.stock)}</td>
-                                <td className={`${padding} text-right tabular-nums ${row.safetyStock ? "text-foreground" : "text-muted-foreground"}`}>{fmt(row.safetyStock)}</td>
-                                <td className={`${padding} text-right tabular-nums ${row.pending ? "font-medium text-foreground" : "text-muted-foreground"}`}>{fmt(row.pending)}</td>
-                                <td className={`${padding} text-right`}>
-                                  <span
-                                    className={`inline-flex min-w-12 justify-center rounded-md px-2 py-1 text-sm font-bold tabular-nums ${
-                                      row.available === 0 ? "bg-destructive-subtle text-destructive" : "bg-muted/60 text-foreground"
-                                    }`}
-                                  >
-                                    {fmt(row.available)}
-                                  </span>
-                                </td>
-                                {promotion && <td className={`${padding} tabular-nums`}>{row.promoActive ? `${row.promoActive} aktif` : "—"}</td>}
-                                <td className={padding}>
-                                  <StatusBadge status={row.listings.length ? row.status.toLowerCase() : "unlinked"} label={row.listings.length ? stockStatusLabel(row.status) : "Belum mapping"} />
-                                </td>
-                                <td className={`${padding} text-right`}>
-                                  <Button size="sm" variant="outline" disabled={busy || row.archived} onClick={() => setEditing([row])}>
-                                    <Pencil className="size-3.5" />
-                                    Ubah stok
-                                  </Button>
-                                </td>
-                              </tr>
-                              {open && (
-                                <tr className="border-t border-border bg-muted/30">
-                                  <td colSpan={columns}>
-                                    <MasterStockListings
-                                      row={row}
-                                      busy={busy}
-                                      allocate={(listing) => setAllocation({ row, listing })}
-                                      retry={(listing) => {
-                                        void retry([row], listing.id);
-                                      }}
-                                      message={setNotice}
-                                    />
-                                    <div className="px-4 pb-3 sm:pl-16">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => {
-                                          void inventoryRequest({ action: "archive", variantId: row.id, archived: !row.ownArchived })
-                                            .then(() => setRevision((value) => value + 1))
-                                            .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Gagal mengubah arsip."));
-                                        }}
-                                      >
-                                        <Archive className="size-3" />
-                                        {row.ownArchived ? "Lepas arsip SKU" : "Arsipkan SKU"}
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </Fragment>
-                          );
-                        })}
-                      </Fragment>
-                    );
-                  })}
-              {!loading && !rows.length && (
-                <tr>
-                  <td colSpan={columns}>
-                    <PageState title="Tidak ada SKU pada tampilan ini" description="Coba ubah pencarian, filter, atau pilihan arsip. Listing tanpa SKU master dapat diperiksa melalui Mapping Stok." />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div aria-busy={loading} className="space-y-3 bg-muted/20 p-3 md:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+            <label className="inline-flex min-h-8 items-center gap-2">
+              <input type="checkbox" className="size-4 accent-primary" aria-label="Pilih semua SKU di halaman ini"
+                checked={rows.length > 0 && rows.every((row) => selected.has(row.id))}
+                onChange={(event) => setSelected(event.target.checked ? new Set(rows.map((row) => row.id)) : new Set())} />
+              Pilih semua varian
+            </label>
+            <span>{data ? `${fmt(productTotal)} produk · ${fmt(data.total)} varian` : "Memuat produk…"}</span>
+          </div>
+          {loading && !data ? Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-28 w-full rounded-xl" />)
+            : products.map(([productId, variants]) => (
+              <MasterStockProduct key={productId} variants={variants} dense={dense} busy={busy}
+                open={filters.q ? !collapsedSearchProducts.has(productId) : expandedProducts.has(productId)}
+                filtered={hasActiveFilters || filters.tab !== "all"} selected={selected} expanded={expanded}
+                toggle={() => {
+                  const update = filters.q ? setCollapsedSearchProducts : setExpandedProducts;
+                  update((current) => {
+                    const next = new Set(current);
+                    if (next.has(productId)) next.delete(productId);
+                    else next.add(productId);
+                    return next;
+                  });
+                }}
+                select={(variants, checked) => setSelected((current) => {
+                  const next = new Set(current);
+                  for (const row of variants) {
+                    if (checked) next.add(row.id);
+                    else next.delete(row.id);
+                  }
+                  return next;
+                })}
+                toggleListing={(id) => setExpanded((current) => {
+                  const next = new Set(current);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                })}
+                edit={(row) => setEditing([row])} allocate={(row, listing) => setAllocation({ row, listing })}
+                retry={(row, listing) => { void retry([row], listing.id); }} message={setNotice}
+                archive={(row) => {
+                  void inventoryRequest({ action: "archive", variantId: row.id, archived: !row.ownArchived })
+                    .then(() => setRevision((value) => value + 1))
+                    .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Gagal mengubah arsip."));
+                }}
+              />
+            ))}
+          {!loading && !rows.length && <PageState title="Tidak ada produk pada tampilan ini" description="Coba ubah pencarian atau filter. SKU yang belum terhubung dapat diperiksa di Mapping Stok." />}
         </div>
 
         {/* Pagination */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
           <p className="tabular-nums">
-            {data ? `${fmt(productTotal)} produk · ${fmt(data.total)} varian · halaman ${page} dari ${Math.max(1, Math.ceil(productTotal / pageSize))}` : "Memuat produk…"} · Total semua gudang; stok per gudang ada di rincian.
+            {data ? `${fmt(productTotal)} produk · ${fmt(data.total)} varian · halaman ${page} dari ${Math.max(1, Math.ceil(productTotal / pageSize))}` : "Memuat produk…"}
           </p>
           <div className="flex items-center gap-2">
             <select
@@ -724,7 +501,7 @@ export default function MasterStockPage() {
       {chosen.length > 0 && (
         <div role="region" aria-label="Aksi massal" className="fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-xl">
           <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{chosen.length}</span>
+            <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{chosen.length}</span>
             <span className="text-sm font-medium text-foreground">SKU dipilih di halaman ini{chosen.length > 200 ? " · Maksimal 200 SKU per aksi" : ""}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -14,7 +14,7 @@ export function MasterStockListings({ row, busy, allocate, retry, message }: {
   row: MasterStockRow; busy: boolean; allocate: (listing: ListingStock) => void;
   retry: (listing: ListingStock) => void; message: (text: string) => void;
 }) {
-  return <div className="sticky left-0 w-[calc(100vw-3rem)] max-w-full space-y-3 p-4 sm:pl-16 xl:w-full">
+  return <div className="min-w-0 space-y-3 p-4 md:p-5">
     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">{row.warehouses.map((warehouse) => <span key={warehouse.id} className="rounded border bg-background p-2">{warehouse.name}: <strong className="tabular-nums">{fmt(warehouse.stock)}</strong> fisik · {fmt(warehouse.safetyStock)} disisihkan</span>)}</div>
     {row.allocationWarning && <p role="alert" className="rounded border border-warning/30 bg-warning/10 p-3 text-xs text-warning">Total alokasi listing melebihi Bisa Dijual. Ada risiko oversell bila beberapa toko menerima pesanan bersamaan.</p>}
     {!row.listings.length && <PageState title="Belum ada listing terhubung" description="Hubungkan SKU ini melalui Mapping Stok." />}

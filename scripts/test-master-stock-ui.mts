@@ -25,7 +25,7 @@ if (!address || typeof address === "string") throw new Error("Server tidak terse
 const browser = await chromium.launch({ headless: true });
 mkdirSync(".next-e2e/qa", { recursive: true });
 try {
-  for (const width of [320, 390, 1280]) {
+  for (const width of [320, 390, 768, 1024, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -53,6 +53,7 @@ try {
       return route.fulfill({ json: { success: true } });
     });
     await page.goto(`http://127.0.0.1:${address.port}`);
+    if (width === 1024) await page.addStyleTag({ content: "#root { margin-left: 240px; }" });
     await expect(page.getByTestId("master-stock-product")).toHaveCount(1);
     await expect(page.getByTestId("master-stock-row")).toHaveCount(0);
     assert.ok(queries.some((query) => query.includes("groupBy=product")));
@@ -60,6 +61,12 @@ try {
     await expect(page.getByTestId("master-stock-row")).toHaveCount(2);
     await expect(page.getByText("Putih / Dewasa", { exact: true })).toBeVisible();
     await expect(page.getByTestId("master-stock-product").getByText("3 toko", { exact: true })).toBeVisible();
+    const firstVariant = page.getByTestId("master-stock-row").first();
+    await firstVariant.getByRole("button", { name: "Ubah stok", exact: true }).scrollIntoViewIfNeeded();
+    await expect(firstVariant.getByRole("button", { name: "Ubah stok", exact: true })).toBeInViewport();
+    const variantBox = await firstVariant.boundingBox();
+    assert.ok(variantBox && variantBox.x >= 0 && variantBox.x + variantBox.width <= width, `${width}px: stok varian harus muat tanpa geser horizontal`);
+    await page.screenshot({ path: `.next-e2e/qa/master-stock-redesign-${width}.png`, fullPage: true });
     await expect(page.getByRole("columnheader", { name: "Promosi", exact: true })).toHaveCount(0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${width}px: overflow halaman`);
     await page.getByRole("button", { name: "Rincian SOCK-BLACK" }).click();
