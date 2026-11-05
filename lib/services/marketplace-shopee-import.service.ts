@@ -404,7 +404,7 @@ function buildDescriptors(params: {
 
   const add = (sku: string, stockRaw: unknown, status: string | null, modelId?: number) => {
     const channelSku = `${itemId}:${modelId ?? 0}`;
-    const stock = readStockInfo(stockRaw);
+    const stock = readStockInfo(stockRaw) ?? readStockInfo(info);
     out.push({
       channelSku,
       sellerSku: sku === `${itemId}:${modelId ?? 0}` ? null : sku,

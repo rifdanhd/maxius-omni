@@ -561,7 +561,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
                 [`${itemId}:${m.model_id}`, m.model_sku],
                 title ? `${title} (${m.model_sku ?? m.model_id})` : (m.model_sku ?? null),
                 m.model_status ?? status,
-                readStockInfo(m)
+                readStockInfo(m) ?? readStockInfo(info)
               );
             }
           }
