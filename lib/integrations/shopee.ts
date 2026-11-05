@@ -12,7 +12,7 @@ const SHOPEE_AUTH_BASE =
 // Kredensial app partner. Default = env (perilaku lama); isi dari
 // AppCredential (clientId=partner_id, clientSecret=partner_key) begitu
 // app ISV disetujui — tanpa refactor pemanggil (param opsional di ekor).
-export type ShopeeCreds = { partnerId: string; partnerKey: string };
+export type ShopeeCreds = { partnerId: string; partnerKey: string; signal?: AbortSignal };
 
 function envShopeeCreds(): ShopeeCreds {
   const partnerId = process.env.SHOPEE_PARTNER_ID ?? "";
@@ -167,7 +167,7 @@ async function getShopApi(
       qs.set(k, String(v));
     }
   }
-  const res = await fetch(`${SHOPEE_API_BASE}${apiPath}?${qs}`);
+  const res = await fetch(`${SHOPEE_API_BASE}${apiPath}?${qs}`, { signal: c.signal });
   const raw = await res.text();
   const data = parseShopeeEnvelope(res.status, raw, apiPath);
   return (data.response ?? {}) as Record<string, unknown>;
@@ -270,6 +270,7 @@ export async function refreshAccessToken(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: c.signal,
   });
   const data = (await res.json().catch(() => ({}))) as ShopeeEnvelope;
   if (!res.ok || data.error) {

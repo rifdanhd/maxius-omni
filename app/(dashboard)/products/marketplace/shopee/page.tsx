@@ -28,6 +28,7 @@ import { ShopeeProductDetail, ShopeeProductList } from "@/components/products/sh
 import { fmtDate, fmtNumber, mappingLabels, storeName, type ShopeeListingRow } from "@/components/products/shopee/presentation";
 import { useShopeeDisplay } from "@/hooks/use-shopee-display";
 import { authFetch } from "@/lib/utils/api-client";
+import type { ShopeeSyncCursor } from "@/lib/services/marketplace-shopee.service";
 
 type ListResponse = {
   rows: ShopeeListingRow[];
@@ -113,9 +114,12 @@ export default function ShopeeMarketplacePage() {
   const [syncProductCount, setSyncProductCount] = useState(0);
   const [detail, setDetail] = useState<ShopeeListingRow | null>(null);
   const [detailReturnFocus, setDetailReturnFocus] = useState<HTMLButtonElement | null>(null);
-  const [pendingSync, setPendingSync] = useState<{ products?: Array<{ accountId: string; productId: string }>; accountIds?: string[]; count: number } | null>(null);
+  const [pendingSync, setPendingSync] = useState<{ products?: Array<{ accountId: string; productId: string }>; accountIds?: string[]; count: number; cursor?: ShopeeSyncCursor; completed?: number } | null>(null);
   const display = useShopeeDisplay();
   const [syncingAll, setSyncingAll] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+  const syncAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => syncAbort.current?.abort(), []);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importAccounts, setImportAccounts] = useState<string[]>([]);
@@ -198,38 +202,72 @@ export default function ShopeeMarketplacePage() {
   async function syncAll(scope: NonNullable<typeof pendingSync>) {
     if (operationRef.current) return;
     operationRef.current = true;
+    const controller = new AbortController();
+    syncAbort.current = controller;
+    let cursor = scope.cursor;
+    let completed = scope.completed ?? 0;
+    const totals = new Map<string, SyncAccountResult>();
     setSyncingAll(true);
+    setSyncProgress({ done: completed, total: scope.count });
     setError(null);
     setSyncFailure(null);
     const reportFailure = (detail: string) => {
-      const message = friendlyError(detail, "Sinkron gagal. Silakan coba lagi.");
-      setSyncFailure({ message, detail, scope });
-      notify("error", message, { title: "Sinkron gagal", details: detail, action: { label: /koneksi toko/i.test(message) ? "Perbarui koneksi" : "Coba lagi", onClick: () => { if (/koneksi toko/i.test(message)) router.push("/settings/accounts"); else void syncAll(scope); } } });
+      const message = /HTTP (504|524)/.test(detail)
+        ? "Batas waktu server tercapai. Progres sebelumnya sudah tersimpan; klik Coba lagi untuk melanjutkan."
+        : friendlyError(detail, "Sinkron gagal. Silakan coba lagi.");
+      const retryScope = { ...scope, cursor, completed };
+      setSyncFailure({ message, detail, scope: retryScope });
+      setRefreshKey((value) => value + 1);
+      notify("error", message, { title: "Sinkron gagal", details: detail, action: { label: /koneksi toko/i.test(message) ? "Perbarui koneksi" : "Coba lagi", onClick: () => { if (/koneksi toko/i.test(message)) router.push("/settings/accounts"); else void syncAll(retryScope); } } });
     };
     try {
-      const res = await authFetch("/api/marketplace/shopee/products/sync", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(scope.products ? { products: scope.products } : {}), ...(scope.accountIds ? { accountIds: scope.accountIds } : {}) }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "Sinkronisasi gagal.");
-      const results = (data?.accounts ?? []) as SyncAccountResult[];
-      if (results.length === 0) {
-        reportFailure("Bisnis aktif belum memiliki toko Shopee. Hubungkan toko melalui Pengaturan Toko.");
-        return;
+      while (!controller.signal.aborted) {
+        const res = await authFetch("/api/marketplace/shopee/products/sync", {
+          method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+          body: JSON.stringify({ batch: true, ...(cursor ? { cursor } : {}),
+            ...(scope.products ? { products: scope.products } : {}), ...(scope.accountIds ? { accountIds: scope.accountIds } : {}) }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) throw new Error(data?.error ?? `Pembaruan Shopee gagal (HTTP ${res.status}).`);
+        if (!Array.isArray(data.accounts) || !Number.isFinite(data.processed) || !Number.isFinite(data.totalProducts) || !("nextCursor" in data)) {
+          throw new Error("Respons pembaruan belum lengkap. Muat ulang halaman, lalu coba lagi.");
+        }
+        const results = data.accounts as SyncAccountResult[];
+        if (results.length === 0 && totals.size === 0) {
+          reportFailure("Bisnis aktif belum memiliki toko Shopee. Hubungkan toko melalui Pengaturan Toko.");
+          return;
+        }
+        const failed = results.filter((account) => account.error);
+        if (failed.length > 0) {
+          reportFailure(failed.map((account) => `${account.label}: ${account.error}`).join(" · "));
+          return;
+        }
+        for (const account of results) {
+          const previous = totals.get(account.accountId);
+          totals.set(account.accountId, { ...account, items: account.items + (previous?.items ?? 0),
+            models: account.models + (previous?.models ?? 0), matched: account.matched + (previous?.matched ?? 0) });
+        }
+        completed += data.processed;
+        setSyncProgress({ done: completed, total: data.totalProducts });
+        const nextCursor = data.nextCursor as ShopeeSyncCursor | null;
+        if (!nextCursor) break;
+        if (cursor?.accountId === nextCursor.accountId && cursor.afterProductId === nextCursor.afterProductId) {
+          throw new Error("Progres pembaruan tidak bergerak. Mulai ulang pembaruan data.");
+        }
+        cursor = nextCursor;
+        await new Promise<void>((resolve) => setTimeout(resolve, 650));
       }
-      setRefreshKey((k) => k + 1);
-      const failed = results.filter((a) => a.error);
-      if (failed.length > 0) {
-        reportFailure(failed.map((a) => `${a.label}: ${a.error}`).join(" · "));
-        return;
-      }
-      const okMsg = results
-        .map((a) => `${storeName(a.label)}: ${fmtNumber(a.items)} produk, ${fmtNumber(a.models)} varian, ${fmtNumber(a.matched)} diperbarui`)
-        .join(" · ");
-      notify("success", `Sinkron selesai. ${fmtNumber(results.reduce((sum, account) => sum + account.matched, 0))} varian diperbarui.`, { details: okMsg });
-    } catch (e) { reportFailure(e instanceof Error ? e.message : "Sinkron gagal. Silakan coba lagi."); }
-    finally { operationRef.current = false; setSyncingAll(false); }
+      if (controller.signal.aborted) return;
+      setRefreshKey((value) => value + 1);
+      const results = [...totals.values()];
+      const detail = results.map((account) => `${storeName(account.label)}: ${fmtNumber(account.items)} produk, ${fmtNumber(account.models)} varian, ${fmtNumber(account.matched)} diperbarui`).join(" · ");
+      notify("success", `Sinkron selesai. ${fmtNumber(results.reduce((sum, account) => sum + account.matched, 0))} varian diperbarui.`, { details: detail });
+    } catch (error) {
+      if (!controller.signal.aborted) reportFailure(error instanceof Error ? error.message : "Sinkron gagal. Silakan coba lagi.");
+    } finally {
+      operationRef.current = false;
+      setSyncingAll(false);
+    }
   }
 
   async function runImport() {
@@ -280,6 +318,7 @@ export default function ShopeeMarketplacePage() {
 
   return (
     <div className="min-w-0 p-3 sm:p-6 [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-ring [&_input]:focus-visible:ring-2 [&_input]:focus-visible:ring-ring [&_select]:focus-visible:ring-2 [&_select]:focus-visible:ring-ring">
+      {syncingAll && <div role="status" className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm">Memperbarui data Shopee · <strong>{fmtNumber(syncProgress.done)} / {fmtNumber(syncProgress.total)} produk</strong><p className="mt-1 text-xs text-muted-foreground">Tetap buka halaman ini sampai selesai. Stok katalog pusat tidak diubah.</p></div>}
       {syncFailure && <Feedback variant="error" title="Sinkron gagal" description={syncFailure.message} details={syncFailure.detail} className="mb-4" action={<>
         {/koneksi toko|belum memiliki toko/i.test(syncFailure.message) ? <Button variant="outline" asChild><Link href="/settings/accounts">Perbarui koneksi</Link></Button> : <Button variant="outline" disabled={busy} onClick={() => void syncAll(syncFailure.scope)}>Coba lagi</Button>}
         <Button variant="ghost" onClick={() => setSyncFailure(null)}>Tutup pesan</Button>

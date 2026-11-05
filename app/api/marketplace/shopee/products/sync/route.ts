@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/utils/api";
-import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
+import { syncShopeeListings, syncShopeeListingsBatch } from "@/lib/services/marketplace-shopee.service";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 
 const selectionSchema = z.object({
+  batch: z.boolean().optional(),
+  cursor: z.object({ accountId: z.string().min(1).max(128), afterProductId: z.string().regex(/^[1-9]\d*$/).nullable() }).strict().optional(),
   accountIds: z.array(z.string().min(1).max(128)).min(1).max(100).optional(),
   products: z.array(z.object({
     accountId: z.string().min(1).max(128),
@@ -14,6 +16,7 @@ const selectionSchema = z.object({
 
 export const POST = withAuth(async (req) => {
   const selection = selectionSchema.parse(req.headers.get("content-type")?.includes("application/json") ? await req.json() : {});
+  if (selection.cursor && !selection.batch) return NextResponse.json({ error: "Cursor memerlukan pembaruan bertahap." }, { status: 400 });
   if (selection.accountIds && selection.products) return NextResponse.json({ error: "Pilih toko atau produk, bukan keduanya." }, { status: 400 });
   const accountIds = [...new Set(selection.products?.map((product) => product.accountId) ?? selection.accountIds ?? [])];
   if (accountIds.length) {
@@ -32,6 +35,10 @@ export const POST = withAuth(async (req) => {
     }
   }
   try {
+    if (selection.batch) {
+      const result = await syncShopeeListingsBatch(req.businessId, selection, selection.cursor);
+      return NextResponse.json(result, { status: result.ok ? 200 : 409 });
+    }
     const results = await syncShopeeListings(req.businessId, undefined, selection);
     return NextResponse.json({ ok: true, accounts: results });
   } catch (e) {

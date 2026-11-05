@@ -45,7 +45,8 @@ function credsOf(account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccoun
 /** Dipakai juga oleh marketplace-shopee-import.service (pull listing → master). */
 export async function withRefreshedToken<T>(
   account: NonNullable<Awaited<ReturnType<typeof loadShopeeAccount>>>,
-  fn: (accessToken: string, shopId: string, creds: ShopeeCreds) => Promise<T>
+  fn: (accessToken: string, shopId: string, creds: ShopeeCreds) => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
   const fresh = await loadShopeeAccount(account.id);
   if (!fresh || fresh.platform !== "SHOPEE") {
@@ -55,7 +56,7 @@ export async function withRefreshedToken<T>(
     throw new Error("Identitas atau bisnis akun Shopee berubah. Pilih ulang akun sebelum melanjutkan.");
   }
   assertAccountActive(fresh);
-  const creds = credsOf(fresh);
+  const creds = { ...credsOf(fresh), signal };
   const shopId = fresh.externalShopId;
   if (!fresh.accessToken || !shopId) {
     throw new Error(
@@ -417,7 +418,44 @@ export async function backfillMasterImages(imageByVariant: Map<string, string>):
 export type ShopeeSyncSelection = {
   accountIds?: string[];
   products?: Array<{ accountId: string; productId: string }>;
+  signal?: AbortSignal;
 };
+
+export type ShopeeSyncCursor = { accountId: string; afterProductId: string | null };
+
+export async function syncShopeeListingsBatch(businessId: string, selection: ShopeeSyncSelection, cursor?: ShopeeSyncCursor) {
+  const accounts = await prisma.platformAccount.findMany({
+    where: { businessId, platform: "SHOPEE", ...(selection.products
+      ? { id: { in: selection.products.map((product) => product.accountId) } }
+      : selection.accountIds ? { id: { in: selection.accountIds } } : {}) },
+    select: { id: true, label: true }, orderBy: { id: "asc" },
+  });
+  const mappings = await prisma.productMapping.findMany({ where: { accountId: { in: accounts.map((account) => account.id) } },
+    select: { accountId: true, platformProductId: true, channelSku: true } });
+  const targets = accounts.map((account) => ({ ...account, products: [...new Set(mappings
+    .filter((mapping) => mapping.accountId === account.id)
+    .map((mapping) => mapping.platformProductId ?? mapping.channelSku.split(":")[0])
+    .filter((id) => /^[1-9]\d*$/.test(id) && Number.isSafeInteger(Number(id)))
+    .filter((id) => !selection.products || selection.products.some((product) => product.accountId === account.id && product.productId === id)))].sort((a, b) => Number(a) - Number(b)) }));
+  const totalProducts = targets.reduce((sum, account) => sum + account.products.length, 0);
+  const index = cursor ? targets.findIndex((account) => account.id === cursor.accountId) : 0;
+  if (cursor && (index < 0 || (cursor.afterProductId && !targets[index].products.includes(cursor.afterProductId)))) {
+    return { ok: false as const, error: "Daftar produk atau toko berubah. Mulai ulang pembaruan data." };
+  }
+  const account = targets[index];
+  if (!account) return { ok: true as const, accounts: [], totalProducts, processed: 0, nextCursor: null };
+  const nextAccount = targets[index + 1];
+  const offset = cursor?.afterProductId ? account.products.indexOf(cursor.afterProductId) + 1 : 0;
+  const productId = account.products[offset];
+  const nextCursor: ShopeeSyncCursor | null = offset + 1 < account.products.length
+    ? { accountId: account.id, afterProductId: productId }
+    : nextAccount ? { accountId: nextAccount.id, afterProductId: null } : null;
+  if (!productId) return { ok: true as const, accounts: [{ accountId: account.id, label: account.label, items: 0, models: 0, matched: 0 }],
+    totalProducts, processed: 0, nextCursor };
+  const signal = AbortSignal.timeout(40_000);
+  const results = await syncShopeeListings(businessId, account.id, { products: [{ accountId: account.id, productId }], signal });
+  return { ok: true as const, accounts: results, totalProducts, processed: results.some((result) => result.error) ? 0 : 1, nextCursor };
+}
 
 export async function syncShopeeListings(businessId: string, accountId?: string, selection?: ShopeeSyncSelection): Promise<
   Array<{ accountId: string; label: string; items: number; models: number; matched: number; error?: string }>
@@ -456,11 +494,11 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
           ? { items: productIds.slice(offset, offset + 50).map((item_id) => ({ item_id })),
               hasNextPage: offset + 50 < productIds.length, nextOffset: offset + 50 }
           : await withRefreshedToken(account, (token, shopId, creds) =>
-              getItemList(token, shopId, { offset, pageSize: 50 }, creds));
+              getItemList(token, shopId, { offset, pageSize: 50 }, creds), selection?.signal);
         if (items.length === 0) break;
         itemCount += items.length;
         const infos = await withRefreshedToken(account, (token, shopId, creds) =>
-          getItemBaseInfo(token, shopId, items.map((i) => i.item_id), creds)
+          getItemBaseInfo(token, shopId, items.map((i) => i.item_id), creds), selection?.signal
         );
         for (const info of infos) {
           const itemId = Number(info.item_id);
@@ -469,7 +507,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
           const status = (info.item_status as string | undefined) ?? null;
           const itemSku = info.item_sku as string | undefined;
           const { models } = await withRefreshedToken(account, (token, shopId, creds) =>
-            getModelList(token, shopId, itemId, creds)
+            getModelList(token, shopId, itemId, creds), selection?.signal
           );
           modelCount += models.length;
           const image = itemBaseImage(info);
@@ -490,6 +528,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
             extraStatus: string | null,
             stock?: number | null
           ) => {
+            selection?.signal?.throwIfAborted();
             for (const c of candidates) {
               if (!c) continue;
               const id = byChannelSku.get(c) ?? byChannelSku.get(`${itemId}:${c}`);
@@ -539,7 +578,9 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
         items: 0,
         models: 0,
         matched: 0,
-        error: e instanceof Error ? e.message : String(e),
+        error: selection?.signal?.aborted
+          ? "Shopee belum merespons dalam 40 detik. Pembaruan dihentikan; coba lanjutkan lagi."
+          : safeStockPushMessage(e, [account.accessToken, account.refreshToken, account.appCredential?.clientSecret]),
       });
     }
   }

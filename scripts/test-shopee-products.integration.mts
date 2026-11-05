@@ -12,13 +12,14 @@ process.env.SHOPEE_PARTNER_ID = "999888";
 process.env.SHOPEE_PARTNER_KEY = "local-fixture-partner-key";
 const db = setupTestDb("shopee_products");
 const { prisma } = await import("@/lib/db/prisma");
-const { listShopeeProducts, getShopeeAccounts } = await import("@/lib/services/marketplace-shopee.service");
+const { listShopeeProducts, getShopeeAccounts, syncShopeeListings } = await import("@/lib/services/marketplace-shopee.service");
 const { createSessionToken } = await import("@/lib/services/auth.service");
 const { POST } = await import("@/app/api/marketplace/shopee/products/sync/route");
 const { productTitle, storeName } = await import("@/components/products/shopee/presentation");
 const originalFetch = globalThis.fetch;
 const calls: URL[] = [];
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, init) => {
+  init?.signal?.throwIfAborted();
   const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
   assert.ok(url.hostname.endsWith("shopeemobile.com"), "Tidak boleh mengakses layanan lain");
   calls.push(url);
@@ -144,6 +145,46 @@ try {
     calls.length = 0;
     assert.equal((await post()).status, 200);
     assert.deepEqual([...new Set(calls.map((url) => url.searchParams.get("shop_id")))].sort(), ["111", "222"]);
+  });
+  await check("sinkron bertahap mencakup semua pasangan produk/toko tanpa memindai katalog atau mengubah stok pusat", async () => {
+    calls.length = 0;
+    let cursor: { accountId: string; afterProductId: string | null } | null = null;
+    let processed = 0;
+    let batches = 0;
+    do {
+      const response = await post({ batch: true, ...(cursor ? { cursor } : {}) });
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.equal(result.totalProducts, 4);
+      assert.equal(result.processed, 1);
+      processed += result.processed;
+      cursor = result.nextCursor;
+      assert.ok(++batches <= 4, "Cursor tidak boleh berulang");
+    } while (cursor);
+    assert.equal(processed, 4);
+    const refreshed = calls.filter((url) => url.pathname.endsWith("get_item_base_info"));
+    assert.deepEqual(refreshed.map((url) => [url.searchParams.get("shop_id"), url.searchParams.get("item_id_list")]).sort(),
+      [["111", "101"], ["111", "102"], ["111", "103"], ["222", "101"]]);
+    assert.ok(calls.every((url) => !url.pathname.endsWith("get_item_list")));
+    assert.equal((await prisma.productVariant.findUniqueOrThrow({ where: { id: variant.id } })).stock, 99);
+  });
+  await check("cursor toko asing dan progres tidak sah ditolak sebelum mengakses Shopee", async () => {
+    calls.length = 0;
+    assert.equal((await post({ batch: true, cursor: { accountId: foreign.id, afterProductId: null } })).status, 409);
+    assert.equal((await post({ batch: true, accountIds: [a.id], cursor: { accountId: b.id, afterProductId: null } })).status, 409);
+    assert.equal((await post({ batch: true, cursor: { accountId: a.id, afterProductId: "999999" } })).status, 409);
+    assert.equal((await post({ cursor: { accountId: a.id, afterProductId: null } })).status, 400);
+    assert.equal(calls.length, 0);
+  });
+  await check("pembatalan request Shopee mempertahankan snapshot dan stok pusat", async () => {
+    const before = await prisma.productMapping.findUniqueOrThrow({ where: { id: first.id } });
+    const result = await syncShopeeListings(business.id, a.id, {
+      products: [{ accountId: a.id, productId: "101" }], signal: AbortSignal.abort(),
+    });
+    assert.match(result[0].error ?? "", /40 detik/);
+    const after = await prisma.productMapping.findUniqueOrThrow({ where: { id: first.id } });
+    assert.equal(after.lastSyncedAt?.toISOString(), before.lastSyncedAt?.toISOString());
+    assert.equal((await prisma.productVariant.findUniqueOrThrow({ where: { id: variant.id } })).stock, 99);
   });
   console.log(`${passed} Shopee product integration checks passed`);
 } finally {
