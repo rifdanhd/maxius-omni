@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { allocationQuantity, resolveAllocation } from "@/lib/services/stock-allocation.policy";
 import type { MasterStockResult, MasterStockRow, MasterStockTab } from "@/lib/inventory/master-stock.types";
+import { getStockReviews } from "@/lib/services/stock-review.service";
 
 export const UNFULFILLED_ORDER_STATUSES = ["UNPAID", "ON_HOLD", "AWAITING_SHIPMENT", "PARTIALLY_SHIPPING"];
 const ARCHIVED_STATUSES = ["INACTIVE", "ARCHIVED", "DELETED", "UNLIST", "BANNED", "SELLER_DELETE", "PLATFORM_DELETE", "SELLER_DEACTIVATED", "PLATFORM_DEACTIVATED", "FREEZE", "FROZEN", "SUSPENDED", "DRAFT", "DEACTIVATED", "UNMATCHED", "MODEL_INACTIVE"];
@@ -115,6 +116,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
     ORDER BY j."variantId", j."accountId", j."channelSku", j."updatedAt" DESC, j.id DESC
   `) : [];
   const byId = new Map(variants.map((variant) => [variant.id, variant]));
+  const reviews = new Map((await getStockReviews(businessId, ids.map((row) => row.id))).map((review) => [review.variantId, review]));
   const rows: MasterStockRow[] = ids.flatMap((raw) => {
     const variant = byId.get(raw.id);
     if (!variant) return [];
@@ -137,7 +139,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
     });
     return [{ id: variant.id, version: variant.version, sku: variant.skuKeys[0]?.sellerSku ?? variant.sku, name: variant.masterProduct.name,
       variantName: variant.name, imageUrl: variant.masterProduct.imageUrl, category: variant.masterProduct.category,
-      stock: variant.stock, safetyStock: variant.safetyStock, available, pending: Number(raw.pending),
+      stock: variant.stock, stockReview: reviews.get(variant.id), safetyStock: variant.safetyStock, available, pending: Number(raw.pending),
       minimum: variant.minStock ?? variant.masterProduct.threshold,
       ownArchived: variant.isArchived,
       archived: variant.isArchived || !variant.masterProduct.isActive || ARCHIVED_STATUSES.includes(variant.masterProduct.status.toUpperCase()) ||

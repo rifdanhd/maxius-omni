@@ -514,6 +514,7 @@ export default function MasterStockPage() {
                                   {row.name}
                                 </p>
                                 {row.variantName && !/^\d+(?::\d+)?$/.test(row.variantName) && <p className="line-clamp-1 text-xs text-muted-foreground">{row.variantName}</p>}
+                                {row.stockReview && <p className="text-xs text-amber-700 dark:text-amber-300" title={row.stockReview.reasons.join("; ")}>Stok perlu ditinjau · belum layak baseline</p>}
                                 <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{sku}</p>
                                 {row.archived && <StatusBadge status="inactive" label="Arsip / nonaktif" />}
                               </div>

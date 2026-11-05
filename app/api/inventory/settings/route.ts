@@ -43,7 +43,7 @@ export const PUT = withAuth(async (req) => {
     const settings = await updateInventorySettings(req.businessId, parsed.data);
     return NextResponse.json({ settings });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Baseline belum lengkap:")) {
+    if (error instanceof Error && (error.message.startsWith("Baseline belum lengkap:") || error.message.startsWith("Baseline perlu ditinjau:"))) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     throw error;

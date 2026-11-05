@@ -6,8 +6,7 @@
  *
  * - Order (5 menit): ringan — TikTok/Shopee list order dengan paginasi cap
  *   50 halaman. Webhook tetap sumber utama update status real-time.
- * - Listing + gambar (30 menit): impor item Shopee baru (limit 100/siklus,
- *   lanjut via hasMore), refresh mapping, backfill gambar (idempoten —
+ * - Listing + gambar (30 menit): refresh mapping Shopee, backfill gambar (idempoten —
  *   hanya mengisi MasterProduct.imageUrl/ProductImage yang masih kosong),
  *   sync mapping TikTok.
  *
@@ -22,7 +21,6 @@ import { enqueueOrderRuns } from "@/lib/services/order-run.service";
 import { syncOrdersTikTok } from "@/lib/services/order-sync.service";
 import { syncOrdersShopee } from "@/lib/services/shopee-order-sync.service";
 import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
-import { importShopeeListings } from "@/lib/services/marketplace-shopee-import.service";
 import { syncTikTokListings, importTikTokListings } from "@/lib/services/marketplace-tiktok.service";
 import { ingestPromotionActivitiesForAccount } from "@/lib/services/promotion-activity.service";
 import { ingestShopeePromotionsForAccount } from "@/lib/services/shopee-promotion.service";
@@ -151,31 +149,6 @@ export async function autoSyncListingsOnce(): Promise<ListingsAutoSummary> {
     };
     for (const biz of businesses) {
       try {
-        // Impor listing Shopee (item baru + backfill gambar) — idempoten,
-        // limit default 100 item/siklus, sisa diproses di siklus berikutnya (hasMore).
-        const imported = await importShopeeListings({ businessId: biz.id });
-        for (const a of imported) {
-          out.shopeeNew += a.importedItems;
-          if (a.importedItems > 0) {
-            await prisma.syncLog
-              .create({
-                data: {
-                  direction: "in",
-                  kind: "listing_sync",
-                  status: "success",
-                  message: `auto import: +${a.importedItems} item, ${a.importedVariants} varian`,
-                  payload: JSON.stringify({
-                    importedItems: a.importedItems,
-                    importedVariants: a.importedVariants,
-                    existing: a.existing,
-                  }),
-                  accountId: a.accountId,
-                },
-              })
-              .catch(() => {});
-          }
-        }
-
         const synced = await syncShopeeListings(biz.id);
         for (const r of synced) {
           if (r.error) {

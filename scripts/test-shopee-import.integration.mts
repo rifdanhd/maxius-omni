@@ -330,18 +330,14 @@ await ok("I5: orphan (variantId NULL) tak dipoint; SKU lain tetap diimpor", asyn
 
 await ok("I6: scoping — akun brand lain tidak diimpor walau accountIds disodorkan", async () => {
   fixture.items = [{ item_id: 1001 }];
-  // Tanpa accountIds → hanya akun milik bizA (findMany businessId filter).
-  const all = await importShopeeListings({ businessId: bizA.id });
-  const ids = all.map((r) => r.accountId);
-  assert.ok(!ids.includes(acctB.id), "akun brand B tidak boleh ikut");
-  assert.ok(ids.includes(acctA.id));
-  assert.ok(ids.includes(acctA2.id), "semua akun brand A ikut (termasuk A2)");
-  // accountIds brand B dipaksa dari luar → hasil kosong (filter tetap menang).
-  const foreign = await importShopeeListings({
+  const callsBefore = fixture.listCalls;
+  await assert.rejects(importShopeeListings({ businessId: bizA.id }), /tepat satu akun/);
+  await assert.rejects(importShopeeListings({ businessId: bizA.id, accountIds: [acctA.id, acctA2.id] }), /tepat satu akun/);
+  await assert.rejects(importShopeeListings({
     businessId: bizA.id,
     accountIds: [acctB.id],
-  });
-  assert.equal(foreign.length, 0, "accountIds lintas brand diabaikan oleh filter");
+  }), /tidak ditemukan di bisnis aktif/);
+  assert.equal(fixture.listCalls, callsBefore, "Penolakan terjadi sebelum API marketplace dipanggil");
 });
 
 await ok("I7: limit → itemsScanned terpotong + hasMore=true", async () => {
@@ -390,6 +386,21 @@ await ok("I9: seller SKU sama di tiga toko memakai satu stok; customer lain teta
   assert.equal(other.error, undefined);
   const isolated = await prisma.productMapping.findFirstOrThrow({ where: { accountId: acctB.id, sellerSku: "SK-A" } });
   assert.notEqual(isolated.variantId, linked[0].variantId);
+});
+
+await ok("I10: varian baru membatalkan baseline dan push bisnis tanpa mengubah bisnis lain", async () => {
+  fixture.items = [{ item_id: 9001 }];
+  fixture.info[9001] = { item_id: 9001, item_name: "New unverified product", item_status: "NORMAL", item_sku: "NEW-UNVERIFIED", stock_info: [{ stock: 99999 }] };
+  fixture.models[9001] = { model: [], item_sku: "NEW-UNVERIFIED" };
+  await prisma.inventorySetting.update({ where: { businessId: bizA.id }, data: { stockBaselineReady: true, stockPushEnabled: true } });
+  const beforeB = await prisma.inventorySetting.findUniqueOrThrow({ where: { businessId: bizB.id } });
+  const [result] = await importShopeeListings({ businessId: bizA.id, accountIds: [acctA.id] });
+  assert.equal(result.error, undefined);
+  assert.equal(result.importedVariants, 1);
+  const afterA = await prisma.inventorySetting.findUniqueOrThrow({ where: { businessId: bizA.id } });
+  assert.equal(afterA.stockBaselineReady, false);
+  assert.equal(afterA.stockPushEnabled, false);
+  assert.deepEqual(await prisma.inventorySetting.findUniqueOrThrow({ where: { businessId: bizB.id } }), beforeB);
 });
 
 db.cleanup();

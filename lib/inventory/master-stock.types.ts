@@ -14,6 +14,7 @@ export type MasterStockRow = {
   imageUrl: string | null; category: string | null; stock: number; safetyStock: number;
   available: number; pending: number; minimum: number; archived: boolean; promoActive: number;
   ownArchived: boolean;
+  stockReview?: { reasons: string[]; initialStock: number | null; initialReason: string | null };
   status: "SUCCESS" | "FAILED" | "PENDING" | "DISABLED"; allocationWarning: boolean;
   listings: ListingStock[];
   warehouses: Array<{ id: string; name: string; stock: number; safetyStock: number }>;

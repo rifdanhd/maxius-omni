@@ -8,10 +8,8 @@ import {
 } from "@/lib/services/app-credential.service";
 import { SHOPEE_OAUTH_CRED_COOKIE, OAUTH_BRAND_COOKIE } from "@/lib/utils/oauth-cookies";
 import { verifySessionCookie } from "@/lib/services/auth.service";
-import {
-  DEFAULT_BUSINESS_ID,
-  getUserBusinessIds,
-} from "@/lib/services/business-scope.service";
+import { getUserBusinessIds } from "@/lib/services/business-scope.service";
+import { selectedShopeeShop } from "@/lib/services/shopee-account.policy";
 import { appOrigin } from "@/lib/utils/request-origin";
 import { clearOAuthCookies, validOAuthState } from "@/lib/security/oauth";
 
@@ -35,7 +33,12 @@ async function handleCallback(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  const shopId = searchParams.get("shop_id") ?? searchParams.get("shop_id_list") ?? undefined;
+  let shopId: string;
+  try {
+    shopId = selectedShopeeShop(searchParams.get("shop_id") ?? searchParams.get("shop_id_list"));
+  } catch {
+    return NextResponse.redirect(new URL("/settings/accounts?error=select_single_shop", appOrigin(req)));
+  }
 
   if (error || !code) {
     return NextResponse.redirect(
@@ -85,10 +88,6 @@ async function handleCallback(req: NextRequest) {
       );
     }
     businessId = cookieBrand;
-  } else {
-    businessId = ownedBusinessIds.includes(DEFAULT_BUSINESS_ID)
-      ? DEFAULT_BUSINESS_ID
-      : (ownedBusinessIds[0] ?? null);
   }
   if (!businessId) {
     return NextResponse.redirect(
@@ -104,11 +103,12 @@ async function handleCallback(req: NextRequest) {
     return NextResponse.redirect(new URL("/settings/accounts?error=shopee_token_exchange_failed", appOrigin(req)));
   }
 
-  const shopIds = token.shopIdList?.length
-    ? token.shopIdList.map(String)
-    : shopId
-      ? [String(shopId)]
-      : [];
+  let shopIds: string[];
+  try {
+    shopIds = [selectedShopeeShop(shopId, token.shopIdList)];
+  } catch {
+    return NextResponse.redirect(new URL("/settings/accounts?error=shop_not_authorized", appOrigin(req)));
+  }
 
   try {
     if (shopIds.length > 0) {
@@ -135,7 +135,7 @@ async function handleCallback(req: NextRequest) {
           console.warn(`[Shopee OAuth] get_shop_info gagal utk ${sid}:`, e instanceof Error ? e.message : e);
         }
         await prisma.platformAccount.upsert({
-          where: { platform_externalShopId: { platform: PLATFORM, externalShopId: sid } },
+          where: { platform_externalShopId: { platform: PLATFORM, externalShopId: sid }, businessId },
           create: {
             platform: PLATFORM,
             label,
@@ -147,9 +147,6 @@ async function handleCallback(req: NextRequest) {
             ...(credential ? { appCredentialId: credential.id } : {}),
           },
           update: {
-            // Reconnect dari brand lain → pindahkan akun ke brand tsb (unik
-            // per platform+shop, jadi toko hanya bisa bernaung di satu brand).
-            businessId,
             label,
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
@@ -158,18 +155,6 @@ async function handleCallback(req: NextRequest) {
           },
         });
       }
-    } else {
-      await prisma.platformAccount.create({
-        data: {
-          platform: PLATFORM,
-          label: `Pending Shopee - ${new Date().toISOString()}`,
-          businessId,
-          accessToken: token.accessToken,
-          refreshToken: token.refreshToken,
-          tokenExpiresAt: new Date(Date.now() + token.expireIn * 1000),
-          ...(credential ? { appCredentialId: credential.id } : {}),
-        },
-      });
     }
   } catch (e) {
     console.error("[Shopee OAuth] Gagal simpan kredensial:", e);

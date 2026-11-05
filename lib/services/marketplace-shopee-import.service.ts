@@ -121,8 +121,10 @@ export async function importShopeeListings(params: {
   accountIds?: string[];
   limit?: number;
 }): Promise<ShopeeImportAccountResult[]> {
+  if (new Set(params.accountIds).size !== 1 || params.accountIds?.length !== 1) {
+    throw new Error("Pilih tepat satu akun Shopee milik bisnis aktif untuk impor.");
+  }
   const limit = normalizeShopeeImportLimit(params.limit);
-  const settings = await getCachedInventorySettings(params.businessId);
 
   const accounts = await prisma.platformAccount.findMany({
     where: {
@@ -134,6 +136,8 @@ export async function importShopeeListings(params: {
   });
 
   const results: ShopeeImportAccountResult[] = [];
+  if (accounts.length !== 1) throw new Error("Akun Shopee tidak ditemukan di bisnis aktif.");
+  const settings = await getCachedInventorySettings(params.businessId);
 
   for (const summary of accounts) {
     const stats: ShopeeImportAccountResult = {
@@ -155,7 +159,7 @@ export async function importShopeeListings(params: {
       continue;
     }
     const account = await loadShopeeAccount(summary.id);
-    if (!account) {
+    if (!account || account.businessId !== params.businessId || account.platform !== "SHOPEE" || account.externalShopId !== summary.externalShopId) {
       stats.error = "Akun tidak ditemukan.";
       continue;
     }
@@ -282,6 +286,10 @@ async function importOneItem(params: {
 
   try {
     const delta = await prisma.$transaction(async (tx) => {
+      const owned = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "PlatformAccount"
+        WHERE id = ${account.id} AND "businessId" = ${businessId}
+          AND platform = 'SHOPEE' AND "externalShopId" = ${account.externalShopId} AND NOT "isFrozen" FOR SHARE`;
+      if (owned.length !== 1) throw new Error("Akun Shopee bukan lagi milik bisnis aktif atau tidak dapat diimpor.");
       await lockSellerSkus(tx, businessId, pending.flatMap((d) => d.sellerSku ? [d.sellerSku] : []));
       let productId: string | null = null;
       let initializedCount = 0;
@@ -350,6 +358,9 @@ async function importOneItem(params: {
             stockAfter: d.stock,
           },
         });
+      }
+      if (initializedCount > 0) {
+        await tx.inventorySetting.updateMany({ where: { businessId }, data: { stockBaselineReady: false, stockPushEnabled: false } });
       }
       return { items: productId ? 1 : 0, variants: initializedCount, reviews: reviewCount };
     });

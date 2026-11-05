@@ -19,11 +19,14 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
         ? body.accountIds.filter((v): v is string => typeof v === "string" && v.trim() !== "")
         : undefined;
 
+  if (accountIds?.length !== 1) {
+    return NextResponse.json({ ok: false, error: "Pilih tepat satu akun Shopee untuk impor." }, { status: 400 });
+  }
   // Scoping: akun pilihan harus milik brand aktif — ID asing → 404 tanpa bocor.
   if (accountIds?.length) {
     const uniqueIds = [...new Set(accountIds)];
     const rows = await prisma.platformAccount.findMany({
-      where: { id: { in: uniqueIds } },
+      where: { id: { in: uniqueIds }, platform: "SHOPEE", businessId: req.businessId, isFrozen: false, accessToken: { not: null }, externalShopId: { not: null } },
       select: { id: true, businessId: true },
     });
     if (rows.length !== uniqueIds.length) {

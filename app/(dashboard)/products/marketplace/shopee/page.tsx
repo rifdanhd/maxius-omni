@@ -312,12 +312,11 @@ export default function ShopeeMarketplacePage() {
                     {accounts.map((a) => (
                       <label key={a.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm text-foreground hover:bg-muted cursor-pointer">
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name="shopee-import-account"
                           className="w-4 h-4"
                           checked={importAccounts.includes(a.id)}
-                          onChange={(e) => setImportAccounts((prev) =>
-                            e.target.checked ? [...prev, a.id] : prev.filter((x) => x !== a.id)
-                          )}
+                          onChange={() => setImportAccounts([a.id])}
                         />
                         <span className="truncate" title={a.id}>{storeName(a.label)}</span>
                       </label>
@@ -326,7 +325,7 @@ export default function ShopeeMarketplacePage() {
                 )}
                 {accounts.length > 0 && (
                   <div className="mt-1.5 flex gap-3 text-xs">
-                    <button onClick={() => setImportAccounts(accounts.map((a) => a.id))} className="font-medium text-foreground hover:underline">Pilih semua</button>
+                    <span className="text-muted-foreground">Proses satu toko per impor.</span>
                     <button onClick={() => setImportAccounts([])} className="font-medium text-muted-foreground hover:underline">Kosongkan</button>
                   </div>
                 )}
@@ -389,7 +388,7 @@ export default function ShopeeMarketplacePage() {
         <div className="flex max-w-full flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <Tooltip><TooltipTrigger asChild><span tabIndex={connectedAccounts.length === 0 ? 0 : undefined}>
-              <Button variant="outline" className="min-h-11" onClick={() => { setImportAccounts(accountFilter.length ? accountFilter : connectedAccounts.map((account) => account.id)); setImportOpen(true); }} disabled={loading || connectedAccounts.length === 0 || busy}>
+              <Button variant="outline" className="min-h-11" onClick={() => { setImportAccounts((accountFilter.length ? accountFilter : connectedAccounts.map((account) => account.id)).slice(0, 1)); setImportOpen(true); }} disabled={loading || connectedAccounts.length === 0 || busy}>
                 <Download aria-hidden="true" />{importing ? "Mengimpor..." : "Impor dari Shopee"}
               </Button></span></TooltipTrigger><TooltipContent className="max-w-xs">{connectedAccounts.length === 0 ? "Hubungkan toko melalui Pengaturan Toko terlebih dahulu." : "Tambahkan produk dan varian baru ke katalog pusat. Produk yang sudah terhubung tidak diimpor ulang."}</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger asChild><span tabIndex={connectedAccounts.length === 0 ? 0 : undefined}>
@@ -515,7 +514,7 @@ export default function ShopeeMarketplacePage() {
           {Array.from({ length: 5 }, (_, index) => <div key={index} className="flex items-center gap-4 rounded-lg border border-border p-3"><Skeleton className="size-10 shrink-0" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div><Skeleton className="h-6 w-16" /></div>)}
         </div> : error ? <PageState variant="error" title="Produk belum dapat dimuat" description={friendlyError(error)} details={error} action={<Button variant="outline" onClick={() => setRefreshKey((key) => key + 1)}>Coba lagi</Button>} /> : rows.length === 0 ? <div className="space-y-3 p-6 text-center text-sm">
           <PackageOpen size={28} className="mx-auto text-muted-foreground" aria-hidden="true" />
-          {q.trim() || filterActive || mappingFilter !== "all" || tab !== "all" ? <><p>Tidak ada produk yang cocok dengan pencarian dan filter.</p><Button variant="outline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setMappingFilter("all"); setTab("all"); setPage(1); }}>Hapus pencarian dan filter</Button></> : <><p>Belum ada produk Shopee di katalog pusat.</p>{accounts.length > 0 ? <Button variant="outline" onClick={() => { setImportAccounts(accounts.map((account) => account.id)); setImportOpen(true); }} disabled={busy}><Download aria-hidden="true" />Impor dari Shopee</Button> : <Button variant="outline" asChild><Link href="/settings/accounts">Hubungkan toko Shopee</Link></Button>}</>}
+          {q.trim() || filterActive || mappingFilter !== "all" || tab !== "all" ? <><p>Tidak ada produk yang cocok dengan pencarian dan filter.</p><Button variant="outline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setMappingFilter("all"); setTab("all"); setPage(1); }}>Hapus pencarian dan filter</Button></> : <><p>Belum ada produk Shopee di katalog pusat.</p>{accounts.length > 0 ? <Button variant="outline" onClick={() => { setImportAccounts(accounts.slice(0, 1).map((account) => account.id)); setImportOpen(true); }} disabled={busy}><Download aria-hidden="true" />Impor dari Shopee</Button> : <Button variant="outline" asChild><Link href="/settings/accounts">Hubungkan toko Shopee</Link></Button>}</>}
         </div> : <ShopeeProductList rows={rows} selected={selected} onToggleRow={toggleRow} onToggleAll={toggleAll} sort={sort} onSort={(value) => { setSort(value); setPage(1); }} density={display.density} threshold={display.threshold} busy={busy} onDetail={(row, trigger) => { setDetailReturnFocus(trigger); setDetail(row); }} onSync={requestSync} />}
 
         {total > 0 && (

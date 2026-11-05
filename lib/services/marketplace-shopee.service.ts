@@ -51,6 +51,9 @@ export async function withRefreshedToken<T>(
   if (!fresh || fresh.platform !== "SHOPEE") {
     throw new Error(`Akun Shopee "${account.label}" tidak ditemukan.`);
   }
+  if (fresh.businessId !== account.businessId || fresh.externalShopId !== account.externalShopId) {
+    throw new Error("Identitas atau bisnis akun Shopee berubah. Pilih ulang akun sebelum melanjutkan.");
+  }
   assertAccountActive(fresh);
   const creds = credsOf(fresh);
   const shopId = fresh.externalShopId;

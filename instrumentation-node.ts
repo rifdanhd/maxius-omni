@@ -64,7 +64,7 @@ export async function registerNodeInstrumentation() {
   // --- Sweep SyncRun stale (selalu aktif; penjaga run background manual) ---
   // Run RUNNING tanpa denyut >2 menit (proses mati / restart) → FAILED
   // resumable; klik Sync Pesanan di UI akan lanjut dari cursor tersimpan.
-  if (!g.__maxiusRunSweepTimer) {
+  if (process.env.ORDER_RUN_SWEEP_DISABLED !== "true" && !g.__maxiusRunSweepTimer) {
     const { sweepStaleOrderRuns } = await import("./lib/services/order-run.service");
     g.__maxiusRunSweepTimer = unref(
       setInterval(() => {

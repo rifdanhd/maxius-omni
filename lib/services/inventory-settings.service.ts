@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_BUSINESS_ID } from "@/lib/services/business-scope.service";
+import { getStockReviews } from "@/lib/services/stock-review.service";
 
 /**
  * Pengaturan Inventori (FITUR Pengaturan Inventori).
@@ -189,8 +190,10 @@ export async function updateInventorySettings(
   businessId: string,
   patch: Partial<InventorySettings>
 ): Promise<InventorySettings> {
-  await getInventorySettings(businessId);
-  if (patch.stockBaselineReady === true) {
+  const current = await getInventorySettings(businessId);
+  if (patch.stockBaselineReady === true || (patch.stockPushEnabled === true && current.stockBaselineReady && patch.stockBaselineReady !== false)) {
+    const reviews = await getStockReviews(businessId);
+    if (reviews.length) throw new Error(`Baseline perlu ditinjau: ${reviews.length} varian memiliki stok awal tidak wajar. Verifikasi stok fisik dan catat stok awal yang benar terlebih dahulu.`);
     const [counts] = await prisma.$queryRaw<Array<{ mapped: bigint; initialized: bigint }>>`
       SELECT
         COUNT(DISTINCT pm."variantId") FILTER (WHERE pm."variantId" IS NOT NULL) AS mapped,
