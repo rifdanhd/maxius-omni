@@ -10,6 +10,7 @@ export type ListingStock = {
   inheritsAllocation: boolean; defaultAllocation: AllocationPolicy;
 };
 export type MasterStockRow = {
+  productId: string;
   id: string; version: number; sku: string; name: string; variantName: string | null;
   imageUrl: string | null; category: string | null; stock: number; safetyStock: number;
   available: number; pending: number; minimum: number; archived: boolean; promoActive: number;
@@ -20,6 +21,7 @@ export type MasterStockRow = {
   warehouses: Array<{ id: string; name: string; stock: number; safetyStock: number }>;
 };
 export type MasterStockResult = {
+  productTotal?: number;
   rows: MasterStockRow[]; total: number; page: number; pageSize: number;
   counts: Record<MasterStockTab, number>; archivedCounts: { all: number; empty: number };
   filters: { categories: string[]; stores: Array<{ id: string; label: string; platform: string }>;

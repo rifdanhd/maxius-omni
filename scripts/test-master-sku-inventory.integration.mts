@@ -190,6 +190,28 @@ try {
   assert.equal((await prisma.productMapping.findUniqueOrThrow({ where: { id: orphan.id } })).variantId, null);
   console.log("PASS: listing orphan tetap dalam tinjauan meskipun satu stok acuan sudah tersedia");
 
+  await prisma.masterProduct.createMany({ data: [
+    { id: "group-a", name: "Produk Sama", businessId: "tenant-a" },
+    { id: "group-b", name: "Produk Sama", businessId: "tenant-a" },
+  ] });
+  await prisma.productVariant.createMany({ data: [
+    { id: "group-a-1", masterProductId: "group-a", sku: "GROUP-A-1", stock: 10 },
+    { id: "group-a-2", masterProductId: "group-a", sku: "GROUP-A-2", stock: 20 },
+    { id: "group-b-1", masterProductId: "group-b", sku: "GROUP-B-1", stock: 0 },
+  ] });
+  const grouped = await getMasterStock("tenant-a", new URLSearchParams("groupBy=product&limit=1&q=GROUP-"));
+  assert.equal(grouped.productTotal, 2);
+  assert.equal(grouped.total, 3);
+  assert.deepEqual(grouped.rows.map((row) => row.id), ["group-a-1", "group-a-2"]);
+  const nextProduct = await getMasterStock("tenant-a", new URLSearchParams("groupBy=product&limit=1&q=GROUP-&page=2"));
+  assert.deepEqual(nextProduct.rows.map((row) => row.productId), ["group-b"]);
+  const emptyProduct = await getMasterStock("tenant-a", new URLSearchParams("groupBy=product&limit=1&q=GROUP-&tab=empty"));
+  assert.equal(emptyProduct.productTotal, 1);
+  assert.equal(emptyProduct.rows[0].id, "group-b-1");
+  const stockSorted = await getMasterStock("tenant-a", new URLSearchParams("groupBy=product&limit=1&q=GROUP-&sort=stock_asc"));
+  assert.equal(stockSorted.rows[0].productId, "group-b");
+  console.log("PASS: pagination per produk, varian tidak terpisah, nama sama tetap terpisah, filter dan urutan stok sesuai");
+
   await prisma.productVariant.createMany({ data: Array.from({ length: 3600 }, (_, index) => ({ id: `scale-${index}`, masterProductId: "product-a", sku: `SCALE-${index}`, stock: index % 5, safetyStock: 0 })) });
   const started = performance.now();
   const scale = await getMasterStock("tenant-a", new URLSearchParams("limit=50"));

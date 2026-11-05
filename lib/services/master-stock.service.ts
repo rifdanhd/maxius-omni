@@ -22,6 +22,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
   const accountId = params.get("store");
   const warehouseId = params.get("warehouse");
   const showArchived = params.get("archives") === "true";
+  const groupByProduct = params.get("groupBy") === "product";
   const tab = params.get("tab") as MasterStockTab | null;
   const sorts: Record<string, Prisma.Sql> = {
     name: Prisma.sql`name ASC, sku ASC, id ASC`,
@@ -51,7 +52,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       ORDER BY j."variantId", j."accountId", j."channelSku", j."updatedAt" DESC, j.id DESC
     ), base AS (
       SELECT pv.id, COALESCE((SELECT k."sellerSku" FROM "MasterSkuKey" k WHERE k."variantId" = pv.id AND k."businessId" = ${businessId} ORDER BY k."sellerSku" LIMIT 1), pv.sku) AS sku,
-        mp.name, pv.stock, GREATEST(pv.stock - pv."safetyStock", 0) AS available,
+        mp.id AS "productId", mp.name, pv.stock, GREATEST(pv.stock - pv."safetyStock", 0) AS available,
         COALESCE(p.qty, 0) AS pending, COALESCE(pv."minStock", mp.threshold) AS minimum,
         ${archived} AS archived,
         EXISTS (SELECT 1 FROM "ProductMapping" pm JOIN "PlatformAccount" a ON a.id = pm."accountId"
@@ -82,13 +83,22 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       : tab === "failed" ? Prisma.sql`failed` : tab === "unmapped" ? Prisma.sql`unmapped`
         : tab === "oversells" ? Prisma.sql`pending > available` : Prisma.sql`true`;
   const [ids, aggregates, archivedRows] = await Promise.all([
-    prisma.$queryRaw<Array<{ id: string; pending: bigint }>>(Prisma.sql`${base} SELECT id, pending FROM visible WHERE ${tabFilter}
+    prisma.$queryRaw<Array<{ id: string; pending: bigint }>>(groupByProduct ? Prisma.sql`${base}, products AS (
+        SELECT "productId" AS id, MIN(name) AS name, MIN(sku) AS sku, SUM(stock) AS stock
+        FROM visible WHERE ${tabFilter} GROUP BY "productId"
+      ), product_page AS (
+        SELECT id, row_number() OVER (ORDER BY ${order}) AS position FROM products
+        ORDER BY ${order} OFFSET ${(page - 1) * pageSize} LIMIT ${pageSize}
+      ) SELECT v.id, v.pending FROM visible v JOIN product_page p ON p.id = v."productId"
+        WHERE ${tabFilter} ORDER BY p.position, v.sku, v.id`
+      : Prisma.sql`${base} SELECT id, pending FROM visible WHERE ${tabFilter}
       ORDER BY ${order} OFFSET ${(page - 1) * pageSize} LIMIT ${pageSize}`),
-    prisma.$queryRaw<Array<{ all: bigint; empty: bigint; low: bigint; failed: bigint; unmapped: bigint; oversells: bigint; total: bigint }>>(Prisma.sql`${base}
+    prisma.$queryRaw<Array<{ all: bigint; empty: bigint; low: bigint; failed: bigint; unmapped: bigint; oversells: bigint; total: bigint; productTotal: bigint }>>(Prisma.sql`${base}
       SELECT count(*) AS "all", count(*) FILTER (WHERE available = 0) AS empty,
         count(*) FILTER (WHERE available > 0 AND available <= minimum) AS low,
         count(*) FILTER (WHERE failed) AS failed, count(*) FILTER (WHERE unmapped) AS unmapped,
-        count(*) FILTER (WHERE pending > available) AS oversells, count(*) FILTER (WHERE ${tabFilter}) AS total FROM visible`),
+        count(*) FILTER (WHERE pending > available) AS oversells, count(*) FILTER (WHERE ${tabFilter}) AS total,
+        count(DISTINCT "productId") FILTER (WHERE ${tabFilter}) AS "productTotal" FROM visible`),
     prisma.$queryRaw<Array<{ all: bigint; empty: bigint }>>(Prisma.sql`${base}
       SELECT count(*) AS "all", count(*) FILTER (WHERE available = 0) AS empty FROM base WHERE archived`),
   ]);
@@ -137,7 +147,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
         allocation, quantity, inheritsAllocation: mapping.stockAllocationMode === null && mapping.stockAllocationValue === null && mapping.stockBuffer === null,
         defaultAllocation: resolveAllocation({}, mapping.account) };
     });
-    return [{ id: variant.id, version: variant.version, sku: variant.skuKeys[0]?.sellerSku ?? variant.sku, name: variant.masterProduct.name,
+    return [{ id: variant.id, productId: variant.masterProductId, version: variant.version, sku: variant.skuKeys[0]?.sellerSku ?? variant.sku, name: variant.masterProduct.name,
       variantName: variant.name, imageUrl: variant.masterProduct.imageUrl, category: variant.masterProduct.category,
       stock: variant.stock, stockReview: reviews.get(variant.id), safetyStock: variant.safetyStock, available, pending: Number(raw.pending),
       minimum: variant.minStock ?? variant.masterProduct.threshold,
@@ -156,6 +166,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
   ]);
   const counts = aggregates[0];
   return { rows, page, pageSize, total: Number(counts?.total ?? 0),
+    productTotal: Number(counts?.productTotal ?? 0),
     counts: Object.fromEntries(["all", "empty", "low", "failed", "unmapped", "oversells"].map((key) => [key, Number(counts?.[key as MasterStockTab] ?? 0)])) as MasterStockResult["counts"],
     archivedCounts: { all: Number(archivedRows[0]?.all ?? 0), empty: Number(archivedRows[0]?.empty ?? 0) },
     filters: { categories: categories.flatMap((item) => item.category ? [item.category] : []), stores, warehouses } };

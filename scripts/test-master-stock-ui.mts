@@ -29,14 +29,14 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    const row: MasterStockRow = { id: "sku-1", version: 7, sku: "SOCK-BLACK", name: "Kaos kaki olahraga premium hitam ukuran dewasa", variantName: "Hitam / Dewasa", imageUrl: null,
+    const row: MasterStockRow = { id: "sku-1", productId: "product-1", version: 7, sku: "SOCK-BLACK", name: "Kaos kaki olahraga premium hitam ukuran dewasa", variantName: "Hitam / Dewasa", imageUrl: null,
       category: "Kaos kaki", stock: 1200, safetyStock: 10, available: 1190, pending: 2, minimum: 5, archived: false, ownArchived: false, promoActive: 0,
       status: "FAILED", allocationWarning: true, warehouses: [{ id: "warehouse-1", name: "Gudang utama", stock: 1200, safetyStock: 10 }],
       listings: [1, 2, 3].map((number) => ({ id: `listing-${number}`, accountId: `shop-${number}`, store: `Toko ${number}`, platform: number === 3 ? "TIKTOK_SHOP" : "SHOPEE",
         channelSku: `${1000 + number}:5`, sellerSku: "SOCK-BLACK", platformSkuId: `${1000 + number}:5`, platformStock: 1190,
         status: number === 2 ? "FAILED" : "SUCCESS", error: number === 2 ? "Toko fixture menolak stok" : null, lastSyncedAt: "2026-10-25T00:00:00Z",
         allocation: { mode: "FULL", value: 100, buffer: 0 }, inheritsAllocation: true, defaultAllocation: { mode: "FULL", value: 100, buffer: 0 }, quantity: 1190 })) };
-    const body: MasterStockResult = { rows: [row], total: 3602, page: 1, pageSize: 50, counts: { all: 3602, empty: 0, low: 0, failed: 1, unmapped: 0, oversells: 0 },
+    const body: MasterStockResult = { rows: [row, { ...row, id: "sku-2", sku: "SOCK-WHITE", variantName: "Putih / Dewasa" }], productTotal: 1801, total: 3602, page: 1, pageSize: 50, counts: { all: 3602, empty: 0, low: 0, failed: 1, unmapped: 0, oversells: 0 },
       archivedCounts: { all: 20, empty: 10 }, filters: { categories: ["Kaos kaki"], stores: row.listings.map((listing) => ({ id: listing.accountId, label: listing.store, platform: listing.platform })),
         warehouses: [{ id: "warehouse-1", name: "Gudang utama", isDefault: true }] } };
     const posts: Array<Record<string, unknown>> = [];
@@ -53,15 +53,20 @@ try {
       return route.fulfill({ json: { success: true } });
     });
     await page.goto(`http://127.0.0.1:${address.port}`);
-    await expect(page.getByTestId("master-stock-row")).toHaveCount(1);
-    await expect(page.getByText("3 toko", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("master-stock-product")).toHaveCount(1);
+    await expect(page.getByTestId("master-stock-row")).toHaveCount(0);
+    assert.ok(queries.some((query) => query.includes("groupBy=product")));
+    await page.getByRole("button", { name: `Varian ${row.name}`, exact: true }).click();
+    await expect(page.getByTestId("master-stock-row")).toHaveCount(2);
+    await expect(page.getByText("Putih / Dewasa", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("master-stock-product").getByText("3 toko", { exact: true })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "Promosi", exact: true })).toHaveCount(0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${width}px: overflow halaman`);
     await page.getByRole("button", { name: "Rincian SOCK-BLACK" }).click();
     await expect(page.getByText("Toko fixture menolak stok", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Sinkron ulang", exact: true }).nth(1).click();
     await expect.poll(() => posts.some((input) => input.action === "retry" && input.listingId === "listing-2")).toBe(true);
-    const rowElement = page.getByTestId("master-stock-row");
+    const rowElement = page.getByTestId("master-stock-row").first();
     await rowElement.getByRole("button", { name: "Ubah stok", exact: true }).click();
     let dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Akan dikirim ke 3 listing di 3 toko.")).toBeVisible();

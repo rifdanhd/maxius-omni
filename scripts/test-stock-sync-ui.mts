@@ -6,7 +6,7 @@ import { build } from "esbuild";
 import { chromium, expect } from "@playwright/test";
 import type { MasterStockRow } from "../lib/inventory/master-stock.types";
 const row: MasterStockRow = {
-  id: "fixture", version: 0, sku: "FIXTURE", name: "Produk fixture", variantName: null, imageUrl: null, category: null,
+  id: "fixture", productId: "product-fixture", version: 0, sku: "FIXTURE", name: "Produk fixture", variantName: null, imageUrl: null, category: null,
   stock: 100, safetyStock: 10, available: 90, pending: 0, minimum: 5, archived: false, ownArchived: false, promoActive: 0, status: "DISABLED", allocationWarning: false,
   warehouses: [{ id: "w", name: "Gudang utama", stock: 100, safetyStock: 10 }],
   listings: [{ id: "l", accountId: "store", store: "Toko fixture", platform: "SHOPEE", channelSku: "100:1", sellerSku: "FIXTURE", platformSkuId: "1", platformStock: 75,
