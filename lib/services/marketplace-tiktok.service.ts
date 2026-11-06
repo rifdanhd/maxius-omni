@@ -673,13 +673,12 @@ include: {
            if (detail && productMainImage(detail)) {
              Object.assign(product, detail);
            }
-         } catch {
-           // Detail gagal diambil — lanjutkan tanpa gambar dari detail.
-         }
-         await new Promise((resolve) => setTimeout(resolve, 120));
-       }
+          } catch {
+            // Detail gagal diambil — lanjutkan tanpa gambar dari detail.
+          }
+        }
 
-       const upd = applyProduct({ channelSku: m.channelSku }, product);
+        const upd = applyProduct({ channelSku: m.channelSku }, product);
       const productStatusUpper = String(product.status ?? "").toUpperCase();
       if (productStatusUpper === "DELETED") {
         deleted += 1;
