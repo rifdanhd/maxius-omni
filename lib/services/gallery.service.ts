@@ -85,6 +85,7 @@ export async function setMasterProductImage(
  * Tidak pernah menimpa pilihan gambar manual di Kelola Gambar.
  */
 export async function applyMarketplaceCover(masterProductId: string, url: string): Promise<void> {
+  if (!url) return;
   await prisma.$transaction(async (tx) => {
     await lockProduct(tx, masterProductId);
     const p = await tx.masterProduct.findUnique({
@@ -92,8 +93,8 @@ export async function applyMarketplaceCover(masterProductId: string, url: string
       select: { imageUrl: true, _count: { select: { productImage: true } } },
     });
     if (!p) return;
-    if (p._count.productImage === 0) {
-      await setMasterProductImage(tx, masterProductId, p.imageUrl || url);
+    if (p.imageUrl === null) {
+      await setMasterProductImage(tx, masterProductId, url);
     }
   });
 }
