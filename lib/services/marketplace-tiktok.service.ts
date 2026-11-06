@@ -644,26 +644,42 @@ include: {
      let archivedVariants = 0;
      const deletedVariantIds = new Set<string>();
 
-     for (const m of account.productMapping) {
-      const product = skuKeys.get(m.channelSku) ?? null;
-      if (!product) {
-        // Mapping ada tapi tidak ditemukan di akun TikTok → tandai UNMATCHED agar
-        // terlihat di tab "Perlu Tindakan".
-        await prisma.productMapping.update({
-          where: { id: m.id },
-          data: {
-            platformStatus: STATUS_UNMATCHED,
-            platformStatusRaw: JSON.stringify({ not_found: true }),
-            platformStock: null,
-            platformProductId: null,
-            lastSyncedAt: new Date(),
-          },
-        });
-        notFound += 1;
-        continue;
-      }
+      for (const m of account.productMapping) {
+       const product = skuKeys.get(m.channelSku) ?? null;
+       if (!product) {
+         // Mapping ada tapi tidak ditemukan di akun TikTok → tandai UNMATCHED agar
+         // terlihat di tab "Perlu Tindakan".
+         await prisma.productMapping.update({
+           where: { id: m.id },
+           data: {
+             platformStatus: STATUS_UNMATCHED,
+             platformStatusRaw: JSON.stringify({ not_found: true }),
+             platformStock: null,
+             platformProductId: null,
+             lastSyncedAt: new Date(),
+           },
+         });
+         notFound += 1;
+         continue;
+       }
 
-      const upd = applyProduct({ channelSku: m.channelSku }, product);
+       // TikTok search API sering tidak menyertakan field gambar (main_images).
+       // Ambil detail produk untuk mendapatkan URL gambar utama bila search result kosong.
+       if (!productMainImage(product) && String(product.id ?? "")) {
+         try {
+           const detail = await withRefreshedTiktokToken(account, (accessToken, creds) =>
+             getProductDetail(accessToken, account.shopCipher ?? undefined, String(product.id), creds)
+           );
+           if (detail && productMainImage(detail)) {
+             Object.assign(product, detail);
+           }
+         } catch {
+           // Detail gagal diambil — lanjutkan tanpa gambar dari detail.
+         }
+         await new Promise((resolve) => setTimeout(resolve, 120));
+       }
+
+       const upd = applyProduct({ channelSku: m.channelSku }, product);
       const productStatusUpper = String(product.status ?? "").toUpperCase();
       if (productStatusUpper === "DELETED") {
         deleted += 1;
