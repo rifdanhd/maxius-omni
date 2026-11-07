@@ -261,6 +261,7 @@ export async function mapOrphanToNewMaster(params: {
         channelSku: params.channelSku,
         variantId: variant.id,
         ...(params.platformTitle ? { platformTitle: params.platformTitle } : {}),
+        origin: "manual",
         updatedAt: new Date(),
       },
       select: { id: true },

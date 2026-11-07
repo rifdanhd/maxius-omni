@@ -81,7 +81,7 @@ export async function applyAutoMatch(businessId: string, decisions: Array<{ acco
       if (!variantId) continue;
       const variant = await tx.productVariant.findFirst({ where: { id: variantId, masterProduct: { businessId }, isArchived: false }, select: { id: true } });
       if (!variant) throw new Error("Varian target tidak ditemukan atau tidak aktif.");
-      await tx.productMapping.upsert({ where: { accountId_channelSku: { accountId: decision.accountId, channelSku: decision.channelSku } }, create: { accountId: decision.accountId, channelSku: decision.channelSku, variantId, updatedAt: new Date() }, update: { variantId, updatedAt: new Date() } });
+      await tx.productMapping.upsert({ where: { accountId_channelSku: { accountId: decision.accountId, channelSku: decision.channelSku } }, create: { accountId: decision.accountId, channelSku: decision.channelSku, variantId, origin: "auto", updatedAt: new Date() }, update: { variantId, origin: "auto", updatedAt: new Date() } });
       mapped += 1;
     }
     return { mapped, created };

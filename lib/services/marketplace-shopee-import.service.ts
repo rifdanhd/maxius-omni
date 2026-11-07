@@ -335,6 +335,7 @@ async function importOneItem(params: {
             // tidak, dibiarkan null supaya tidak terlihat sebagai "0 di Shopee".
             ...(d.stockKnown ? { platformStock: d.stock } : {}),
             lastSyncedAt: now,
+            origin: "auto",
             updatedAt: now,
           },
         });

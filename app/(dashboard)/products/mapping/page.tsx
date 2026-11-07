@@ -43,6 +43,8 @@ type Variant = {
 type Mapping = {
   id: string;
   channelSku: string;
+  origin: string | null;
+  reviewed: boolean;
   account: { id: string; platform: string; label: string } | null;
   variant: Variant | null;
 };
@@ -197,6 +199,27 @@ function StockPill({ value }: { value: number }) {
   );
 }
 
+// Badge asal mapping: ditinjau > auto > manual — traceback siapa yang membuat
+// hubungan ini (research pola omnichannel: zero unapproved master-link).
+const originLabel: Record<string, { label: string; cls: string } | undefined> = {
+  review: { label: "Hasil tinjauan", cls: "border-warning/40 text-foreground bg-warning/10" },
+  auto: { label: "Otomatis", cls: "border-primary/30 bg-primary/10 text-primary" },
+  manual: { label: "Manual", cls: "text-muted-foreground" },
+};
+
+function OriginBadge({ mapping }: { mapping: Mapping }) {
+  const meta = mapping.reviewed ? originLabel.review : mapping.origin ? originLabel[mapping.origin] : undefined;
+  if (!meta) return null;
+  return (
+    <span
+      title={mapping.reviewed ? "Hubungan disatukan melalui antrean tinjauan SKU seller" : mapping.origin === "auto" ? "Dibuat otomatis (auto-match / import marketplace)" : "Dibuat manual lewat form mapping"}
+      className={`inline-flex whitespace-nowrap rounded-full border border-transparent px-1.5 py-0 text-[10px] font-semibold leading-[1.4] ${meta.cls}`}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
 function PlatformChip({ platform }: { platform: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground">
@@ -235,6 +258,7 @@ function ListRow({
   mono,
   subtitle,
   trailing,
+  originBadge,
   testId,
 }: {
   active: boolean;
@@ -244,6 +268,7 @@ function ListRow({
   mono?: boolean;
   subtitle: ReactNode;
   trailing?: ReactNode;
+  originBadge?: ReactNode;
   testId?: string;
 }) {
   return (
@@ -259,7 +284,10 @@ function ListRow({
       {avatar}
       <div className="min-w-0 flex-1">
         <p className={`truncate text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`}>{title}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+          {originBadge}
+          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+        </div>
       </div>
       {trailing}
       <ChevronRight size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -706,6 +734,7 @@ export default function ProductMappingPage() {
           mono
           subtitle={
             <>
+              <OriginBadge mapping={m} />
               <span>{m.account?.label ?? "-"}</span>
               {m.account?.platform && <PlatformChip platform={m.account.platform} />}
             </>
@@ -991,7 +1020,10 @@ export default function ProductMappingPage() {
                     >
                       <Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-mono text-sm font-medium text-foreground">{m.channelSku}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate font-mono text-sm font-medium text-foreground">{m.channelSku}</p>
+                          <OriginBadge mapping={m} />
+                        </div>
                         <p className="truncate text-xs text-muted-foreground">{m.account?.label ?? "-"}</p>
                       </div>
                       {m.account?.platform && <PlatformChip platform={m.account.platform} />}
@@ -1238,6 +1270,7 @@ export default function ProductMappingPage() {
                                 ? `${m.variant.masterProduct.name} · ${m.account?.label ?? "-"}`
                                 : `belum ter-mapping · ${m.account?.label ?? "-"}`
                             }
+                            originBadge={<OriginBadge mapping={m} />}
                             trailing={m.variant ? <StockPill value={effectiveStock(m.variant)} /> : undefined}
                           />
                         ))}

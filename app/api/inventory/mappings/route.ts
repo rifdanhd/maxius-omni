@@ -35,14 +35,20 @@ const mappingInclude = {
       masterProduct: { select: { id: true, name: true, threshold: true } },
     },
   },
+  mappingReviews: { select: { status: true } },
 } as const;
 
 export const GET = withAuth(async (req) => {
-  const mappings = await prisma.productMapping.findMany({
+  const rows = await prisma.productMapping.findMany({
     where: { account: { businessId: req.businessId } },
     include: mappingInclude,
     orderBy: [{ variant: { masterProduct: { name: "asc" } } }, { variant: { sku: "asc" } }],
   });
+  // Badge asal: tinjauan yang sudah diselesaikan (review) > auto > manual.
+  const mappings = rows.map(({ mappingReviews, ...mapping }) => ({
+    ...mapping,
+    reviewed: (mappingReviews ?? []).some((review) => review.status === "RESOLVED"),
+  }));
   return NextResponse.json({ mappings });
 });
 

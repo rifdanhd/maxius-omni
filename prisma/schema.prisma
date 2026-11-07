@@ -232,6 +232,9 @@ model ProductMapping {
   channelSku            String
   sellerSku             String?
   platformSkuId         String?
+  // Asal mapping: "manual" (form mapping), "auto" (auto-match / import
+  // marketplace), "review" (disatukan dari antrean tinjauan SKU seller).
+  origin                String                  @default("manual")
   stockAllocationMode   String?
   stockAllocationValue  Int?
   stockBuffer           Int?

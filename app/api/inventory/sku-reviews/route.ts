@@ -41,7 +41,7 @@ export const POST = withAuth(async (req) => {
       if (activeOrders) throw new InventoryConflict("SKU sumber masih memiliki pesanan aktif. Selesaikan peninjauan pesanan sebelum menyatukan mapping.");
       const targets = await tx.productMapping.findMany({ where: { account: { businessId: req.businessId },
         ...(review.mappingId ? { id: review.mappingId } : { variantId: { in: candidateIds } }) }, select: { id: true, variantId: true } });
-      for (const mapping of targets) await tx.productMapping.update({ where: { id: mapping.id }, data: { variantId: variant.id } });
+      for (const mapping of targets) await tx.productMapping.update({ where: { id: mapping.id }, data: { variantId: variant.id, origin: "review" } });
       await tx.masterSkuKey.upsert({ where: { businessId_sellerSku: { businessId: req.businessId, sellerSku: review.sellerSku } },
         create: { businessId: req.businessId, sellerSku: review.sellerSku, variantId: variant.id }, update: { variantId: variant.id } });
       await tx.skuMappingReview.update({ where: { id: review.id }, data: { status: "RESOLVED" } });

@@ -500,6 +500,7 @@ async function autoLinkKnownTikTokSkus(businessId: string, accountId: string, pr
             platformStatus: product.status,
             platformStock: sku.stock,
             lastSyncedAt: new Date(),
+            origin: "auto",
           };
 
           const mapping = old
@@ -950,6 +951,7 @@ async function importOneTikTokProduct(params: {
             platformTitle: title,
             platformStatus: product.status ?? null,
             lastSyncedAt: new Date(),
+            origin: "auto",
             updatedAt: new Date(),
           },
         });
