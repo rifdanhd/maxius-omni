@@ -317,7 +317,12 @@ export async function listProducts(
     .filter((product): product is (typeof products)[number] => Boolean(product))
     .map(({ productVariant, bundleItem, ...product }) => ({
       ...product,
-      variants: productVariant,
+      // Kontrak API lama memakai "mappings" (bukan "productMapping") —
+      // halaman Produk & modal lain membaca variant.mappings.
+      variants: productVariant.map(({ productMapping, ...variant }) => ({
+        ...variant,
+        mappings: productMapping,
+      })),
       bundleItems: bundleItem,
       type: product.type === "bundle" || bundleItem.length > 0 ? "bundle" : "single",
     }));
