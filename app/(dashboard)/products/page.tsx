@@ -93,6 +93,12 @@ export default function MasterProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<{ all: number; single: number; bundle: number } | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [stores, setStores] = useState<{ id: string; label: string; platform: string }[]>([]);
+  const [reloadToken, setReloadToken] = useState(0);
 
 
   const [q, setQ] = useState("");
@@ -123,36 +129,66 @@ export default function MasterProductsPage() {
 
 
 
-  const productsUrl = (includeInactive: boolean) =>
-    includeInactive ? "/api/products?includeInactive=true" : "/api/products";
+  const PAGE_SIZE = 25;
+
+  // URL fetch halaman ini: kedua mode server-side (pagination + filter).
+  const productsUrl = () => {
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
+    if (q.trim()) params.set("q", q.trim());
+    if (activeTab === "produk_satuan") params.set("tab", "single");
+    if (activeTab === "produk_bundle") params.set("tab", "bundle");
+    if (filterLevel !== "all") params.set("level", filterLevel);
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    if (platformFilter !== "all") params.set("platform", platformFilter);
+    if (storeFilter !== "all") params.set("store", storeFilter);
+    params.set("sort", sort.id);
+    if (showInactive) params.set("includeInactive", "true");
+    return `/api/products?${params.toString()}`;
+  };
+
+  async function load(): Promise<boolean> {
+    const res = await authFetch(productsUrl(), {
+      headers: { },
+    });
+    if (!res.ok) throw new Error(`Gagal memuat produk (${res.status})`);
+    const data = await res.json();
+    // Jika halaman melewati batas (mis. item habis setelah nonaktif),
+    // kembali ke halaman 1 supaya tabel tidak kosong.
+    if (page > 1 && (data.products ?? []).length === 0) {
+      applyPage(1);
+      return true;
+    }
+    setProducts(data.products ?? []);
+    setTotal(data.total ?? 0);
+    setCounts(data.counts ?? null);
+    setCategories(data.facets?.categories ?? []);
+    setStores(data.facets?.stores ?? []);
+    setError(null);
+    return true;
+  }
 
   useEffect(() => {
+    if (!urlReady) return;
     let cancelled = false;
-    async function load() {
+    (async () => {
       try {
-        const res = await authFetch(productsUrl(showInactive), {
-          headers: { },
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          setError(`Gagal memuat produk (${res.status})`);
-          return;
-        }
-        const data = await res.json();
-        setProducts(data.products ?? []);
-        setError(null);
+        const ok = await load();
+        if (ok && !cancelled) setLoading(false);
       } catch (e) {
         console.error(e);
-        if (!cancelled) setError("Terjadi kesalahan saat memuat produk.");
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setError("Terjadi kesalahan saat memuat produk.");
+          setLoading(false);
+        }
       }
-    }
-    load();
+    })();
     return () => {
       cancelled = true;
     };
-  }, [showInactive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlReady, reloadToken, page, q, activeTab, filterLevel, categoryFilter, platformFilter, storeFilter, sort, showInactive]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -191,13 +227,8 @@ export default function MasterProductsPage() {
   }, [activeTab, categoryFilter, filterLevel, platformFilter, q, showInactive, sort.id, storeFilter, urlReady]);
 
   async function refreshProducts() {
-    const res = await authFetch(productsUrl(showInactive), {
-      headers: { },
-    });
-    if (!res.ok) throw new Error(`Gagal memperbarui daftar produk (${res.status}).`);
-    const data = await res.json();
-    setProducts(data.products ?? []);
-    setError(null);
+    // Refetch halaman aktif via token (fetch effect di atas yang eksekusi).
+    setReloadToken((t) => t + 1);
   }
 
   async function setProductActive(product: Product, active: boolean) {
@@ -262,16 +293,30 @@ export default function MasterProductsPage() {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => setQ(searchInput), 300);
+    const t = setTimeout(() => {
+      setQ(searchInput);
+      // Filter berubah → kembali ke halaman 1 & reset seleksi (sama dgn switchTab).
+      setSelected(new Set());
+      setExpanded(new Set());
+      setPage(1);
+    }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
   // Reset seleksi saat pindah tab, supaya "N Dipilih" tidak menghitung
   // produk dari tab lain yang sedang tidak terlihat. Dilakukan di event
   // handler (bukan effect) agar lolos aturan react-hooks/set-state-in-effect.
+  function applyPage(next: number) {
+    setPage(next);
+    setSelected(new Set());
+    setExpanded(new Set());
+  }
+
   function switchTab(id: TabId) {
     setActiveTab(id);
     setSelected(new Set());
+    setExpanded(new Set());
+    setPage(1);
   }
 
   const filtered = useMemo(() => {
@@ -331,18 +376,6 @@ export default function MasterProductsPage() {
     return list;
   }, [products, q, sort, filterLevel, activeTab, categoryFilter, platformFilter, storeFilter]);
 
-  const categories = useMemo(
-    () => Array.from(new Set(products.map((product) => product.category).filter((value): value is string => Boolean(value)))).sort(),
-    [products]
-  );
-  const stores = useMemo(() => {
-    const values = new Map<string, { id: string; label: string; platform: string }>();
-    products.forEach((product) => product.variants.forEach((variant) => variant.mappings.forEach((mapping) => {
-      if (mapping.account) values.set(mapping.account.id, mapping.account);
-    })));
-    return Array.from(values.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [products]);
-
   const resetFilters = () => {
     setSearchInput("");
     setQ("");
@@ -353,19 +386,22 @@ export default function MasterProductsPage() {
     setSort(SORT_OPTIONS[0]);
     setShowInactive(false);
     switchTab("semua_produk");
+    setPage(1);
   };
 
+  const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   const tabs: { id: TabId; label: string; count: number }[] = [
-    { id: "semua_produk", label: "Semua Produk", count: products.length },
+    { id: "semua_produk", label: "Semua Produk", count: counts ? counts.all : products.length },
     {
       id: "produk_satuan",
       label: "Produk Satuan",
-      count: products.filter((p) => !isBundle(p)).length,
+      count: counts ? counts.single : 0,
     },
     {
       id: "produk_bundle",
       label: "Produk Bundle",
-      count: products.filter((p) => isBundle(p)).length,
+      count: counts ? counts.bundle : 0,
     },
   ];
 
@@ -553,17 +589,20 @@ export default function MasterProductsPage() {
               <div className="absolute max-w-[calc(100vw-2rem)] left-0 top-full mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-30 py-1.5">
                 {SORT_OPTIONS.map((opt) => (
                   <button
-                    key={opt.id}
-                    onClick={() => {
-                      setSort(opt);
-                      setSortOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2 text-sm ${
-                      sort.id === opt.id
-                        ? "font-semibold text-foreground bg-muted"
-                        : "text-foreground hover:bg-muted"
-                    }`}
-                  >
+                     key={opt.id}
+                     onClick={() => {
+                       setSort(opt);
+                       setSortOpen(false);
+                       setSelected(new Set());
+                       setExpanded(new Set());
+                       setPage(1);
+                     }}
+                     className={`w-full text-left px-4 py-2 text-sm ${
+                       sort.id === opt.id
+                         ? "font-semibold text-foreground bg-muted"
+                         : "text-foreground hover:bg-muted"
+                     }`}
+                   >
                     {opt.label}
                   </button>
                 ))}
@@ -602,6 +641,9 @@ export default function MasterProductsPage() {
                     onClick={() => {
                       setFilterLevel(opt.id);
                       setFilterOpen(false);
+                      setSelected(new Set());
+                      setExpanded(new Set());
+                      setPage(1);
                     }}
                     className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${
                       filterLevel === opt.id
@@ -622,7 +664,12 @@ export default function MasterProductsPage() {
           <select
             aria-label="Filter kategori"
             value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setSelected(new Set());
+              setExpanded(new Set());
+              setPage(1);
+            }}
             className="h-[38px] max-w-full rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option value="all">Semua kategori</option>
@@ -631,7 +678,12 @@ export default function MasterProductsPage() {
           <select
             aria-label="Filter marketplace"
             value={platformFilter}
-            onChange={(event) => setPlatformFilter(event.target.value)}
+            onChange={(event) => {
+              setPlatformFilter(event.target.value);
+              setSelected(new Set());
+              setExpanded(new Set());
+              setPage(1);
+            }}
             className="h-[38px] rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option value="all">Semua marketplace</option>
@@ -641,7 +693,12 @@ export default function MasterProductsPage() {
           <select
             aria-label="Filter toko"
             value={storeFilter}
-            onChange={(event) => setStoreFilter(event.target.value)}
+            onChange={(event) => {
+              setStoreFilter(event.target.value);
+              setSelected(new Set());
+              setExpanded(new Set());
+              setPage(1);
+            }}
             className="h-[38px] max-w-full rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option value="all">Semua toko</option>
@@ -656,7 +713,12 @@ export default function MasterProductsPage() {
               type="checkbox"
               className="w-4 h-4 rounded border-border"
               checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
+              onChange={(e) => {
+                setShowInactive(e.target.checked);
+                setSelected(new Set());
+                setExpanded(new Set());
+                setPage(1);
+              }}
             />
             Tampilkan nonaktif
           </label>
@@ -1048,6 +1110,33 @@ export default function MasterProductsPage() {
               )}
             </tbody>
           </table>
+
+          {total > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm">
+              <span className="text-muted-foreground">
+                Total <span className="font-semibold text-foreground">{total.toLocaleString("id-ID")}</span> produk
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => applyPage(page - 1)}
+                  disabled={page <= 1 || loading}
+                  className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  Sebelumnya
+                </button>
+                <span className="text-muted-foreground whitespace-nowrap">
+                  Halaman <span className="font-semibold text-foreground">{page}</span> / {maxPage}
+                </span>
+                <button
+                  onClick={() => applyPage(page + 1)}
+                  disabled={page >= maxPage || loading}
+                  className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  Berikutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
