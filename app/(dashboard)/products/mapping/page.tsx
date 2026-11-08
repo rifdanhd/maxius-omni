@@ -973,7 +973,7 @@ export default function ProductMappingPage() {
             o.imageUrl ? (
               <img
                 src={o.imageUrl}
-                alt={o.channelSku}
+                alt={o.sampleProductName || o.channelSku}
                 className="size-10 shrink-0 rounded-md object-cover"
                 loading="lazy"
                 onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -984,13 +984,15 @@ export default function ProductMappingPage() {
               <Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>
             )
           }
-          title={o.channelSku}
-          mono
+          title={o.sampleProductName?.trim() || o.channelSku}
+          mono={!o.sampleProductName?.trim()}
           subtitle={
-            <>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="font-mono text-xs">SKU/ID: {o.channelSku}</span>
+              <span>·</span>
               <span>{o.accountLabel ?? "-"}</span>
               {o.platform && <PlatformChip platform={o.platform} />}
-            </>
+            </div>
           }
           onBack={back}
         />
@@ -1359,6 +1361,8 @@ export default function ProductMappingPage() {
                       <div className="divide-y divide-border">
                         {visibleOrphans.slice(0, shown).map((o) => {
                           const key = orphanKey(o);
+                          const mainTitle = o.sampleProductName?.trim() || o.channelSku;
+                          const isSkuOnly = !o.sampleProductName?.trim();
                           return (
                             <ListRow
                               key={`${o.accountId}|${o.channelSku}`}
@@ -1369,7 +1373,7 @@ export default function ProductMappingPage() {
                                 o.imageUrl ? (
                                   <img
                                     src={o.imageUrl}
-                                    alt={o.channelSku}
+                                    alt={mainTitle}
                                     className="size-9 shrink-0 rounded-md object-cover"
                                     loading="lazy"
                                     onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -1380,9 +1384,15 @@ export default function ProductMappingPage() {
                                   <Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>
                                 )
                               }
-                              title={o.channelSku}
-                              mono
-                              subtitle={`${o.sampleProductName ?? "(nama listing tidak tersedia)"} · ${o.accountLabel ?? "-"}`}
+                              title={mainTitle}
+                              mono={isSkuOnly}
+                              subtitle={
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <span className="font-mono text-[11px] text-muted-foreground">{o.channelSku}</span>
+                                  <span>·</span>
+                                  <span className="truncate">{o.accountLabel ?? "-"}</span>
+                                </span>
+                              }
                               trailing={<span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">{o.qty} pcs</span>}
                             />
                           );
