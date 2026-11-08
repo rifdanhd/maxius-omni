@@ -8,7 +8,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import {
   Plus,
@@ -28,6 +28,7 @@ import {
   Store as StoreIcon,
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
   MousePointerClick,
   type LucideIcon,
 } from "lucide-react";
@@ -172,6 +173,155 @@ function SearchBox({ value, onChange, placeholder }: { value: string; onChange: 
       <Search className="absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden="true" />
       <input className={`${field} pl-9`} aria-label={placeholder} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
+  );
+}
+
+function VariantSearchSelect({
+  value,
+  onChange,
+  variants,
+  placeholder = "Cari nama produk atau SKU pusat...",
+  className = "",
+}: {
+  value: string;
+  onChange: (variantId: string) => void;
+  variants: Variant[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const selected = variants.find((v) => v.id === value);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return variants.slice(0, 60);
+    return variants
+      .filter(
+        (v) =>
+          v.masterProduct.name.toLowerCase().includes(q) ||
+          v.sku.toLowerCase().includes(q)
+      )
+      .slice(0, 60);
+  }, [variants, query]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [open]);
+
+  return (
+    <div className={`relative ${className}`} ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((prev) => !prev);
+          setQuery("");
+        }}
+        className="flex min-h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-left text-sm shadow-xs transition-colors hover:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      >
+        {selected ? (
+          <div className="flex min-w-0 flex-1 flex-col pr-2">
+            <span className="truncate font-semibold text-foreground leading-snug">
+              {selected.masterProduct.name}
+            </span>
+            <span className="truncate text-xs text-muted-foreground font-mono">
+              SKU: {selected.sku} · Stok: {selected.stock.toLocaleString("id-ID")}
+            </span>
+          </div>
+        ) : (
+          <span className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Search size={14} className="shrink-0" />
+            <span className="truncate">{placeholder}</span>
+          </span>
+        )}
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-muted-foreground transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-80 w-full min-w-[340px] max-w-[540px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95">
+          <div className="border-b border-border p-2 bg-muted/40">
+            <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs">
+              <Search size={14} className="shrink-0 text-muted-foreground" />
+              <input
+                type="text"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Ketik nama produk atau SKU varian..."
+                className="w-full bg-transparent focus:outline-none text-foreground placeholder:text-muted-foreground text-xs"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto p-1 divide-y divide-border/30">
+            {filtered.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                Tidak ada variasi pusat yang cocok dengan &quot;{query}&quot;.
+              </div>
+            ) : (
+              filtered.map((v) => {
+                const isSelected = v.id === value;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(v.id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-start justify-between gap-3 p-2 text-left transition-colors rounded-md ${
+                      isSelected
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold leading-tight line-clamp-2" title={v.masterProduct.name}>
+                        {v.masterProduct.name}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground font-mono">
+                        SKU: <span className="font-semibold text-foreground/80">{v.sku}</span>
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                      Stok {v.stock.toLocaleString("id-ID")}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-[10px] text-muted-foreground flex justify-between items-center">
+            <span>Ditemukan {filtered.length} varian</span>
+            <span>Total {variants.length} variasi pusat</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -673,14 +823,12 @@ export default function ProductMappingPage() {
 
           {!form.useNewVariant ? (
             <Field label="Variasi Pusat Tujuan (Varian Target)" className="md:col-span-2">
-              <select value={form.variantId} onChange={(e) => setForm((f) => ({ ...f, variantId: e.target.value }))} className={field}>
-                <option value="">— pilih varian —</option>
-                {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.masterProduct.name} / {v.sku} (stok {v.stock})
-                  </option>
-                ))}
-              </select>
+              <VariantSearchSelect
+                value={form.variantId}
+                onChange={(id) => setForm((f) => ({ ...f, variantId: id }))}
+                variants={variants}
+                placeholder="Cari & pilih variasi pusat tujuan..."
+              />
             </Field>
           ) : (
             <>
@@ -782,18 +930,13 @@ export default function ProductMappingPage() {
           <Section title="Ganti varian target" hint="Arahkan kode produk toko ini ke variasi pusat lain.">
             {repoint[m.id] !== undefined ? (
               <div className="flex flex-wrap items-center gap-2">
-                <select
+                <VariantSearchSelect
                   value={repoint[m.id]}
-                  onChange={(e) => setRepoint((p) => ({ ...p, [m.id]: e.target.value }))}
-                  className={`${field} sm:max-w-[360px]`}
-                >
-                  <option value="">— pilih —</option>
-                  {variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.masterProduct.name} / {variant.sku}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setRepoint((p) => ({ ...p, [m.id]: id }))}
+                  variants={variants}
+                  className="w-full sm:max-w-[360px]"
+                  placeholder="Pilih variasi pusat..."
+                />
                 <Button onClick={() => handleRepoint(m.id, repoint[m.id])} disabled={!repoint[m.id] || repointSaving === m.id}>
                   <Save size={14} /> {repointSaving === m.id ? "Menyimpan..." : "Simpan"}
                 </Button>
@@ -881,14 +1024,13 @@ export default function ProductMappingPage() {
             />
             {mode === "existing" ? (
               <div className="flex flex-wrap items-center gap-2">
-                <select value={mapTarget[key] ?? ""} onChange={(e) => setMapTarget((p) => ({ ...p, [key]: e.target.value }))} className={`${field} sm:max-w-[360px]`}>
-                  <option value="">— pilih varian —</option>
-                  {variants.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.masterProduct.name} / {v.sku} (stok {v.stock})
-                    </option>
-                  ))}
-                </select>
+                <VariantSearchSelect
+                  value={mapTarget[key] ?? ""}
+                  onChange={(id) => setMapTarget((p) => ({ ...p, [key]: id }))}
+                  variants={variants}
+                  className="w-full sm:max-w-[360px]"
+                  placeholder="Ketik untuk cari variasi pusat..."
+                />
                 <Button onClick={() => handleMapOrphan(o)} disabled={mapSaving !== null || !mapTarget[key]}>
                   {mapSaving === key ? "Menyimpan..." : "Hubungkan & Lengkapi Pesanan Lama (Mapping + Backfill)"}
                 </Button>

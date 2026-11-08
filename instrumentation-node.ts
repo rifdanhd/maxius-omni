@@ -8,12 +8,12 @@
  * sync-job.service (updateMany bersyarat) sehingga tick tumpang-tindih /
  * register ulang (dev HMR) aman.
  *
- * Auto-sync (A+C): order tiap 5 menit + listing/gambar tiap 30 menit via
+ * Auto-sync (A+C): order tiap 1 menit (60 detik) + listing/gambar tiap 30 menit via
  * auto-sync.service — juga in-process (alasan RAM yang sama), unref(),
  * dedup per-timer untuk dev HMR, kill-switch AUTO_SYNC_DISABLED.
  */
 const TICK_MS = 30_000;
-const AUTO_ORDERS_MS = 5 * 60_000;
+const AUTO_ORDERS_MS = Number(process.env.AUTO_ORDERS_INTERVAL_MS) || 60_000;
 const AUTO_LISTINGS_MS = 30 * 60_000;
 const AUTO_PROMOS_MS = 30 * 60_000;
 const RUN_SWEEP_MS = 15_000;
