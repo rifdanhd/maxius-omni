@@ -204,6 +204,30 @@ export default function InventorySettingsPage() {
     }
   };
 
+  const updateSetting = async (patch: Partial<Settings>) => {
+    if (!settings) return;
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    setSaving(true);
+    setError(null);
+    try {
+      const { settings: fresh } = await api<{ settings: Settings }>(
+        "/api/inventory/settings",
+        { method: "PUT", body: JSON.stringify(patch) }
+      );
+      setSettings(fresh);
+      setInitialSettings(fresh);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      console.error("[InventorySettings] auto-save gagal:", e);
+      setError(e instanceof Error ? e.message : "Gagal menyimpan perubahan.");
+      setSettings(settings); // rollback jika gagal
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -336,7 +360,7 @@ export default function InventorySettingsPage() {
                 </div>
                 <Toggle
                   checked={settings.notifyLowStock}
-                  onChange={(v) => setSettings({ ...settings, notifyLowStock: v })}
+                  onChange={(v) => updateSetting({ notifyLowStock: v })}
                   aria-label="Toggle notifikasi in-app"
                 />
               </label>
@@ -393,7 +417,7 @@ export default function InventorySettingsPage() {
                     <div className="text-sm font-semibold text-foreground">Baseline stok sudah diisi</div>
                     <div className="text-xs text-muted-foreground">Aktifkan hanya setelah seluruh stok awal tervalidasi. Tanpa konfirmasi ini, tidak ada stok yang dikirim ke marketplace.</div>
                   </div>
-                  <Toggle checked={settings.stockBaselineReady} onChange={(value) => setSettings({ ...settings, stockBaselineReady: value })} aria-label="Konfirmasi baseline stok sudah diisi" />
+                  <Toggle checked={settings.stockBaselineReady} onChange={(value) => updateSetting({ stockBaselineReady: value })} aria-label="Konfirmasi baseline stok sudah diisi" />
                 </label>
                 {/* Gate Brand Utama */}
                 <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
@@ -405,11 +429,10 @@ export default function InventorySettingsPage() {
                   </div>
                   <Toggle
                     checked={settings.stockPushEnabled}
-                    onChange={(value) => setSettings({ ...settings, stockPushEnabled: value })}
+                    onChange={(value) => updateSetting({ stockPushEnabled: value })}
                     aria-label="Toggle push stok brand"
                   />
                 </label>
-
                 {/* Platform Toggles */}
                 {[
                   {
@@ -451,7 +474,7 @@ export default function InventorySettingsPage() {
                     <Toggle
                       disabled={p.disabled}
                       checked={settings[p.key]}
-                      onChange={(v) => setSettings({ ...settings, [p.key]: v })}
+                      onChange={(v) => updateSetting({ [p.key]: v })}
                       aria-label={`Toggle sinkronisasi ${p.label}`}
                     />
                   </label>
@@ -524,6 +547,36 @@ export default function InventorySettingsPage() {
               </div>
             </div>
           </Section>
+
+          {/* Bottom Save Bar */}
+          <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4 sm:p-5 shadow-xs">
+            <div className="text-sm">
+              <span className="font-semibold text-foreground">Simpan Perubahan Pengaturan</span>
+              <p className="text-xs text-muted-foreground">
+                Toggle otomatis tersimpan saat digeser. Untuk perubahan angka atau frekuensi, klik simpan.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {saved && (
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Tersimpan</span>
+                </div>
+              )}
+              <button
+                onClick={save}
+                disabled={saving || !settings || (!isDirty && !saved)}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all shadow-xs ${
+                  isDirty
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 ring-2 ring-primary/20"
+                    : "bg-primary/80 text-primary-foreground hover:bg-primary"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                <span>Simpan Pengaturan</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
