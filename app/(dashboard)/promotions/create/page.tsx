@@ -184,7 +184,7 @@ export default function PromotionCreatePage() {
   const [accounts, setAccounts] = useState<TikTokAccount[]>([]);
   const [accountId, setAccountId] = useState("");
   const [listings, setListings] = useState<ListingRow[]>([]);
-  const [loadingListings, setLoadingListings] = useState(false);
+  const [loadingListings, setLoadingListings] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -658,9 +658,10 @@ export default function PromotionCreatePage() {
             </div>
 
             {loadingListings ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <Loader2 size={22} className="animate-spin mr-2 text-foreground" />
-                <span className="text-sm">Memuat produk…</span>
+              <div className="m-4 space-y-3 py-2" aria-busy="true">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/60" />
+                ))}
               </div>
             ) : (
               <>

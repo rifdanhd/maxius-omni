@@ -297,7 +297,15 @@ export default function ReturnsPage() {
           </thead>
           <tbody className="divide-y divide-border">
             {loading && rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Memuat...</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-6">
+                  <div className="space-y-3" aria-busy="true">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="h-12 animate-pulse rounded-md bg-muted/60" />
+                    ))}
+                  </div>
+                </td>
+              </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">{loadError ? "Daftar belum dapat dimuat. Gunakan Muat Ulang di pesan error." : q.trim() || platform || tab !== "all" ? (

@@ -237,7 +237,13 @@ export default function StoreIntegration() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-muted-foreground">Memuat...</td>
+                  <td colSpan={5} className="px-6 py-6">
+                    <div className="space-y-3" aria-busy="true">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="h-10 animate-pulse rounded-md bg-muted/60" />
+                      ))}
+                    </div>
+                  </td>
                 </tr>
               ) : loadError ? (
                 <tr>

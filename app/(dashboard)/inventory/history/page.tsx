@@ -243,7 +243,11 @@ export default function InventoryHistoryPage() {
       {/* Tabel riwayat */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {loading ? (
-          <div className="flex items-center justify-center p-10 text-muted-foreground">Memuat…</div>
+          <div className="space-y-3 p-6" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded-md bg-muted/60" />
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
             Tidak ada perubahan stok pada pencarian/filter ini. Jika baru mulai, aktivitas muncul setelah ada perubahan stok.

@@ -930,8 +930,12 @@ export default function KelolaHargaPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
-                    Memuat data harga...
+                  <td colSpan={7} className="px-5 py-6">
+                    <div className="space-y-3" aria-busy="true">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="h-8 animate-pulse rounded-md bg-muted/60" />
+                      ))}
+                    </div>
                   </td>
                 </tr>
               ) : error ? (
