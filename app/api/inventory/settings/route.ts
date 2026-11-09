@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth } from "@/lib/utils/api";
 import {
+  BaselineGateError,
   getInventorySettings,
   updateInventorySettings,
   validateInventorySettingsUpdate,
@@ -43,8 +44,12 @@ export const PUT = withAuth(async (req) => {
     const settings = await updateInventorySettings(req.businessId, parsed.data);
     return NextResponse.json({ settings });
   } catch (error) {
+    // 409 + daftar varian penyebab: UI menampilkan SKU & alasan, bukan rollback diam-diam.
+    if (error instanceof BaselineGateError) {
+      return NextResponse.json({ error: error.message, blockers: error.blockers }, { status: 409 });
+    }
     if (error instanceof Error && (error.message.startsWith("Baseline belum lengkap:") || error.message.startsWith("Baseline perlu ditinjau:"))) {
-      return NextResponse.json({ error: error.message }, { status: 409 });
+      return NextResponse.json({ error: error.message, blockers: [] }, { status: 409 });
     }
     throw error;
   }

@@ -185,6 +185,79 @@ export function validateInventorySettingsUpdate(
   return { ok: true, data: out };
 }
 
+/** Satu varian yang menahan konfirmasi baseline. Ditampilkan apa adanya di UI. */
+export type BaselineBlocker = {
+  sku: string;
+  name: string;
+  stock: number | null;
+  issue: string;
+};
+
+/** Penolakan gate baseline; membawa daftar varian penyebab agar UI bisa spesifik. */
+export class BaselineGateError extends Error {
+  readonly blockers: BaselineBlocker[];
+  constructor(message: string, blockers: BaselineBlocker[]) {
+    super(message);
+    this.name = "BaselineGateError";
+    this.blockers = blockers;
+  }
+}
+
+/**
+ * Baseline siap = tidak ada stok awal mencurigakan + SETIAP varian ter-mapping
+ * punya catatan stok awal. Catatan dihitung dari reason INIT maupun
+ * INITIAL_STOCK: impor Shopee/Salin Produk menulis INIT, sedangkan hitung
+ * stok fisik manual menulis INITIAL_STOCK. Sebelumnya INIT tidak dihitung,
+ * sehingga brand yang baseline-nya berasal dari impor tidak pernah bisa
+ * mengaktifkan konfirmasi (selalu "belum lengkap").
+ */
+async function assertBaselineReady(businessId: string): Promise<void> {
+  const reviews = await getStockReviews(businessId);
+  if (reviews.length) {
+    throw new BaselineGateError(
+      `Baseline perlu ditinjau: ${reviews.length} varian memiliki stok awal tidak wajar. Verifikasi stok fisik dan catat stok awal yang benar terlebih dahulu.`,
+      reviews.slice(0, 20).map((review) => ({
+        sku: review.sku,
+        name: review.name,
+        stock: review.stock,
+        issue: review.reasons.join("; "),
+      }))
+    );
+  }
+  const rows = await prisma.$queryRaw<Array<{ sku: string; name: string; initialized: boolean }>>`
+    SELECT pv."sku" AS sku, mp."name" AS name,
+      BOOL_OR(EXISTS (
+        SELECT 1 FROM "StockLedger" sl
+        WHERE sl."variantId" = pv."id" AND sl."reason" IN ('INIT', 'INITIAL_STOCK')
+      )) AS initialized
+    FROM "ProductMapping" pm
+    JOIN "ProductVariant" pv ON pv."id" = pm."variantId"
+    JOIN "MasterProduct" mp ON mp."id" = pv."masterProductId"
+    WHERE mp."businessId" = ${businessId} AND mp."isActive" = true AND pv."isArchived" = false
+    GROUP BY pv."id", pv."sku", mp."name"
+    ORDER BY pv."sku"
+  `;
+  const mapped = rows.length;
+  if (mapped === 0) {
+    throw new BaselineGateError(
+      "Baseline belum lengkap: belum ada varian aktif yang ter-mapping ke marketplace. Hubungkan produk dan isi stok awal terlebih dahulu.",
+      []
+    );
+  }
+  const missing = rows.filter((row) => !row.initialized);
+  if (missing.length) {
+    throw new BaselineGateError(
+      `Baseline belum lengkap: ${mapped - missing.length} dari ${mapped} varian yang sudah ter-mapping memiliki stok awal.`,
+      missing.slice(0, 20).map((row) => ({
+        sku: row.sku,
+        name: row.name,
+        stock: null,
+        issue: "Belum ada catatan stok awal (INITIAL_STOCK)",
+      }))
+    );
+  }
+}
+
 /** updateInventorySettings — patch parsial per brand; pastikan baris ada dulu. */
 export async function updateInventorySettings(
   businessId: string,
@@ -192,23 +265,7 @@ export async function updateInventorySettings(
 ): Promise<InventorySettings> {
   const current = await getInventorySettings(businessId);
   if (patch.stockBaselineReady === true || (patch.stockPushEnabled === true && current.stockBaselineReady && patch.stockBaselineReady !== false)) {
-    const reviews = await getStockReviews(businessId);
-    if (reviews.length) throw new Error(`Baseline perlu ditinjau: ${reviews.length} varian memiliki stok awal tidak wajar. Verifikasi stok fisik dan catat stok awal yang benar terlebih dahulu.`);
-    const [counts] = await prisma.$queryRaw<Array<{ mapped: bigint; initialized: bigint }>>`
-      SELECT
-        COUNT(DISTINCT pm."variantId") FILTER (WHERE pm."variantId" IS NOT NULL) AS mapped,
-        COUNT(DISTINCT sl."variantId") FILTER (WHERE sl."reason" = 'INITIAL_STOCK') AS initialized
-      FROM "ProductMapping" pm
-      LEFT JOIN "ProductVariant" pv ON pv."id" = pm."variantId"
-      LEFT JOIN "MasterProduct" mp ON mp."id" = pv."masterProductId"
-      LEFT JOIN "StockLedger" sl ON sl."variantId" = pm."variantId"
-      WHERE mp."businessId" = ${businessId}
-    `;
-    const mapped = Number(counts?.mapped ?? 0);
-    const initialized = Number(counts?.initialized ?? 0);
-    if (mapped === 0 || initialized < mapped) {
-      throw new Error(`Baseline belum lengkap: ${initialized} dari ${mapped} varian yang sudah ter-mapping memiliki stok awal.`);
-    }
+    await assertBaselineReady(businessId);
   }
   const row = await prisma.inventorySetting.update({ where: { businessId }, data: patch });
   return toSettings(row);

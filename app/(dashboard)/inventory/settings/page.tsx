@@ -17,7 +17,18 @@ import {
   Clock,
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
-import { ErrorFeedback } from "@/components/ui/feedback";
+import { ErrorFeedback, Feedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -47,6 +58,21 @@ const FREQ_OPTIONS = [
 ] as const;
 
 const THRESHOLD_PRESETS = [5, 10, 20, 50];
+const BASELINE_KEY = "stockBaselineReady";
+
+/** Varian yang menahan konfirmasi baseline (dikirim route sebagai 409). */
+type BaselineBlocker = { sku: string; name: string; stock: number | null; issue: string };
+
+class ApiError extends Error {
+  readonly status: number;
+  readonly blockers: BaselineBlocker[];
+  constructor(message: string, status: number, blockers: BaselineBlocker[] = []) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.blockers = blockers;
+  }
+}
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await authFetch(path, {
@@ -57,7 +83,13 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    throw new ApiError(
+      (data as { error?: string }).error ?? `HTTP ${res.status}`,
+      res.status,
+      (data as { blockers?: BaselineBlocker[] }).blockers ?? []
+    );
+  }
   return data as T;
 }
 
@@ -146,6 +178,9 @@ export default function InventorySettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [globalPushEnabled, setGlobalPushEnabled] = useState<boolean | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [baselineConfirm, setBaselineConfirm] = useState(false);
+  const [baselineIssue, setBaselineIssue] = useState<{ message: string; blockers: BaselineBlocker[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,12 +239,15 @@ export default function InventorySettingsPage() {
     }
   };
 
-  const updateSetting = async (patch: Partial<Settings>) => {
+  const updateSetting = async (patch: Partial<Settings>, key?: string) => {
     if (!settings) return;
-    const next = { ...settings, ...patch };
-    setSettings(next);
+    const previous = settings;
+    const isBaseline = patch.stockBaselineReady !== undefined;
+    setSettings({ ...settings, ...patch });
     setSaving(true);
     setError(null);
+    if (key) setSavingKey(key);
+    if (isBaseline) setBaselineIssue(null);
     try {
       const { settings: fresh } = await api<{ settings: Settings }>(
         "/api/inventory/settings",
@@ -219,12 +257,35 @@ export default function InventorySettingsPage() {
       setInitialSettings(fresh);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      if (key) {
+        notify(
+          "success",
+          patch.stockBaselineReady
+            ? "Baseline stok dikonfirmasi. Push stok ke marketplace kini aktif."
+            : "Pengaturan tersimpan."
+        );
+      }
     } catch (e) {
       console.error("[InventorySettings] auto-save gagal:", e);
-      setError(e instanceof Error ? e.message : "Gagal menyimpan perubahan.");
-      setSettings(settings); // rollback jika gagal
+      // Rollback tetap dilakukan, tetapi selalu disertai alasan yang terlihat.
+      setSettings(previous);
+      const status = e instanceof ApiError ? e.status : 0;
+      const message =
+        status === 403
+          ? "Akun Anda tidak berwenang mengubah Pengaturan Inventori (perlu owner/admin)."
+          : e instanceof Error
+            ? e.message
+            : "Gagal menyimpan perubahan.";
+      if (isBaseline) {
+        setBaselineIssue({ message, blockers: e instanceof ApiError ? e.blockers : [] });
+        notify("error", message, { title: "Baseline belum bisa diaktifkan" });
+      } else {
+        setError(message);
+        notify("error", message);
+      }
     } finally {
       setSaving(false);
+      setSavingKey(null);
     }
   };
 
@@ -414,11 +475,55 @@ export default function InventorySettingsPage() {
               <div className="divide-y divide-border/60 rounded-lg border border-border/60 bg-card p-3">
                 <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
                   <div className="space-y-0.5">
-                    <div className="text-sm font-semibold text-foreground">Baseline stok sudah diisi</div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                      <span>Baseline stok sudah diisi</span>
+                      {savingKey === BASELINE_KEY && (
+                        <span role="status" className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Memeriksa baseline…
+                        </span>
+                      )}
+                      {settings.stockBaselineReady && (
+                        <span className="rounded-md bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">Aktif</span>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">Aktifkan hanya setelah seluruh stok awal tervalidasi. Tanpa konfirmasi ini, tidak ada stok yang dikirim ke marketplace.</div>
                   </div>
-                  <Toggle checked={settings.stockBaselineReady} onChange={(value) => updateSetting({ stockBaselineReady: value })} aria-label="Konfirmasi baseline stok sudah diisi" />
+                  <Toggle
+                    checked={settings.stockBaselineReady}
+                    disabled={savingKey === BASELINE_KEY}
+                    onChange={(value) => {
+                      // Mengaktifkan baseline membuka jalur push stok sungguhan → minta konfirmasi dulu.
+                      if (value) setBaselineConfirm(true);
+                      else void updateSetting({ stockBaselineReady: false }, BASELINE_KEY);
+                    }}
+                    aria-label="Konfirmasi baseline stok sudah diisi"
+                  />
                 </label>
+                {baselineIssue && (
+                  <Feedback
+                    variant="error"
+                    title="Baseline belum bisa diaktifkan"
+                    className="my-3"
+                    description={
+                      <div className="space-y-1.5">
+                        <p>{baselineIssue.message}</p>
+                        {baselineIssue.blockers.length > 0 && (
+                          <ul className="list-disc space-y-0.5 pl-5">
+                            {baselineIssue.blockers.map((blocker) => (
+                              <li key={`${blocker.sku}-${blocker.issue}`}>
+                                <span className="font-mono">{blocker.sku}</span> — {blocker.name} · {blocker.issue}
+                                {blocker.stock !== null && ` (stok sistem ${blocker.stock.toLocaleString("id-ID")})`}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {baselineIssue.blockers.length === 20 && (
+                          <p className="text-xs">Daftar dipotong pada 20 varian pertama.</p>
+                        )}
+                      </div>
+                    }
+                  />
+                )}
                 {/* Gate Brand Utama */}
                 <label className="flex cursor-pointer items-center justify-between gap-4 py-3">
                   <div className="space-y-0.5">
@@ -579,6 +684,31 @@ export default function InventorySettingsPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={baselineConfirm} onOpenChange={setBaselineConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aktifkan konfirmasi baseline stok?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Setelah diaktifkan, stok langsung dikirim ke marketplace: perubahan stok berikutnya dan antrean
+              sinkron yang sedang berjalan akan mengirim angka sungguhan ke toko terhubung.
+              Konfirmasi hanya diterima bila setiap varian ter-mapping punya stok awal dan tidak ada angka
+              stok awal yang mencurigakan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setBaselineConfirm(false);
+                void updateSetting({ stockBaselineReady: true }, BASELINE_KEY);
+              }}
+            >
+              Aktifkan baseline
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
