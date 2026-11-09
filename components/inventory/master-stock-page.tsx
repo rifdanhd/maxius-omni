@@ -63,7 +63,7 @@ export default function MasterStockPage() {
   const [collapsedSearchProducts, setCollapsedSearchProducts] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<MasterStockRow[] | null>(null);
-  const [allocation, setAllocation] = useState<{ row: MasterStockRow; listing: ListingStock } | null>(null);
+  const [allocation, setAllocation] = useState<{ row: MasterStockRow; listings: ListingStock[] } | null>(null);
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -174,6 +174,20 @@ export default function MasterStockPage() {
     setError(null);
     try {
       await inventoryRequest({ action: "retry", variantIds: rows.map((row) => row.id), ...(listingId ? { listingId } : {}) });
+      saved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Sinkron ulang belum berhasil.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function retryListings(row: MasterStockRow, listings: ListingStock[]) {
+    if (!listings.length) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // API retry bekerja per listing; jalankan berurutan agar tidak membanjiri antrean.
+      for (const listing of listings) await inventoryRequest({ action: "retry", variantIds: [row.id], listingId: listing.id });
       saved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sinkron ulang belum berhasil.");
@@ -435,8 +449,10 @@ export default function MasterStockPage() {
                   else next.add(id);
                   return next;
                 })}
-                edit={(row) => setEditing([row])} allocate={(row, listing) => setAllocation({ row, listing })}
+                edit={(row) => setEditing([row])} allocate={(row, listings) => setAllocation({ row, listings })}
                 retry={(row, listing) => { void retry([row], listing.id); }} message={setNotice}
+                syncMany={(row, listings) => { void retryListings(row, listings); }}
+                refresh={() => setRevision((value) => value + 1)}
                 archive={(row) => {
                   void inventoryRequest({ action: "archive", variantId: row.id, archived: !row.ownArchived })
                     .then(() => setRevision((value) => value + 1))
@@ -529,7 +545,7 @@ export default function MasterStockPage() {
       )}
 
       {editing && data && <StockChangeDialog rows={editing} warehouses={data.filters.warehouses} onClose={() => setEditing(null)} onSaved={saved} />}
-      {allocation && <AllocationDialog row={allocation.row} listing={allocation.listing} onClose={() => setAllocation(null)} onSaved={saved} />}
+      {allocation && <AllocationDialog row={allocation.row} listings={allocation.listings} onClose={() => setAllocation(null)} onSaved={saved} />}
       {importing && data && <StockImportDialog warehouses={data.filters.warehouses} onClose={() => setImporting(false)} onSaved={saved} />}
     </div>
   );

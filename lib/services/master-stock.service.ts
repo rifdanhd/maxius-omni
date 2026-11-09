@@ -1,4 +1,4 @@
-import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
+import { stockPushDisabledCode, stockPushDisabledReason } from "@/lib/services/stock-push.policy";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
@@ -142,6 +142,9 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
             ? "PENDING" as const : mapping.lastSyncedAt ? "SUCCESS" as const : "PENDING" as const;
       return { id: mapping.id, accountId: mapping.accountId, store: mapping.account.label, platform: mapping.account.platform,
         channelSku: mapping.channelSku, sellerSku: mapping.sellerSku, platformSkuId: mapping.platformSkuId,
+        platformTitle: mapping.platformTitle,
+        pushEnabled: mapping.account.stockPushEnabled !== false,
+        disabledCode: stockPushDisabledCode(mapping.account, settings),
         platformStock: mapping.platformStock, status, blockedReason, error: blockedReason ? null : mapping.lastStockPushError ?? job?.lastError ?? null,
         lastSyncedAt: mapping.lastSyncedAt?.toISOString() ?? null,
         allocation, quantity, inheritsAllocation: mapping.stockAllocationMode === null && mapping.stockAllocationValue === null && mapping.stockBuffer === null,

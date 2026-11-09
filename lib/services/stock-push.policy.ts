@@ -1,4 +1,23 @@
 export type StockPushSettings = { stockPushEnabled: boolean; stockBaselineReady: boolean; syncPushShopee: boolean; syncPushTiktok: boolean; syncPushTokopedia: boolean };
+export type StockPushBlockCode = "GLOBAL" | "BASELINE" | "FROZEN" | "STORE" | "BRAND" | "PLATFORM";
+
+/**
+ * stockPushDisabledCode — versi kode dari stockPushDisabledReason, dengan urutan
+ * pemeriksaan yang SAMA (satu sumber kebenaran). Dipakai UI untuk mengelompokkan
+ * penyebab push nonaktif (baseline vs toko vs brand) tanpa mencocokkan teks pesan.
+ */
+export function stockPushDisabledCode(
+  account: { platform: string; isFrozen?: boolean; stockPushEnabled?: boolean },
+  settings: StockPushSettings
+): StockPushBlockCode | null {
+  if (process.env.STOCK_PUSH_ENABLED !== "true") return "GLOBAL";
+  if (!settings.stockBaselineReady) return "BASELINE";
+  if (account.isFrozen) return "FROZEN";
+  if (account.stockPushEnabled === false) return "STORE";
+  if (!settings.stockPushEnabled) return "BRAND";
+  const enabled = account.platform === "SHOPEE" ? settings.syncPushShopee : account.platform === "TIKTOK_SHOP" ? settings.syncPushTiktok : account.platform === "TOKOPEDIA" ? settings.syncPushTokopedia : true;
+  return enabled ? null : "PLATFORM";
+}
 export function stockPushDisabledReason(account: { platform: string; isFrozen?: boolean; stockPushEnabled?: boolean }, settings: StockPushSettings): string | null {
   if (process.env.STOCK_PUSH_ENABLED !== "true") return "Push stok dinonaktifkan global; STOCK_PUSH_ENABLED belum bernilai true.";
   if (!settings.stockBaselineReady) return "Baseline stok belum dikonfirmasi; isi stok awal dan aktifkan konfirmasi baseline terlebih dahulu.";

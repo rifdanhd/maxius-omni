@@ -20,14 +20,16 @@ interface MasterStockProductProps {
   select: (rows: MasterStockRow[], checked: boolean) => void;
   toggleListing: (id: string) => void;
   edit: (row: MasterStockRow) => void;
-  allocate: (row: MasterStockRow, listing: ListingStock) => void;
+  allocate: (row: MasterStockRow, listings: ListingStock[]) => void;
   retry: (row: MasterStockRow, listing: ListingStock) => void;
+  syncMany: (row: MasterStockRow, listings: ListingStock[]) => void;
   archive: (row: MasterStockRow) => void;
   message: (message: string) => void;
+  refresh: () => void;
 }
 
 export function MasterStockProduct({ variants, open, dense, filtered, busy, selected, expanded,
-  toggle, select, toggleListing, edit, allocate, retry, archive, message }: MasterStockProductProps) {
+  toggle, select, toggleListing, edit, allocate, retry, syncMany, archive, message, refresh }: MasterStockProductProps) {
   const product = variants[0];
   const checked = variants.every((row) => selected.has(row.id));
   const storeCount = new Set(variants.flatMap((row) => row.listings.map((listing) => listing.accountId))).size;
@@ -110,7 +112,11 @@ export function MasterStockProduct({ variants, open, dense, filtered, busy, sele
                 </div>
                 {listingOpen && (
                   <div id={`listings-${row.id}`} className="border-t border-border bg-muted/25">
-                    <MasterStockListings row={row} busy={busy} allocate={(listing) => allocate(row, listing)} retry={(listing) => retry(row, listing)} message={message} />
+                    <MasterStockListings row={row} busy={busy}
+                      allocate={(listings) => allocate(row, listings)}
+                      retry={(listing) => retry(row, listing)}
+                      syncMany={(listings) => syncMany(row, listings)}
+                      message={message} refresh={refresh} />
                     <div className="px-4 pb-3"><Button size="sm" variant="ghost" disabled={busy} onClick={() => archive(row)}><Archive className="size-3" />{row.ownArchived ? "Lepas arsip SKU" : "Arsipkan SKU"}</Button></div>
                   </div>
                 )}
