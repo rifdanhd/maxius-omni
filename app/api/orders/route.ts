@@ -143,17 +143,39 @@ export const GET = withAuth(async (req) => {
     ],
   };
 
+  // Pilih hanya field yang dirender daftar. `include` ikut menarik seluruh kolom
+  // OrderItem/ProductVariant (harga, stok, versi, dst) sehingga payload halaman besar
+  // membengkak tanpa dipakai UI.
   const [orders, total, statusGroups, accounts, categoryRows] = await Promise.all([
     prisma.order.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        orderNo: true,
+        status: true,
+        accountId: true,
+        buyerName: true,
+        buyerEmail: true,
+        amount: true,
+        currency: true,
+        createTime: true,
+        shippingDueTime: true,
         items: {
-          include: {
-            variant: { include: { masterProduct: { select: { name: true, imageUrl: true } } } },
+          select: {
+            id: true,
+            channelSku: true,
+            productId: true,
+            productName: true,
+            skuName: true,
+            imageUrl: true,
+            qty: true,
+            price: true,
+            variant: {
+              select: { sku: true, masterProduct: { select: { name: true, imageUrl: true } } },
+            },
           },
         },
         account: { select: { id: true, platform: true, label: true } },
-        orderMappings: { select: { externalOrderId: true, rawStatus: true } },
         shipments: { select: { externalId: true, carrier: true, trackingNo: true, status: true } },
       },
       orderBy: [{ [sortField]: { sort: sortDir, nulls: "last" } }, { id: "asc" }],
@@ -183,10 +205,23 @@ export const GET = withAuth(async (req) => {
   statusGroups.forEach((g) => {
     counts[g.status] = g._count;
   });
-  const mappingImages = await prisma.productMapping.findMany({
-    where: { accountId: { in: orders.map((order) => order.accountId) }, channelSku: { in: [...new Set(orders.flatMap((order) => order.items.map((item) => item.channelSku)))] }, imageUrl: { not: null } },
-    select: { accountId: true, channelSku: true, imageUrl: true },
-  });
+  // Lookup gambar marketplace hanya dilewati untuk item yang sudah punya gambar
+  // sendiri (prioritas tertinggi). Urutan fallback tetap: item → mapping → master.
+  const missingImage = orders.flatMap((order) =>
+    order.items
+      .filter((item) => !item.imageUrl)
+      .map((item) => ({ accountId: order.accountId, channelSku: item.channelSku }))
+  );
+  const mappingImages = missingImage.length === 0
+    ? []
+    : await prisma.productMapping.findMany({
+        where: {
+          accountId: { in: [...new Set(missingImage.map((entry) => entry.accountId))] },
+          channelSku: { in: [...new Set(missingImage.map((entry) => entry.channelSku))] },
+          imageUrl: { not: null },
+        },
+        select: { accountId: true, channelSku: true, imageUrl: true },
+      });
   const imageByMapping = new Map(mappingImages.map((mapping) => [`${mapping.accountId}:${mapping.channelSku}`, mapping.imageUrl]));
 
   // List berarti selalu masked (keputusan PII): nama pembeli, tanpa ciphertext.
@@ -200,14 +235,9 @@ export const GET = withAuth(async (req) => {
     amount: o.amount,
     currency: o.currency,
     createTime: o.createTime,
-    paidTime: o.paidTime,
     shippingDueTime: o.shippingDueTime,
-    rtsSlaTime: o.rtsSlaTime,
-    ttsSlaTime: o.ttsSlaTime,
-    isCod: o.isCod,
     items: o.items.map((item) => ({ ...item, imageUrl: item.imageUrl ?? imageByMapping.get(`${o.accountId}:${item.channelSku}`) ?? item.variant?.masterProduct?.imageUrl ?? null })),
     account: o.account,
-    orderMappings: o.orderMappings,
     shipments: o.shipments,
   }));
 

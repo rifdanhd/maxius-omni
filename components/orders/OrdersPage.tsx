@@ -87,7 +87,6 @@ type Order = {
   shippingDueTime: string | null;
   account: { id: string; platform: string; label: string } | null;
   items: OrderItem[];
-  orderMappings: { externalOrderId: string; rawStatus: string }[];
   shipments: { externalId: string | null; carrier: string | null; trackingNo: string | null; status: string }[];
 };
 
@@ -399,7 +398,10 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(1000);
+  // Default kecil: 1.000 kartu sekaligus berarti ~1,8 MB JSON + 1.000 komponen,
+  // yang membuat halaman terasa lambat. Pilihan besar tetap tersedia di footer
+  // untuk cetak/ekspor massal.
+  const [pageSize, setPageSize] = useState(50);
   const [total, setTotal] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -483,6 +485,9 @@ export default function OrdersPage() {
   );
 
   useEffect(() => {
+    // Tunggu filter dari URL siap, supaya deep link (mis. ?tab=ready) tidak
+    // memicu satu request pembuangan dengan filter default.
+    if (!urlReady) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -507,7 +512,7 @@ export default function OrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, currentTab, currentSubTab, q, searchType.id, sort, from, to, platformFilter, accountFilter, categoryFilter, fetchOrders]);
+  }, [page, currentTab, currentSubTab, q, searchType.id, sort, from, to, platformFilter, accountFilter, categoryFilter, fetchOrders, urlReady]);
 
   const handleTab = (id: string) => {
     if (id === "returned") { router.push("/orders/returns"); return; }
