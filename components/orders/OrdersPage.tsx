@@ -643,78 +643,6 @@ export default function OrdersPage() {
     return () => clearInterval(t);
   }, [bgActive]);
 
-  const handleSyncAndReconcile = async (history?: OrderHistoryRange): Promise<boolean> => {
-    setSyncing(true);
-    setReconciling(false);
-    setError(null);
-    try {
-      // 1. Sync pesanan dari marketplace
-      const res = await authFetch("/api/orders/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(history ? { history } : {}),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? `Gagal sync (${res.status})`);
-        return false;
-      }
-      const guardErrors = (data.errors as string[] | undefined) ?? [];
-      const started = Number(data.started ?? 0);
-      const stillRunning = Number(data.stillRunning ?? 0);
-      if (started === 0 && stillRunning === 0) {
-        setError(guardErrors.join("\n") || "Belum ada toko terhubung yang dapat disinkronkan.");
-        return false;
-      }
-      if (guardErrors.length > 0 && (started > 0 || stillRunning > 0)) {
-        notify("warning", `Sebagian akun gagal disinkronkan:\n${guardErrors.join("\n")}`);
-      }
-      if (started > 0 || stillRunning > 0) {
-        bgWasActive.current = true;
-        setBgActive(true);
-        void refreshRunStatus();
-      }
-      notify("info", `${history ? "Pengambilan riwayat" : "Sync pesanan"} berjalan di latar belakang${started > 0 ? ` — ${started} akun mulai menarik order` : ""}. ` +
-        `Anda bisa berpindah menu; progres tampil di halaman ini.` +
-        (stillRunning > 0 ? `\n\n${stillRunning} akun masih berjalan dari sync sebelumnya.` : "") +
-        (guardErrors.length > 0 ? `\n\nCatatan:\n- ${guardErrors.join("\n- ")}` : ""));
-
-      // 2. Lengkapi data resi (reconcile) setelah sync selesai
-      setSyncing(false);
-      setReconciling(true);
-      try {
-        const recRes = await authFetch("/api/orders/fulfillment/reconcile", {
-          method: "POST", headers: {},
-        });
-        const recData = await recRes.json();
-        if (!recRes.ok) {
-          setError(recData.error ?? `Gagal lengkapi resi (${recRes.status})`);
-          return false;
-        }
-        const detail = (recData.results as { label?: string; scanned?: number; updated?: number; error?: string }[])
-          ?.map((r) => (r.error ? `${r.label}: ${r.error}` : `${r.label}: ${r.updated ?? 0}/${r.scanned ?? 0} resi dilengkapi`))
-          .join("\n");
-        const failed = recData.results?.some((result: { error?: string }) => result.error);
-        notify(failed ? "error" : "success", failed ? "Sebagian resi belum diperbarui." : `Sinkron & lengkapi resi selesai. ${recData.updated ?? 0} paket diperbarui.`, { details: detail });
-        const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to, platform: platformFilter, account: accountFilter, category: categoryFilter });
-        setOrders(refreshed.orders ?? []);
-        setTotal(refreshed.total ?? 0);
-      } catch (e) {
-        console.error(e);
-        setError("Terjadi kesalahan saat lengkapi resi.");
-        return false;
-      }
-      return true;
-    } catch (e) {
-      console.error(e);
-      setError("Terjadi kesalahan saat sinkronisasi.");
-      return false;
-    } finally {
-      setSyncing(false);
-      setReconciling(false);
-    }
-  };
-
   const handleSync = async (history?: OrderHistoryRange): Promise<boolean> => {
     setSyncing(true);
     setError(null);
@@ -755,6 +683,37 @@ export default function OrdersPage() {
       return false;
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleReconcile = async () => {
+    setReconciling(true);
+    setError(null);
+    try {
+      const res = await authFetch("/api/orders/fulfillment/reconcile", {
+        method: "POST", headers: {},
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? `Gagal lengkapi resi (${res.status})`);
+        return;
+      }
+      const detail = (data.results as { label?: string; scanned?: number; updated?: number; error?: string }[])
+        ?.map((r) => (r.error ? `${r.label}: ${r.error}` : `${r.label}: ${r.updated ?? 0}/${r.scanned ?? 0} resi dilengkapi`))
+        .join("\n");
+      const failed = data.results?.some((result: { error?: string }) => result.error);
+      notify(failed ? "error" : "success", failed ? "Sebagian resi belum diperbarui." : `Lengkapi resi selesai. ${data.updated ?? 0} paket diperbarui.`, { details: detail });
+      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to, platform: platformFilter, account: accountFilter, category: categoryFilter });
+      setOrders(refreshed.orders ?? []);
+      setTotal(refreshed.total ?? 0);
+      setPageCount(refreshed.pageCount ?? 1);
+      setCounts(refreshed.counts ?? counts);
+      setSelected(new Set());
+    } catch (e) {
+      console.error(e);
+      setError("Terjadi kesalahan saat lengkapi resi.");
+    } finally {
+      setReconciling(false);
     }
   };
 
@@ -1035,7 +994,7 @@ export default function OrdersPage() {
     router.push(`/orders/detail/${order.id}`);
   };
 
-  const busy = syncing || reconciling || bgActive;
+  const busy = syncing || bgActive;
 
   return (
     <div className="flex min-h-full min-w-0 flex-col gap-4 p-3 font-sans sm:p-6">
@@ -1044,9 +1003,9 @@ export default function OrdersPage() {
         description="Semua pesanan dari toko Anda dalam satu tempat. Perbarui pesanan, atur pengiriman, lalu cetak label sebelum menyerahkan paket ke kurir."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void handleSyncAndReconcile()} disabled={busy || refreshingShipping} className="gap-2">
+            <Button onClick={() => void handleSync()} disabled={busy || refreshingShipping} className="gap-2">
               <RefreshCw size={16} className={busy ? "animate-spin" : ""} />
-              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : reconciling ? "Mengisi resi..." : "Sinkron & Lengkapi Resi"}
+              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Sinkron Pesanan"}
             </Button>
             <Button variant="outline" onClick={() => setHistoryOpen(true)} disabled={busy} className="gap-2">
               <Calendar size={16} /> Ambil Riwayat
@@ -1057,6 +1016,15 @@ export default function OrdersPage() {
               </Button>
               {moreOpen && (
                 <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-card py-1 shadow-lg">
+                  <button
+                    type="button"
+                    disabled={reconciling || refreshingShipping}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted disabled:opacity-50"
+                    onClick={() => { setMoreOpen(false); void handleReconcile(); }}
+                  >
+                    <RefreshCw size={14} className={reconciling ? "animate-spin" : ""} />
+                    {reconciling ? "Mengisi resi..." : "Lengkapi Data Resi"}
+                  </button>
                   <button
                     type="button"
                     disabled={orders.length === 0}
@@ -1299,8 +1267,8 @@ export default function OrdersPage() {
               title="Tidak ada pesanan"
               description="Belum ada pesanan pada filter ini. Coba ganti tab, ubah kata kunci, atau jalankan sync pesanan."
               action={
-                <Button variant="outline" onClick={() => void handleSyncAndReconcile()} disabled={busy} className="gap-2">
-                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Sinkron & Lengkapi Resi
+                <Button variant="outline" onClick={() => void handleSync()} disabled={busy} className="gap-2">
+                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Sinkron Pesanan
                 </Button>
               }
             />
@@ -1313,7 +1281,7 @@ export default function OrdersPage() {
                 order={toCardOrder(order)}
                 checked={selected.has(order.id)}
                 onToggleChecked={() => toggleSelect(order.id)}
-                onSync={() => void handleSyncAndReconcile()}
+                onSync={() => void handleSync()}
                 onPrint={(type: PrintType) => printOrder(order, type)}
                 onPickup={() => void openShipModal([order])}
                 shipping={refreshingShipping}
