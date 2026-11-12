@@ -413,6 +413,7 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   /** Background run (SyncRun): progres live + tombol terkunci saat aktif. */
   const [bgActive, setBgActive] = useState(false);
+  const [syncProgressOpen, setSyncProgressOpen] = useState(true);
   const [bgProgress, setBgProgress] = useState<{ fetched: number; created: number; skipped: number; phase: string | null } | null>(null);
   const [infoDismissed, setInfoDismissed] = useState(false);
   const bgWasActive = useRef(false);
@@ -605,6 +606,7 @@ export default function OrdersPage() {
       const runs = data.runs ?? [];
       const activeRuns = runs.filter((r) => r.status === "QUEUED" || r.status === "RUNNING");
       if (activeRuns.length > 0) {
+        if (!bgWasActive.current) setSyncProgressOpen(true);
         bgWasActive.current = true;
         setBgActive(true);
         setBgProgress({
@@ -696,6 +698,7 @@ export default function OrdersPage() {
         notify("warning", `Sebagian akun gagal disinkronkan:\n${guardErrors.join("\n")}`);
       }
       if (started > 0 || stillRunning > 0) {
+        setSyncProgressOpen(true);
         bgWasActive.current = true; // alert penutup muncul saat run selesai
         setBgActive(true);
         void refreshRunStatus();
@@ -1031,9 +1034,9 @@ export default function OrdersPage() {
         description="Semua pesanan dari toko Anda dalam satu tempat. Perbarui pesanan, atur pengiriman, lalu cetak label sebelum menyerahkan paket ke kurir."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void handleSync()} disabled={busy || refreshingShipping} className="gap-2">
+            <Button onClick={() => bgActive ? setSyncProgressOpen(true) : void handleSync()} disabled={syncing || refreshingShipping} className="gap-2">
               <RefreshCw size={16} className={busy ? "animate-spin" : ""} />
-              {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Sinkron Pesanan"}
+              {bgActive ? "Lihat progres sinkronisasi" : syncing ? "Memulai sync..." : "Sinkron Pesanan"}
             </Button>
             <Button variant="outline" onClick={() => setHistoryOpen(true)} disabled={busy} className="gap-2">
               <Calendar size={16} /> Ambil Riwayat
@@ -1070,44 +1073,61 @@ export default function OrdersPage() {
 
       <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={busy} onSubmit={handleSync} />
 
-      {/* Progres background run (SyncRun) — popup */}
       {bgActive && bgProgress && (
-        <Dialog open={true} onOpenChange={() => {}}>
-          <DialogContent className="sm:max-w-md p-0">
-            <DialogHeader>
-              <DialogTitle>Sinkronisasi pesanan</DialogTitle>
-              <DialogDescription>
-                Menarik data pesanan dari toko terhubung di latar belakang.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="px-6 py-4 space-y-4">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-sm font-semibold text-foreground">
-                  Progres
-                  {bgProgress.phase === "rate_wait" && (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                      <AlertTriangle size={10} /> Jeda rate limit
+        <Dialog open={syncProgressOpen} onOpenChange={setSyncProgressOpen}>
+          <DialogContent className="gap-0 overflow-x-hidden rounded-2xl p-0 sm:max-w-md">
+            <div className="px-5 pb-5 pt-6 sm:px-6">
+              <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+                <RefreshCw className="size-5 motion-safe:animate-spin" aria-hidden="true" />
+              </div>
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-xl leading-tight tracking-tight">Menyinkronkan pesanan</DialogTitle>
+                <DialogDescription className="leading-relaxed">
+                  Pesanan dari toko terhubung sedang diperbarui. Anda tetap bisa melanjutkan pekerjaan.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-5 rounded-xl border border-border bg-muted/40 p-4">
+                <div role="status" className="flex items-start gap-2 text-sm font-medium text-foreground">
+                  {bgProgress.phase === "rate_wait" ? (
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                  ) : (
+                    <span className="relative mt-1 flex size-2 shrink-0">
+                      <span className="absolute inline-flex size-full rounded-full bg-primary/50 motion-safe:animate-ping" />
+                      <span className="relative inline-flex size-2 rounded-full bg-primary" />
                     </span>
                   )}
-                </span>
-                <span className="text-xs font-mono font-bold text-primary">
-                  {Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100)}%
-                </span>
+                  {bgProgress.phase === "rate_wait" ? "Menunggu giliran dari marketplace" : "Mengambil data pesanan"}
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                  {bgProgress.phase === "rate_wait"
+                    ? "Marketplace membatasi permintaan sementara. Proses akan dilanjutkan otomatis."
+                    : "Jumlah pesanan diperbarui secara otomatis selama proses berjalan."}
+                </p>
               </div>
-              <div className="h-2.5 w-full bg-primary/10 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100))}%` }} />
-              </div>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Download className="size-3.5 shrink-0" /> <b>{bgProgress.fetched}</b> ditarik
-                </span>
-                <span className="flex items-center gap-1">
-                  <PlusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.created}</b> baru
-                </span>
-                <span className="flex items-center gap-1">
-                  <MinusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.skipped}</b> sama
-                </span>
-              </div>
+              <dl className="mt-4 grid grid-cols-3 divide-x divide-border rounded-xl border border-border py-4">
+                {[
+                  { label: "Diambil", value: bgProgress.fetched, Icon: Download },
+                  { label: "Baru", value: bgProgress.created, Icon: PlusCircle },
+                  { label: "Sudah ada", value: bgProgress.skipped, Icon: MinusCircle },
+                ].map(({ label, value, Icon }) => (
+                  <div key={label} className="flex min-w-0 flex-col items-center gap-1.5 px-1">
+                    <dt className="flex items-center gap-1 text-[11px] text-muted-foreground sm:text-xs">
+                      <Icon className="size-3.5 shrink-0" aria-hidden="true" /> {label}
+                    </dt>
+                    <dd className="max-w-full break-all text-center text-lg font-semibold tabular-nums tracking-tight text-foreground sm:text-xl">
+                      {value.toLocaleString("id-ID")}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-border bg-muted/30 px-5 py-4 sm:px-6">
+              <Button variant="outline" className="w-full bg-background" onClick={() => setSyncProgressOpen(false)}>
+                Lanjutkan di latar belakang
+              </Button>
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                Menutup jendela ini tidak menghentikan sinkronisasi.
+              </p>
             </div>
           </DialogContent>
         </Dialog>
