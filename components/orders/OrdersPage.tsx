@@ -5,7 +5,7 @@ import { PageState } from "@/components/ui/feedback";
 import { friendlyError } from "@/lib/ui/feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Download, Filter, Info, MoreHorizontal, PackageCheck, Printer, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, Calendar, Download, Filter, Info, MinusCircle, MoreHorizontal, PackageCheck, PlusCircle, Printer, RefreshCw, Search, X } from "lucide-react";
 import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
@@ -1043,14 +1043,39 @@ export default function OrdersPage() {
       <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={busy} onSubmit={handleSync} />
 
       {/* Progres background run (SyncRun) */}
-      {bgActive && (
-        <div className="flex items-center gap-2 rounded-md border border-info bg-info-subtle px-3 py-2 text-sm text-info" role="status">
-          <RefreshCw size={14} className="shrink-0 animate-spin" />
-          <span>
-            Menarik pesanan di latar belakang: <b>{bgProgress?.fetched ?? 0} ditarik</b>, {bgProgress?.created ?? 0} baru,{" "}
-            {bgProgress?.skipped ?? 0} sudah ada
-            {bgProgress?.phase === "rate_wait" ? ", jeda rate limit API (wajar)" : ""}. Anda boleh berpindah menu.
-          </span>
+      {bgActive && bgProgress && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary bg-primary/5 p-3 sm:p-4 shadow-sm mb-4" role="status" aria-live="polite">
+          <RefreshCw size={14} className="shrink-0 text-primary animate-spin" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-sm font-semibold text-primary">
+                Menarik pesanan di latar belakang
+                {bgProgress.phase === "rate_wait" && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    <AlertTriangle size={10} /> Jeda rate limit
+                  </span>
+                )}
+              </span>
+              <span className="text-xs font-mono font-bold text-primary">
+                {Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100)}%
+              </span>
+            </div>
+            <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
+              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100))}%` }} />
+            </div>
+            <div className="flex flex-wrap items-center gap-4 mt-1 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Download className="size-3.5 shrink-0" /> <b>{bgProgress.fetched}</b> ditarik
+              </span>
+              <span className="flex items-center gap-1">
+                <PlusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.created}</b> baru
+              </span>
+              <span className="flex items-center gap-1">
+                <MinusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.skipped}</b> sama
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Anda boleh berpindah menu; notifikasi akan muncul saat selesai.</p>
+          </div>
         </div>
       )}
 
