@@ -623,7 +623,34 @@ export default function OrdersPage() {
         if (last?.status === "DONE") {
           notify("success", `Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
         } else if (last?.status === "FAILED") {
-          notify("error", `Sync gagal: ${last.error ?? "-"}\n\nKlik "Perbarui Pesanan (Sync)" untuk lanjut dari posisi terakhir.`);
+          const rawError = last.error ?? "-";
+          const isTokenError = /invalid_acceess_token|invalid access token|expired|token/i.test(rawError);
+          const isConnectionError = /koneksi|connection|network|timeout/i.test(rawError);
+          if (isTokenError) {
+            notify("error", "Token toko kadaluarsa atau tidak valid. Perbarui koneksi toko di Pengaturan Toko.", {
+              title: "Sync gagal",
+              action: {
+                label: "Buka Pengaturan Toko",
+                onClick: () => router.push("/settings/accounts"),
+              },
+            });
+          } else if (isConnectionError) {
+            notify("error", "Koneksi ke marketplace terputus. Periksa koneksi internet, lalu coba lagi.", {
+              title: "Sync gagal",
+              action: {
+                label: "Coba lagi",
+                onClick: () => void handleSync(),
+              },
+            });
+          } else {
+            notify("error", "Gagal menyinkronkan pesanan dari marketplace. Coba lagi nanti.", {
+              title: "Sync gagal",
+              action: {
+                label: "Coba lagi",
+                onClick: () => void handleSync(),
+              },
+            });
+          }
         }
         void refreshList().catch((e) => console.error(e));
       }
