@@ -54,7 +54,7 @@ export function detectPlatform(host: string): string {
   const h = host.toLowerCase();
   if (h.includes("shopee")) return "Shopee";
   if (h.includes("tokopedia")) return "Tokopedia";
-  if (h.includes("tiktok")) return "Tokopedia";
+  if (h.includes("tiktok")) return "TikTok Shop";
   if (h.includes("bukalapak")) return "Bukalapak";
   if (h.includes("lazada")) return "Lazada";
   if (h.includes("blibli")) return "Blibli";
@@ -790,7 +790,7 @@ function buildVariantSkus(
   for (const v of variants) {
     const name = String(v.name ?? "").trim().slice(0, 120);
     const price =
-      typeof v.price === "number" && Number.isFinite(v.price) && v.price > 0
+      typeof v.price === "number" && Number.isFinite(v.price) && v.price >= 0
         ? Math.round(v.price)
         : null;
     const stock = stockQuantity.parse(v.stock ?? 0);
@@ -847,8 +847,9 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
         ];
 
   const settings = await getCachedInventorySettings(input.businessId);
-  // Cek apakah produk dengan nama yang sama sudah ada (idempoten)
-  const existingProduct = await prisma.masterProduct.findFirst({
+  return prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${JSON.stringify([input.businessId, name.toLowerCase(), input.sourceUrl?.trim() ?? null])}, 0))`;
+  const existingProduct = await tx.masterProduct.findFirst({
     where: {
       name: {
         equals: name,
@@ -860,33 +861,10 @@ export async function saveProductCopyAsDraft(input: SaveDraftInput): Promise<{ i
     select: { id: true, productVariant: { select: { sku: true } } },
   });
 
-  // Jika produk sudah ada, kembalikan ID-nya tanpa membuat yang baru
-  if (existingProduct && existingProduct.productVariant.length > 0) {
-    // Varian sudah ada, cek apakah SKU sudah sesuai
-    const existingSkus = existingProduct.productVariant.map((v) => v.sku);
-    const newSkus = variantsForCreate?.map((v) => v.sku) ?? [];
-    const allSkusMatch = newSkus.every((sku) => existingSkus.includes(sku));
-    
-    if (allSkusMatch) {
-      // Update existing product images jika ada yang baru
-      if (images.length > 0) {
-        await prisma.productImage.deleteMany({ where: { masterProductId: existingProduct.id } });
-        await prisma.productImage.createMany({
-          data: images.map((url, i) => ({
-            id: crypto.randomUUID(),
-            updatedAt: new Date(),
-            url,
-            isCover: i === 0,
-            order: i,
-            masterProductId: existingProduct.id,
-          })),
-        });
-      }
-      return { id: existingProduct.id };
-    }
+  if (existingProduct) {
+    throw new CopyError("NOT_PARSEABLE", "Produk dengan nama dan sumber yang sama sudah ada. Buka Produk Master untuk mengeditnya; data dan gambar lama tetap tersimpan.");
   }
 
-  return await prisma.$transaction(async (tx) => {
     const product = await tx.masterProduct.create({
       data: {
         name,

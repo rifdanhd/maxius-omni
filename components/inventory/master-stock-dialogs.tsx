@@ -8,6 +8,7 @@ import { FormError } from "@/components/ui/feedback";
 import type { ListingStock, MasterStockRow } from "@/lib/inventory/master-stock.types";
 import { allocationQuantity, type AllocationMode, type AllocationPolicy } from "@/lib/services/stock-allocation.policy";
 import { authFetch } from "@/lib/utils/api-client";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 export const numberFormat = (value: number) => value.toLocaleString("id-ID");
 export const inputClass = "mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
@@ -98,6 +99,7 @@ export function AllocationDialog({ row, listings, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const policy: AllocationPolicy = { mode, value: Number(value || 0), buffer: Number(buffer || 0) };
   let preview: number | null = null;
@@ -224,37 +226,51 @@ export function AllocationDialog({ row, listings, onClose, onSaved }: {
               </label>
             )}
 
-            <label className="block text-sm">
-              Buffer pengaman listing (unit)
-              <input required disabled={saving || scope === "inherit"} type="number" min="0" step="1"
-                className={inputClass} value={buffer} onChange={(event) => setBuffer(event.target.value)} />
-              <span className="mt-1 block text-xs text-muted-foreground">Unit yang disisihkan sebagai cadangan, mis. 5.</span>
-            </label>
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/90 underline-offset-4 hover:underline"
+              aria-expanded={advancedOpen}
+            >
+              {advancedOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              {advancedOpen ? "Sembunyikan opsi lanjutan" : "Tampilkan opsi lanjutan"}
+            </button>
 
-            {scope === "store" && !primary.inheritsAllocation && (
-              <p className="text-xs text-muted-foreground">
-                Listing ini punya aturan khusus dan tetap memakainya. Default baru berlaku untuk SKU toko yang mengikuti default.
-              </p>
+            {advancedOpen && (
+              <section className="space-y-3 rounded-lg border border-border bg-muted/50 p-3">
+                <label className="block text-sm">
+                  Buffer pengaman listing (unit)
+                  <input required disabled={saving || scope === "inherit"} type="number" min="0" step="1"
+                    className={inputClass} value={buffer} onChange={(event) => setBuffer(event.target.value)} />
+                  <span className="mt-1 block text-xs text-muted-foreground">Unit yang disisihkan sebagai cadangan, mis. 5.</span>
+                </label>
+
+                {scope === "store" && !primary.inheritsAllocation && (
+                  <p className="text-xs text-muted-foreground">
+                    Listing ini punya aturan khusus dan tetap memakainya. Default baru berlaku untuk SKU toko yang mengikuti default.
+                  </p>
+                )}
+
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border bg-muted/50 p-3 text-sm tabular-nums">
+                  <dt className="text-muted-foreground">Stok fisik</dt>
+                  <dd className="text-right font-medium">{numberFormat(row.stock)}</dd>
+                  <dt className="text-muted-foreground">Disisihkan gudang</dt>
+                  <dd className="text-right">{numberFormat(row.safetyStock)}</dd>
+                  <dt className="text-muted-foreground">Bisa Dijual</dt>
+                  <dd className="text-right font-medium">{numberFormat(row.available)}</dd>
+                  <dt className="border-t border-border pt-1 text-muted-foreground">
+                    {listings.length > 1 ? `${listings.length} listing dipilih` : "Listing ini"}
+                  </dt>
+                  <dd className="border-t border-border pt-1 text-right">{numberFormat(thisTotal)}</dd>
+                  <dt className="text-muted-foreground">Listing lain ({row.listings.length - listings.length})</dt>
+                  <dd className="text-right">{numberFormat(otherTotal)}</dd>
+                  <dt className={`font-medium ${overstack ? "text-destructive" : "text-foreground"}`}>
+                    Total dialokasikan {overstack && <span aria-hidden="true">⚠</span>}
+                  </dt>
+                  <dd className={`text-right font-semibold ${overstack ? "text-destructive" : "text-foreground"}`}>{numberFormat(total)}</dd>
+                </dl>
+              </section>
             )}
-
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border bg-muted/50 p-3 text-sm tabular-nums">
-              <dt className="text-muted-foreground">Stok fisik</dt>
-              <dd className="text-right font-medium">{numberFormat(row.stock)}</dd>
-              <dt className="text-muted-foreground">Disisihkan gudang</dt>
-              <dd className="text-right">{numberFormat(row.safetyStock)}</dd>
-              <dt className="text-muted-foreground">Bisa Dijual</dt>
-              <dd className="text-right font-medium">{numberFormat(row.available)}</dd>
-              <dt className="border-t border-border pt-1 text-muted-foreground">
-                {listings.length > 1 ? `${listings.length} listing dipilih` : "Listing ini"}
-              </dt>
-              <dd className="border-t border-border pt-1 text-right">{numberFormat(thisTotal)}</dd>
-              <dt className="text-muted-foreground">Listing lain ({row.listings.length - listings.length})</dt>
-              <dd className="text-right">{numberFormat(otherTotal)}</dd>
-              <dt className={`font-medium ${overstack ? "text-destructive" : "text-foreground"}`}>
-                Total dialokasikan {overstack && <span aria-hidden="true">⚠</span>}
-              </dt>
-              <dd className={`text-right font-semibold ${overstack ? "text-destructive" : "text-foreground"}`}>{numberFormat(total)}</dd>
-            </dl>
 
             <p className="text-xs text-muted-foreground">
               Hasil untuk {listings.length > 1 ? "listing utama" : "listing ini"}: <strong className="text-foreground">{numberFormat(quantity)}</strong> unit dikirim

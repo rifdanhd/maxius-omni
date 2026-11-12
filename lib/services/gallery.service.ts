@@ -101,7 +101,7 @@ export async function applyMarketplaceCover(masterProductId: string, url: string
 
 export async function listGallery(
   params: GalleryParams
-): Promise<{ rows: GalleryRow[]; total: number; page: number; pageSize: number }> {
+): Promise<{ rows: GalleryRow[]; total: number; page: number; pageSize: number; categories: string[] }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
 
@@ -117,8 +117,23 @@ export async function listGallery(
     where.category = params.category.trim();
   }
 
+  const imageCount = Prisma.sql`(SELECT COUNT(*) FROM "ProductImage" i WHERE i."masterProductId" = p.id)`;
+  const variantCount = Prisma.sql`(SELECT COUNT(*) FROM "ProductVariant" v WHERE v."masterProductId" = p.id)`;
+  const conditions = [Prisma.sql`p."businessId" = ${params.businessId}`];
+  if (search) conditions.push(Prisma.sql`(p.name ILIKE ${`%${search.replace(/[\\%_]/g, "\\$&")}%`} OR EXISTS (SELECT 1 FROM "ProductVariant" v WHERE v."masterProductId" = p.id AND v.sku ILIKE ${`%${search.replace(/[\\%_]/g, "\\$&")}%`}))`);
+  if (params.category?.trim()) conditions.push(Prisma.sql`p.category = ${params.category.trim()}`);
+  if (params.status === "none") conditions.push(Prisma.sql`${imageCount} = 0`);
+  if (params.status === "complete") conditions.push(Prisma.sql`${imageCount} >= GREATEST(1, ${variantCount})`);
+  if (params.status === "incomplete") conditions.push(Prisma.sql`${imageCount} > 0 AND ${imageCount} < GREATEST(1, ${variantCount})`);
+  const predicate = Prisma.join(conditions, " AND ");
+  const order = params.sort === "name_desc" ? Prisma.sql`p.name DESC, p.id` : params.sort === "variants_desc" ? Prisma.sql`${variantCount} DESC, p.name, p.id` : params.sort === "images_desc" ? Prisma.sql`${imageCount} DESC, p.name, p.id` : Prisma.sql`p.name, p.id`;
+  const [ids, totals, categoryRows] = await Promise.all([
+    prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT p.id FROM "MasterProduct" p WHERE ${predicate} ORDER BY ${order} LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`),
+    prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*) AS total FROM "MasterProduct" p WHERE ${predicate}`),
+    prisma.masterProduct.findMany({ where: { businessId: params.businessId, category: { not: null } }, distinct: ["category"], select: { category: true }, orderBy: { category: "asc" } }),
+  ]);
   const products = await prisma.masterProduct.findMany({
-    where,
+    where: { businessId: params.businessId, id: { in: ids.map((row) => row.id) } },
     include: {
       _count: { select: { productVariant: true, productImage: true } },
       productImage: { where: { isCover: true }, select: { url: true }, take: 1 },
@@ -164,9 +179,9 @@ export async function listGallery(
     }
   });
 
-  const total = rows.length;
-  const sliced = rows.slice((page - 1) * pageSize, page * pageSize);
-  return { rows: sliced, total, page, pageSize };
+  const positions = new Map(ids.map((row, index) => [row.id, index]));
+  rows.sort((left, right) => (positions.get(left.id) ?? 0) - (positions.get(right.id) ?? 0));
+  return { rows, total: Number(totals[0]?.total ?? 0), page, pageSize, categories: categoryRows.flatMap((row) => row.category ? [row.category] : []) };
 }
 
 /**
@@ -255,8 +270,10 @@ export async function addImages(
     let base = (nextOrder._max.order ?? -1) + 1;
 
     const result: AddImagesResult = { ok: true, added: 0, reasons: [] };
+    const existing = new Set((await tx.productImage.findMany({ where: { masterProductId: productId }, select: { url: true } })).map((image) => image.url));
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
+      if (existing.has(e.url)) continue;
       if (e.url === "") {
         result.reasons.push({ index: i, reason: "Tidak ada URL valid pada entri ini." });
         continue;
@@ -268,6 +285,7 @@ export async function addImages(
         await promoteCover(tx, productId, created.id);
       }
       result.added += 1;
+      existing.add(e.url);
     }
     return result;
   });

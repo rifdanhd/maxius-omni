@@ -2,6 +2,8 @@
 
 import { FormError, ErrorFeedback } from "@/components/ui/feedback";
 import { notify } from "@/components/ui/notify";
+import { confirmAction } from "@/components/ui/confirm-action";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import {
@@ -29,6 +31,7 @@ type Market = {
   price: number | null;
   overridePrice: number | null;
   priceUpdatedAt: string | null;
+  syncStatus?: string;
 };
 
 type PricingRow = {
@@ -43,6 +46,7 @@ type PricingRow = {
 };
 
 type PricingResponse = {
+  categories: string[];
   rows: PricingRow[];
   total: number;
   page: number;
@@ -113,14 +117,14 @@ function InlinePrice({
   }, [editing]);
 
   async function commit() {
-    const raw = draft.trim().replace(/[Rp\s.,]/g, "").replace(",", ".");
-    const n = Number(raw && raw.length ? raw.replace(/[^0-9.]/g, "") : "NaN");
+    const raw = draft.trim().replace(/^Rp\s*/i, "");
+    const n = /^\d+$/.test(raw) ? Number(raw) : NaN;
     if (draft.trim() === "") {
       setError("Harga tidak boleh kosong.");
       return;
     }
-    if (!Number.isFinite(n) || n < 0) {
-      setError("Masukkan angka harga yang valid (>= 0).");
+    if (!Number.isSafeInteger(n) || n < 0) {
+      setError("Isi rupiah utuh tanpa pemisah, contoh 25000.");
       return;
     }
     setSaving(true);
@@ -244,12 +248,18 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
     failed: Array<{ row: number; message: string }>;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const fileReadVersion = useRef(0);
 
   function handleFile(file: File) {
+    const version = ++fileReadVersion.current;
+    setCsvText(null);
+    setPreview([]);
     setErr(null);
     setResult(null);
     setFileName(file.name);
+    if (!file.name.toLowerCase().endsWith(".csv") || file.size > 2 * 1024 * 1024) { setErr("Pilih file CSV maksimal 2 MB."); return; }
     file.text().then((text) => {
+      if (version !== fileReadVersion.current) return;
       const rows = parseCsv(text);
       if (rows.length < 2) {
         setErr("File tidak memiliki header + minimal 1 baris data.");
@@ -258,11 +268,11 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
       }
       setPreview(rows.slice(0, 4));
       setCsvText({ text });
-    });
+    }).catch(() => { if (version === fileReadVersion.current) setErr("File belum dapat dibaca. Pilih ulang file CSV."); });
   }
 
   async function submit() {
-    if (!csvText) return;
+    if (!csvText || submitting || result) return;
     setSubmitting(true);
     setErr(null);
     try {
@@ -272,7 +282,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ csv: csvText.text }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok && !data) throw new Error(`Unggah gagal (HTTP ${res.status}).`);
+      if (!res.ok) throw new Error(data?.error ?? `Unggah gagal (HTTP ${res.status}).`);
       setResult(
         data ?? { ok: false, updated: 0, failed: [{ row: 0, message: "Respons tidak valid." }] }
       );
@@ -309,6 +319,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
         <div className="p-6">
           <button
             onClick={() => fileRef.current?.click()}
+            disabled={submitting}
             className="w-full border-2 border-dashed border-border rounded-xl py-8 flex flex-col items-center gap-2 text-muted-foreground hover:border-ring hover:text-foreground transition-colors"
           >
             <Upload size={24} />
@@ -320,6 +331,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           <input
             ref={fileRef}
             type="file"
+            disabled={submitting}
             accept=".csv,text/csv"
             className="hidden"
             onChange={(e) => {
@@ -329,6 +341,8 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           />
 
           <p className="mt-4 text-xs text-muted-foreground">
+            Maksimal 500 baris. Harga berupa rupiah utuh tanpa titik atau koma, contoh 25000. Harga kosong dengan toko terisi akan menghapus harga khusus dan mengikuti harga utama.
+            <br />
             Kolom: <code className="bg-muted px-1 rounded">sku, price, store, channel_sku</code>.
             <br />
             <code className="bg-muted px-1 rounded">store</code> kosong → gunakan Harga Utama (Default) untuk variasi.
@@ -394,13 +408,14 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
           <div className="flex gap-2">
             <button
               onClick={onClose}
+              disabled={submitting}
               className="px-4 py-2 text-sm font-medium border border-border rounded-md text-foreground hover:bg-muted"
             >
               Tutup
             </button>
             <button
               onClick={submit}
-              disabled={!fileName || submitting}
+              disabled={!csvText || submitting || !!err || !!result}
               className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary disabled:opacity-50 inline-flex items-center gap-2"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
@@ -433,6 +448,7 @@ export default function KelolaHargaPage() {
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   const [page, setPage] = useState(1);
+  const [revision, setRevision] = useState(0);
   const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState("");
   const [priceMin, setPriceMin] = useState("");
@@ -468,11 +484,7 @@ export default function KelolaHargaPage() {
         }
         if (catRes.ok) {
           const d: PricingResponse = await catRes.json();
-          setCategories([
-            ...new Set(
-              d.rows.map((r) => r.product?.category).filter((c): c is string => !!c)
-            ),
-          ]);
+          setCategories(d.categories ?? []);
         }
       } catch {
         // meta opsional; jangan gagalkan halaman utama
@@ -521,7 +533,7 @@ export default function KelolaHargaPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, q, sort.id, selectedStores, categoryFilter, priceMin, priceMax]);
+  }, [page, q, sort.id, selectedStores, categoryFilter, priceMin, priceMax, revision]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -587,6 +599,7 @@ export default function KelolaHargaPage() {
   }
 
   async function saveDefaultPrice(row: PricingRow, price: number) {
+    if (!await confirmAction(`Simpan harga utama ${row.sku} menjadi ${fmtRp(price)}? ${row.markets.filter((market) => market.overridePrice === null).length} listing mengikuti perubahan ini.`)) return;
     const res = await authFetch(`/api/products/pricing/${row.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -596,6 +609,7 @@ export default function KelolaHargaPage() {
       const data = await res.json().catch(() => null);
       throw new Error(data?.error ?? "Gagal menyimpan harga utama (default).");
     }
+    notify("success", "Harga utama tersimpan di pusat. Muat ulang status untuk memeriksa pengiriman ke toko.");
     setRows((prev) =>
       prev.map((r) =>
         r.id === row.id
@@ -604,7 +618,7 @@ export default function KelolaHargaPage() {
               defaultPrice: price,
               defaultPriceUpdatedAt: new Date().toISOString(),
               markets: r.markets.map((m) =>
-                m.overridePrice === null ? { ...m, price } : m
+                m.overridePrice === null ? { ...m, price, syncStatus: "unknown" } : m
               ),
             }
           : r
@@ -613,6 +627,7 @@ export default function KelolaHargaPage() {
   }
 
   async function saveOverridePrice(row: PricingRow, market: Market, price: number) {
+    if (!await confirmAction(`Ubah target harga ${market.accountLabel} / ${market.channelSku} menjadi ${fmtRp(price)}? Harga toko lain tetap mengikuti pengaturannya.`)) return;
     const res = await authFetch(
       `/api/products/pricing/${row.id}/marketplace/${market.id}`,
       {
@@ -625,6 +640,7 @@ export default function KelolaHargaPage() {
       const data = await res.json().catch(() => null);
       throw new Error(data?.error ?? "Gagal menyimpan harga marketplace.");
     }
+    notify("success", "Harga khusus tersimpan di pusat. Hasil pengiriman ke toko ditampilkan pada status harga.");
     setRows((prev) =>
       prev.map((r) =>
         r.id === row.id
@@ -632,7 +648,7 @@ export default function KelolaHargaPage() {
               ...r,
               markets: r.markets.map((m) =>
                 m.id === market.id
-                  ? { ...m, price, overridePrice: price, priceUpdatedAt: new Date().toISOString() }
+                  ? { ...m, price, overridePrice: price, syncStatus: "unknown", priceUpdatedAt: new Date().toISOString() }
                   : m
               ),
             }
@@ -642,6 +658,8 @@ export default function KelolaHargaPage() {
   }
 
   async function clearOverridePrice(row: PricingRow, market: Market) {
+    if (row.defaultPrice === null) throw new Error("Isi harga utama sebelum menghapus harga khusus.");
+    if (!await confirmAction(`Gunakan harga utama ${fmtRp(row.defaultPrice)} untuk ${market.accountLabel} / ${market.channelSku}?`)) return;
     const res = await authFetch(
       `/api/products/pricing/${row.id}/marketplace/${market.id}`,
       {
@@ -654,13 +672,14 @@ export default function KelolaHargaPage() {
       const data = await res.json().catch(() => null);
       throw new Error(data?.error ?? "Gagal menghapus Harga Khusus (Override).");
     }
+    notify("success", "Harga khusus dihapus. Toko ini sekarang mengikuti harga utama di pusat.");
     setRows((prev) =>
       prev.map((r) =>
         r.id === row.id
           ? {
               ...r,
               markets: r.markets.map((m) =>
-                m.id === market.id ? { ...m, price: r.defaultPrice, overridePrice: null } : m
+                m.id === market.id ? { ...m, price: r.defaultPrice, overridePrice: null, syncStatus: "unknown" } : m
               ),
             }
           : r
@@ -691,9 +710,11 @@ export default function KelolaHargaPage() {
             </p>
             <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
               Harga Utama berlaku untuk toko yang mengikuti harga utama; Harga Khusus hanya berlaku di toko itu. Menyimpan harga memicu pembaruan ke marketplace, tetapi belum berarti pembaruan di toko sudah berhasil.
+              {" "}<a href="/logs" className="font-medium underline">Periksa hasil pengiriman di Log Aktivitas.</a>
             </p>
           </div>
           <div className="relative" ref={uploadRef}>
+            <button type="button" disabled={loading} onClick={() => { setLoading(true); setRevision((value) => value + 1); }} className="mb-2 w-full rounded-md border border-border px-4 py-2 text-sm disabled:opacity-50">Muat ulang harga &amp; status</button>
             <button
               onClick={() => setUploadOpen((v) => !v)}
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary transition-colors"
@@ -718,7 +739,7 @@ export default function KelolaHargaPage() {
 
         {/* Toolbar */}
         <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
-          <div className="relative w-80">
+          <div className="relative min-w-0 w-full sm:w-80">
             <input
               type="text"
               value={searchInput}
@@ -923,7 +944,7 @@ export default function KelolaHargaPage() {
                 <th className="px-5 py-3 text-right">Harga Utama (Default)</th>
                 <th className="px-5 py-3">Toko</th>
                 <th className="px-5 py-3">SKU Marketplace</th>
-                <th className="px-5 py-3 text-right">Harga Toko (Utama / Khusus)</th>
+                <th className="px-5 py-3 text-right">Target Harga Toko</th>
                 <th className="px-5 py-3">Waktu</th>
               </tr>
             </thead>
@@ -1061,10 +1082,12 @@ export default function KelolaHargaPage() {
                           )}
                           {row.markets.map((m) => (
                             <div key={m.id} className="relative flex flex-col items-end">
+                              <span className="mb-1 text-[10px] text-muted-foreground">{m.accountLabel} · {m.overridePrice === null ? "Ikut harga utama" : "Harga khusus"}</span>
                               <InlinePrice
                                 value={m.price}
                                 onSave={(p) => saveOverridePrice(row, m, p)}
                               />
+                              <StatusBadge className="mt-1" status={m.syncStatus === "success" ? "success" : m.syncStatus === "error" ? "failed" : "info"} label={m.syncStatus === "success" ? "Diterima marketplace" : m.syncStatus === "error" ? "Pengiriman gagal — cek log" : m.syncStatus === "skipped" ? "Pengiriman dilewati — cek log" : "Belum terkonfirmasi"} />
                               {m.overridePrice !== null && (
                                 <button
                                   onClick={() => clearOverridePrice(row, m).catch((e: unknown) => notify("error", e instanceof Error ? e.message : "Gagal mengubah harga khusus."))}

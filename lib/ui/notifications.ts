@@ -4,7 +4,7 @@ export type NotificationItem = {
   description: string;
   href: string;
   severity: "error" | "warning" | "info";
-  source: "stock" | "sync" | "store" | "opname" | "local";
+  source: "order" | "stock" | "sync" | "store" | "opname" | "local";
   fingerprint: string;
   occurredAt?: string;
   detectedAt?: string;

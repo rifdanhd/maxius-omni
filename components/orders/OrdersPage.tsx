@@ -408,6 +408,7 @@ export default function OrdersPage() {
   const [syncing, setSyncing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [reconciling, setReconciling] = useState(false);
+  const [refreshingShipping, setRefreshingShipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Background run (SyncRun): progres live + tombol terkunci saat aktif. */
   const [bgActive, setBgActive] = useState(false);
@@ -904,7 +905,31 @@ export default function OrdersPage() {
   const isReadyTab = currentTab.id === "ready";
 
   /** Buka modal pengiriman sesuai platform untuk daftar order yang sudah difilter. */
-  const openShipModal = (targets: Order[]) => {
+  const openShipModal = async (targets: Order[]) => {
+    if (targets.length === 0) return;
+    setRefreshingShipping(true);
+    try {
+      const refreshed = await Promise.all(targets.map(async (order) => {
+        const res = await authFetch(`/api/orders/${order.id}/refresh`, { method: "POST", headers: {} });
+        const data = await res.json().catch(() => ({})) as { ready?: boolean; status?: string; error?: string };
+        return { order, res, data };
+      }));
+      const notReady = refreshed.find(({ res, data }) => !res.ok || !data.ready);
+      if (notReady) {
+        notify(
+          "warning",
+          notReady.data.error ?? `Pesanan ${notReady.order.orderNo} belum siap diatur pengirimannya (status: ${notReady.data.status ?? "belum tersedia"}).`
+        );
+        await refreshList();
+        return;
+      }
+    } catch (error) {
+      console.error("refresh order sebelum pengiriman:", error);
+      notify("error", "Gagal mengambil status terbaru pesanan dari marketplace. Coba lagi.");
+      return;
+    } finally {
+      setRefreshingShipping(false);
+    }
     // TikTok → modal slot handover, Shopee → ShopeeShipModal (Shopee Open API).
     // Campuran tidak diproses dalam satu aksi.
     const tiktok = targets.filter((o) => o.account?.platform === "TIKTOK_SHOP");
@@ -927,7 +952,7 @@ export default function OrdersPage() {
   };
 
   const handlePickup = () => {
-    openShipModal(orders.filter((o) => selected.has(o.id) && o.status === "AWAITING_SHIPMENT"));
+    void openShipModal(orders.filter((o) => selected.has(o.id)));
   };
 
   const handlePickupConfirm = (result: PickupShipResult) => {
@@ -979,7 +1004,7 @@ export default function OrdersPage() {
         description="Semua pesanan dari toko Anda dalam satu tempat. Perbarui pesanan, atur pengiriman, lalu cetak label sebelum menyerahkan paket ke kurir."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void handleSync()} disabled={busy} className="gap-2">
+            <Button onClick={() => void handleSync()} disabled={busy || refreshingShipping} className="gap-2">
               <RefreshCw size={16} className={busy ? "animate-spin" : ""} />
               {bgActive ? "Berjalan di latar belakang..." : syncing ? "Memulai sync..." : "Perbarui Pesanan"}
             </Button>
@@ -994,7 +1019,7 @@ export default function OrdersPage() {
                 <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-card py-1 shadow-lg">
                   <button
                     type="button"
-                    disabled={reconciling}
+                    disabled={reconciling || refreshingShipping}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted disabled:opacity-50"
                     onClick={() => { setMoreOpen(false); void handleReconcile(); }}
                   >
@@ -1259,8 +1284,8 @@ export default function OrdersPage() {
                 onToggleChecked={() => toggleSelect(order.id)}
                 onSync={() => void handleSync()}
                 onPrint={(type: PrintType) => printOrder(order, type)}
-                onPickup={() => openShipModal([order])}
-                shipping={false}
+                onPickup={() => void openShipModal([order])}
+                shipping={refreshingShipping}
                 onDetail={() => handleOpenDetail(order)}
               />
             ))}

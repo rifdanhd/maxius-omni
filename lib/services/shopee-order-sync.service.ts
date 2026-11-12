@@ -69,7 +69,7 @@ async function logOrderSyncError(
 }
 
 /** Sinkronkan paket pengiriman Shopee (merge — payload null tidak menimpa data lama). */
-async function syncShopeeShipments(
+export async function syncShopeeShipments(
   db: { shipment: typeof defaultPrisma.shipment },
   orderId: string,
   accountId: string,

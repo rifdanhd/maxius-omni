@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
-import { assertSameBrand } from "@/lib/services/business-scope.service";
 import { updateMappingPrice } from "@/lib/services/pricing.service";
 
 // PATCH /api/products/pricing/[variantId]/marketplace/[channelId]
@@ -21,7 +20,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
   }
 
   const body = (await req.json().catch(() => ({}))) as { price?: unknown };
-  if (body.price === undefined) {
+  if (body.price !== null && (typeof body.price !== "number" || !Number.isFinite(body.price))) {
     return NextResponse.json({ error: "Field price wajib diisi." }, { status: 400 });
   }
 

@@ -8,7 +8,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useId, type ReactNode } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import {
   Plus,
@@ -96,7 +96,7 @@ type OrphanSku = {
 };
 
 const orphanKey = (orphan: OrphanSku) => JSON.stringify([orphan.accountId, orphan.channelSku]);
-type MappingResult = { stockWarnings?: string[] };
+type MappingResult = { stockWarnings?: string[]; reviewRequired?: boolean };
 const showStockWarnings = (result: MappingResult) => {
   if (result.stockWarnings?.length) notify("warning", `Mapping tersimpan. Stok pesanan berikut perlu ditinjau:\n${result.stockWarnings.slice(0, 10).join("\n")}`);
 };
@@ -119,7 +119,7 @@ type Selection =
   | { kind: "new" }
   | null;
 
-const PAGE_STEP = 200;
+const PAGE_STEP = 50;
 
 /* ───────────────────────── Komponen UI kecil ───────────────────────── */
 
@@ -145,7 +145,7 @@ function Segmented<T extends string>({
   options: Array<{ id: T; label: string; icon?: LucideIcon }>;
 }) {
   return (
-    <div role="group" className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+    <div role="group" className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted p-0.5">
       {options.map(({ id, label, icon: Icon }) => {
         const active = value === id;
         return (
@@ -192,6 +192,8 @@ function VariantSearchSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionsId = useId();
 
   const selected = variants.find((v) => v.id === value);
 
@@ -220,8 +222,11 @@ function VariantSearchSelect({
   }, [open]);
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
+    <div className={`relative min-w-0 ${className}`} ref={dropdownRef} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false); triggerRef.current?.focus(); } }}>
       <button
+        ref={triggerRef}
+        aria-expanded={open}
+        aria-controls={open ? optionsId : undefined}
         type="button"
         onClick={() => {
           setOpen((prev) => !prev);
@@ -253,13 +258,14 @@ function VariantSearchSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-80 w-full min-w-[340px] max-w-[540px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95">
+        <div id={optionsId} className="absolute left-0 top-full z-50 mt-1 max-h-80 w-full min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95">
           <div className="border-b border-border p-2 bg-muted/40">
             <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs">
               <Search size={14} className="shrink-0 text-muted-foreground" />
               <input
                 type="text"
                 autoFocus
+                aria-label="Cari varian pusat"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Ketik nama produk atau SKU varian..."
@@ -292,6 +298,7 @@ function VariantSearchSelect({
                     onClick={() => {
                       onChange(v.id);
                       setOpen(false);
+                      triggerRef.current?.focus();
                     }}
                     className={`flex w-full items-start justify-between gap-3 p-2 text-left transition-colors rounded-md ${
                       isSelected
@@ -522,6 +529,7 @@ export default function ProductMappingPage() {
   const [stockInForm, setStockInForm] = useState({ qty: "", note: "" });
   const [stockInSaving, setStockInSaving] = useState(false);
   const [mapQuery, setMapQuery] = useState("");
+  const [storeFilter, setStoreFilter] = useState("all");
   const [variantQuery, setVariantQuery] = useState("");
   const [listFilter, setListFilter] = useState<"all" | "linked" | "orphan">("all");
   const [selection, setSelection] = useState<Selection>(null);
@@ -595,6 +603,7 @@ export default function ProductMappingPage() {
         }),
       });
       showStockWarnings(result);
+      if (!result.reviewRequired) notify("success", "Produk toko berhasil dihubungkan ke stok pusat.");
       setForm(emptyForm);
       await loadAll();
       await loadLedger();
@@ -606,6 +615,10 @@ export default function ProductMappingPage() {
   }
 
   async function handleRepoint(id: string, variantId: string) {
+    const target = variants.find((variant) => variant.id === variantId);
+    const current = mappings.find((mapping) => mapping.id === id);
+    if (!target || !current || current.variant?.id === variantId) return;
+    if (!await confirmAction(`Hubungkan SKU marketplace ${current.channelSku} ke ${target.masterProduct.name} / ${target.sku}? Hubungan sebelumnya: ${current.variant?.sku ?? "belum terhubung"}. Stok fisik kedua varian tidak digabung.`)) return;
     setRepointSaving(id);
     setError(null);
     try {
@@ -614,6 +627,7 @@ export default function ProductMappingPage() {
         body: JSON.stringify({ variantId }),
       });
       showStockWarnings(result);
+      notify("success", "Hubungan produk berhasil diperbarui.");
       setRepoint((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -744,18 +758,14 @@ export default function ProductMappingPage() {
 
   /* ── Data turunan ── */
   const mq = mapQuery.trim().toLowerCase();
-  const filteredMappings = mq
-    ? mappings.filter((m) => [m.channelSku, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq)))
-    : mappings;
-  const filteredOrphans = mq
-    ? orphans.filter((o) => [o.channelSku, o.accountLabel, o.sampleProductName].some((x) => x?.toLowerCase().includes(mq)))
-    : orphans;
+  const filteredMappings = mappings.filter((m) => (storeFilter === "all" || m.account?.id === storeFilter) && (!mq || [m.channelSku, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq))));
+  const filteredOrphans = orphans.filter((o) => (storeFilter === "all" || o.accountId === storeFilter) && (!mq || [o.channelSku, o.accountLabel, o.sampleProductName].some((x) => x?.toLowerCase().includes(mq))));
   const vq = variantQuery.trim().toLowerCase();
   const filteredVariants = vq ? variants.filter((v) => [v.sku, v.masterProduct.name].some((x) => x.toLowerCase().includes(vq))) : variants;
   const totalEffective = variants.reduce((sum, v) => sum + effectiveStock(v), 0);
   const orphanAlert = orphansLoaded && orphans.length > 0;
   const visibleOrphans = listFilter === "linked" ? [] : filteredOrphans;
-  const visibleMappings = listFilter === "orphan" ? [] : filteredMappings;
+  const visibleMappings = filteredMappings.filter((mapping) => listFilter === "linked" ? !!mapping.variant : listFilter === "orphan" ? !mapping.variant : true);
 
   const selMapping = selection?.kind === "mapping" ? mappings.find((m) => m.id === selection.id) : undefined;
   const selOrphan = selection?.kind === "orphan" ? orphans.find((o) => orphanKey(o) === selection.key) : undefined;
@@ -764,15 +774,15 @@ export default function ProductMappingPage() {
   const back = () => setSelection(null);
 
   const kpis: Array<{ label: string; value: string; icon: LucideIcon; alert?: boolean }> = [
-    { label: "Mapping aktif", value: loading ? "…" : mappings.length.toLocaleString("id-ID"), icon: Link2 },
-    { label: "Variasi pusat", value: loading ? "…" : variants.length.toLocaleString("id-ID"), icon: Boxes },
+    { label: "Listing terhubung", value: loading ? "…" : mappings.filter((mapping) => mapping.variant).length.toLocaleString("id-ID"), icon: Link2 },
+    { label: "Varian pusat", value: loading ? "…" : variants.length.toLocaleString("id-ID"), icon: Boxes },
     { label: "SKU belum terhubung", value: orphansLoaded ? orphans.length.toLocaleString("id-ID") : "…", icon: AlertTriangle, alert: orphanAlert },
-    { label: "Total stok efektif", value: loading ? "…" : totalEffective.toLocaleString("id-ID"), icon: PackagePlus },
+    { label: "Tersedia di pusat", value: loading ? "…" : totalEffective.toLocaleString("id-ID"), icon: PackagePlus },
   ];
 
   const tabs = [
-    { id: "mapping", label: "Hubungan Produk (Mapping)", count: mappings.length },
-    { id: "varian", label: "Variasi Pusat (sku_master)", count: variants.length },
+    { id: "mapping", label: "Produk Toko", count: mappings.length },
+    { id: "varian", label: "Varian Pusat", count: variants.length },
     { id: "riwayat", label: "Riwayat Stok", count: ledger.length },
   ] as const;
 
@@ -801,7 +811,7 @@ export default function ProductMappingPage() {
               ))}
             </select>
           </Field>
-          <Field label="Kode Produk di Toko (Channel SKU)">
+          <Field label="SKU Marketplace">
             <input
               type="text"
               value={form.channelSku}
@@ -810,7 +820,7 @@ export default function ProductMappingPage() {
               className={field}
             />
           </Field>
-          <Field label="Tujuan stok" className="md:col-span-2">
+          <Field label="2. Pilih sumber stok pusat" className="md:col-span-2">
             <Segmented
               value={form.useNewVariant ? "new" : "existing"}
               onChange={(next) => setForm((f) => ({ ...f, useNewVariant: next === "new" }))}
@@ -822,7 +832,7 @@ export default function ProductMappingPage() {
           </Field>
 
           {!form.useNewVariant ? (
-            <Field label="Variasi Pusat Tujuan (Varian Target)" className="md:col-span-2">
+            <Field label="Varian pusat tujuan" className="md:col-span-2">
               <VariantSearchSelect
                 value={form.variantId}
                 onChange={(id) => setForm((f) => ({ ...f, variantId: id }))}
@@ -853,18 +863,19 @@ export default function ProductMappingPage() {
               <Field label="Stok Awal">
                 <input type="number" min="0" value={form.stock} onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))} className={field} />
               </Field>
-              <Field label="Stok Cadangan (Stok Aman)">
+              <Field label="Cadangan">
                 <input type="number" min="0" value={form.safetyStock} onChange={(e) => setForm((f) => ({ ...f, safetyStock: e.target.value }))} className={field} />
               </Field>
             </>
           )}
 
-          <div className="flex justify-end gap-2 md:col-span-2">
+          {!form.useNewVariant && form.variantId && <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm md:col-span-2"><p className="font-semibold">3. Tinjau hubungan</p><p className="mt-1 break-words">{stores.find((store) => store.id === form.accountId)?.name ?? "Pilih toko"} / {form.channelSku || "Isi SKU marketplace"} → {variants.find((variant) => variant.id === form.variantId)?.masterProduct.name} / {variants.find((variant) => variant.id === form.variantId)?.sku}</p><p className="mt-2 text-xs text-muted-foreground">Produk toko ini memakai stok varian pusat tersebut. Jumlah stok tidak digabung. Alokasi setiap toko diatur melalui Stok Varian.</p></div>}
+          <div className="flex flex-wrap justify-end gap-2 md:col-span-2">
             <Button variant="outline" onClick={() => setForm(emptyForm)} disabled={saving}>
               Kosongkan
             </Button>
             <Button onClick={handleCreateMapping} disabled={saving}>
-              <Link2 size={16} /> {saving ? "Menyimpan..." : "Simpan Hubungan (Mapping)"}
+              <Link2 size={16} /> {saving ? "Menyimpan..." : "Hubungkan produk"}
             </Button>
           </div>
         </div>
@@ -914,9 +925,9 @@ export default function ProductMappingPage() {
                   </Button>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  <StatBox label="Stok total" value={v.stock} />
-                  <StatBox label="Stok aman" value={v.safetyStock} />
-                  <StatBox label="Stok efektif" value={effectiveStock(v)} danger={effectiveStock(v) === 0} />
+                <StatBox label="Fisik" value={v.stock} />
+                  <StatBox label="Cadangan" value={v.safetyStock} />
+                  <StatBox label="Tersedia" value={effectiveStock(v)} danger={effectiveStock(v) === 0} />
                 </div>
               </div>
             ) : (
@@ -937,7 +948,8 @@ export default function ProductMappingPage() {
                   className="w-full sm:max-w-[360px]"
                   placeholder="Pilih variasi pusat..."
                 />
-                <Button onClick={() => handleRepoint(m.id, repoint[m.id])} disabled={!repoint[m.id] || repointSaving === m.id}>
+                {variants.find((variant) => variant.id === repoint[m.id]) && <p className="basis-full rounded-lg bg-muted p-3 text-sm break-words">SKU toko <b>{m.channelSku}</b> → SKU pusat <b>{variants.find((variant) => variant.id === repoint[m.id])?.sku}</b>. Stok fisik tidak digabung.</p>}
+                <Button onClick={() => handleRepoint(m.id, repoint[m.id])} disabled={!repoint[m.id] || repoint[m.id] === m.variant?.id || repointSaving === m.id}>
                   <Save size={14} /> {repointSaving === m.id ? "Menyimpan..." : "Simpan"}
                 </Button>
                 <Button variant="outline" onClick={() => setRepoint((p) => { const n = { ...p }; delete n[m.id]; return n; })}>
@@ -947,7 +959,7 @@ export default function ProductMappingPage() {
             ) : (
               <Button
                 variant="outline"
-                onClick={() => setRepoint((p) => ({ ...p, [m.id]: variants[0]?.id ?? "" }))}
+                onClick={() => setRepoint((p) => ({ ...p, [m.id]: "" }))}
                 title="Ganti variasi pusat yang dihubungkan (Varian Target)"
               >
                 Ganti Varian
@@ -1235,13 +1247,12 @@ export default function ProductMappingPage() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-4 p-4 md:p-6">
-      <SkuReviewPanel />
 
       {/* ───────── Header ───────── */}
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Hubungkan Produk &amp; Stok (Mapping Stok Terpusat)</h1>
+            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Hubungkan Produk Toko</h1>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button type="button" aria-label="Cara stok efektif dihitung" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -1249,12 +1260,12 @@ export default function ProductMappingPage() {
                 </button>
               </TooltipTrigger>
               <TooltipContent className="max-w-sm p-3 text-xs leading-relaxed">
-                <strong>Stok Efektif = stok total − stok cadangan (Stok Aman).</strong> Itulah jumlah yang bisa dijual ke semua toko yang terhubung.
+                <strong>Tersedia di pusat = stok fisik − cadangan, minimal nol.</strong> Target stok setiap toko mengikuti pengaturan alokasi dan buffer di Stok Varian.
               </TooltipContent>
             </Tooltip>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Hubungkan produk di tiap toko ke satu variasi stok pusat (sku_master). Produk yang belum dihubungkan tetap berdiri sendiri.
+            Tentukan varian pusat yang menjadi sumber stok setiap produk marketplace. Mulai dari produk toko, lalu pilih SKU pusat yang sesuai.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1273,9 +1284,16 @@ export default function ProductMappingPage() {
         </div>
       </header>
 
-      <AutoMatchPanel />
+      <ol aria-label="Alur menghubungkan produk" className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
+        {["Pilih produk toko", "Pilih varian pusat", "Tinjau dan simpan"].map((step, index) => <li key={step} className="flex items-center gap-3"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span><span className="font-medium">{step}</span></li>)}
+      </ol>
 
-      {error && <ErrorFeedback error={error} className="mb-4" />}
+      <details className="rounded-xl border border-border bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Bantuan pencocokan &amp; tinjauan SKU <span className="ml-1 font-normal text-muted-foreground">— buka bila ada produk yang sulit dicocokkan</span></summary>
+        <div className="space-y-3 border-t border-border p-3"><SkuReviewPanel onShowUnlinked={() => { changeTab("mapping"); setListFilter("orphan"); setStoreFilter("all"); setMapQuery(""); window.requestAnimationFrame(() => document.getElementById("mapping-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" })); }} /><AutoMatchPanel /></div>
+      </details>
+
+      {error && !detailActive && <ErrorFeedback error={error} className="mb-4" />}
 
       {/* ───────── Strip ringkasan ───────── */}
       <section aria-label="Ringkasan mapping" className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:grid-cols-4 lg:divide-x lg:divide-border">
@@ -1321,20 +1339,22 @@ export default function ProductMappingPage() {
 
       {/* ───────── Master-detail ───────── */}
       {tab !== "riwayat" && (
-        <div className="grid grid-cols-1 gap-4 lg:h-[calc(100vh-17rem)] lg:min-h-[520px] lg:grid-cols-[minmax(300px,390px)_minmax(0,1fr)]">
+        <div id="mapping-workspace" className="grid scroll-mt-4 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
           {/* Daftar (master) */}
-          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <section className={`${detailActive ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm`}>
             <div className="space-y-3 border-b border-border p-3">
+              <p className="text-sm font-semibold">{tab === "mapping" ? "1. Pilih produk toko" : "Daftar varian pusat"}</p>
               {tab === "mapping" ? (
                 <>
                   <SearchBox value={mapQuery} onChange={(v) => { setMapQuery(v); setShown(PAGE_STEP); }} placeholder="Cari toko, channel SKU, atau produk" />
+                  <select aria-label="Filter toko" value={storeFilter} onChange={(event) => { setStoreFilter(event.target.value); setShown(PAGE_STEP); }} className={field}><option value="all">Semua toko</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name} · {formatPlatform(store.platform)}</option>)}</select>
                   <Segmented
                     value={listFilter}
                     onChange={(next) => { setListFilter(next); setShown(PAGE_STEP); }}
                     options={[
                       { id: "all", label: "Semua" },
-                      { id: "linked", label: `Terhubung (${filteredMappings.length})` },
-                      { id: "orphan", label: `Belum terhubung (${filteredOrphans.length})` },
+                      { id: "linked", label: `Terhubung (${filteredMappings.filter((mapping) => mapping.variant).length})` },
+                      { id: "orphan", label: "Belum terhubung" },
                     ]}
                   />
                 </>
@@ -1343,7 +1363,7 @@ export default function ProductMappingPage() {
               )}
             </div>
 
-            <div className="max-h-[70vh] min-h-0 flex-1 overflow-y-auto lg:max-h-none">
+            <div className="max-h-[70dvh] min-h-0 flex-1 overflow-y-auto">
               {loading ? (
                 <div className="space-y-3 p-3">
                   {Array.from({ length: 6 }, (_, i) => (
@@ -1415,11 +1435,10 @@ export default function ProductMappingPage() {
                             active={selection?.kind === "mapping" && selection.id === m.id}
                             onClick={() => setSelection({ kind: "mapping", id: m.id })}
                             avatar={<Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>}
-                            title={m.channelSku}
-                            mono
+                            title={m.variant?.masterProduct.name ?? m.channelSku}
                             subtitle={
                               m.variant
-                                ? `${m.variant.masterProduct.name} · ${m.account?.label ?? "-"}`
+                                ? `${m.account?.label ?? "-"} · ${m.channelSku} → ${m.variant.sku}`
                                 : `belum ter-mapping · ${m.account?.label ?? "-"}`
                             }
                             originBadge={<OriginBadge mapping={m} />}
@@ -1480,14 +1499,9 @@ export default function ProductMappingPage() {
           </section>
 
           {/* Rincian (detail) — di layar kecil tampil sebagai layar penuh */}
-          <div
-            className={
-              detailActive
-                ? "fixed inset-0 z-40 overflow-y-auto bg-background p-4 lg:static lg:z-auto lg:min-h-0 lg:overflow-visible lg:bg-transparent lg:p-0"
-                : "hidden min-h-0 lg:block"
-            }
-          >
-            <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:h-full lg:overflow-y-auto">
+          <div className={detailActive ? "min-w-0" : "hidden min-w-0 lg:block"}>
+            <section className="min-w-0 rounded-xl border border-border bg-card shadow-sm">
+              {error && <div role="alert" className="p-4"><ErrorFeedback error={error} /></div>}
               {renderDetail()}
             </section>
           </div>

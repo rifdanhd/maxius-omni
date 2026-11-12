@@ -71,6 +71,7 @@ export default function MasterStockPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [urlReady, setUrlReady] = useState(false);
+  const [autoRefreshPaused, setAutoRefreshPaused] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,15 +136,15 @@ export default function MasterStockPage() {
       }
     }
     void load(true);
-    const timer = setInterval(() => {
+    const timer = autoRefreshPaused ? null : setInterval(() => {
       void load();
     }, 5000);
     return () => {
       cancelled = true;
       request?.abort();
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
     };
-  }, [filters, page, pageSize, revision, urlReady]);
+  }, [filters, page, pageSize, revision, urlReady, autoRefreshPaused]);
 
   useEffect(() => {
     if (!urlReady) return;
@@ -355,6 +356,9 @@ export default function MasterStockPage() {
               </select>
             <Button variant="outline" disabled={busy} onClick={() => setRevision((value) => value + 1)} aria-label="Perbarui status stok">
               <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setAutoRefreshPaused((p) => !p)} aria-label={autoRefreshPaused ? "Nyalakan refresh otomatis" : "Matikan refresh otomatis"}>
+              {autoRefreshPaused ? "Nyalakan Otomatis" : "Matikan Otomatis"}
             </Button>
             {hasActiveFilters && <Button size="sm" variant="ghost" onClick={resetFilters}><FilterX className="size-4" />Reset</Button>}
           </div>

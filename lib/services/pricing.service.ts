@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
 import { syncPriceToMarketplaces } from "@/lib/services/sync.service";
+import { after } from "next/server";
 
 /**
  * Kelola Harga.
@@ -55,18 +56,21 @@ export interface PricingRow {
     price: number | null;
     overridePrice: number | null;
     priceUpdatedAt: Date | null;
+    syncStatus?: string;
   }>;
 }
 
 export async function listPricing(
   params: ListPricingParams
-): Promise<{ rows: PricingRow[]; total: number; page: number; pageSize: number }> {
+): Promise<{ rows: PricingRow[]; total: number; page: number; pageSize: number; categories: string[] }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
 
   const where: Prisma.ProductVariantWhereInput = {
+    isArchived: false,
     masterProduct: {
       businessId: params.businessId,
+      isActive: true, status: "active",
       ...(params.category?.trim() ? { category: params.category.trim() } : {}),
     },
   };
@@ -89,8 +93,17 @@ export async function listPricing(
     };
   }
 
+  const orders: Record<PricingSort, Prisma.ProductVariantOrderByWithRelationInput> = {
+    name_asc: { masterProduct: { name: "asc" } }, name_desc: { masterProduct: { name: "desc" } },
+    sku_asc: { sku: "asc" }, sku_desc: { sku: "desc" }, price_asc: { price: { sort: "asc", nulls: "last" } }, price_desc: { price: { sort: "desc", nulls: "last" } }, updated_desc: { updatedAt: "desc" }, created_desc: { createdAt: "desc" },
+  };
+  const [total, categoryRows] = await Promise.all([
+    prisma.productVariant.count({ where }),
+    prisma.masterProduct.findMany({ where: { businessId: params.businessId, category: { not: null } }, distinct: ["category"], select: { category: true }, orderBy: { category: "asc" } }),
+  ]);
   const variants = await prisma.productVariant.findMany({
     where,
+    orderBy: [orders[params.sort ?? "name_asc"], { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize,
     include: {
       masterProduct: { select: { id: true, name: true, category: true, imageUrl: true } },
       productMapping: {
@@ -99,6 +112,15 @@ export async function listPricing(
     },
   });
 
+  const accountIds = [...new Set(variants.flatMap((variant) => variant.productMapping.map((mapping) => mapping.accountId)))];
+  const logs = accountIds.length ? await prisma.syncLog.findMany({ where: { accountId: { in: accountIds }, kind: "price_push" }, select: { accountId: true, payload: true, status: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 500 }) : [];
+  const delivery = (accountId: string, sku: string, price: number | null, updated: Date | null) => {
+    for (const log of logs) {
+      if (log.accountId !== accountId || !updated || log.createdAt < updated) continue;
+      try { const payload = JSON.parse(log.payload ?? "{}"); if (payload.channelSku === sku && payload.price === price) return log.status; } catch { continue; }
+    }
+    return "unknown";
+  };
   const rows: PricingRow[] = variants.map((v) => ({
     id: v.id,
     sku: v.sku,
@@ -116,42 +138,11 @@ export async function listPricing(
       price: m.price ?? v.price,
       overridePrice: m.price,
       priceUpdatedAt: m.priceUpdatedAt,
+      syncStatus: delivery(m.accountId, m.channelSku, m.price ?? v.price, m.price === null ? [m.priceUpdatedAt, v.priceUpdatedAt].filter((date): date is Date => !!date).sort((a, b) => b.getTime() - a.getTime())[0] ?? null : m.priceUpdatedAt),
     })),
   }));
 
-  const sort = params.sort ?? "name_asc";
-  const localeCompare = (a: string, b: string) => a.localeCompare(b, "id");
-  rows.sort((a, b) => {
-    switch (sort) {
-      case "name_desc":
-        return localeCompare(b.product?.name ?? "", a.product?.name ?? "");
-      case "sku_asc":
-        return localeCompare(a.sku, b.sku);
-      case "sku_desc":
-        return localeCompare(b.sku, a.sku);
-      case "price_asc": {
-        const ap = a.defaultPrice ?? Infinity;
-        const bp = b.defaultPrice ?? Infinity;
-        return ap - bp || localeCompare(a.product?.name ?? "", b.product?.name ?? "");
-      }
-      case "price_desc": {
-        const ap = a.defaultPrice ?? -1;
-        const bp = b.defaultPrice ?? -1;
-        return bp - ap || localeCompare(a.product?.name ?? "", b.product?.name ?? "");
-      }
-      case "updated_desc":
-        return b.updatedAt.getTime() - a.updatedAt.getTime();
-      case "created_desc":
-        return b.createdAt.getTime() - a.createdAt.getTime();
-      default:
-        return localeCompare(a.product?.name ?? "", b.product?.name ?? "");
-    }
-  });
-
-  const total = rows.length;
-  const sliced = rows.slice((page - 1) * pageSize, page * pageSize);
-
-  return { rows: sliced, total, page, pageSize };
+  return { rows, total, page, pageSize, categories: categoryRows.flatMap((row) => row.category ? [row.category] : []) };
 }
 
 const effectiveMarketPrice = (override: number | null, defaultPrice: number | null) =>
@@ -166,20 +157,21 @@ export async function updateVariantDefaultPrice(
   price: number,
   businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (!Number.isFinite(price) || price < 0) {
+  if (!Number.isSafeInteger(price) || price < 0) {
     return { ok: false, reason: "Harga harus angka >= 0." };
   }
 
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
      include: {
-       masterProduct: { select: { businessId: true } },
+       masterProduct: { select: { businessId: true, isActive: true, status: true } },
        productMapping: { select: { id: true, accountId: true, channelSku: true, price: true } },
      },
    });
    if (!variant || variant.masterProduct.businessId !== businessId) {
     return { ok: false, reason: "Varian tidak ditemukan." };
   }
+  if (variant.isArchived || !variant.masterProduct.isActive || variant.masterProduct.status !== "active") return { ok: false, reason: "Produk tidak aktif atau masih draf. Aktifkan melalui Produk Master sebelum mengirim harga." };
 
   const newPrice = Math.round(price * 100) / 100;
   await prisma.productVariant.update({
@@ -193,9 +185,9 @@ export async function updateVariantDefaultPrice(
     .map((m) => ({ accountId: m.accountId, channelSku: m.channelSku }));
 
   if (targets.length > 0) {
-    syncPriceToMarketplaces(targets, newPrice).catch((err) =>
+    after(() => syncPriceToMarketplaces(targets, newPrice).catch((err) =>
       console.error(`[Pricing] sync default price varian ${variantId} gagal:`, err)
-    );
+    ));
   }
 
   return { ok: true };
@@ -210,7 +202,7 @@ export async function updateMappingPrice(
   price: number | null,
   businessId: string
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (price !== null && (!Number.isFinite(price) || price < 0)) {
+  if (price !== null && (!Number.isSafeInteger(price) || price < 0)) {
     return { ok: false, reason: "Harga harus angka >= 0." };
   }
 
@@ -221,8 +213,9 @@ export async function updateMappingPrice(
       variant: {
         select: {
           id: true,
+          isArchived: true,
           price: true,
-          masterProduct: { select: { businessId: true } },
+          masterProduct: { select: { businessId: true, isActive: true, status: true } },
         },
       },
     },
@@ -239,10 +232,12 @@ export async function updateMappingPrice(
   if (mapping.variant.masterProduct.businessId !== businessId) {
     return { ok: false, reason: "Mapping toko tidak ditemukan." };
   }
+  if (mapping.variant.isArchived || !mapping.variant.masterProduct.isActive || mapping.variant.masterProduct.status !== "active") return { ok: false, reason: "Produk tidak aktif atau masih draf. Aktifkan melalui Produk Master sebelum mengirim harga." };
 
   const newPrice = price === null ? null : Math.round(price * 100) / 100;
   const effectiveAfter = effectiveMarketPrice(newPrice, mapping.variant.price);
   const effectiveBefore = effectiveMarketPrice(mapping.price, mapping.variant.price);
+  if (newPrice === null && effectiveAfter === null) return { ok: false, reason: "Isi harga utama sebelum menghapus harga khusus." };
 
   await prisma.productMapping.update({
     where: { id: mappingId },
@@ -250,12 +245,12 @@ export async function updateMappingPrice(
   });
 
   if (effectiveAfter !== null && effectiveAfter !== effectiveBefore) {
-    syncPriceToMarketplaces(
+    after(() => syncPriceToMarketplaces(
       [{ accountId: mapping.accountId, channelSku: mapping.channelSku }],
       effectiveAfter
     ).catch((err) =>
       console.error(`[Pricing] sync override mapping ${mappingId} gagal:`, err)
-    );
+    ));
   }
 
   return { ok: true };
@@ -297,24 +292,26 @@ export async function processBulkPrice(
     try {
       if (r.store) {
         // Override per toko — cari mapping varian oleh toko tsb.
-        const variant = await prisma.productVariant.findFirst({
-          where: { sku: r.sku, masterProduct: { businessId } },
+        const variants = await prisma.productVariant.findMany({
+          where: { sku: r.sku, isArchived: false, masterProduct: { businessId, isActive: true, status: "active" } }, take: 2,
            include: {
              productMapping: {
                include: { account: { select: { id: true, label: true } } },
              },
            },
          });
+         const variant = variants.length === 1 ? variants[0] : null;
          if (!variant) {
-           result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan.` });
+           result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan atau memiliki beberapa kandidat. Pilih produk melalui tabel harga.` });
            continue;
          }
          const store = r.store.trim().toLowerCase();
-         const mapping = variant.productMapping.find(
+         const matches = variant.productMapping.filter(
            (m) =>
-             m.account.label.trim().toLowerCase() === store ||
-            (r.channelSku && m.channelSku.trim().toLowerCase() === r.channelSku!.trim().toLowerCase())
+             m.account.label.trim().toLowerCase() === store &&
+            (!r.channelSku || m.channelSku === r.channelSku.trim())
         );
+        const mapping = matches.length === 1 ? matches[0] : null;
         if (!mapping) {
           result.failed.push({
             row: r.row,
@@ -336,11 +333,12 @@ export async function processBulkPrice(
           });
           continue;
         }
-        const variant = await prisma.productVariant.findFirst({
-          where: { sku: r.sku, masterProduct: { businessId } },
+        const variants = await prisma.productVariant.findMany({
+          where: { sku: r.sku, isArchived: false, masterProduct: { businessId, isActive: true, status: "active" } }, take: 2,
         });
+        const variant = variants.length === 1 ? variants[0] : null;
         if (!variant) {
-          result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan.` });
+          result.failed.push({ row: r.row, message: `SKU "${r.sku}" tidak ditemukan atau ambigu. Pilih produk melalui tabel harga.` });
           continue;
         }
         const upd = await updateVariantDefaultPrice(variant.id, r.price, businessId);

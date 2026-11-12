@@ -217,7 +217,7 @@ export default function ProductCopyPage() {
           description: form.description.trim(),
           price: priceNum,
           images,
-          imageUrl: images[0] ?? parsed?.images[0] ?? null,
+          imageUrl: images[0] ?? null,
           sourceUrl: parsed?.sourceUrl ?? null,
           category: form.category.trim() || null,
           variants,
@@ -231,7 +231,7 @@ export default function ProductCopyPage() {
         return;
       }
       notify("success", "Draf tersimpan di katalog pusat; belum diterbitkan ke toko. Selanjutnya periksa produk di Produk Master.");
-      window.setTimeout(() => router.push("/products"), 1200);
+      router.push(`/products?inactive=1&q=${encodeURIComponent(name)}`);
     } catch (e) {
       console.error(e);
       setError("Terjadi kesalahan saat menyimpan draft.");
@@ -258,6 +258,8 @@ export default function ProductCopyPage() {
         <h1 className="text-xl font-bold text-foreground">Tambah Produk dari Tautan (Product Copy)</h1>
       </div>
 
+      <ol aria-label="Langkah Product Copy" className="mb-4 grid gap-2 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">{["1. Tempel tautan atau isi manual", "2. Periksa produk dan varian", "3. Simpan dan buka draf"].map((step) => <li key={step} className="font-medium">{step}</li>)}</ol>
+      {mode !== "input" && <p className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-sm">Periksa SKU, harga, dan stok fisik sebelum menyimpan. Angka dari halaman sumber belum tentu sama dengan persediaan gudang Anda. Foto yang tidak dipilih tidak ikut disimpan.</p>}
       <div className="mb-4 space-y-1 text-sm text-muted-foreground">
         <p>Disimpan sebagai draf di katalog pusat; belum diterbitkan ke toko.</p>
         <p>Setelah menyimpan, periksa draf di Produk Master, lengkapi harga dan gambar, lalu hubungkan produk toko melalui Mapping Stok Terpusat.</p>
@@ -285,14 +287,14 @@ export default function ProductCopyPage() {
             <p className="text-[11px] text-muted-foreground mb-3">
               Tempel link produk dari Shopee, TikTok Shop, atau situs lainnya.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && runParse()}
                 placeholder="https://www.tokopedia.com/…"
-                className="flex-1 px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+                className="min-w-0 flex-1 px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
               />
               <button
                 onClick={runParse}

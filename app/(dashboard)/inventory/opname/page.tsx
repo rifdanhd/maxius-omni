@@ -14,7 +14,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { authFetch } from "@/lib/utils/api-client";
-import { ErrorFeedback } from "@/components/ui/feedback";
+import { ErrorFeedback, FormError } from "@/components/ui/feedback";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -442,8 +444,8 @@ function CreateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-border px-6 py-5">
           <div>
@@ -597,8 +599,8 @@ function CreateModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -725,8 +727,8 @@ function CountModal({
   const closed = opname?.status === "COMPLETED" || opname?.status === "CANCELLED";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
         {/* Header */}
         <div className="border-b border-border px-6 py-5">
           <div className="flex items-start justify-between gap-4">
@@ -946,7 +948,7 @@ function CountModal({
             </button>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

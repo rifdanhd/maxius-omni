@@ -83,14 +83,16 @@ function ReviewCard({
             {best && !selected && (
               <button
                 type="button"
-                onClick={() => { onSelect(bestId); onAcknowledge(true); }}
+                disabled={saving}
+                onClick={() => { onSelect(bestId); onAcknowledge(false); }}
                 className="ml-auto rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-foreground hover:bg-muted"
               >
-                Pilih saran: {best.sku} (stok terbesar)
+                Lihat kandidat stok terbesar
               </button>
             )}
           </label>
           <select
+            disabled={saving}
             aria-label={`Stok acuan ${review.sellerSku}`}
             className="mt-1 h-10 w-full rounded border bg-background px-3 text-sm"
             value={selected}
@@ -118,7 +120,7 @@ function ReviewCard({
             </p>
           ) : (
             <p className="text-[10px] text-muted-foreground mt-1">
-              Pilih satu stok acuan. Stok kandidat lain tidak akan ditambahkan ke stok ini.
+              Pastikan nama dan varian barang sesuai. Stok terbesar bukan jaminan kandidat benar. Stok kandidat lain tidak ditambahkan.
             </p>
           )}
         </div>
@@ -126,6 +128,7 @@ function ReviewCard({
       <label className="flex items-start gap-2 text-xs">
         <input
           type="checkbox"
+          disabled={saving || !selected}
           checked={acknowledged}
           onChange={(event) => onAcknowledge(event.target.checked)}
           className="shrink-0"
@@ -155,7 +158,7 @@ function ReviewCard({
   );
 }
 
-export function SkuReviewPanel() {
+export function SkuReviewPanel({ onShowUnlinked }: { onShowUnlinked?: () => void } = {}) {
   const [data, setData] = useState<ReviewData | null>(null);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
@@ -165,6 +168,8 @@ export function SkuReviewPanel() {
   const [expanded, setExpanded] = useState(false);
   const [bulk, setBulk] = useState<{ done: number; total: number; failed: number } | null>(null);
   const [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,14 +178,21 @@ export function SkuReviewPanel() {
         const response = await authFetch("/api/inventory/sku-reviews");
         if (!response.ok) throw new Error("Antrean tinjauan SKU belum dapat dimuat.");
         const result = await response.json();
-        if (!cancelled) setData(result);
+        if (!result || !Array.isArray(result.reviews) || !Array.isArray(result.candidates) || !Number.isInteger(result.total) || result.total < 0) throw new Error("Data antrean belum dapat dibaca. Coba muat ulang.");
+        if (!cancelled) { setData(result); setError(null); }
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "Antrean belum dapat dimuat.");
-      }
+      } finally { if (!cancelled) setLoading(false); }
     }
     void load();
     return () => { cancelled = true; };
   }, [revision]);
+
+  function refresh() {
+    setLoading(true);
+    setError(null);
+    setRevision((value) => value + 1);
+  }
 
   const candidatesByReview = useMemo(() => {
     const map = new Map<string, ReviewData["candidates"]>();
@@ -243,7 +255,8 @@ export function SkuReviewPanel() {
     }
     setErrors(failureMessages);
     setBulk(null);
-    setRevision((value) => value + 1);
+    setNotice(`${queue.length - failed} pemeriksaan berhasil disimpan${failed ? `; ${failed} belum berhasil. Periksa pesan pada masing-masing SKU.` : "."}`);
+    refresh();
   }
 
   function selectDefaults() {
@@ -254,98 +267,89 @@ export function SkuReviewPanel() {
       const candidates = candidatesByReview.get(review.id) ?? [];
       if (!candidates.length) continue;
       nextSelected[review.id] = pickDefaultCandidate(candidates);
-      nextAcknowledged[review.id] = true;
+      nextAcknowledged[review.id] = false;
     }
     setSelected(nextSelected);
     setAcknowledged(nextAcknowledged);
   }
 
-  if (!data) {
+  if (!data && loading) {
     return (
-      <section className="rounded-lg border bg-card p-4" aria-label="Tinjauan SKU seller">
+      <section className="rounded-lg border bg-card p-4" aria-label="Periksa acuan stok SKU toko">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold flex items-center gap-2">
-            <AlertTriangle size={16} className="text-warning" /> Tinjauan SKU seller
+            <AlertTriangle size={16} className="text-warning" /> Pemeriksaan Acuan Stok
           </h2>
           <Button size="sm" variant="ghost" disabled>
             <Loader2 className="animate-spin mr-1" size={14} /> Memuat…
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Sedang memuat antrean tinjauan SKU seller…
+          Sedang memuat SKU toko yang perlu dipilihkan acuan stoknya…
         </p>
       </section>
     );
   }
 
+  if (!data) return <section className="rounded-lg border bg-card p-4"><h2 className="mb-2 font-semibold">Pemeriksaan Acuan Stok</h2><ErrorFeedback error={error ?? "Antrean belum dapat dimuat."} action={<Button variant="outline" onClick={refresh}>Coba lagi</Button>} /></section>;
+
   const pending = data.total > 0;
 
   return (
-    <section className="rounded-lg border bg-card p-4" aria-label="Tinjauan SKU seller">
+    <section className="rounded-lg border bg-card p-4" aria-label="Pemeriksaan Acuan Stok" aria-busy={loading}>
       {/* Header kompak — selalu tampil, antrean disembunyikan sampai dibuka */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold flex items-center gap-2">
-          <AlertTriangle size={16} className={pending ? "text-warning" : "text-muted-foreground"} /> Tinjauan SKU seller
+          <AlertTriangle size={16} className={pending ? "text-warning" : "text-muted-foreground"} /> Pemeriksaan Acuan Stok
         </h2>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge
-            status={pending ? "warning" : "ok"}
+            status={error || pending ? "warning" : loading ? "pending" : "ok"}
             label={
-              pending
+              error ? "Belum dapat diperbarui" : loading ? "Memuat antrean…" : pending
                 ? `${data.total.toLocaleString("id-ID")} perlu ditinjau`
-                : "Tidak ada yang perlu ditinjau"
+                : "Antrean kosong"
             }
           />
-          <Button size="sm" variant="ghost" onClick={() => setRevision((value) => value + 1)} title="Muat ulang antrean">
-            <RefreshCw size={14} className="mr-1" /> Perbarui
+          <Button size="sm" variant="ghost" disabled={loading || !!saving || !!bulk} onClick={refresh} title="Muat ulang antrean pemeriksaan">
+            <RefreshCw size={14} className="mr-1" /> Muat ulang antrean
           </Button>
           {pending && (
             <Button size="sm" variant={expanded ? "outline" : "default"} onClick={() => setExpanded((value) => !value)}>
               <ListChecks size={14} className="mr-1" />
-              {expanded ? "Tutup antrean" : "Selesaikan antrean"}
+              {expanded ? "Tutup daftar" : "Pilih acuan stok"}
             </Button>
           )}
         </div>
       </div>
 
-      {!pending && !error && (
-        <p className="mt-2 text-sm text-muted-foreground">
-          Semua SKU seller sudah terhubung ke stok pusat.
-        </p>
+      <p className="mt-2 text-sm text-muted-foreground">Gunakan panel ini saat sistem meminta Anda memastikan varian pusat yang menjadi sumber stok suatu SKU toko.</p>
+      {error && <div className="mt-3"><ErrorFeedback error={error} action={<Button variant="outline" onClick={refresh}>Coba lagi</Button>} /></div>}
+      {notice && <p role="status" className="mt-3 rounded-lg bg-muted p-3 text-sm">{notice}</p>}
+
+      {!pending && !error && !loading && (
+        <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3"><p className="text-sm font-medium">Tidak ada SKU yang menunggu pemeriksaan.</p><p className="mt-1 text-sm text-muted-foreground">Produk toko yang belum terhubung diperiksa melalui daftar Produk Toko.</p>{onShowUnlinked ? <Button size="sm" variant="outline" className="mt-3" onClick={onShowUnlinked}>Lihat produk belum terhubung</Button> : <a className="mt-3 inline-block text-sm font-semibold underline" href="/products/mapping">Buka daftar Produk Toko</a>}</div>
       )}
 
       {expanded && pending && (
         <>
           <p className="mt-3 text-sm text-muted-foreground">
-            SKU seller yang sama dipakai lintas toko akan memakai satu stok acuan. Stok lama yang berbeda tidak dijumlahkan otomatis.
+            Panel ini membantu saat SKU toko memiliki beberapa kandidat stok pusat atau acuannya belum jelas. Contoh: SKU KAOS-HITAM muncul di dua produk pusat. Periksa barangnya, lalu pilih satu varian sebagai acuan. Stok kandidat lain tidak dijumlahkan otomatis.
           </p>
-
-          {error && (
-            <div className="mt-3">
-              <ErrorFeedback
-                error={error}
-                action={
-                  <Button variant="outline" onClick={() => setRevision((value) => value + 1)}>
-                    Coba lagi
-                  </Button>
-                }
-              />
-            </div>
-          )}
 
           {/* Toolbar bulk */}
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3">
             <Button
               size="sm"
               variant="outline"
-              disabled={Boolean(bulk)}
+              disabled={loading || Boolean(saving) || Boolean(bulk)}
               onClick={selectDefaults}
             >
-              <Wand2 size={14} className="mr-1" /> Pilih acuan otomatis ({(data.reviews ?? []).filter((review) => (candidatesByReview.get(review.id) ?? []).length > 0).length})
+              <Wand2 size={14} className="mr-1" /> Isi kandidat stok terbesar
             </Button>
             <Button
               size="sm"
-              disabled={Boolean(bulk) || readyIds.length === 0}
+              disabled={loading || Boolean(saving) || Boolean(bulk) || readyIds.length === 0}
               onClick={() => { void applyAll(); }}
             >
               {bulk ? (
@@ -353,7 +357,7 @@ export function SkuReviewPanel() {
               ) : (
                 <ListChecks size={14} className="mr-1" />
               )}
-              Terapkan semua ({readyIds.length})
+              Simpan pilihan yang dikonfirmasi ({readyIds.length})
             </Button>
             {bulk && (
               <p className="text-xs text-muted-foreground">
@@ -372,10 +376,11 @@ export function SkuReviewPanel() {
                   candidates={candidatesByReview.get(review.id) ?? []}
                   selected={selected[review.id] ?? ""}
                   acknowledged={acknowledged[review.id] ?? false}
-                  saving={saving === review.id}
+                  saving={loading || Boolean(saving) || Boolean(bulk)}
                   error={errors[review.id] ?? null}
                   onSelect={(candidateId) => {
                     setSelected((current) => ({ ...current, [review.id]: candidateId }));
+                    setAcknowledged((current) => ({ ...current, [review.id]: false }));
                     setErrors((current) => ({ ...current, [review.id]: "" }));
                   }}
                   onAcknowledge={(checked) =>
@@ -389,7 +394,8 @@ export function SkuReviewPanel() {
                     if (message) {
                       setErrors((current) => ({ ...current, [review.id]: message }));
                     } else {
-                      setRevision((value) => value + 1);
+                      setNotice(`Acuan stok SKU ${review.sellerSku} berhasil disimpan.`);
+                      refresh();
                     }
                   }}
                 />

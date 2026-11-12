@@ -11,7 +11,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, ctx) => {
   }
 
   const body = (await req.json().catch(() => ({}))) as { price?: unknown };
-  if (body.price === undefined) {
+  if (typeof body.price !== "number" || !Number.isFinite(body.price)) {
     return NextResponse.json({ error: "Field price wajib diisi." }, { status: 400 });
   }
 

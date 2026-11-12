@@ -24,6 +24,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest, ctx) => {
 
   const body = await req.json().catch(() => ({}));
   const entries = normalizeImageInputs(body);
+  if (entries.length > 20) return NextResponse.json({ error: "Maksimal 20 gambar per unggahan." }, { status: 400 });
   if (entries.length === 0) {
     return NextResponse.json(
       { error: "Body harus memuat field url atau images (array url)." },

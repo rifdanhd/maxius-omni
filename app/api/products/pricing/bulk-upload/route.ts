@@ -24,6 +24,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
       { status: 400 }
     );
   }
+  if (Buffer.byteLength(body.csv, "utf8") > 2 * 1024 * 1024) return NextResponse.json({ error: "File CSV maksimal 2 MB." }, { status: 400 });
 
   const parsed = parseCsv(body.csv);
   if (parsed.length < 2) {
@@ -40,14 +41,15 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
     store: header.indexOf("store"),
     channelSku: header.indexOf("channel_sku"),
   };
-  if (idx.sku === -1) {
+  if (idx.sku === -1 || idx.price === -1) {
     return NextResponse.json(
-      { error: 'Kolom "sku" tidak ditemukan di header CSV.' },
+      { error: 'Kolom "sku" dan "price" wajib ada di CSV.' },
       { status: 400 }
     );
   }
 
   const rows: BulkPriceRow[] = [];
+  if (parsed.length > 501) return NextResponse.json({ error: "Maksimal 500 baris harga per unggahan." }, { status: 400 });
   for (let i = 1; i < parsed.length; i++) {
     const cells = parsed[i];
     const get = (k: keyof typeof idx) =>
@@ -56,8 +58,10 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
     const sku = get("sku");
     if (!sku) continue;
 
-    const priceRaw = get("price").replace(/[Rp\s.]/g, "").replace(",", ".");
+    const priceRaw = get("price").replace(/^Rp\s*/i, "").trim();
+    if (priceRaw && !/^\d+$/.test(priceRaw)) return NextResponse.json({ error: `Baris ${i + 1}: harga harus rupiah utuh tanpa pemisah, contoh 25000. Belum ada harga yang diubah.` }, { status: 400 });
     const price = priceRaw === "" ? null : Number(priceRaw);
+    if (price !== null && !Number.isSafeInteger(price)) return NextResponse.json({ error: `Baris ${i + 1}: harga terlalu besar.` }, { status: 400 });
 
     rows.push({
       row: i + 1,

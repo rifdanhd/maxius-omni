@@ -17,12 +17,14 @@
 #   1c preflight git: remote origin HARUS sama dgn repo asal + branch sesuai
 #   2 swap  (RAM 1.9GB — swap DIBUAT SEBELUM build agar build tidak OOM)
 #   3 fetch → tolak bila ada commit lokal belum di-push → pull --ff-only
+#   3b prune artefak build basi (.next.bak.<tag>/.next.failed.*) + cek ruang disk
 #   4 npm ci → 5 pg_dump backup DB → 6 prisma migrate deploy
 #   7 backup .next → build --webpack → 8 systemctl restart maxius-omni
 #   9 health check 127.0.0.1:3000 → 10 verifikasi log [SyncRetry]
 #
-# Rollback build: hentikan service, pindahkan .next baru, salin .next.bak
-# ke .next, lalu hidupkan service. Tidak perlu menjalankan deploy/build lagi.
+# Rollback build: hentikan service, pindahkan .next baru, lalu rename .next.bak
+# menjadi .next (rename = tidak butuh ruang ekstra; JANGAN cp saat disk penuh).
+# Tidak perlu menjalankan deploy/build lagi.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -186,6 +188,47 @@ fi
 log "git pull --ff-only origin ${BRANCH}"
 git pull --ff-only origin "${BRANCH}"
 
+# ── 3b. Ruang disk: buang artefak build basi, tolak deploy bila sempit ───────
+# Rollback hanya butuh .next.bak. Arsip .next.bak.<tag>, .next.failed.<tag>, dan
+# sisa cp yang terputus (.next.bak.tmp.<tag>) TIDAK dipakai siapa pun — dulu
+# menumpuk tiap deploy gagal sampai disk 19GB penuh (ENOSPC saat build).
+dir_mb() { du -sm -- "$1" 2>/dev/null | awk '{print $1+0}'; }
+free_mb() { df -Pk . | awk 'NR==2{print int($4/1024)}'; }
+
+prune_build_artifacts() {
+  local before after d
+  before="$(free_mb)"
+  for d in .next.bak.* .next.failed.*; do
+    [ -e "$d" ] || continue
+    rm -rf -- "$d"
+  done
+  after="$(free_mb)"
+  if [ "$after" -gt "$before" ]; then
+    log "prune artefak build basi: +$((after - before))MB (sisa ${after}MB)"
+  fi
+}
+
+prune_build_artifacts
+
+# Perkiraan kebutuhan: tulis ulang node_modules (~1GB) + salinan .next.bak
+# + output build baru + cache webpack. DISK_MIN_MB bisa dioverride manual.
+need_mb="${DISK_MIN_MB:-$(( $(dir_mb node_modules) + 2 * $(dir_mb .next) + 500 ))}"
+[ "$need_mb" -ge 1500 ] || need_mb=1500
+free_now="$(free_mb)"
+if [ "$free_now" -lt "$need_mb" ]; then
+  printf '  pemakaian terbesar di %s:\n' "$(pwd)" >&2
+  du -sh .next .next.bak .next.bak.* .next.failed.* node_modules backups .git logs 2>/dev/null | sort -h | tail -8 >&2 || true
+  printf '  disk: %s\n' "$(df -h . | tail -1)" >&2
+  die "ruang disk kurang: butuh ~${need_mb}MB, tersedia ${free_now}MB.
+  Artefak build basi sudah dipruning otomatis di atas; kalau masih kurang, bebaskan:
+    npm cache clean --force                # cache unduhan npm (~0.5-1GB)
+    sudo journalctl --vacuum-size=200M     # log systemd
+    docker system prune -af                # HANYA bila docker dipakai
+  Cek: du -xh /home/maxis --max-depth=1 | sort -h | tail
+  Lalu jalankan ./deploy.sh lagi (atau DISK_MIN_MB=<MB> ./deploy.sh bila yakin cukup)."
+fi
+log "Disk OK: ${free_now}MB bebas, butuh ~${need_mb}MB"
+
 # ── 4. Install dependensi (postinstall → prisma generate) ────────────────────
 log "npm ci"
 npm ci --no-audit --no-fund ||
@@ -226,12 +269,12 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
   if [ -s .next/BUILD_ID ]; then
     build_backup_tmp=".next.bak.tmp.${build_backup_tag}"
     [ ! -e "$build_backup_tmp" ] || die "direktori backup sementara sudah ada"
+    # Buang .next.bak LAMA sebelum menyalin yang baru: menumpuk arsip
+    # .next.bak.<tag> tiap deploy bikin disk penuh (ENOSPC). Kalau cp di bawah
+    # gagal, .next lama masih utuh & service masih jalan — tak perlu rollback.
+    rm -rf -- .next.bak
     log "salin build lama ke .next.bak sebelum build baru"
     cp -a -- .next "$build_backup_tmp"
-    if [ -e .next.bak ]; then
-      [ ! -e ".next.bak.${build_backup_tag}" ] || die "arsip backup sudah ada"
-      mv -- .next.bak ".next.bak.${build_backup_tag}"
-    fi
     mv -- "$build_backup_tmp" .next.bak
     build_backup_created=1
   else
@@ -248,8 +291,13 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
       if [ -e .next ]; then
         mv -- .next ".next.failed.${build_backup_tag}"
       fi
-      cp -a -- .next.bak .next
-      log "Build gagal; .next lama dipulihkan, .next.bak tetap tersedia"
+      # Rollback lewat RENAME, bukan cp: saat ENOSPC, cp .next.bak → .next
+      # gagal separuh jalan dan .next hilang (service mati). Build gagal
+      # memang tak berguna — buang dulu untuk mengembalikan ruang.
+      rm -rf -- ".next.failed.${build_backup_tag}"
+      [ -e .next.bak ] || die "build gagal DAN .next.bak hilang — bangun ulang setelah ruang disk dibebaskan"
+      mv -- .next.bak .next
+      log "Build gagal; .next lama dipulihkan via rename (tanpa salin)"
     fi
     die "build gagal atau .next/BUILD_ID tidak ditemukan — service tidak direstart"
   fi

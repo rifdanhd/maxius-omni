@@ -14,6 +14,9 @@ const { GET } = await import("@/app/api/products/route");
 const { PATCH } = await import("@/app/api/products/[productId]/route");
 const { POST: copy } = await import("@/app/api/product-copy/save/route");
 const { POST: createBundle } = await import("@/app/api/products/bundle/route");
+const { processBulkPrice, listPricing, updateVariantDefaultPrice, updateMappingPrice } = await import("@/lib/services/pricing.service");
+const { POST: uploadPrices } = await import("@/app/api/products/pricing/bulk-upload/route");
+const { POST: bulkImages } = await import("@/app/api/products/gallery/bulk/route");
 const business = await prisma.business.create({ data: { name: "Master products" } });
 const otherBusiness = await prisma.business.create({ data: { name: "Other brand" } });
 await prisma.inventorySetting.create({ data: { id: business.id, businessId: business.id, lowStockDefaultThreshold: 3 } });
@@ -153,6 +156,59 @@ try {
     assert.equal((await createBundle(request("/api/products/bundle", "POST", { name: "Forbidden", items: [{ variantId: other.productVariant[0].id, qty: 1 }] }), context())).status, 400);
     const response = await GET(request("/api/products"), context());
     assert.ok(!(await response.json()).products.some((p: { id: string }) => p.id === other.id));
+  });
+  await check("copying the same source again preserves the original gallery and stock", async () => {
+    const before = await product(copyId);
+    await assert.rejects(saveProductCopyAsDraft({ businessId: business.id, name: "Copied", images: ["https://example.com/replacement.jpg"] }));
+    assert.deepEqual(await product(copyId), before);
+  });
+  await check("invalid CSV prices fail before changing any rows", async () => {
+    const response = await uploadPrices(request("/api/products/pricing/bulk-upload", "POST", { csv: "sku,price,store\nRED,25000,\nBLUE,not-a-number,Toko" }), context());
+    assert.equal(response.status, 400);
+    assert.equal((await product(copyId)).productVariant.find((v) => v.sku === "RED")?.price, 12000);
+  });
+  await check("ambiguous central SKU never selects an arbitrary price target", async () => {
+    for (const name of ["Duplicate price A", "Duplicate price B"]) await prisma.masterProduct.create({ data: { businessId: business.id, name, productVariant: { create: { sku: "DUP-PRICE", stock: 0, price: 100 } } } });
+    const result = await processBulkPrice([{ row: 2, sku: "DUP-PRICE", price: 500, store: null, channelSku: null }], business.id);
+    assert.equal(result.updated, 0); assert.equal(result.failed.length, 1);
+    assert.ok((await prisma.productVariant.findMany({ where: { sku: "DUP-PRICE" } })).every((v) => v.price === 100));
+    const prices = await listPricing({ businessId: business.id, pageSize: 1, page: 2 });
+    assert.equal(prices.rows.length, 1); assert.ok(prices.total >= 2);
+  });
+  await check("bulk price matching requires both the store and channel SKU", async () => {
+    const master = await prisma.masterProduct.create({ data: { businessId: business.id, name: "Store price safety", productVariant: { create: { sku: "STORE-PRICE", stock: 0, price: 1000 } } }, include: { productVariant: true } });
+    for (const label of ["Price A", "Price B"]) {
+      const account = await prisma.platformAccount.create({ data: { businessId: business.id, platform: "SHOPEE", label } });
+      await prisma.productMapping.create({ data: { accountId: account.id, variantId: master.productVariant[0].id, channelSku: label === "Price A" ? "CHANNEL-A" : "CHANNEL-B", price: 2000, updatedAt: new Date() } });
+    }
+    const result = await processBulkPrice([{ row: 2, sku: "STORE-PRICE", price: 500, store: "Price A", channelSku: "CHANNEL-B" }], business.id);
+    assert.equal(result.updated, 0); assert.equal(result.failed.length, 1);
+    assert.ok((await prisma.productMapping.findMany({ where: { variantId: master.productVariant[0].id } })).every((mapping) => mapping.price === 2000));
+  });
+  await check("gallery pagination and repeated bulk upload preserve a single cover", async () => {
+    const page = await listGallery({ businessId: business.id, pageSize: 1, page: 2 });
+    assert.equal(page.rows.length, 1); assert.ok(page.total > 1);
+    const body = { rows: [{ sku: "RED", url: "https://example.com/bulk.jpg" }] };
+    for (let i = 0; i < 2; i++) assert.equal((await bulkImages(request("/api/products/gallery/bulk", "POST", body), context())).status, 200);
+    const saved = await product(copyId);
+    assert.equal(saved.productImage.filter((image) => image.url === body.rows[0].url).length, 1);
+    assert.equal(saved.productImage.filter((image) => image.isCover).length, 1);
+  });
+  await check("draft and archived variants reject direct price mutations", async () => {
+    const draft = await product(copyId);
+    assert.equal((await updateVariantDefaultPrice(draft.productVariant[0].id, 999, business.id)).ok, false);
+    const archived = await prisma.masterProduct.create({ data: { businessId: business.id, name: "Archived pricing", productVariant: { create: { sku: "ARCHIVED-PRICE", stock: 0, price: 1000, isArchived: true } } }, include: { productVariant: true } });
+    const account = await prisma.platformAccount.create({ data: { businessId: business.id, platform: "SHOPEE", label: "Archived prices" } });
+    const mapping = await prisma.productMapping.create({ data: { accountId: account.id, variantId: archived.productVariant[0].id, channelSku: "ARCHIVED-REMOTE", price: 2000, updatedAt: new Date() } });
+    assert.equal((await updateVariantDefaultPrice(archived.productVariant[0].id, 999, business.id)).ok, false);
+    assert.equal((await updateMappingPrice(mapping.id, 999, business.id)).ok, false);
+    assert.equal((await product(archived.id)).productVariant[0].price, 1000);
+    assert.equal((await prisma.productMapping.findUniqueOrThrow({ where: { id: mapping.id } })).price, 2000);
+  });
+  await check("invalid Product Copy price returns a validation error without creating a draft", async () => {
+    const response = await copy(request("/api/product-copy/save", "POST", { name: "Invalid price draft", price: -500 }), context());
+    assert.equal(response.status, 400);
+    assert.equal(await prisma.masterProduct.count({ where: { name: "Invalid price draft", businessId: business.id } }), 0);
   });
   console.log(`${passed} master product checks passed on isolated PostgreSQL.`);
 } finally {

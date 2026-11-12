@@ -3,7 +3,7 @@
 import { ErrorFeedback, FormError } from "@/components/ui/feedback";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { notify } from "@/components/ui/notify";
-import { useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/utils/api-client";
 import { stockLevel, effectiveStock } from "@/lib/services/stock-level.policy";
@@ -23,6 +23,8 @@ import {
   X,
   Loader2,
   Trash2,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 type Mapping = {
@@ -37,6 +39,8 @@ type Variant = {
   stock: number;
   safetyStock: number;
   minStock: number | null;
+  name?: string | null;
+  price?: number | null;
   mappings: Mapping[];
 };
 
@@ -126,6 +130,9 @@ export default function MasterProductsPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [confirmProduct, setConfirmProduct] = useState<Product | null>(null);
   const [togglingActive, setTogglingActive] = useState(false);
+  const [productModal, setProductModal] = useState<Product | null | undefined>(undefined);
+  const [importOpen, setImportOpen] = useState(false);
+  const [priceProduct, setPriceProduct] = useState<Product | null>(null);
 
 
 
@@ -229,6 +236,17 @@ export default function MasterProductsPage() {
   async function refreshProducts() {
     // Refetch halaman aktif via token (fetch effect di atas yang eksekusi).
     setReloadToken((t) => t + 1);
+  }
+
+  async function downloadCatalog() {
+    try {
+      const res = await authFetch("/api/products/export");
+      if (!res.ok) throw new Error("Katalog belum dapat diunduh.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a"); link.href = url; link.download = "katalog-pusat.xlsx"; link.click(); URL.revokeObjectURL(url);
+      notify("success", "Katalog pusat berhasil diunduh.");
+    } catch (e) { notify("error", e instanceof Error ? e.message : "Gagal mengunduh katalog."); }
   }
 
   async function setProductActive(product: Product, active: boolean) {
@@ -440,6 +458,14 @@ export default function MasterProductsPage() {
   const totalLinks = (p: Product) =>
     p.variants.reduce((s, v) => s + v.mappings.length, 0);
 
+  const priceRange = (p: Product) => {
+    const prices = p.variants.map((v) => v.price).filter((v): v is number => typeof v === "number");
+    if (!prices.length) return "-";
+    const min = Math.min(...prices).toLocaleString("id-ID");
+    const max = Math.max(...prices).toLocaleString("id-ID");
+    return min === max ? `Rp ${min}` : `Rp ${min} – ${max}`;
+  };
+
   return (
     <div className="p-4 md:p-8">
       <div className="bg-card border border-border rounded-xl shadow-sm">
@@ -456,8 +482,8 @@ export default function MasterProductsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button disabled title="Unduh katalog belum tersedia" className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground opacity-60">
-              Unduh (Segera Hadir) <ChevronDown size={16} />
+            <button onClick={() => void downloadCatalog()} className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+              <Download size={16} /> Unduh katalog <ChevronDown size={16} />
             </button>
             <div className="relative" ref={addRef}>
               <button
@@ -469,16 +495,14 @@ export default function MasterProductsPage() {
               {addOpen && (
                 <div className="absolute max-w-[calc(100vw-2rem)] right-0 top-full mt-1 w-72 bg-card border border-border rounded-xl shadow-xl z-30 py-1.5">
                   <button
-                    disabled
-                    title="Segera hadir"
-                    className="w-full flex items-start gap-3 px-4 py-2.5 text-left opacity-50 cursor-not-allowed"
+                    onClick={() => { setAddOpen(false); setProductModal(null); }}
+                    className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-muted"
                   >
                     <Plus size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <span>
                       <span className="block text-sm font-semibold text-foreground">
                         Tambah Produk Baru{" "}
                         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold">
-                          Segera hadir
                         </span>
                       </span>
                       <span className="block text-[11px] text-muted-foreground">Buat produk satuan manual</span>
@@ -511,16 +535,14 @@ export default function MasterProductsPage() {
                     </span>
                   </button>
                   <button
-                    disabled
-                    title="Segera hadir"
-                    className="w-full flex items-start gap-3 px-4 py-2.5 text-left opacity-50 cursor-not-allowed"
+                    onClick={() => { setAddOpen(false); setImportOpen(true); }}
+                    className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-muted"
                   >
                     <FileUp size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <span>
                       <span className="block text-sm font-semibold text-foreground">
                         Unggah dari Excel{" "}
                         <span className="ml-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold">
-                          Segera hadir
                         </span>
                       </span>
                       <span className="block text-[11px] text-muted-foreground">Import banyak produk sekaligus</span>
@@ -893,8 +915,8 @@ export default function MasterProductsPage() {
                           {mastersku(product)}
                         </td>
 
-                        <td className="px-5 py-4 align-top pt-5 text-muted-foreground">
-                          -
+                        <td className="px-5 py-4 align-top pt-5 text-muted-foreground whitespace-nowrap">
+                          {priceRange(product)}
                         </td>
 
                         <td className="px-5 py-4 align-top pt-5">
@@ -940,7 +962,7 @@ export default function MasterProductsPage() {
                           </a>
                         </td>
 
-                        <td className="px-5 py-4 align-top pt-5 text-muted-foreground">-</td>
+                        <td className="px-5 py-4 align-top pt-5 text-muted-foreground whitespace-nowrap">-</td>
 
                         <td className="px-5 py-4 align-top pt-5">
                           <div
@@ -971,10 +993,10 @@ export default function MasterProductsPage() {
                                   <ImageIcon size={14} /> Ubah Gambar
                                 </button>
                                 <button
-                                  disabled title="Pengeditan informasi produk belum tersedia"
-                                  className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-muted-foreground opacity-60"
+                                  onClick={() => { setAturFor(null); setProductModal(product); }}
+                                  className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
                                 >
-                                  <Pencil size={14} /> Edit (Segera Hadir)
+                                  <Pencil size={14} /> Edit produk
                                 </button>
                                 {product.isActive !== false ? (
                                   <button
@@ -1015,11 +1037,10 @@ export default function MasterProductsPage() {
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <button
-                                    disabled
-                                    title="Harga belum tersedia di model data"
-                                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-border text-muted-foreground bg-card rounded-md cursor-not-allowed"
+                                    onClick={() => setPriceProduct(product)}
+                                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-border text-foreground bg-card rounded-md hover:bg-muted"
                                   >
-                                    <Pencil size={12} /> Ubah semua harga (Segera Hadir)
+                                    <Pencil size={12} /> Ubah harga varian
                                   </button>
                                 </div>
                               </div>
@@ -1158,6 +1179,15 @@ export default function MasterProductsPage() {
           }}
         />
       )}
+      {productModal !== undefined && (
+        <ProductFormModal product={productModal} onClose={() => setProductModal(undefined)} onSaved={(message) => { setProductModal(undefined); notify("success", message); void refreshProducts(); }} />
+      )}
+      {importOpen && (
+        <ImportModal onClose={() => setImportOpen(false)} onImported={(message) => { setImportOpen(false); notify("success", message); void refreshProducts(); }} />
+      )}
+      {priceProduct && (
+        <PriceModal product={priceProduct} onClose={() => setPriceProduct(null)} onSaved={() => { setPriceProduct(null); notify("success", "Harga varian berhasil diperbarui."); void refreshProducts(); }} />
+      )}
       {confirmProduct && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
@@ -1197,6 +1227,34 @@ export default function MasterProductsPage() {
       )}
     </div>
   );
+}
+
+function ModalShell({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4" onClick={onClose}><div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold text-foreground">{title}</h2><button onClick={onClose} title="Tutup" className="text-muted-foreground hover:text-foreground"><X size={17} /></button></div>{children}</div></div>;
+}
+
+function ProductFormModal({ product, onClose, onSaved }: { product: Product | null; onClose: () => void; onSaved: (message: string) => void }) {
+  const [name, setName] = useState(product?.name ?? ""); const [description, setDescription] = useState(product?.description ?? ""); const [category, setCategory] = useState(product?.category ?? ""); const [threshold, setThreshold] = useState(String(product?.threshold ?? 20)); const [status, setStatus] = useState(product?.status === "draft" ? "draft" : "active"); const [sku, setSku] = useState(""); const [variantName, setVariantName] = useState(""); const [stock, setStock] = useState("0"); const [price, setPrice] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  async function submit() {
+    setBusy(true); setError(null);
+    try {
+      const body = product ? { name, description, category, threshold: Number(threshold), status } : { name, description, category, threshold: Number(threshold), variants: [{ sku, name: variantName, stock: Number(stock), price: price === "" ? null : Number(price) }] };
+      const res = await authFetch(product ? `/api/products/${product.id}` : "/api/products", { method: product ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const data = await res.json().catch(() => null); if (!res.ok) throw new Error(data?.error ?? "Gagal menyimpan produk."); onSaved(product ? "Produk master berhasil diperbarui." : "Produk master berhasil dibuat.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Gagal menyimpan produk."); } finally { setBusy(false); }
+  }
+  return <ModalShell title={product ? "Edit Produk Master" : "Tambah Produk Baru"} onClose={onClose}><div className="grid gap-3"><label className="text-xs font-semibold">Nama produk *<input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Kategori<input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" /></label><label className="text-xs font-semibold">Ambang stok<input type="number" min="0" value={threshold} onChange={(e) => setThreshold(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" /></label></div>{product && <label className="text-xs font-semibold">Status katalog<select value={status} onChange={(e) => setStatus(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal"><option value="active">Aktif — tampil di katalog</option><option value="draft">Draf — belum siap dipakai</option></select></label>}<label className="text-xs font-semibold">Deskripsi<textarea value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1 min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-normal" /></label>{!product && <div className="rounded-lg border border-border bg-muted/40 p-3"><p className="mb-2 text-xs font-bold">Varian pertama</p><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">SKU *<input value={sku} onChange={(e) => setSku(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" /></label><label className="text-xs font-semibold">Nama varian<input value={variantName} onChange={(e) => setVariantName(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" /></label><label className="text-xs font-semibold">Stok awal<input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-normal" /></label><label className="text-xs font-semibold">Harga<input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" /></label></div></div>}{error && <FormError>{error}</FormError>}<div className="flex justify-end gap-2"><button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm">Batal</button><button onClick={() => void submit()} disabled={busy} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy && <Loader2 size={14} className="animate-spin" />}{busy ? "Menyimpan..." : "Simpan produk"}</button></div></div></ModalShell>;
+}
+
+function PriceModal({ product, onClose, onSaved }: { product: Product; onClose: () => void; onSaved: () => void }) {
+  const [prices, setPrices] = useState<Record<string, string>>(() => Object.fromEntries(product.variants.map((v) => [v.id, v.price == null ? "" : String(v.price)]))); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  async function save() { setBusy(true); setError(null); try { const res = await authFetch(`/api/products/${product.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ variants: product.variants.map((v) => ({ id: v.id, price: prices[v.id] === "" ? null : Number(prices[v.id]) })) }) }); const data = await res.json().catch(() => null); if (!res.ok) throw new Error(data?.error ?? "Gagal menyimpan harga."); onSaved(); } catch (e) { setError(e instanceof Error ? e.message : "Gagal menyimpan harga."); } finally { setBusy(false); } }
+  return <ModalShell title={`Ubah Harga — ${product.name}`} onClose={onClose}><div className="space-y-2">{product.variants.map((v) => <label key={v.id} className="grid grid-cols-[1fr_9rem] items-center gap-3 rounded-md border border-border p-3 text-xs"><span><b className="block">{v.name || v.sku}</b><span className="font-mono text-muted-foreground">{v.sku}</span></span><input type="number" min="0" value={prices[v.id] ?? ""} onChange={(e) => setPrices((prev) => ({ ...prev, [v.id]: e.target.value }))} className="h-9 rounded-md border border-input bg-background px-2 text-sm" placeholder="Kosong" /></label>)}</div>{error && <FormError>{error}</FormError>}<div className="mt-4 flex justify-end gap-2"><button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm">Batal</button><button onClick={() => void save()} disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? "Menyimpan..." : "Simpan harga"}</button></div></ModalShell>;
+}
+
+function ImportModal({ onClose, onImported }: { onClose: () => void; onImported: (message: string) => void }) {
+  const [file, setFile] = useState<File | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  async function upload() { if (!file) { setError("Pilih file .xlsx terlebih dahulu."); return; } setBusy(true); setError(null); try { const form = new FormData(); form.set("file", file); const res = await authFetch("/api/products/import", { method: "POST", body: form }); const data = await res.json().catch(() => null); if (!res.ok) throw new Error(data?.error ?? "Gagal mengunggah katalog."); onImported(data.message ?? "Katalog berhasil diunggah."); } catch (e) { setError(e instanceof Error ? e.message : "Gagal mengunggah katalog."); } finally { setBusy(false); } }
+  return <ModalShell title="Unggah Katalog dari Excel" onClose={onClose}><p className="mb-3 text-sm text-muted-foreground">Kolom wajib: <b>Nama Produk</b> dan <b>SKU</b>. Kolom opsional: Nama Varian, Kategori, Harga, Stok Pusat, Cadangan, Ambang Stok, URL Gambar.</p><label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border p-5 text-sm"><FileSpreadsheet size={22} /><span>{file ? file.name : "Pilih file .xlsx"}</span><input type="file" accept=".xlsx" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>{error && <FormError>{error}</FormError>}<div className="mt-4 flex justify-end gap-2"><button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm">Batal</button><button onClick={() => void upload()} disabled={busy} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? "Mengunggah..." : "Unggah dan simpan"}</button></div></ModalShell>;
 }
 
 /* ------------------------------ Modal Tambah Produk Bundle ------------------------------ */

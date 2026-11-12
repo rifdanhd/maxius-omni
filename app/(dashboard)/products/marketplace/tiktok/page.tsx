@@ -6,7 +6,10 @@ import { notify } from "@/components/ui/notify";
 import { useEffect, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
 import Link from "next/link";
-import { Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Loader2, ChevronUp, ExternalLink, Filter, PackageOpen, MoreVertical, Sparkles } from "lucide-react";
+import { Search, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Loader2, ChevronUp, ExternalLink, Filter, PackageOpen, MoreVertical, Sparkles, Trash2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -207,6 +210,9 @@ export default function TikTokMarketplacePage() {
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [syncingRows, setSyncingRows] = useState<Set<string>>(new Set());
   const [toggleOverrides, setToggleOverrides] = useState<Map<string, boolean>>(new Map());
+  const [toggleConfirm, setToggleConfirm] = useState<{ key: string; nextOn: boolean; label: string } | null>(null);
+  const [syncSelectedOpen, setSyncSelectedOpen] = useState(false);
+  const [syncingSelected, setSyncingSelected] = useState(false);
 
 
   const filterRef = useRef<HTMLDivElement>(null);
@@ -539,33 +545,68 @@ export default function TikTokMarketplacePage() {
       notify("error", "Listing belum pernah di-sync. Klik ikon refresh baris ini dulu.");
       return;
     }
-    // Optimistic
-    setToggleOverrides((prev) => new Map(prev).set(String(mappingId), nextOn));
-    setToggling((prev) => new Set(prev).add(String(mappingId)));
+    setToggleConfirm({ key: String(mappingId), nextOn, label: row.platformTitle ?? row.master?.name ?? row.channelSku ?? "" });
+  }
+
+  async function confirmToggle() {
+    if (!toggleConfirm) return;
+    const { key, nextOn, label } = toggleConfirm;
+    const row = rows.find((r) => String(r.variants[0].mappingId) === key);
+    if (!row) return;
+    setToggleConfirm(null);
+    setToggling((prev) => new Set(prev).add(key));
+    setToggleOverrides((prev) => new Map(prev).set(key, nextOn));
     try {
-      const res = await authFetch(`/api/marketplace/tiktok/products/${mappingId}`, {
+      const res = await authFetch(`/api/marketplace/tiktok/products/${key}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: nextOn }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? (nextOn ? "Gagal mengaktifkan." : "Gagal menonaktifkan."));
-      notify("success", nextOn ? "Listing diaktifkan di TikTok Shop." : "Listing dinonaktifkan di TikTok Shop.");
+      notify("success", nextOn ? `Listing "${label}" diaktifkan di TikTok Shop.` : `Listing "${label}" dinonaktifkan di TikTok Shop.`);
       setRefreshKey((k) => k + 1);
     } catch (e) {
-      // rollback
       setToggleOverrides((prev) => {
         const next = new Map(prev);
-        next.set(String(mappingId), !nextOn);
+        next.set(key, !nextOn);
         return next;
       });
       notify("error", e instanceof Error ? e.message : "Gagal mengubah status.");
     } finally {
       setToggling((prev) => {
         const next = new Set(prev);
-        next.delete(String(mappingId));
+        next.delete(key);
         return next;
       });
+    }
+  }
+
+  async function syncSelected() {
+    const selectedRows = rows.filter((r) => selected.has(r.key));
+    if (selectedRows.length === 0) return;
+    setSyncSelectedOpen(false);
+    setSyncingSelected(true);
+    try {
+      for (const row of selectedRows) {
+        const mappingId = row.variants[0].mappingId;
+        setSyncingRows((prev) => new Set(prev).add(String(mappingId)));
+        try {
+          const res = await authFetch(`/api/marketplace/tiktok/products/${mappingId}`, {
+            method: "POST", headers: { },
+          });
+          if (!res.ok) throw new Error("Refresh gagal.");
+        } finally {
+          setSyncingRows((prev) => { const next = new Set(prev); next.delete(String(mappingId)); return next; });
+        }
+      }
+      notify("success", `${selectedRows.length} listing diperbarui.`);
+      setSelected(new Set());
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      notify("error", e instanceof Error ? e.message : "Gagal memperbarui listing terpilih.");
+    } finally {
+      setSyncingSelected(false);
     }
   }
 
@@ -677,7 +718,7 @@ export default function TikTokMarketplacePage() {
             className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {syncingAll ? "Menyinkronkan..." : "Perbarui Data (Sync Semua)"}
+            {syncingAll ? "Menyinkronkan..." : "Perbarui Data"}
           </button>
           <button
             onClick={syncTikTokToCentral}
@@ -686,8 +727,18 @@ export default function TikTokMarketplacePage() {
             className="flex items-center gap-2 rounded-md border border-amber-500/60 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300"
           >
             {syncingCentral ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {syncingCentral ? "Mengganti stok..." : "TikTok → Stok Pusat"}
+            {syncingCentral ? "Mengganti stok..." : "Koreksi Stok Pusat"}
           </button>
+          {selected.size > 0 && (
+            <button
+              onClick={() => setSyncSelectedOpen(true)}
+              disabled={syncingSelected}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary disabled:opacity-60"
+            >
+              {syncingSelected ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Sinkron terpilih ({selected.size})
+            </button>
+          )}
         </div>
       </div>
 
@@ -978,7 +1029,7 @@ export default function TikTokMarketplacePage() {
             className="flex items-center gap-2 border rounded-md px-4 py-2 text-sm font-medium h-[38px] border-border text-muted-foreground bg-card hover:bg-muted disabled:opacity-60"
           >
             {unmappedLoading ? <Loader2 size={14} className="animate-spin" /> : <PackageOpen size={14} />}
-            <span>Belum ter-mapping</span>
+            <span>Periksa Belum Terhubung</span>
             {unmappedChecked && unmappedTotal > 0 && (
               <span className="px-1.5 rounded-full bg-muted-foreground text-primary-foreground text-[10px] font-bold">
                 {unmappedTotal}
@@ -994,8 +1045,8 @@ export default function TikTokMarketplacePage() {
           )}
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Table (desktop) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted border-b border-border text-foreground font-semibold">
               <tr>
@@ -1071,6 +1122,236 @@ export default function TikTokMarketplacePage() {
           </table>
         </div>
 
+        {/* Cards (mobile) */}
+        <div className="md:hidden space-y-3 p-3">
+          <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" className="w-4 h-4 rounded border-border" checked={allPageSelected} onChange={toggleAll} /> Pilih semua di halaman ini</label>
+          {loading ? (
+            <div className="space-y-3" aria-busy="true">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-10 animate-pulse rounded-lg bg-muted/60" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="px-5 py-12 text-center"><ErrorFeedback title="Produk belum dapat dimuat" error={error} action={<button className="underline" onClick={() => setRefreshKey((key) => key + 1)}>Coba lagi</button>} /></div>
+          ) : rows.length === 0 ? (
+            <div className="px-5 py-12 text-center text-muted-foreground">
+              <PackageOpen size={28} className="mx-auto mb-2" />
+              {q.trim() || accountFilter.length || tab !== "all" ? <div className="space-y-2"><p>Tidak ada produk yang cocok dengan pencarian/filter.</p><button className="underline" onClick={() => { setSearchInput(""); setQ(""); setAccountFilter([]); setTab("all"); setPage(1); }}>Hapus Pencarian dan Filter</button></div> : <div className="space-y-2"><p>Belum ada produk TikTok Shop pada tampilan ini. Perbarui Data, lalu hubungkan produk yang belum masuk katalog pusat.</p><Link href="/settings/accounts" className="underline">Hubungkan atau Periksa Toko TikTok Shop</Link></div>}
+            </div>
+          ) : (
+            rows.map((row) => {
+              const rowActive = isActiveStatus(row.status);
+              const effectiveActive =
+                toggleOverrides.get(String(row.variants[0].mappingId)) ?? rowActive;
+              const busy = toggling.has(String(row.variants[0].mappingId));
+              const deleted = isDeletedStatus(row.status);
+              const name = row.platformTitle ?? row.master?.name ?? row.channelSku ?? "-";
+              const isExpanded = expanded.has(row.key);
+              const single = row.variantCount === 1;
+
+              // Status explanation: problem + next action
+              let statusProblem = "";
+              let statusNext = "";
+              const st = (row.status ?? "").toUpperCase();
+              if (!row.platformProductId) {
+                statusProblem = "Belum di-sync";
+                statusNext = "Klik ikon refresh untuk menarik status dari TikTok Shop";
+              } else if (st === "DELETED") {
+                statusProblem = "Dihapus di TikTok Shop";
+                statusNext = "Produk tidak tersedia di toko; cek apakah perlu dipublish ulang";
+              } else if (st === "SELLER_DEACTIVATED" || st === "PLATFORM_DEACTIVATED" || st === "FREEZE") {
+                statusProblem = "Tidak aktif di toko";
+                statusNext = "Aktifkan kembali lewat switch Aktif atau edit listing";
+              } else if (st === "DRAFT" || st === "PENDING") {
+                statusProblem = "Belum tayang di toko";
+                statusNext = "Selesaikan publish melalui Ubah atau tinjauan platform";
+              } else if (st === "FAILED") {
+                statusProblem = "Gagal publish";
+                statusNext = "Klik Sync ulang untuk mencoba kembali atau edit listing";
+              } else if (st === "UNMATCHED") {
+                statusProblem = "Tidak ditemukan di TikTok";
+                statusNext = "Periksa kembali koneksi toko atau mapping SKU";
+              } else if (!effectiveActive) {
+                statusProblem = "Nonaktif di toko";
+                statusNext = "Nyalakan switch Aktif untuk menayangkan listing";
+              }
+
+              const stockSource = row.variants[0].platformStock !== null
+                ? "Stok tayang (dari pusat)"
+                : "Belum tersedia di platform";
+
+              return (
+                <article key={row.key} className="rounded-xl border border-border bg-card p-4" data-testid="tiktok-product-card">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" className="w-4 h-4 rounded border-border" checked={selected.has(row.key)} onChange={() => toggleRow(row.key)} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        {row.master?.imageUrl ? (
+                          <img src={row.master.imageUrl} alt={name} className="w-10 h-10 rounded object-cover bg-muted shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center text-muted-foreground shrink-0"><PackageOpen size={16} /></div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-foreground font-semibold leading-tight flex items-start gap-1.5">
+                            <span className="min-w-0 truncate" title={name}>{name}</span>
+                            {row.titleUnsynced && (
+                              <span className="shrink-0 inline-flex items-center gap-1 bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">Judul belum sync</span>
+                            )}
+                            {deleted && (
+                              <span className="shrink-0 inline-flex items-center gap-1 bg-muted text-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">Del</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => toggleExpand(row.key)}
+                            className="text-xs text-foreground hover:underline mt-1 inline-flex items-center gap-1"
+                          >
+                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            Lihat {row.variantCount} varian
+                          </button>
+                          <p className="text-[10px] text-muted-foreground mt-1">{statusProblem ? `${statusProblem} · ${statusNext}` : "Aktif di toko"}</p>
+                          {row.accountLabel && (
+                            <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-full">TikTok Shop</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted-foreground">SKU Channel</span>
+                      <span className="font-mono font-semibold text-foreground truncate" title={row.channelSku ?? undefined}>{row.channelSku ?? "-"}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted-foreground">Harga</span>
+                      <span className="font-semibold text-foreground">{row.priceMin !== null && row.priceMin !== row.priceMax ? `${fmtPrice(row.priceMin)} – ${fmtPrice(row.priceMax)}` : fmtPrice(row.priceMin)}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted-foreground">Stok</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-foreground">{fmtNumber(row.stockTotal)}</span>
+                        <span className="text-[10px] text-muted-foreground" title={stockSource}>{stockSource}</span>
+                        {row.stockTotal === 0 && <StatusBadge status="out" className="ml-1" />}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted-foreground">Status di Toko</span>
+                      <span className="font-semibold text-foreground">{STATUS_LABEL[row.status ?? ""] ?? "Belum di-sync"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleActive(row, !effectiveActive)}
+                        disabled={busy || !row.platformProductId || deleted}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          effectiveActive ? "bg-muted-foreground" : "bg-muted"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        role="switch"
+                        aria-checked={effectiveActive}
+                        title={
+                          !row.platformProductId
+                            ? "Belum di-sync — refresh status baris dulu."
+                            : effectiveActive
+                              ? "Aktif di TikTok Shop"
+                              : "Nonaktif di TikTok Shop"
+                        }
+                      >
+                        {busy ? (
+                          <Loader2 size={11} className="text-primary-foreground mx-auto animate-spin" />
+                        ) : (
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${
+                              effectiveActive ? "translate-x-[18px]" : "translate-x-0.5"
+                            }`}
+                          />
+                        )}
+                      </button>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        {busy ? "proses..." : STATUS_LABEL[row.status ?? ""] ?? "Belum di-sync"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button
+                        onClick={() => syncRow(row)}
+                        disabled={syncingRows.has(String(row.variants[0].mappingId))}
+                        title="Sync ulang status dari TikTok Shop"
+                        className="p-1.5 rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        {syncingRows.has(String(row.variants[0].mappingId)) ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      </button>
+                      <button
+                        onClick={() => setOpenMenu((k) => (k === row.key ? null : row.key))}
+                        className="p-1.5 rounded-md border text-foreground hover:bg-muted"
+                        title="Atur"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                      {openMenu === row.key && (
+                        <div className="absolute right-0 top-full z-20 w-44 bg-card border border-border rounded-md shadow-lg py-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                          <Link
+                            href={`/products/marketplace/tiktok/${encodeURIComponent(row.variants[0]?.mappingId ?? "")}/edit`}
+                            className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
+                          >
+                            Ubah
+                            <span className="block text-[10px] text-muted-foreground">Edit & publish ke TikTok Shop</span>
+                          </Link>
+                          <button
+                            onClick={() => syncRow(row)}
+                            className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
+                          >
+                            Sync ulang status
+                          </button>
+                          <button
+                            onClick={() => toggleExpand(row.key)}
+                            className="block w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted"
+                          >
+                            Detail varian
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">{row.lastSyncedAt ? fmtDate(row.lastSyncedAt) : "belum sync"}</p>
+
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <div className="mb-2 text-xs font-bold text-muted-foreground uppercase tracking-wide">Varian — {row.accountLabel}</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead>
+                            <tr className="text-left text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border">
+                              <th className="py-2 pr-4">SKU Lokal</th>
+                              <th className="py-2 pr-4">SKU Channel</th>
+                              <th className="py-2 pr-4">Harga</th>
+                              <th className="py-2 pr-4">Stok</th>
+                              <th className="py-2">Status Platform</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {row.variants.map((v) => (
+                              <tr key={v.mappingId} className="border-b border-border last:border-0">
+                                <td className="py-2 pr-4 text-foreground font-semibold">{v.sku}</td>
+                                <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
+                                <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
+                                <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>
+                                <td className="py-2 pr-4"><span className="text-[10px] font-bold text-foreground">{STATUS_LABEL[v.status ?? ""] ?? "Belum di-sync"}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </article>
+              );
+            })
+          )}
+        </div>
+
         {/* Pagination */}
         <div className="px-6 py-4 border-t border-border flex items-center justify-between flex-wrap gap-3">
           <span className="text-sm text-muted-foreground">
@@ -1107,6 +1388,110 @@ export default function TikTokMarketplacePage() {
           </div>
         </div>
       </div>
+
+      {/* Konfirmasi switch aktif/nonaktif */}
+      {toggleConfirm && (
+        <AlertDialog open={Boolean(toggleConfirm)} onOpenChange={(open) => { if (!open) setToggleConfirm(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{toggleConfirm.nextOn ? "Aktifkan listing?" : "Nonaktifkan listing?"}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {`Listing "${toggleConfirm.label}" akan ${toggleConfirm.nextOn ? "diaktifkan" : "dinonaktifkan"} di TikTok Shop. Pembeli tidak akan melihat produk yang nonaktif. Tindakan ini langsung mengubah listing di toko.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmToggle} disabled={toggling.has(toggleConfirm.key)}>
+                {toggling.has(toggleConfirm.key) ? <Loader2 size={14} className="animate-spin" /> : (toggleConfirm.nextOn ? "Aktifkan" : "Nonaktifkan")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Konfirmasi sinkron terpilih */}
+      {syncSelectedOpen && (
+        <AlertDialog open={syncSelectedOpen} onOpenChange={setSyncSelectedOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Sinkron {selected.size} listing terpilih?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Aksi ini akan menarik status terbaru dari TikTok Shop untuk setiap listing yang dipilih. Stok katalog pusat tidak diubah.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={syncSelected} disabled={syncingSelected}>
+                {syncingSelected ? <Loader2 size={14} className="animate-spin" /> : "Sinkronkan"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Preview koreksi stok pusat (Dialog, ramah HP, aksesibel) */}
+      {centralPreview && (
+        <Dialog open={Boolean(centralPreview)} onOpenChange={(open) => { if (!open) setCentralPreview(null); }}>
+          <DialogContent className="w-full max-w-[640px] p-0">
+            <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">Preview perubahan stok pusat</p>
+                <h2 className="mt-1 text-lg font-bold text-foreground">{centralPreview.label}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Periksa foto dan SKU sebelum angka TikTok menggantikan stok pusat.</p>
+              </div>
+              <button onClick={() => setCentralPreview(null)} className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted">Tutup</button>
+            </div>
+            <div className="max-h-[60vh] overflow-auto p-5">
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground px-4 py-2 border-b border-border">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    <div>Produk</div>
+                    <div>SKU Pusat</div>
+                    <div className="text-right">SKU TikTok</div>
+                    <div className="text-right">Sekarang</div>
+                    <div className="text-right">TikTok</div>
+                  </div>
+                </div>
+                <div className="divide-y divide-border">
+                  {centralPreview.updated.map((item) => (
+                    <div key={item.mappingId} className="p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
+                        <div className="flex min-w-[180px] items-center gap-3 text-sm">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.productName} className="h-10 w-10 rounded-md border border-border object-cover" />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-[10px] text-muted-foreground">No foto</div>
+                          )}
+                          <div className="min-w-0">
+                            <span className="font-semibold text-foreground truncate block">{item.productName}</span>
+                            <span className="text-[10px] text-muted-foreground block mt-0.5">{item.sku}</span>
+                          </div>
+                        </div>
+                        <div className="font-mono text-foreground text-sm">{item.sku}</div>
+                        <div className="font-mono text-muted-foreground text-sm text-right">{item.channelSku}</div>
+                        <div className="text-right font-semibold text-foreground text-sm">{fmtNumber(item.before)}</div>
+                        <div className={`text-right font-bold text-sm ${item.before === item.after ? "text-muted-foreground" : "text-amber-600"}`}>{fmtNumber(item.after)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {centralPreview.skipped.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                  <b>{centralPreview.skipped.length} SKU dilewati:</b> {centralPreview.skipped.map((item) => `${item.sku} — ${item.reason}`).join("; ")}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border p-5">
+              <button onClick={() => setCentralPreview(null)} className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">Batal</button>
+              <button onClick={confirmTikTokToCentral} disabled={syncingCentral || centralPreview.updated.length === 0} className="flex items-center gap-2 rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
+                {syncingCentral && <Loader2 size={14} className="animate-spin" />}
+                {syncingCentral ? "Mengganti stok..." : `Konfirmasi ${centralPreview.updated.length} SKU`}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -1221,12 +1606,14 @@ function MapUnmappedModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4" onClick={onClose}>
-      <div
-        className="bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-base font-bold text-foreground">Hubungkan Produk TikTok (Mapping)</h2>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="p-0" showCloseButton>
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <div className="pr-6 text-left">
+            <h2 className="text-base font-bold text-foreground">Hubungkan Produk TikTok (Mapping)</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">Pilih varian tujuan di katalog pusat atau buat produk master baru untuk menghubungkan SKU ini.</p>
+          </div>
+        </div>
         <div className="flex items-center gap-3 mt-2.5 p-2 rounded-lg bg-muted border border-border">
           {target.sku.imageUrl || target.product.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1370,24 +1757,24 @@ function MapUnmappedModal({
 
         {error && <FormError>{error}</FormError>}
 
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-md hover:bg-muted"
-          >
-            Batal
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || loadingMasters}
-            className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-md hover:bg-primary disabled:opacity-60 flex items-center gap-2"
-          >
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            {saving ? "Menyimpan..." : "Simpan mapping"}
-          </button>
-        </div>
-      </div>
-    </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-md hover:bg-muted"
+            >
+              Batal
+            </button>
+            <button
+              onClick={submit}
+              disabled={saving || loadingMasters}
+              className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-md hover:bg-primary disabled:opacity-60 flex items-center gap-2"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              {saving ? "Menyimpan..." : "Simpan mapping"}
+            </button>
+          </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

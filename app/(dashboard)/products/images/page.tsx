@@ -1,7 +1,9 @@
 "use client";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { GalleryBulkDialog } from "@/components/inventory/gallery-bulk-dialog";
 
 import { ErrorFeedback } from "@/components/ui/feedback";
+import { notify } from "@/components/ui/notify";
 import { confirmAction } from "@/components/ui/confirm-action";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authFetch } from "@/lib/utils/api-client";
@@ -37,6 +39,7 @@ type GalleryRow = {
 };
 
 type GalleryResponse = {
+  categories: string[];
   rows: GalleryRow[];
   total: number;
   page: number;
@@ -79,11 +82,12 @@ const fmtDate = (iso: string | null | undefined) => {
 function statusBadge(row: GalleryRow) {
   if (row.totalImages === 0)
     return { label: "Tidak Ada Gambar", cls: "bg-muted text-foreground" };
-  if (row.complete) return { label: "Lengkap", cls: "bg-muted text-foreground" };
-  return { label: "Belum Lengkap", cls: "bg-muted text-foreground" };
+  if (row.complete) return { label: "Jumlah foto cukup", cls: "bg-muted text-foreground" };
+  return { label: "Perlu tambah foto", cls: "bg-muted text-foreground" };
 }
 
 function fileToDataUrl(file: File): Promise<string> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024) return Promise.reject(new Error("Gunakan JPG, PNG, atau WebP maksimal 2 MB per gambar."));
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
@@ -169,6 +173,7 @@ function GalleryModal({ row, onClose }: { row: GalleryRow; onClose: () => void }
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Gagal mengunggah gambar.");
+      notify("success", data.added > 0 ? `${data.added} gambar ditambahkan ke katalog pusat.` : "Gambar sudah ada di galeri; tidak ditambahkan ulang.");
       setPendingUrls("");
       setPendingFiles([]);
       if (fileRef.current) fileRef.current.value = "";
@@ -405,12 +410,13 @@ function HistoryModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 backdrop-blur-sm p-4">
       <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <h2 className="text-lg font-bold text-foreground">Riwayat Gambar</h2>
+          <h2 className="text-lg font-bold text-foreground">Gambar Terakhir Diperbarui</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
             <X size={20} />
           </button>
         </div>
         <div className="p-6 overflow-y-auto">
+          <p className="mb-3 text-sm text-muted-foreground">Daftar gambar yang masih tersimpan, diurutkan berdasarkan waktu pembaruan. Gambar yang dihapus tidak tampil di daftar ini.</p>
           {error && <ErrorFeedback error={error} className="mb-4" />}
           {loading ? (
             <p className="text-sm text-muted-foreground">Memuat riwayat...</p>
@@ -466,6 +472,7 @@ export default function KelolaGambarPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailRow, setDetailRow] = useState<GalleryRow | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const filterRef = useRef<HTMLDivElement>(null);
@@ -529,7 +536,7 @@ export default function KelolaGambarPage() {
         });
         if (!res.ok) return;
         const data: GalleryResponse = await res.json();
-        setCategories([...new Set(data.rows.map((r) => r.category).filter((c): c is string => !!c))]);
+        setCategories(data.categories ?? []);
       } catch {
         // opsional
       }
@@ -588,28 +595,28 @@ export default function KelolaGambarPage() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Kelola Gambar</h1>
             <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-              Kelola foto, foto utama, dan urutan gambar produk di katalog pusat; mulai dengan mencari produk, klik Lihat Gambar, lalu pilih file atau tempel tautan gambar dan unggah. Status Lengkap berarti jumlah foto minimal sama dengan jumlah variasi (minimal satu foto).
+              Pilih produk → tambah foto → tentukan foto utama. Gambar disimpan di katalog pusat; perubahan di sini belum mengubah gambar marketplace. Label jumlah foto cukup hanya menghitung foto, bukan memeriksa kecocokan setiap varian.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setHistoryOpen(true)}
               className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
-              <History size={16} /> Riwayat
+              <History size={16} /> Terakhir diperbarui
             </button>
             <button
-              disabled
-              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-60 cursor-not-allowed"
+              onClick={() => setBulkOpen(true)}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
-              <Upload size={16} /> Unggah Massal (Segera Hadir)
+              <Upload size={16} /> Tambah gambar massal
             </button>
           </div>
         </div>
 
         {/* Toolbar */}
         <div className="p-4 border-b border-border flex items-center gap-3 flex-wrap">
-          <div className="relative w-80">
+          <div className="relative min-w-0 w-full sm:w-80">
             <input
               type="text"
               value={searchInput}
@@ -665,8 +672,8 @@ export default function KelolaGambarPage() {
                   <div className="flex flex-col gap-1">
                     {([
                       ["all", "Semua"],
-                      ["complete", "Lengkap"],
-                      ["incomplete", "Belum Lengkap"],
+                      ["complete", "Jumlah foto cukup"],
+                      ["incomplete", "Perlu tambah foto"],
                       ["none", "Tidak Ada Gambar"],
                     ] as const).map(([val, label]) => (
                       <label key={val} className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-muted rounded px-1 py-0.5">
@@ -879,8 +886,9 @@ export default function KelolaGambarPage() {
         </div>
       </div>
 
-      {detailRow && <GalleryModal row={detailRow} onClose={() => setDetailRow(null)} />}
+      {detailRow && <GalleryModal row={detailRow} onClose={() => { setDetailRow(null); setRefreshKey((key) => key + 1); }} />}
       {historyOpen && <HistoryModal onClose={() => setHistoryOpen(false)} />}
+      {bulkOpen && <GalleryBulkDialog onClose={() => setBulkOpen(false)} onSaved={() => setRefreshKey((key) => key + 1)} />}
     </div>
   );
 }

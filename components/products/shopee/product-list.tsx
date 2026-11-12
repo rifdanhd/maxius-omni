@@ -32,9 +32,10 @@ function ProductInfo({ row, compact, full = false }: { row: ShopeeListingRow; co
 
 function Stock({ row, threshold }: { row: ShopeeListingRow; threshold: number }) {
   const label = row.stockTotal === 0 ? "Habis" : row.stockTotal < threshold ? "Menipis" : null;
-  return <div className="flex flex-col items-end gap-1" title={row.variantCount > 1 ? "Total stok seluruh varian produk di toko ini" : "Stok produk di marketplace"}>
+  return <div className="flex flex-col items-end gap-1" title={row.variantCount > 1 ? "Total stok semua varian di toko Shopee (stok marketplace, bukan stok pusat)" : "Stok produk di toko Shopee"}>
     <span className="font-semibold tabular-nums">{fmtNumber(row.stockTotal)}</span>
     {label && <StatusBadge status={label === "Habis" ? "out" : "low"} />}
+    <span className="text-[10px] text-muted-foreground">Stok Shopee</span>
   </div>;
 }
 
@@ -154,8 +155,9 @@ export function ShopeeProductDetail({ row, onClose, threshold, returnFocus }: { 
         <dt className="text-muted-foreground">SKU</dt><dd className="break-all">{row.channelSku ?? `${fmtNumber(row.variantCount)} SKU per varian`}</dd>
         <dt className="text-muted-foreground">Jumlah varian</dt><dd>{fmtNumber(row.variantCount)}</dd>
         <dt className="text-muted-foreground">Sinkron terakhir</dt><dd>{fmtDate(row.lastSyncedAt)}</dd>
+        <dt className="text-muted-foreground">Sumber stok</dt><dd className="text-xs text-foreground">Stok ditampilkan adalah stok yang tampil di toko Shopee (marketplace), bukan stok gudang pusat. Ubah stok pusat di Stok Gudang (Pusat).</dd>
       </dl>
-      {row.variantCount > 1 && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">Stok yang ditampilkan adalah total seluruh varian, bukan stok tiap varian.</p>}
+      {row.variantCount > 1 && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">Stok yang ditampilkan adalah total seluruh varian di toko Shopee. Untuk lihat stok tiap varian, buka detail varian atau gunakan Stok Gudang (Pusat) untuk rincian per SKU.</p>}
       {mappingStatus(row) === "failed" && <Feedback variant="error" title="Gagal sinkron" description="Pembaruan stok ke marketplace belum terselesaikan; periksa kegagalannya di Stok Mismatch." />}
       <div className="flex flex-wrap gap-2"><Button variant="outline" asChild><Link href={mappingHref(row)}>Atur mapping</Link></Button>{mappingStatus(row) === "failed" && <Button variant="outline" asChild><Link href="/inventory/mismatch">Periksa kegagalan</Link></Button>}</div>
     </div>}

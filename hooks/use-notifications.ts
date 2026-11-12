@@ -7,9 +7,34 @@ import { useAuthStore } from "@/stores/auth-store";
 import { APPLICATION_NOTIFICATION_EVENT, localNotificationStorageKey, notificationStorageKey, readLocalNotifications, readNotificationMemory, reconcileNotifications, writeLocalNotifications, type ApplicationNotificationDetail, type NotificationItem, type NotificationMemory } from "@/lib/ui/notifications";
 
 type SyncResponse = { rows: Array<{ id: string; status: string; retryCount: number; updatedAt: string; account: { label: string }; variant: { productName: string } }>; nextCursor?: string | null };
+type OrdersResponse = { orders: Array<{ id: string; orderNo: string; buyerName: string | null; amount: number | null; createTime: string | null; account: { label: string } | null }> };
 type Store = { id: string; name: string; status: string; canRefresh?: boolean; isFrozen?: boolean; tokenExpiresAt?: string };
 type View = { scope: string; rows: NotificationItem[]; loading: boolean; failed: string[]; more: boolean };
 const initial: View = { scope: "", rows: [], loading: true, failed: [], more: false };
+
+let notificationAudio: AudioContext | null = null;
+function playNewOrderSound() {
+  if (typeof window === "undefined" || !window.AudioContext) return;
+  try {
+    notificationAudio ??= new AudioContext();
+    if (notificationAudio.state === "suspended") void notificationAudio.resume();
+    const now = notificationAudio.currentTime;
+    const oscillator = notificationAudio.createOscillator();
+    const gain = notificationAudio.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, now);
+    oscillator.frequency.setValueAtTime(1175, now + 0.12);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+    oscillator.connect(gain);
+    gain.connect(notificationAudio.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.3);
+  } catch {
+    // Browser autoplay policy or audio device may block the optional sound.
+  }
+}
 
 export function useNotifications() {
   const username = useAuthStore((state) => state.auth.user?.accountNo ?? "");
@@ -39,10 +64,11 @@ export function useNotifications() {
       running = true;
       const scope = scopeNow();
       if (viewRef.current.scope !== scope) update({ ...initial, scope });
-      const [stock, sync, stores] = await Promise.allSettled([
+      const [stock, sync, stores, orders] = await Promise.allSettled([
         read<StockAlertsResponse>("/api/stock-alerts"),
         read<SyncResponse>("/api/sync-jobs?status=mismatch&limit=100"),
         read<Store[]>("/api/stores"),
+        read<OrdersResponse>("/api/orders?page=1&pageSize=20&sort=createTime&dir=desc"),
       ]);
       running = false;
       if (cancelled) return;
@@ -63,6 +89,39 @@ export function useNotifications() {
           items.push({ id: `store:${store.id}`, source: "store", fingerprint: `${store.status}:${store.isFrozen}:${store.tokenExpiresAt}`, severity: "error", title: store.isFrozen ? "Koneksi toko dibekukan" : "Koneksi toko kedaluwarsa", description: `${store.name} · Periksa koneksi melalui Pengaturan Toko.`, href: "/settings/accounts" });
         }
       } else { failed.push("koneksi toko"); failedSources.add("store"); }
+      const local = readLocalNotifications(scope);
+      const seenKey = `${scope}:order-seen`;
+      let seenIds: string[] = [];
+      try {
+        const storedSeen = JSON.parse(localStorage.getItem(seenKey) ?? "[]");
+        if (Array.isArray(storedSeen)) seenIds = storedSeen.filter((id): id is string => typeof id === "string");
+      } catch { /* baseline baru dibuat di bawah */ }
+      const orderRows = orders.status === "fulfilled" ? orders.value.orders ?? [] : [];
+      if (orders.status === "rejected") { failed.push("pesanan"); failedSources.add("order"); }
+      const currentIds = orderRows.map((order) => order.id).filter(Boolean);
+      const isBaseline = !localStorage.getItem(seenKey);
+      const newOrders = isBaseline ? [] : orderRows.filter((order) => !seenIds.includes(order.id));
+      if (newOrders.length > 0) {
+        const newOrderNotifications: NotificationItem[] = newOrders.slice(0, 5).map((order) => ({
+          id: `order:new:${order.id}`,
+          source: "order",
+          fingerprint: `new:${order.id}`,
+          severity: "info",
+          title: "Pesanan baru",
+          description: `${order.account?.label ?? "Marketplace"} · ${order.orderNo}${order.buyerName ? ` · ${order.buyerName}` : ""}`,
+          href: `/orders?q=${encodeURIComponent(order.orderNo)}&searchType=orderNo`,
+          occurredAt: order.createTime ?? new Date().toISOString(),
+        }));
+        const mergedLocal = [...newOrderNotifications, ...local.filter((item) => item.source !== "order"), ...local.filter((item) => item.source === "order")].slice(0, 30);
+        writeLocalNotifications(scope, mergedLocal);
+        playNewOrderSound();
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("Pesanan baru", { body: `${newOrders.length} pesanan baru masuk ke Maxius.` });
+        }
+      }
+      if (orders.status === "fulfilled") {
+        try { localStorage.setItem(seenKey, JSON.stringify(currentIds.slice(0, 100))); } catch { /* optional memory */ }
+      }
       items.push(...readLocalNotifications(scope));
       const oldRows = viewRef.current.scope === scope ? viewRef.current.rows : [];
       items.push(...oldRows.filter((item) => failedSources.has(item.source)));
@@ -74,7 +133,15 @@ export function useNotifications() {
     const refreshNow = () => { void load(); };
     refresh.current = refreshNow;
     void load();
-    const timer = window.setInterval(refreshNow, 60_000);
+    const unlockSound = () => {
+      if (typeof window === "undefined" || !window.AudioContext) return;
+      try {
+        notificationAudio ??= new AudioContext();
+        if (notificationAudio.state === "suspended") void notificationAudio.resume();
+      } catch { /* optional sound */ }
+    };
+    window.addEventListener("pointerdown", unlockSound, { once: true });
+    const timer = window.setInterval(refreshNow, 30_000);
     window.addEventListener("focus", refreshNow);
     const onStorage = (event: StorageEvent) => {
       if (event.key === "activeBusinessId") { refreshNow(); return; }
@@ -110,7 +177,7 @@ export function useNotifications() {
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener(APPLICATION_NOTIFICATION_EVENT, onApplicationNotification);
-    return () => { cancelled = true; controller.abort(); clearInterval(timer); window.removeEventListener("focus", refreshNow); window.removeEventListener("storage", onStorage); window.removeEventListener(APPLICATION_NOTIFICATION_EVENT, onApplicationNotification); };
+    return () => { cancelled = true; controller.abort(); clearInterval(timer); window.removeEventListener("focus", refreshNow); window.removeEventListener("pointerdown", unlockSound); window.removeEventListener("storage", onStorage); window.removeEventListener(APPLICATION_NOTIFICATION_EVENT, onApplicationNotification); };
   }, [username]);
 
   function markRead(id?: string) {

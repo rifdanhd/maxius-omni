@@ -87,6 +87,8 @@ export default function SyncMismatchPage() {
   const [q, setQ] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [retrying, setRetrying] = useState<Set<string>>(new Set());
+  const [selectedForRetry, setSelectedForRetry] = useState<Set<string>>(new Set());
+  const [bulkRetrying, setBulkRetrying] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
@@ -159,6 +161,35 @@ export default function SyncMismatchPage() {
       });
     }
   }
+
+  async function retrySelected() {
+    const ids = [...selectedForRetry];
+    if (ids.length === 0) return;
+    setBulkRetrying(true);
+    setSelectedForRetry(new Set());
+    let success = 0;
+    let failed = 0;
+    for (const id of ids) {
+      if (!retryCooldownOk(id)) continue;
+      try {
+        const res = await authFetch(`/api/sync-jobs/${id}/retry`, { method: "POST" });
+        const data = (await res.json().catch(() => ({}))) as { job?: { status: string } };
+        if (res.ok && data.job?.status === "SUCCESS") success += 1;
+        else failed += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setBulkRetrying(false);
+    setReloadKey((k) => k + 1);
+    setNotice({
+      kind: failed === 0 ? "ok" : "err",
+      text: `Bulk retry selesai: ${success} berhasil, ${failed} gagal.`,
+    });
+  }
+
+  const retryableRows = rows.filter((r) => r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0));
+  const allRetryableSelected = retryableRows.length > 0 && retryableRows.every((r) => selectedForRetry.has(r.id));
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -278,6 +309,44 @@ export default function SyncMismatchPage() {
         </div>
       </div>
 
+      {/* Aksi massal retry untuk item yang gagal */}
+      {retryableRows.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allRetryableSelected}
+              onChange={() => {
+                if (allRetryableSelected) setSelectedForRetry(new Set());
+                else setSelectedForRetry(new Set(retryableRows.map((r) => r.id)));
+              }}
+              className="w-4 h-4 rounded border-border accent-primary"
+              aria-label="Pilih semua item yang bisa dicoba lagi"
+            />
+            <label className="text-xs font-medium text-foreground cursor-pointer">
+              Pilih semua yang bisa dicoba lagi ({fmt(retryableRows.length)})
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium ${selectedForRetry.size > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+              {selectedForRetry.size} dipilih
+            </span>
+            <button
+              type="button"
+              onClick={retrySelected}
+              disabled={bulkRetrying || selectedForRetry.size === 0}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                selectedForRetry.size > 0
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  : "border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+              }`}
+            >
+              {bulkRetrying ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+              {bulkRetrying ? "Mencoba lagi semua…" : "Coba Lagi Terpilih"}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Notifikasi Hasil Retry */}
       {notice && (
         <Feedback
@@ -333,8 +402,22 @@ export default function SyncMismatchPage() {
                   <th className="px-4 py-3.5 text-right">Angka yang Dikirim</th>
                   <th className="px-4 py-3.5 text-center">Percobaan Ulang</th>
                   <th className="px-4 py-3.5">Error Terakhir</th>
-                  <th className="px-4 py-3.5">Status & Waktu</th>
+                  <th className="px-4 py-3.5">Status &amp; Waktu</th>
                   <th className="px-4 py-3.5 text-right">Aksi</th>
+                  <th className="px-4 py-3.5 text-center" scope="col">
+                    {retryableRows.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={allRetryableSelected}
+                        onChange={() => {
+                          if (allRetryableSelected) setSelectedForRetry(new Set());
+                          else setSelectedForRetry(new Set(retryableRows.map((r) => r.id)));
+                        }}
+                        className="w-4 h-4 rounded border-border accent-primary"
+                        aria-label="Pilih semua item yang bisa dicoba lagi"
+                      />
+                    )}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -431,6 +514,25 @@ export default function SyncMismatchPage() {
                         <div>{fmtDate(r.updatedAt)}</div>
                       </td>
 
+                      {/* Checkbox pilihan massal */}
+                      <td className="whitespace-nowrap px-4 py-3.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedForRetry.has(r.id)}
+                          onChange={() => {
+                            setSelectedForRetry((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(r.id)) next.delete(r.id);
+                              else next.add(r.id);
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded border-border accent-primary"
+                          aria-label={`Pilih ${r.variant.productName} untuk retry massal`}
+                          disabled={!(r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0))}
+                        />
+                      </td>
+
                       {/* Aksi Retry */}
                       <td className="whitespace-nowrap px-4 py-3.5 text-right">
                         {r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0) ? (
@@ -463,7 +565,7 @@ export default function SyncMismatchPage() {
             </table>
           )}
         </div>
-
+      </div>
         {/* Tombol Muat Lebih Banyak */}
         {nextCursor && (
           <div className="border-t border-border/60 p-4 text-center">
@@ -478,7 +580,6 @@ export default function SyncMismatchPage() {
             </button>
           </div>
         )}
-      </div>
     </div>
   );
 }

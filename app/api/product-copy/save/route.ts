@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import {
   saveProductCopyAsDraft,
+  CopyError,
   type CopyVariantInput,
 } from "@/lib/services/product-copy.service";
 
@@ -26,9 +27,17 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
   if (!name) {
     return NextResponse.json({ ok: false, error: "Nama produk wajib diisi." }, { status: 400 });
   }
+  if (body.price !== undefined && body.price !== null && (typeof body.price !== "number" || !Number.isSafeInteger(body.price) || body.price < 0)) return NextResponse.json({ ok: false, error: "Harga utama harus rupiah utuh minimal nol." }, { status: 400 });
+  if (Array.isArray(body.variants) && body.variants.length > 200) return NextResponse.json({ ok: false, error: "Maksimal 200 varian per produk." }, { status: 400 });
+  if (Array.isArray(body.variants)) for (const variant of body.variants) {
+    if (!variant || typeof variant !== "object") return NextResponse.json({ ok: false, error: "Data varian tidak valid." }, { status: 400 });
+    const item = variant as Record<string, unknown>;
+    if (item.stock !== null && item.stock !== undefined && (typeof item.stock !== "number" || !Number.isSafeInteger(item.stock) || item.stock < 0)) return NextResponse.json({ ok: false, error: "Stok varian harus bilangan bulat minimal nol." }, { status: 400 });
+    if (item.price !== null && item.price !== undefined && (typeof item.price !== "number" || !Number.isSafeInteger(item.price) || item.price < 0)) return NextResponse.json({ ok: false, error: "Harga varian harus rupiah utuh minimal nol." }, { status: 400 });
+  }
 
   const price =
-    typeof body.price === "number" && Number.isFinite(body.price) && body.price > 0
+    typeof body.price === "number" && Number.isFinite(body.price) && body.price >= 0
       ? Math.round(body.price)
       : null;
 
@@ -41,7 +50,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
         return {
           name: typeof o.name === "string" ? o.name : undefined,
           price:
-            typeof o.price === "number" && Number.isFinite(o.price) && o.price > 0
+            typeof o.price === "number" && Number.isFinite(o.price) && o.price >= 0
               ? Math.round(o.price)
               : null,
           stock:
@@ -73,6 +82,6 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
     return NextResponse.json({ ok: true, productId: id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Gagal menyimpan draft produk.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg }, { status: e instanceof CopyError ? 409 : 500 });
   }
 });

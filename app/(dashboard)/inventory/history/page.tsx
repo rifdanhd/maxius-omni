@@ -255,8 +255,7 @@ export default function InventoryHistoryPage() {
             <a href="/inventory" className="block mt-2 underline">Periksa Stok Varian</a>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-3">Referensi</th>
@@ -343,9 +342,8 @@ export default function InventoryHistoryPage() {
                 })}
               </tbody>
             </table>
-          </div>
-        )}
-
+          )}
+        {/* Pagination cursor — tidak pernah findMany semua data */}
         {/* Pagination cursor — tidak pernah findMany semua data */}
         {nextCursor && !loading && (
           <div className="border-t border-border p-4 text-center">

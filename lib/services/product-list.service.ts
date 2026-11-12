@@ -129,7 +129,7 @@ function buildWhere(p: ListProductsParams): Prisma.Sql {
   const conds: Prisma.Sql[] = [
     Prisma.sql`mp."businessId" = ${p.businessId}`,
   ];
-  if (!p.includeInactive) conds.push(Prisma.sql`mp."isActive" = true`);
+  if (!p.includeInactive) conds.push(Prisma.sql`mp."isActive" = true AND lower(mp.status) = 'active'`);
   if (p.tab === "bundle") conds.push(fragIsBundle);
   else if (p.tab === "single") conds.push(Prisma.sql`NOT ${fragIsBundle}`);
   if (p.category) conds.push(Prisma.sql`mp."category" = ${p.category}`);
@@ -210,7 +210,7 @@ async function loadFacets(
 ): Promise<ProductListFacets> {
   const base = {
     businessId,
-    ...(includeInactive ? {} : { isActive: true }),
+    ...(includeInactive ? {} : { isActive: true, status: "active" }),
   };
   const [categoryRows, storeRows] = await Promise.all([
     prisma.masterProduct.findMany({
@@ -283,6 +283,8 @@ export async function listProducts(
                 stock: true,
                 safetyStock: true,
                 minStock: true,
+                name: true,
+                price: true,
                 productMapping: {
                   select: {
                     id: true,

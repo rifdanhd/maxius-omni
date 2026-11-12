@@ -3,6 +3,53 @@ import { withAuth, type AuthenticatedRequest } from "@/lib/utils/api";
 import { businessWhere } from "@/lib/services/business-scope.service";
 import { listProducts, type ProductListLevel, type ProductListSort, type ProductListTab } from "@/lib/services/product-list.service";
 import { prisma } from "@/lib/db/prisma";
+import crypto from "node:crypto";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
+  const body = (await req.json().catch(() => ({}))) as {
+    name?: unknown; description?: unknown; category?: unknown; imageUrl?: unknown;
+    threshold?: unknown; variants?: unknown;
+  };
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!name) return NextResponse.json({ error: "Nama produk wajib diisi." }, { status: 400 });
+  const variants = Array.isArray(body.variants) ? body.variants : [];
+  if (variants.length === 0) return NextResponse.json({ error: "Minimal satu varian wajib diisi." }, { status: 400 });
+  const seen = new Set<string>();
+  const parsed = variants.map((raw, index) => {
+    const item = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    const sku = String(item.sku ?? "").trim();
+    if (!sku) throw new Error(`SKU varian ke-${index + 1} wajib diisi.`);
+    const key = sku.toLowerCase();
+    if (seen.has(key)) throw new Error(`SKU "${sku}" duplikat.`);
+    seen.add(key);
+    const stock = Number(item.stock ?? 0);
+    const price = item.price === null || item.price === undefined || item.price === "" ? null : Number(item.price);
+    if (!Number.isInteger(stock) || stock < 0) throw new Error(`Stok varian "${sku}" harus bilangan bulat >= 0.`);
+    if (price !== null && (!Number.isFinite(price) || price < 0)) throw new Error(`Harga varian "${sku}" tidak valid.`);
+    return { sku, name: String(item.name ?? "").trim() || null, stock, price, safetyStock: Math.max(0, Math.trunc(Number(item.safetyStock ?? 0) || 0)) };
+  });
+  try {
+    const settings = await getCachedInventorySettings(req.businessId);
+    const imageUrl = body.imageUrl === undefined || body.imageUrl === null ? null : String(body.imageUrl).trim();
+    if (imageUrl && !/^https?:\/\/.+/.test(imageUrl)) return NextResponse.json({ error: "URL gambar harus http/https." }, { status: 400 });
+    const threshold = body.threshold === undefined || body.threshold === "" ? settings.lowStockDefaultThreshold : Number(body.threshold);
+    if (!Number.isInteger(threshold) || threshold < 0) return NextResponse.json({ error: "Ambang stok tidak valid." }, { status: 400 });
+    const created = await prisma.$transaction(async (tx) => {
+      const product = await tx.masterProduct.create({ data: {
+        name, businessId: req.businessId, description: String(body.description ?? "").trim() || null,
+        category: String(body.category ?? "").trim() || null, imageUrl: imageUrl || null, threshold,
+        productVariant: { create: parsed },
+      }, select: { id: true, name: true } });
+      const createdVariants = await tx.productVariant.findMany({ where: { masterProductId: product.id }, select: { id: true, stock: true, sku: true } });
+      if (createdVariants.some((v) => v.stock > 0)) await tx.stockLedger.createMany({ data: createdVariants.filter((v) => v.stock > 0).map((v) => ({ id: crypto.randomUUID(), variantId: v.id, changeQty: v.stock, stockAfter: v.stock, reason: "INIT", referenceId: product.id, note: "Stok awal produk master" })) });
+      return product;
+    });
+    return NextResponse.json({ ok: true, product: created }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Gagal membuat produk." }, { status: 400 });
+  }
+});
 
 // GET /api/products
 // - Tanpa ?page=      → dump penuh semua produk (mode lama, dipakai modal
@@ -29,7 +76,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
     const products = await prisma.masterProduct.findMany({
       where: {
         ...businessWhere.product(req.businessId),
-        ...(includeInactive ? {} : { isActive: true }),
+        ...(includeInactive ? {} : { isActive: true, status: "active" }),
       },
       include: {
         productVariant: {
