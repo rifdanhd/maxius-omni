@@ -511,6 +511,14 @@ async function runTikTok(
   }
 
   // Pasca-ingest sekali di akhir: reconcile resi + tracking + SyncLog.
+  const alive = await persist(run.id, {
+    phase: "reconciling",
+    message: "melengkapi resi dan status pengiriman",
+    fetched: result.fetched,
+    created: result.created,
+    skipped: result.skipped,
+  });
+  if (!alive) return;
   await postTikTokOrderSync(prisma, run.accountId, result);
   const reconcileNote = result.reconciled > 0 ? `, ${result.reconciled} resi dilengkapi` : "";
   if (result.errors.length === 0) await advanceWatermark(run);

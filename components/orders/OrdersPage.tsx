@@ -5,7 +5,7 @@ import { PageState } from "@/components/ui/feedback";
 import { friendlyError } from "@/lib/ui/feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Calendar, Download, Filter, Info, MinusCircle, MoreHorizontal, PackageCheck, PlusCircle, Printer, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, Calendar, Download, Filter, Info, MinusCircle, PackageCheck, PlusCircle, Printer, RefreshCw, Search, X } from "lucide-react";
 import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
@@ -373,19 +373,6 @@ export default function OrdersPage() {
   const [q, setQ] = useState("");
   const [searchType, setSearchType] = useState(SEARCH_TYPES[0]);
   const [sort, setSort] = useState(SORT_OPTIONS[0]);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
-
-  // Tutup menu "Lainnya" saat klik di luar
-  useEffect(() => {
-    if (!moreOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [moreOpen]);
-
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -408,7 +395,6 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [reconciling, setReconciling] = useState(false);
   const [refreshingShipping, setRefreshingShipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Background run (SyncRun): progres live + tombol terkunci saat aktif. */
@@ -717,37 +703,6 @@ export default function OrdersPage() {
     }
   };
 
-  const handleReconcile = async () => {
-    setReconciling(true);
-    setError(null);
-    try {
-      const res = await authFetch("/api/orders/fulfillment/reconcile", {
-        method: "POST", headers: {},
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? `Gagal lengkapi resi (${res.status})`);
-        return;
-      }
-      const detail = (data.results as { label?: string; scanned?: number; updated?: number; error?: string }[])
-        ?.map((r) => (r.error ? `${r.label}: ${r.error}` : `${r.label}: ${r.updated ?? 0}/${r.scanned ?? 0} resi dilengkapi`))
-        .join("\n");
-      const failed = data.results?.some((result: { error?: string }) => result.error);
-      notify(failed ? "error" : "success", failed ? "Sebagian resi belum diperbarui." : `Lengkapi resi selesai. ${data.updated ?? 0} paket diperbarui.`, { details: detail });
-      const refreshed = await fetchOrders({ page, tab: currentTab, subTab: currentSubTab, q, searchType: searchType.id, sort, from, to, platform: platformFilter, account: accountFilter, category: categoryFilter });
-      setOrders(refreshed.orders ?? []);
-      setTotal(refreshed.total ?? 0);
-      setPageCount(refreshed.pageCount ?? 1);
-      setCounts(refreshed.counts ?? counts);
-      setSelected(new Set());
-    } catch (e) {
-      console.error(e);
-      setError("Terjadi kesalahan saat lengkapi resi.");
-    } finally {
-      setReconciling(false);
-    }
-  };
-
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -1031,7 +986,7 @@ export default function OrdersPage() {
     <div className="flex min-h-full min-w-0 flex-col gap-4 p-3 font-sans sm:p-6">
       <PageHeader
         title="Kelola Pesanan"
-        description="Semua pesanan dari toko Anda dalam satu tempat. Perbarui pesanan, atur pengiriman, lalu cetak label sebelum menyerahkan paket ke kurir."
+        description="Sinkronkan pesanan sekaligus lengkapi resi dari toko Anda. Atur pengiriman, lalu cetak label sebelum menyerahkan paket ke kurir."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => bgActive ? setSyncProgressOpen(true) : void handleSync()} disabled={syncing || refreshingShipping} className="gap-2">
@@ -1041,32 +996,9 @@ export default function OrdersPage() {
             <Button variant="outline" onClick={() => setHistoryOpen(true)} disabled={busy} className="gap-2">
               <Calendar size={16} /> Ambil Riwayat
             </Button>
-            <div className="relative" ref={moreRef}>
-              <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Aksi lainnya" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
-                <MoreHorizontal size={18} />
-              </Button>
-              {moreOpen && (
-                <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-lg border border-border bg-card py-1 shadow-lg">
-                  <button
-                    type="button"
-                    disabled={reconciling || refreshingShipping}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted disabled:opacity-50"
-                    onClick={() => { setMoreOpen(false); void handleReconcile(); }}
-                  >
-                    <RefreshCw size={14} className={reconciling ? "animate-spin" : ""} />
-                    {reconciling ? "Mengisi resi..." : "Lengkapi Data Resi"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={orders.length === 0}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted disabled:opacity-50"
-                    onClick={() => { setMoreOpen(false); handleExportVisible(); }}
-                  >
-                    <Download size={14} /> Unduh halaman ini (CSV)
-                  </button>
-                </div>
-              )}
-            </div>
+            <Button variant="outline" disabled={orders.length === 0} onClick={handleExportVisible} className="gap-2">
+              <Download size={16} /> Unduh CSV
+            </Button>
           </div>
         }
       />
@@ -1083,7 +1015,7 @@ export default function OrdersPage() {
               <DialogHeader className="text-left">
                 <DialogTitle className="text-xl leading-tight tracking-tight">Menyinkronkan pesanan</DialogTitle>
                 <DialogDescription className="leading-relaxed">
-                  Pesanan dari toko terhubung sedang diperbarui. Anda tetap bisa melanjutkan pekerjaan.
+                  Pesanan dan resi dari toko terhubung sedang diperbarui. Anda tetap bisa melanjutkan pekerjaan.
                 </DialogDescription>
               </DialogHeader>
               <div className="mt-5 rounded-xl border border-border bg-muted/40 p-4">
@@ -1096,12 +1028,18 @@ export default function OrdersPage() {
                       <span className="relative inline-flex size-2 rounded-full bg-primary" />
                     </span>
                   )}
-                  {bgProgress.phase === "rate_wait" ? "Menunggu giliran dari marketplace" : "Mengambil data pesanan"}
+                  {bgProgress.phase === "rate_wait"
+                    ? "Menunggu giliran dari marketplace"
+                    : bgProgress.phase === "reconciling"
+                      ? "Melengkapi resi dan status pengiriman"
+                      : "Mengambil data pesanan"}
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                   {bgProgress.phase === "rate_wait"
                     ? "Marketplace membatasi permintaan sementara. Proses akan dilanjutkan otomatis."
-                    : "Jumlah pesanan diperbarui secara otomatis selama proses berjalan."}
+                    : bgProgress.phase === "reconciling"
+                      ? "Resi yang tersedia di marketplace dilengkapi otomatis sebelum sinkronisasi selesai."
+                      : "Data pesanan diambil terlebih dahulu, lalu resi yang tersedia dilengkapi otomatis."}
                 </p>
               </div>
               <dl className="mt-4 grid grid-cols-3 divide-x divide-border rounded-xl border border-border py-4">
@@ -1144,7 +1082,7 @@ export default function OrdersPage() {
             </button>
           </AlertTitle>
           <AlertDescription className="space-y-1 text-warning">
-            <p>Sync pertama mengambil pesanan sesuai periode toko (default 30 hari). Sync berikutnya hanya mengambil pesanan baru atau yang berubah. Untuk tanggal lebih lama, gunakan Ambil Riwayat.</p>
+            <p>Sinkron Pesanan sekaligus memperbarui data pesanan dan melengkapi resi yang tersedia di marketplace. Sync pertama mengambil pesanan sesuai periode toko (default 30 hari). Sync berikutnya hanya mengambil pesanan baru atau yang berubah. Untuk tanggal lebih lama, gunakan Ambil Riwayat.</p>
             <p>Untuk pekerjaan harian, buka tab Perlu Diproses dan pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
             <p>Invoice dan packing list dibuat oleh Maxius. Label TikTok berasal dari marketplace; untuk resi Shopee resmi, gunakan Seller Center.</p>
           </AlertDescription>
