@@ -21,6 +21,7 @@ import { DataCard } from "@/components/ui/data-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const PAGE_SIZES = [20, 50, 100, 250, 500, 1000];
 
@@ -1042,41 +1043,47 @@ export default function OrdersPage() {
 
       <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={busy} onSubmit={handleSync} />
 
-      {/* Progres background run (SyncRun) */}
+      {/* Progres background run (SyncRun) — popup */}
       {bgActive && bgProgress && (
-        <div className="flex items-center gap-3 rounded-xl border border-primary bg-primary/5 p-3 sm:p-4 shadow-sm mb-4" role="status" aria-live="polite">
-          <RefreshCw size={14} className="shrink-0 text-primary animate-spin" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-sm font-semibold text-primary">
-                Menarik pesanan di latar belakang
-                {bgProgress.phase === "rate_wait" && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                    <AlertTriangle size={10} /> Jeda rate limit
-                  </span>
-                )}
-              </span>
-              <span className="text-xs font-mono font-bold text-primary">
-                {Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100)}%
-              </span>
+        <Dialog open={true} onOpenChange={() => {}}>
+          <DialogContent className="sm:max-w-md p-0">
+            <DialogHeader>
+              <DialogTitle>Sinkronisasi pesanan</DialogTitle>
+              <DialogDescription>
+                Menarik data pesanan dari toko terhubung di latar belakang.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 py-4 space-y-4">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-sm font-semibold text-foreground">
+                  Progres
+                  {bgProgress.phase === "rate_wait" && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      <AlertTriangle size={10} /> Jeda rate limit
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs font-mono font-bold text-primary">
+                  {Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100)}%
+                </span>
+              </div>
+              <div className="h-2.5 w-full bg-primary/10 rounded-full overflow-hidden">
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100))}%` }} />
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Download className="size-3.5 shrink-0" /> <b>{bgProgress.fetched}</b> ditarik
+                </span>
+                <span className="flex items-center gap-1">
+                  <PlusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.created}</b> baru
+                </span>
+                <span className="flex items-center gap-1">
+                  <MinusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.skipped}</b> sama
+                </span>
+              </div>
             </div>
-            <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, Math.round(((bgProgress.fetched + bgProgress.created + bgProgress.skipped) / Math.max(1, bgProgress.fetched + bgProgress.created + bgProgress.skipped + 1)) * 100))}%` }} />
-            </div>
-            <div className="flex flex-wrap items-center gap-4 mt-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Download className="size-3.5 shrink-0" /> <b>{bgProgress.fetched}</b> ditarik
-              </span>
-              <span className="flex items-center gap-1">
-                <PlusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.created}</b> baru
-              </span>
-              <span className="flex items-center gap-1">
-                <MinusCircle className="size-3.5 shrink-0" /> <b>{bgProgress.skipped}</b> sama
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">Anda boleh berpindah menu; notifikasi akan muncul saat selesai.</p>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Edukasi batas API & pola pakai */}
