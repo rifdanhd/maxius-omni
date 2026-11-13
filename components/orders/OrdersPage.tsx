@@ -5,7 +5,7 @@ import { PageState } from "@/components/ui/feedback";
 import { friendlyError } from "@/lib/ui/feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Calendar, Download, Filter, Info, MinusCircle, PackageCheck, PlusCircle, Printer, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, Calendar, Download, Filter, MinusCircle, PackageCheck, PlusCircle, Printer, RefreshCw, Search, X } from "lucide-react";
 import OrderCard, { type PrintType } from "./OrderCard";
 import PrintDropdown from "./PrintDropdown";
 import { printOrders, printShippingDocument, openPrintWindow, fillPrintPdfWindow, pdfBlobFromBase64, type PrintableOrder } from "./printOrders";
@@ -20,7 +20,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DataCard } from "@/components/ui/data-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const PAGE_SIZES = [20, 50, 100, 250, 500, 1000];
@@ -401,7 +400,6 @@ export default function OrdersPage() {
   const [bgActive, setBgActive] = useState(false);
   const [syncProgressOpen, setSyncProgressOpen] = useState(true);
   const [bgProgress, setBgProgress] = useState<{ fetched: number; created: number; skipped: number; phase: string | null } | null>(null);
-  const [infoDismissed, setInfoDismissed] = useState(false);
   const bgWasActive = useRef(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [printingBulk, setPrintingBulk] = useState(false);
@@ -1069,24 +1067,6 @@ export default function OrdersPage() {
             </div>
           </DialogContent>
         </Dialog>
-      )}
-
-      {/* Edukasi batas API & pola pakai */}
-      {!infoDismissed && (
-        <Alert className="border-warning bg-warning-subtle text-warning [&>svg]:text-warning">
-          <Info size={16} className="text-warning" />
-          <AlertTitle className="flex w-full items-start justify-between gap-2 text-warning">
-            Tentang sinkronisasi pesanan
-            <button type="button" onClick={() => setInfoDismissed(true)} className="rounded p-0.5 hover:bg-warning-subtle" aria-label="Tutup informasi">
-              <X size={14} />
-            </button>
-          </AlertTitle>
-          <AlertDescription className="space-y-1 text-warning">
-            <p>Sinkron Pesanan sekaligus memperbarui data pesanan dan melengkapi resi yang tersedia di marketplace. Sync pertama mengambil pesanan sesuai periode toko (default 30 hari). Sync berikutnya hanya mengambil pesanan baru atau yang berubah. Untuk tanggal lebih lama, gunakan Ambil Riwayat.</p>
-            <p>Untuk pekerjaan harian, buka tab Perlu Diproses dan pilih pesanan dari satu marketplace setiap kali mengatur pengiriman.</p>
-            <p>Invoice dan packing list dibuat oleh Maxius. Label TikTok berasal dari marketplace; untuk resi Shopee resmi, gunakan Seller Center.</p>
-          </AlertDescription>
-        </Alert>
       )}
 
       <DataCard className="min-w-0 shrink-0" contentClassName="min-w-0 p-0">
