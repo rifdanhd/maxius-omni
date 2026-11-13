@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VariantThumbnail } from "@/components/ui/variant-thumbnail";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageState } from "@/components/ui/feedback";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -314,33 +315,38 @@ export function MasterStockListings({ row, busy, allocate, retry, syncMany, mess
                                 />
                               </td>
                               <td className="px-2 py-2 align-top">
-                                <p className="line-clamp-2 font-medium text-foreground">{listingName(listing)}</p>
-                                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                  <span title={variantId}>
-                                    ID <code className="break-all">{shortVariantId(variantId)}</code>
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="inline-flex size-6 items-center justify-center rounded hover:bg-muted"
-                                    aria-label={`Salin ID ${listing.store}`}
-                                    onClick={() => void copyId(listing)}
-                                  >
-                                    <Copy className="size-3" aria-hidden="true" />
-                                  </button>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button type="button" className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted" aria-label="Cara angka Dikirim dihitung">
-                                        <Info className="size-3" aria-hidden="true" />
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <VariantThumbnail src={listing.imageUrl} fallbackSrc={row.imageUrl} size={32} alt={listingName(listing)} />
+                                  <div className="min-w-0">
+                                    <p className="line-clamp-2 font-medium text-foreground">{listingName(listing)}</p>
+                                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                                      <span title={variantId}>
+                                        ID <code className="break-all">{shortVariantId(variantId)}</code>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="inline-flex size-6 items-center justify-center rounded hover:bg-muted"
+                                        aria-label={`Salin ID ${listing.store}`}
+                                        onClick={() => void copyId(listing)}
+                                      >
+                                        <Copy className="size-3" aria-hidden="true" />
                                       </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      max(0, Bisa Dijual {fmt(row.available)} − buffer {fmt(listing.allocation.buffer)})
-                                      {listing.allocation.mode === "PERCENT" ? ` × ${listing.allocation.value}%`
-                                        : listing.allocation.mode === "EQUAL" ? ` ÷ ${Math.max(1, row.listings.length)} listing`
-                                          : listing.allocation.mode === "FIXED" ? ` (maks ${fmt(listing.allocation.value)} unit)` : " × 100%"}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </p>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button type="button" className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted" aria-label="Cara angka Dikirim dihitung">
+                                            <Info className="size-3" aria-hidden="true" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs">
+                                          max(0, Bisa Dijual {fmt(row.available)} − buffer {fmt(listing.allocation.buffer)})
+                                          {listing.allocation.mode === "PERCENT" ? ` × ${listing.allocation.value}%`
+                                            : listing.allocation.mode === "EQUAL" ? ` ÷ ${Math.max(1, row.listings.length)} listing`
+                                              : listing.allocation.mode === "FIXED" ? ` (maks ${fmt(listing.allocation.value)} unit)` : " × 100%"}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </p>
+                                  </div>
+                                </div>
                               </td>
                               <td className="px-2 py-2 text-right align-top tabular-nums">
                                 {listing.platformStock === null ? <span className="text-muted-foreground">Belum diketahui</span> : fmt(listing.platformStock)}

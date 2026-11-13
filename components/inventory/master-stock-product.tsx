@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
-import { Archive, ChevronDown, Package, Pencil, Store } from "lucide-react";
+import { Archive, ChevronDown, Pencil, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VariantThumbnail } from "@/components/ui/variant-thumbnail";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { MasterStockListings, stockStatusLabel } from "@/components/inventory/master-stock-listings";
 import { numberFormat as fmt } from "@/components/inventory/master-stock-dialogs";
@@ -47,11 +47,7 @@ export function MasterStockProduct({ variants, open, dense, filtered, busy, sele
         <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <button type="button" aria-label={`Varian ${product.name}`} aria-expanded={open} aria-controls={`variants-${product.productId}`}
             onClick={toggle} className="group flex min-w-0 flex-1 items-start gap-3 text-left sm:items-center">
-            {product.imageUrl ? (
-              <Image src={product.imageUrl} alt="" width={56} height={56} unoptimized className="size-14 shrink-0 rounded-lg border border-border object-cover" />
-            ) : (
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-muted"><Package className="size-6 text-muted-foreground" /></span>
-            )}
+            <VariantThumbnail src={product.imageUrl} size={56} alt={product.name} className="rounded-lg" />
             <span className="min-w-0">
               <span className="line-clamp-2 text-sm font-semibold leading-relaxed text-foreground group-hover:text-primary">{product.name}</span>
               <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -84,6 +80,7 @@ export function MasterStockProduct({ variants, open, dense, filtered, busy, sele
                   <div className={grid}>
                     <div className="flex min-w-0 items-start gap-3">
                       <input type="checkbox" className="mt-1 size-4 shrink-0 accent-primary" aria-label={`Pilih ${sku}`} checked={selected.has(row.id)} onChange={(event) => select([row], event.target.checked)} />
+                      <VariantThumbnail src={row.variantImageUrl} fallbackSrc={product.imageUrl} alt={sku} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground">{row.variantName && !/^\d+(?::\d+)?$/.test(row.variantName) ? row.variantName : "Varian standar"}</p>
                         <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{sku}</p>

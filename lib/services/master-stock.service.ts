@@ -111,6 +111,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       warehouseStock: { where: { warehouse: { businessId } }, include: { warehouse: true } },
       productMapping: {
         where: { account: { businessId } },
+        orderBy: { updatedAt: "desc" },
         include: { account: { select: { id: true, label: true, platform: true, stockPushEnabled: true, isFrozen: true, stockAllocationMode: true, stockAllocationValue: true, stockBuffer: true } },
           promotionActivityItem: { where: { activity: { startsAt: { lte: now }, endsAt: { gte: now }, status: { notIn: ["DEACTIVATED", "EXPIRED", "ENDED", "CANCELLED"] } } }, select: { activityId: true } } },
       },
@@ -142,7 +143,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
             ? "PENDING" as const : mapping.lastSyncedAt ? "SUCCESS" as const : "PENDING" as const;
       return { id: mapping.id, accountId: mapping.accountId, store: mapping.account.label, platform: mapping.account.platform,
         channelSku: mapping.channelSku, sellerSku: mapping.sellerSku, platformSkuId: mapping.platformSkuId,
-        platformTitle: mapping.platformTitle,
+        platformTitle: mapping.platformTitle, imageUrl: mapping.imageUrl ?? variant.masterProduct.imageUrl,
         pushEnabled: mapping.account.stockPushEnabled !== false,
         disabledCode: stockPushDisabledCode(mapping.account, settings),
         platformStock: mapping.platformStock, status, blockedReason, error: blockedReason ? null : mapping.lastStockPushError ?? job?.lastError ?? null,
@@ -152,6 +153,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
     });
     return [{ id: variant.id, productId: variant.masterProductId, version: variant.version, sku: variant.skuKeys[0]?.sellerSku ?? variant.sku, name: variant.masterProduct.name,
       variantName: variant.name, imageUrl: variant.masterProduct.imageUrl, category: variant.masterProduct.category,
+      variantImageUrl: variant.productMapping.find((mapping) => mapping.imageUrl)?.imageUrl ?? null,
       stock: variant.stock, stockReview: reviews.get(variant.id), safetyStock: variant.safetyStock, available, pending: Number(raw.pending),
       minimum: variant.minStock ?? variant.masterProduct.threshold,
       ownArchived: variant.isArchived,

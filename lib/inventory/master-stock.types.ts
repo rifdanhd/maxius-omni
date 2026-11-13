@@ -8,6 +8,8 @@ export type ListingStock = {
   status: "SUCCESS" | "FAILED" | "PENDING" | "DISABLED"; error: string | null; lastSyncedAt: string | null;
   /** Judul listing di marketplace (ProductMapping.platformTitle) — aditif. */
   platformTitle?: string | null;
+  /** Gambar listing dari ProductMapping.imageUrl — aditif, untuk thumbnail. */
+  imageUrl?: string | null;
   /** Push stok toko ini aktif secara pengaturan (PlatformAccount.stockPushEnabled). */
   pushEnabled?: boolean;
   /** Penyebab push nonaktif; null = push aktif. */
@@ -20,6 +22,8 @@ export type MasterStockRow = {
   productId: string;
   id: string; version: number; sku: string; name: string; variantName: string | null;
   imageUrl: string | null; category: string | null; stock: number; safetyStock: number;
+  /** Foto varian dari listing marketplace (ProductMapping.imageUrl); null bila belum ada. */
+  variantImageUrl?: string | null;
   available: number; pending: number; minimum: number; archived: boolean; promoActive: number;
   ownArchived: boolean;
   stockReview?: { reasons: string[]; initialStock: number | null; initialReason: string | null };
