@@ -44,6 +44,8 @@ type Variant = {
   price?: number | null;
   /** Foto varian dari listing marketplace (opsional). */
   imageUrl?: string | null;
+  /** Atribut varian di marketplace (mis. "Biru, 10 Buah"). */
+  attributes?: string[];
   /** Cover MasterProduct untuk fallback thumbnail (opsional). */
   masterImageUrl?: string | null;
   mappings: Mapping[];
@@ -1091,12 +1093,24 @@ export default function MasterProductsPage() {
                                   {product.variants.map((v) => {
                                     const l = level(v, product.threshold);
                                     const m = stockMeta[l];
+                                    // Atribut yang menambah info di luar nama/SKU varian.
+                                    const attributes = (v.attributes ?? []).filter((value) => {
+                                      const label = value.toLowerCase();
+                                      return label !== (v.name ?? "").trim().toLowerCase() && label !== v.sku.trim().toLowerCase();
+                                    });
                                     return (
                                       <tr key={v.id} data-testid={`catalog-variant-${v.id}`} className="border-b border-border last:border-0">
                                         <td className="px-4 py-2.5 text-foreground font-medium">
                                           <div className="flex min-w-0 items-center gap-2">
                                             <VariantThumbnail src={v.imageUrl} fallbackSrc={v.masterImageUrl ?? product.imageUrl} alt={v.name ?? v.sku} />
-                                            <span className="truncate">{v.name?.trim() || v.sku}</span>
+                                            <span className="min-w-0">
+                                              <span className="block truncate">{v.name?.trim() || v.sku}</span>
+                                              {attributes.length > 0 && (
+                                                <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" title={attributes.join(" · ")}>
+                                                  Atribut: {attributes.slice(0, 3).join(" · ")}{attributes.length > 3 ? ` +${attributes.length - 3}` : ""}
+                                                </span>
+                                              )}
+                                            </span>
                                           </div>
                                         </td>
                                         <td className="px-4 py-2.5 text-foreground">{v.sku}</td>

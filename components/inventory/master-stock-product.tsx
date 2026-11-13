@@ -73,6 +73,8 @@ export function MasterStockProduct({ variants, open, dense, filtered, busy, sele
           </div>
           {variants.map((row) => {
             const sku = !/^\d+(?::\d+)?$/.test(row.sku) ? row.sku : row.listings.find((listing) => listing.sellerSku)?.sellerSku ?? "SKU seller belum tersedia";
+            // Atribut marketplace yang menambah info di luar nama/SKU varian pusat.
+            const attributes = (row.attributes ?? []).filter((value) => value.toLowerCase() !== (row.variantName ?? "").trim().toLowerCase());
             const listingOpen = expanded.has(row.id);
             return (
               <div key={row.id} className="border-t border-border/70 first:border-t-0">
@@ -84,6 +86,11 @@ export function MasterStockProduct({ variants, open, dense, filtered, busy, sele
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground">{row.variantName && !/^\d+(?::\d+)?$/.test(row.variantName) ? row.variantName : "Varian standar"}</p>
                         <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{sku}</p>
+                        {attributes.length > 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Atribut: <span className="text-foreground">{attributes.slice(0, 4).join(" · ")}{attributes.length > 4 ? ` +${attributes.length - 4}` : ""}</span>
+                          </p>
+                        )}
                         {row.stockReview && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300" title={row.stockReview.reasons.join("; ")}>Stok perlu ditinjau</p>}
                         {row.archived && <StatusBadge status="inactive" label="Arsip / nonaktif" className="mt-1" />}
                         {row.promoActive > 0 && <p className="mt-1 text-xs text-primary">{row.promoActive} promosi aktif</p>}

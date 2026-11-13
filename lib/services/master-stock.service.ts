@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { allocationQuantity, resolveAllocation } from "@/lib/services/stock-allocation.policy";
 import type { MasterStockResult, MasterStockRow, MasterStockTab } from "@/lib/inventory/master-stock.types";
 import { getStockReviews } from "@/lib/services/stock-review.service";
+import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 
 export const UNFULFILLED_ORDER_STATUSES = ["UNPAID", "ON_HOLD", "AWAITING_SHIPMENT", "PARTIALLY_SHIPPING"];
 const ARCHIVED_STATUSES = ["INACTIVE", "ARCHIVED", "DELETED", "UNLIST", "BANNED", "SELLER_DELETE", "PLATFORM_DELETE", "SELLER_DEACTIVATED", "PLATFORM_DEACTIVATED", "FREEZE", "FROZEN", "SUSPENDED", "DRAFT", "DEACTIVATED", "UNMATCHED", "MODEL_INACTIVE"];
@@ -144,6 +145,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
       return { id: mapping.id, accountId: mapping.accountId, store: mapping.account.label, platform: mapping.account.platform,
         channelSku: mapping.channelSku, sellerSku: mapping.sellerSku, platformSkuId: mapping.platformSkuId,
         platformTitle: mapping.platformTitle, imageUrl: mapping.imageUrl ?? variant.masterProduct.imageUrl,
+        attributes: variantAttributesFromRaw(mapping.account.platform, mapping.platformStatusRaw, mapping.channelSku),
         pushEnabled: mapping.account.stockPushEnabled !== false,
         disabledCode: stockPushDisabledCode(mapping.account, settings),
         platformStock: mapping.platformStock, status, blockedReason, error: blockedReason ? null : mapping.lastStockPushError ?? job?.lastError ?? null,
@@ -154,6 +156,7 @@ export async function getMasterStock(businessId: string, params: URLSearchParams
     return [{ id: variant.id, productId: variant.masterProductId, version: variant.version, sku: variant.skuKeys[0]?.sellerSku ?? variant.sku, name: variant.masterProduct.name,
       variantName: variant.name, imageUrl: variant.masterProduct.imageUrl, category: variant.masterProduct.category,
       variantImageUrl: variant.productMapping.find((mapping) => mapping.imageUrl)?.imageUrl ?? null,
+      attributes: [...new Set(listings.map((listing) => listing.attributes).filter((value): value is string => Boolean(value)))],
       stock: variant.stock, stockReview: reviews.get(variant.id), safetyStock: variant.safetyStock, available, pending: Number(raw.pending),
       minimum: variant.minStock ?? variant.masterProduct.threshold,
       ownArchived: variant.isArchived,

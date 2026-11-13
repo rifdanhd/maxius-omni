@@ -319,6 +319,9 @@ export function MasterStockListings({ row, busy, allocate, retry, syncMany, mess
                                   <VariantThumbnail src={listing.imageUrl} fallbackSrc={row.imageUrl} size={32} alt={listingName(listing)} />
                                   <div className="min-w-0">
                                     <p className="line-clamp-2 font-medium text-foreground">{listingName(listing)}</p>
+                                    {listing.attributes && (
+                                      <p className="mt-0.5 text-xs text-muted-foreground">{listing.attributes}</p>
+                                    )}
                                     <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                                       <span title={variantId}>
                                         ID <code className="break-all">{shortVariantId(variantId)}</code>

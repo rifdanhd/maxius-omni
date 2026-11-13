@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
+import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 
 /**
  * product-list.service — daftar Produk Master (Katalog Pusat) versi
@@ -315,6 +316,26 @@ export async function listProducts(
           },
         });
 
+  // Atribut varian marketplace (mis. "Biru, 10 Buah") diambil dari payload
+  // mentah agar varian yang foto & SKU-nya sama tetap bisa dibedakan. Query
+  // terpisah supaya payload mentah tidak ikut terkirim ke klien.
+  const variantIds = products.flatMap((product) => product.productVariant.map((variant) => variant.id));
+  const attributeRows = variantIds.length > 0
+    ? await prisma.productMapping.findMany({
+      where: { variantId: { in: variantIds }, platformStatusRaw: { not: null } },
+      select: { variantId: true, channelSku: true, platformStatusRaw: true, account: { select: { platform: true } } },
+    })
+    : [];
+  const attributesByVariant = new Map<string, string[]>();
+  for (const row of attributeRows) {
+    if (!row.variantId) continue;
+    const label = variantAttributesFromRaw(row.account.platform, row.platformStatusRaw, row.channelSku);
+    if (!label) continue;
+    const labels = attributesByVariant.get(row.variantId) ?? [];
+    if (!labels.includes(label)) labels.push(label);
+    attributesByVariant.set(row.variantId, labels);
+  }
+
   const byId = new Map(products.map((product) => [product.id, product]));
   const ordered = ids
     .map((id) => byId.get(id))
@@ -329,6 +350,7 @@ export async function listProducts(
         // gambar master tetap dikirim terpisah untuk fallback di UI.
         imageUrl: productMapping.find((mapping) => mapping.imageUrl)?.imageUrl ?? null,
         masterImageUrl: product.imageUrl ?? null,
+        attributes: attributesByVariant.get(variant.id) ?? [],
         mappings: productMapping,
       })),
       bundleItems: bundleItem,

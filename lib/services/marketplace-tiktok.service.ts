@@ -14,6 +14,7 @@ import {
   productMainImage,
 } from "@/lib/integrations/tiktokShop";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 
 /**
@@ -351,23 +352,6 @@ function extractSkuName(sku: Record<string, unknown>): string | null {
     if (names.length > 0) return names.join(", ");
   }
   return null;
-}
-
-/**
- * Label atribut SKU dari payload produk TikTok (platformStatusRaw).
- * Listing tanpa foto per varian hanya bisa dibedakan lewat atribut ini.
- */
-function attributesFromRaw(raw: string | null, channelSku: string): string | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { skus?: Array<Record<string, unknown>> };
-    const skus = parsed?.skus;
-    if (!Array.isArray(skus)) return null;
-    const sku = skus.find((s) => String(s.id) === channelSku);
-    return sku ? extractSkuName(sku) : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Ekstrak URL gambar dari objek SKU TikTok (sku_img / image / sales_attributes). */
@@ -1414,7 +1398,8 @@ export async function listTikTokProducts(
       variantId: m.variantId,
       sku: m.variant?.sku ?? m.channelSku,
       sellerSku: m.sellerSku ?? null,
-      attributes: attributesFromRaw(m.platformStatusRaw, m.channelSku),
+      // Listing tanpa foto per varian hanya bisa dibedakan lewat atribut ini.
+      attributes: variantAttributesFromRaw(m.account.platform, m.platformStatusRaw, m.channelSku),
       channelSku: m.channelSku,
       status: m.platformStatus,
       tab: tabOf({

@@ -8,6 +8,8 @@ export type ListingStock = {
   status: "SUCCESS" | "FAILED" | "PENDING" | "DISABLED"; error: string | null; lastSyncedAt: string | null;
   /** Judul listing di marketplace (ProductMapping.platformTitle) — aditif. */
   platformTitle?: string | null;
+  /** Atribut varian di marketplace (mis. "Biru, 10 Buah") — pembeda saat foto & SKU sama. */
+  attributes?: string | null;
   /** Gambar listing dari ProductMapping.imageUrl — aditif, untuk thumbnail. */
   imageUrl?: string | null;
   /** Push stok toko ini aktif secara pengaturan (PlatformAccount.stockPushEnabled). */
@@ -24,6 +26,8 @@ export type MasterStockRow = {
   imageUrl: string | null; category: string | null; stock: number; safetyStock: number;
   /** Foto varian dari listing marketplace (ProductMapping.imageUrl); null bila belum ada. */
   variantImageUrl?: string | null;
+  /** Atribut marketplace dari semua listing varian ini (unik, urut kemunculan). */
+  attributes?: string[];
   available: number; pending: number; minimum: number; archived: boolean; promoActive: number;
   ownArchived: boolean;
   stockReview?: { reasons: string[]; initialStock: number | null; initialReason: string | null };
