@@ -37,6 +37,7 @@ type VariantRow = {
   accountId: string;
   accountLabel: string;
   lastSyncedAt: string | null;
+  imageUrl: string | null;
 };
 
 type ListingRow = {
@@ -1336,7 +1337,20 @@ export default function TikTokMarketplacePage() {
                           <tbody>
                             {row.variants.map((v) => (
                               <tr key={v.mappingId} className="border-b border-border last:border-0">
-                                <td className="py-2 pr-4 text-foreground font-semibold">{v.sku}</td>
+                                <td className="py-2 pr-4 text-foreground font-semibold">
+                      <div className="flex items-center gap-2">
+                        {v.imageUrl || row.master?.imageUrl ? (
+                          <img
+                            src={v.imageUrl || row.master?.imageUrl || ""}
+                            alt={v.sku}
+                            className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted object-cover"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted" />
+                        )}
+                        <span>{v.sku}</span>
+                      </div>
+                    </td>
                                 <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
                                 <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
                                 <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>
@@ -2034,7 +2048,20 @@ function FragmentRow({
               <tbody>
                 {row.variants.map((v) => (
                   <tr key={v.mappingId} className="border-b border-border last:border-0">
-                    <td className="py-2 pr-4 text-foreground font-semibold">{v.sku}</td>
+                    <td className="py-2 pr-4 text-foreground font-semibold">
+                      <div className="flex items-center gap-2">
+                        {v.imageUrl || row.master?.imageUrl ? (
+                          <img
+                            src={v.imageUrl || row.master?.imageUrl || ""}
+                            alt={v.sku}
+                            className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted object-cover"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 shrink-0 rounded-md border border-border bg-muted" />
+                        )}
+                        <span>{v.sku}</span>
+                      </div>
+                    </td>
                     <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
                     <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
                     <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>

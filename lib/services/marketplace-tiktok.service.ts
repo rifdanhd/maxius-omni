@@ -120,6 +120,8 @@ export interface TikTokVariantRow {
   accountId: string;
   accountLabel: string;
   lastSyncedAt: Date | null;
+  /** Foto varian dari TikTok (mapping.imageUrl); null bila belum tersinkron. */
+  imageUrl: string | null;
 }
 
 export interface TikTokListingRow {
@@ -1398,6 +1400,7 @@ export async function listTikTokProducts(
       accountId: m.account.id,
       accountLabel: m.account.label,
       lastSyncedAt: m.lastSyncedAt,
+      imageUrl: m.imageUrl ?? null,
     };
     row.variants.push(variantRow);
     row.variantCount += 1;
