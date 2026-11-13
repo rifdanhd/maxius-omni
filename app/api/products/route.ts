@@ -86,6 +86,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
               include: {
                 account: { select: { id: true, platform: true, label: true } },
               },
+              orderBy: { updatedAt: "desc" },
             },
           },
         },
@@ -115,6 +116,10 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
       ...product,
       variants: productVariant.map(({ productMapping, ...variant }) => ({
         ...variant,
+        // Foto varian dari listing marketplace (bila ada) + foto master untuk
+        // fallback; keduanya opsional sehingga konsumen lama tetap aman.
+        imageUrl: productMapping.find((mapping) => mapping.imageUrl)?.imageUrl ?? null,
+        masterImageUrl: product.imageUrl ?? null,
         mappings: productMapping,
       })),
       bundleItems: bundleItem,

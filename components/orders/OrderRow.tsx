@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Clock, Copy, PackageCheck, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VariantThumbnail } from "@/components/ui/variant-thumbnail";
 import { notify } from "@/components/ui/notify";
 import type { PrintType } from "./OrderCard";
 
@@ -182,16 +183,7 @@ export default function OrderRow({ order, checked, onToggleChecked, onPrint, onP
       {/* Isi pesanan */}
       <div className={`flex flex-col gap-3 px-4 py-3 ${ORDER_GRID}`}>
         <div className="flex min-w-0 gap-3">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
-            {order.productImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={order.productImage} alt="" className="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <PackageCheck size={18} />
-              </div>
-            )}
-          </div>
+          <VariantThumbnail src={order.productImage} size={56} alt={order.productName} />
           <div className="min-w-0">
             <p className="line-clamp-2 text-sm font-medium text-foreground">{order.productName}</p>
             <p className="truncate text-xs text-muted-foreground">{order.productVariant}</p>

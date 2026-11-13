@@ -2,6 +2,7 @@
 
 import { ErrorFeedback, FormError } from "@/components/ui/feedback";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { VariantThumbnail } from "@/components/ui/variant-thumbnail";
 import { notify } from "@/components/ui/notify";
 import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -41,6 +42,10 @@ type Variant = {
   minStock: number | null;
   name?: string | null;
   price?: number | null;
+  /** Foto varian dari listing marketplace (opsional). */
+  imageUrl?: string | null;
+  /** Cover MasterProduct untuk fallback thumbnail (opsional). */
+  masterImageUrl?: string | null;
   mappings: Mapping[];
 };
 
@@ -1089,7 +1094,10 @@ export default function MasterProductsPage() {
                                     return (
                                       <tr key={v.id} data-testid={`catalog-variant-${v.id}`} className="border-b border-border last:border-0">
                                         <td className="px-4 py-2.5 text-foreground font-medium">
-                                          {v.sku}
+                                          <div className="flex min-w-0 items-center gap-2">
+                                            <VariantThumbnail src={v.imageUrl} fallbackSrc={v.masterImageUrl ?? product.imageUrl} alt={v.name ?? v.sku} />
+                                            <span className="truncate">{v.name?.trim() || v.sku}</span>
+                                          </div>
                                         </td>
                                         <td className="px-4 py-2.5 text-foreground">{v.sku}</td>
                                         <td className="px-4 py-2.5 text-muted-foreground">

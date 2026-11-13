@@ -289,8 +289,10 @@ export async function listProducts(
                   select: {
                     id: true,
                     channelSku: true,
+                    imageUrl: true,
                     account: { select: { id: true, platform: true, label: true } },
                   },
+                  orderBy: { updatedAt: "desc" },
                 },
               },
             },
@@ -323,6 +325,10 @@ export async function listProducts(
       // halaman Produk & modal lain membaca variant.mappings.
       variants: productVariant.map(({ productMapping, ...variant }) => ({
         ...variant,
+        // Gambar varian diambil dari listing marketplace yang punya foto;
+        // gambar master tetap dikirim terpisah untuk fallback di UI.
+        imageUrl: productMapping.find((mapping) => mapping.imageUrl)?.imageUrl ?? null,
+        masterImageUrl: product.imageUrl ?? null,
         mappings: productMapping,
       })),
       bundleItems: bundleItem,

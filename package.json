@@ -11,6 +11,7 @@
     "test:backend": "playwright test -c playwright.backend.config.ts",
     "worker:stock": "tsx scripts/stock-outbox-worker.mts",
     "audit:orphans": "tsx scripts/detect-orphans.mts",
+    "backfill:mapping-images": "tsx scripts/backfill-mapping-images.mts",
     "postinstall": "prisma generate",
     "clean:seed": "tsx scripts/clean-seed.mts",
     "push": "bash scripts/git-push.sh"

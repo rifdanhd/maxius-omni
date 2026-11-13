@@ -7,6 +7,7 @@ import { StoreMappingPanel, type StoreMappingRow } from "@/components/inventory/
 import { notify } from "@/components/ui/notify";
 import { confirmAction } from "@/components/ui/confirm-action";
 import { Button } from "@/components/ui/button";
+import { VariantThumbnail } from "@/components/ui/variant-thumbnail";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState, useId, type ReactNode } from "react";
@@ -984,15 +985,7 @@ export default function ProductMappingPage() {
         <DetailHeader
           avatar={
             o.imageUrl ? (
-              <img
-                src={o.imageUrl}
-                alt={o.sampleProductName || o.channelSku}
-                className="size-10 shrink-0 rounded-md object-cover"
-                loading="lazy"
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  e.currentTarget.src = "/placeholder-product.svg";
-                }}
-              />
+              <VariantThumbnail src={o.imageUrl} alt={o.sampleProductName || o.channelSku} />
             ) : (
               <Avatar alert><AlertTriangle size={16} aria-hidden="true" /></Avatar>
             )
@@ -1396,15 +1389,7 @@ export default function ProductMappingPage() {
                               onClick={() => setSelection({ kind: "orphan", key })}
                               avatar={
                                 o.imageUrl ? (
-                                  <img
-                                    src={o.imageUrl}
-                                    alt={mainTitle}
-                                    className="size-9 shrink-0 rounded-md object-cover"
-                                    loading="lazy"
-                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                      e.currentTarget.src = "/placeholder-product.svg";
-                                    }}
-                                  />
+                                  <VariantThumbnail src={o.imageUrl} alt={mainTitle} size={36} />
                                 ) : (
                                   <Avatar alert><AlertTriangle size={15} aria-hidden="true" /></Avatar>
                                 )

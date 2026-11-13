@@ -2,7 +2,8 @@
 import { StatusBadge } from "@/components/ui/status-badge";
 
 import { useState } from "react";
-import { Clock, RefreshCw, MessageCircle, FileText, PackageCheck, Printer, Store, Package } from "lucide-react";
+import { Clock, RefreshCw, MessageCircle, FileText, PackageCheck, Printer, Store } from "lucide-react";
+import { VariantThumbnail } from "@/components/ui/variant-thumbnail";
 import OrderProgressSteps from "./OrderProgressSteps";
 import PrintDropdown from "./PrintDropdown";
 import TikTokLogo from "@/components/icons/TikTokLogo";
@@ -161,9 +162,7 @@ export default function OrderCard({
         <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-6 flex-1">
           {/* Product details */}
           <div className="col-span-1 sm:col-span-2 xl:col-span-4 min-w-0 flex gap-4">
-            <div className="w-16 h-16 bg-muted rounded-lg shrink-0 border border-border overflow-hidden">
-               <>{order.productImage ? <img src={order.productImage} alt={order.productName} className="w-full h-full object-cover" /> : <Package size={24} className="mx-auto mt-4 text-muted-foreground" />}</>
-            </div>
+            <VariantThumbnail src={order.productImage} size={64} alt={order.productName} className="rounded-lg" />
             <div>
               <h3 className="text-sm font-bold text-foreground leading-tight mb-1">{order.productName}</h3>
               <p className="text-xs text-muted-foreground mb-2">{order.productVariant}</p>
