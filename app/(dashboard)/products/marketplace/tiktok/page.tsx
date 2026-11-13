@@ -37,6 +37,7 @@ type VariantRow = {
   accountId: string;
   accountLabel: string;
   lastSyncedAt: string | null;
+  imageUrl: string | null;
 };
 
 type ListingRow = {
@@ -1334,15 +1335,27 @@ export default function TikTokMarketplacePage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {row.variants.map((v) => (
-                              <tr key={v.mappingId} className="border-b border-border last:border-0">
-                                <td className="py-2 pr-4 text-foreground font-semibold">{v.sku}</td>
-                                <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
-                                <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
-                                <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>
-                                <td className="py-2 pr-4"><span className="text-[10px] font-bold text-foreground">{STATUS_LABEL[v.status ?? ""] ?? "Belum di-sync"}</span></td>
-                              </tr>
-                            ))}
+                          {row.variants.map((v) => (
+                            <tr key={v.mappingId} className="border-b border-border last:border-0">
+                              <td className="py-2 pr-4 text-foreground font-semibold">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-10 w-10 rounded-md border border-border bg-muted shrink-0 flex items-center justify-center">
+                                    {v.imageUrl ?? row.master?.imageUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={v.imageUrl ?? row.master?.imageUrl ?? ""} alt="" className="h-10 w-10 rounded-md border border-border object-cover" />
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground">–</span>
+                                    )}
+                                  </div>
+                                  <span>{v.sku}</span>
+                                </div>
+                              </td>
+                              <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
+                              <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
+                              <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>
+                              <td className="py-2 pr-4"><span className="text-[10px] font-bold text-foreground">{STATUS_LABEL[v.status ?? ""] ?? "Belum di-sync"}</span></td>
+                            </tr>
+                          ))}
                           </tbody>
                         </table>
                       </div>
@@ -2034,7 +2047,19 @@ function FragmentRow({
               <tbody>
                 {row.variants.map((v) => (
                   <tr key={v.mappingId} className="border-b border-border last:border-0">
-                    <td className="py-2 pr-4 text-foreground font-semibold">{v.sku}</td>
+                    <td className="py-2 pr-4 text-foreground font-semibold">
+                      <div className="flex items-center gap-2">
+                        <div className="h-10 w-10 rounded-md border border-border bg-muted shrink-0 flex items-center justify-center">
+                          {v.imageUrl ?? row.master?.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={v.imageUrl ?? row.master?.imageUrl ?? ""} alt="" className="h-10 w-10 rounded-md border border-border object-cover" />
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">–</span>
+                          )}
+                        </div>
+                        <span>{v.sku}</span>
+                      </div>
+                    </td>
                     <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
                     <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
                     <td className="py-2 pr-4 text-foreground">{fmtNumber(v.stock)}</td>
