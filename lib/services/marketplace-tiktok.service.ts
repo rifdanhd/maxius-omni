@@ -111,6 +111,7 @@ export interface TikTokVariantRow {
   mappingId: string;
   variantId: string | null;
   sku: string;
+  sellerSku: string | null;
   channelSku: string;
   status: string | null;
   tab: TikTokTabKey | null;
@@ -153,6 +154,7 @@ export interface TikTokListingRow {
 interface ListedMapping {
   id: string;
   channelSku: string;
+  sellerSku: string | null;
   variantId: string | null;
   platformProductId: string | null;
   platformStatus: string | null;
@@ -1385,6 +1387,7 @@ export async function listTikTokProducts(
       mappingId: m.id,
       variantId: m.variantId,
       sku: m.variant?.sku ?? m.channelSku,
+      sellerSku: m.sellerSku ?? null,
       channelSku: m.channelSku,
       status: m.platformStatus,
       tab: tabOf({
