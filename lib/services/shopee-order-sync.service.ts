@@ -338,7 +338,7 @@ export async function ingestShopeeOrderSummaries(
   shopId: string,
   summaries: ShopeeOrderSummary[],
   result: ShopeeSyncResult,
-  options?: { importOnly?: boolean }
+  options?: { importOnly?: boolean; creds?: Parameters<typeof getOrderDetail>[3] }
 ): Promise<void> {
   // A4 — order yang sudah ada: refresh status saja (progress-only).
   const newSns: string[] = [];
@@ -387,7 +387,7 @@ export async function ingestShopeeOrderSummaries(
   if (newSns.length > 0) {
     let details: Array<Record<string, unknown>> = [];
     try {
-      details = await getOrderDetail(accessToken, shopId, newSns);
+      details = await getOrderDetail(accessToken, shopId, newSns, options?.creds);
     } catch (e) {
       const message = `get_order_detail: ${errMsg(e)}`;
       result.errors.push(message);

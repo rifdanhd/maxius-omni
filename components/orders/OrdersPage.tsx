@@ -398,7 +398,9 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   /** Background run (SyncRun): progres live + tombol terkunci saat aktif. */
   const [bgActive, setBgActive] = useState(false);
-  const [syncProgressOpen, setSyncProgressOpen] = useState(true);
+  const [syncProgressOpen, setSyncProgressOpen] = useState(false);
+  const [automaticSync, setAutomaticSync] = useState<{ enabled: boolean; intervalMs: number } | null>(null);
+  const [lastOrderSync, setLastOrderSync] = useState<string | null>(null);
   const [bgProgress, setBgProgress] = useState<{ fetched: number; created: number; skipped: number; phase: string | null } | null>(null);
   const bgWasActive = useRef(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -576,6 +578,7 @@ export default function OrdersPage() {
       });
       if (!res.ok) return;
       const data = (await res.json()) as {
+        automatic?: { enabled: boolean; intervalMs: number };
         runs: Array<{
           id: string;
           status: string;
@@ -585,12 +588,15 @@ export default function OrdersPage() {
           created: number;
           skipped: number;
           error: string | null;
+          finishedAt?: string | null;
         }>;
       };
       const runs = data.runs ?? [];
+      if (data.automatic) setAutomaticSync(data.automatic);
+      const finished = runs.filter((run) => run.status === "DONE" && run.finishedAt).map((run) => run.finishedAt!).sort();
+      if (finished.length) setLastOrderSync(finished[finished.length - 1]);
       const activeRuns = runs.filter((r) => r.status === "QUEUED" || r.status === "RUNNING");
       if (activeRuns.length > 0) {
-        if (!bgWasActive.current) setSyncProgressOpen(true);
         bgWasActive.current = true;
         setBgActive(true);
         setBgProgress({
@@ -607,7 +613,7 @@ export default function OrdersPage() {
         bgWasActive.current = false;
         const last = runs[0];
         if (last?.status === "DONE") {
-          notify("success", `Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
+          notify(last.phase === "partial" ? "warning" : "success", last.phase === "partial" ? `Sinkronisasi selesai sebagian. ${last.error ?? "Periksa log sinkronisasi toko."}` : `Sync selesai — ${last.created} order baru, ${last.skipped} sudah ada (${last.fetched} ditarik).`);
         } else if (last?.status === "FAILED") {
           const rawError = last.error ?? "-";
           const isTokenError = /invalid_acceess_token|invalid access token|expired|token/i.test(rawError);
@@ -638,7 +644,7 @@ export default function OrdersPage() {
             });
           }
         }
-        void refreshList().catch((e) => console.error(e));
+        if (selected.size === 0 && !pickupTargets && !shopeeTargets && !showPrintModal) void refreshList().catch((e) => console.error(e));
       }
     } catch (e) {
       console.warn("status sync:", e);
@@ -651,9 +657,8 @@ export default function OrdersPage() {
     runStatusRef.current = refreshRunStatus; // closure terbaru tiap render
   });
   useEffect(() => {
-    if (!bgActive) return;
     void runStatusRef.current();
-    const t = setInterval(() => void runStatusRef.current(), 4000);
+    const t = setInterval(() => void runStatusRef.current(), bgActive ? 4000 : 15000);
     return () => clearInterval(t);
   }, [bgActive]);
 
@@ -1002,6 +1007,11 @@ export default function OrdersPage() {
       />
 
       <OrderHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} busy={busy} onSubmit={handleSync} />
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {automaticSync ? automaticSync.enabled ? `Pesanan diperbarui otomatis setiap ${Math.round(automaticSync.intervalMs / 60000)} menit.` : "Sinkronisasi pesanan otomatis sedang dinonaktifkan." : "Memeriksa sinkronisasi otomatis…"}
+        {lastOrderSync && ` Terakhir selesai: ${new Date(lastOrderSync).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}.`}
+        {bgActive && " Pembaruan sedang berjalan di latar belakang."}
+      </p>
 
       {bgActive && bgProgress && (
         <Dialog open={syncProgressOpen} onOpenChange={setSyncProgressOpen}>

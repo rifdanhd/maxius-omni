@@ -30,9 +30,10 @@ const mappingInclude = {
     select: {
       id: true,
       sku: true,
+      name: true,
       stock: true,
       safetyStock: true,
-      masterProduct: { select: { id: true, name: true, threshold: true } },
+      masterProduct: { select: { id: true, name: true, imageUrl: true, threshold: true } },
     },
   },
   mappingReviews: { select: { status: true } },

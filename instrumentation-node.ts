@@ -13,7 +13,8 @@
  * dedup per-timer untuk dev HMR, kill-switch AUTO_SYNC_DISABLED.
  */
 const TICK_MS = 30_000;
-const AUTO_ORDERS_MS = Number(process.env.AUTO_ORDERS_INTERVAL_MS) || 60_000;
+import { orderAutoStatus } from "./lib/services/order-auto.policy";
+const AUTO_ORDERS_MS = orderAutoStatus().intervalMs;
 const AUTO_LISTINGS_MS = 30 * 60_000;
 const AUTO_PROMOS_MS = 30 * 60_000;
 const RUN_SWEEP_MS = 15_000;
@@ -82,19 +83,19 @@ export async function registerNodeInstrumentation() {
   const autoAllowed =
     process.env.AUTO_SYNC_DISABLED !== "true" &&
     (process.env.NODE_ENV === "production" || process.env.AUTO_SYNC_DEV === "true");
-  if (autoAllowed) {
+  if (autoAllowed || orderAutoStatus().enabled) {
     const { autoSyncOrdersOnce, autoSyncListingsOnce, autoSyncPromotionsOnce } = await import(
       "./lib/services/auto-sync.service"
     );
 
-    if (!g.__maxiusAutoOrdersTimer) {
+    if (orderAutoStatus().enabled && !g.__maxiusAutoOrdersTimer) {
       g.__maxiusAutoOrdersTimer = unref(
         setInterval(() => {
           void autoSyncOrdersOnce()
             .then((r) => {
-              if (r.created > 0 || r.errors > 0) {
+              if (r.queued > 0 || r.errors > 0) {
                 console.log(
-                  `[AutoSync] order: ${r.accounts} akun, +${r.created} baru, ${r.skipped} sudah ada, ${r.errors} galat`
+                  `[AutoSync] order: ${r.accounts} akun, ${r.queued} antrean dimulai, ${r.skipped} masih berjalan, ${r.errors} galat`
                 );
               }
             })
@@ -104,7 +105,7 @@ export async function registerNodeInstrumentation() {
       console.log(`[AutoSync] order otomatis aktif (tiap ${AUTO_ORDERS_MS / 60000} menit)`);
     }
 
-    if (!g.__maxiusAutoListingsTimer) {
+    if (autoAllowed && !g.__maxiusAutoListingsTimer) {
       g.__maxiusAutoListingsTimer = unref(
         setInterval(() => {
           void autoSyncListingsOnce()
@@ -119,7 +120,7 @@ export async function registerNodeInstrumentation() {
       console.log(`[AutoSync] listing+gambar otomatis aktif (tiap ${AUTO_LISTINGS_MS / 60000} menit)`);
     }
 
-    if (!g.__maxiusAutoPromosTimer) {
+    if (autoAllowed && !g.__maxiusAutoPromosTimer) {
       g.__maxiusAutoPromosTimer = unref(
         setInterval(() => {
           void autoSyncPromotionsOnce()

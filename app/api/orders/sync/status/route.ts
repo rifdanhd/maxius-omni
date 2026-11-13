@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/utils/api";
 import { listOrderRuns } from "@/lib/services/order-run.service";
+import { orderAutoStatus } from "@/lib/services/order-auto.policy";
 
 /**
  * GET /api/orders/sync/status — run terbaru utk brand ini (UI polling tiap
@@ -10,5 +11,5 @@ import { listOrderRuns } from "@/lib/services/order-run.service";
 export const GET = withAuth(async (req) => {
   const runs = await listOrderRuns(req.businessId, 10);
   const active = runs.some((r) => r.status === "QUEUED" || r.status === "RUNNING");
-  return NextResponse.json({ active, runs });
+  return NextResponse.json({ active, runs, automatic: orderAutoStatus() });
 });

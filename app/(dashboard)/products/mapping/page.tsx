@@ -3,6 +3,7 @@
 import { ErrorFeedback } from "@/components/ui/feedback";
 import { SkuReviewPanel } from "@/components/inventory/sku-review-panel";
 import { AutoMatchPanel } from "@/components/inventory/auto-match-panel";
+import { StoreMappingPanel, type StoreMappingRow } from "@/components/inventory/store-mapping-panel";
 import { notify } from "@/components/ui/notify";
 import { confirmAction } from "@/components/ui/confirm-action";
 import { Button } from "@/components/ui/button";
@@ -41,9 +42,7 @@ type Variant = {
   safetyStock: number;
   masterProduct: { id: string; name: string };
 };
-type Mapping = {
-  id: string;
-  channelSku: string;
+type Mapping = StoreMappingRow & {
   origin: string | null;
   reviewed: boolean;
   account: { id: string; platform: string; label: string } | null;
@@ -509,7 +508,7 @@ export default function ProductMappingPage() {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [tab, setTab] = useState<"mapping" | "varian" | "riwayat">("mapping");
+  const [tab, setTab] = useState<"antartoko" | "mapping" | "varian" | "riwayat">("antartoko");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -563,6 +562,7 @@ export default function ProductMappingPage() {
         await loadAll();
         const params = new URLSearchParams(window.location.search);
         if (params.get("accountId")) {
+          setTab("mapping");
           setForm((previous) => ({ ...previous,
             accountId: params.get("accountId") ?? "", channelSku: params.get("channelSku") ?? "" }));
           setSelection({ kind: "new" });
@@ -749,7 +749,7 @@ export default function ProductMappingPage() {
     }
   }
 
-  function changeTab(id: "mapping" | "varian" | "riwayat") {
+  function changeTab(id: "antartoko" | "mapping" | "varian" | "riwayat") {
     setTab(id);
     setSelection(null);
     setShown(PAGE_STEP);
@@ -758,7 +758,7 @@ export default function ProductMappingPage() {
 
   /* ── Data turunan ── */
   const mq = mapQuery.trim().toLowerCase();
-  const filteredMappings = mappings.filter((m) => (storeFilter === "all" || m.account?.id === storeFilter) && (!mq || [m.channelSku, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq))));
+  const filteredMappings = mappings.filter((m) => (storeFilter === "all" || m.account?.id === storeFilter) && (!mq || [m.sellerSku, m.channelSku, m.platformTitle, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq))));
   const filteredOrphans = orphans.filter((o) => (storeFilter === "all" || o.accountId === storeFilter) && (!mq || [o.channelSku, o.accountLabel, o.sampleProductName].some((x) => x?.toLowerCase().includes(mq))));
   const vq = variantQuery.trim().toLowerCase();
   const filteredVariants = vq ? variants.filter((v) => [v.sku, v.masterProduct.name].some((x) => x.toLowerCase().includes(vq))) : variants;
@@ -781,6 +781,7 @@ export default function ProductMappingPage() {
   ];
 
   const tabs = [
+    { id: "antartoko", label: "Antar Toko", count: stores.length },
     { id: "mapping", label: "Produk Toko", count: mappings.length },
     { id: "varian", label: "Varian Pusat", count: variants.length },
     { id: "riwayat", label: "Riwayat Stok", count: ledger.length },
@@ -889,7 +890,7 @@ export default function ProductMappingPage() {
       <>
         <DetailHeader
           avatar={<Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>}
-          title={m.channelSku}
+          title={m.sellerSku || m.platformTitle || m.channelSku}
           mono
           subtitle={
             <>
@@ -1252,7 +1253,7 @@ export default function ProductMappingPage() {
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Hubungkan Produk Toko</h1>
+            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Hubungkan Produk Antar Toko</h1>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button type="button" aria-label="Cara stok efektif dihitung" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -1265,7 +1266,7 @@ export default function ProductMappingPage() {
             </Tooltip>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Tentukan varian pusat yang menjadi sumber stok setiap produk marketplace. Mulai dari produk toko, lalu pilih SKU pusat yang sesuai.
+            Bandingkan SKU penjual dari seluruh toko dan tentukan satu varian pusat untuk barang yang sama.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1284,19 +1285,19 @@ export default function ProductMappingPage() {
         </div>
       </header>
 
-      <ol aria-label="Alur menghubungkan produk" className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
-        {["Pilih produk toko", "Pilih varian pusat", "Tinjau dan simpan"].map((step, index) => <li key={step} className="flex items-center gap-3"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span><span className="font-medium">{step}</span></li>)}
+      {tab !== "antartoko" && <><ol aria-label="Alur menghubungkan produk" className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
+        {["Bandingkan listing tiap toko", "Pilih satu varian pusat", "Tinjau dan simpan hubungan"].map((step, index) => <li key={step} className="flex items-center gap-3"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span><span className="font-medium">{step}</span></li>)}
       </ol>
 
       <details className="rounded-xl border border-border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Bantuan pencocokan &amp; tinjauan SKU <span className="ml-1 font-normal text-muted-foreground">— buka bila ada produk yang sulit dicocokkan</span></summary>
         <div className="space-y-3 border-t border-border p-3"><SkuReviewPanel onShowUnlinked={() => { changeTab("mapping"); setListFilter("orphan"); setStoreFilter("all"); setMapQuery(""); window.requestAnimationFrame(() => document.getElementById("mapping-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" })); }} /><AutoMatchPanel /></div>
-      </details>
+      </details></>}
 
       {error && !detailActive && <ErrorFeedback error={error} className="mb-4" />}
 
       {/* ───────── Strip ringkasan ───────── */}
-      <section aria-label="Ringkasan mapping" className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:grid-cols-4 lg:divide-x lg:divide-border">
+      {tab !== "antartoko" && <section aria-label="Ringkasan mapping" className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:grid-cols-4 lg:divide-x lg:divide-border">
         {kpis.map(({ label, value, icon: Icon, alert }) => (
           <div key={label} className={`flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 lg:border-b-0 ${alert ? "bg-destructive-subtle" : ""}`}>
             <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${alert ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>
@@ -1308,7 +1309,7 @@ export default function ProductMappingPage() {
             </div>
           </div>
         ))}
-      </section>
+      </section>}
 
       {/* ───────── Tab ───────── */}
       <div role="tablist" aria-label="Tampilan mapping stok" className="flex items-center gap-1 overflow-x-auto border-b border-border">
@@ -1338,7 +1339,11 @@ export default function ProductMappingPage() {
       </div>
 
       {/* ───────── Master-detail ───────── */}
-      {tab !== "riwayat" && (
+      {tab === "antartoko" && (loading
+        ? <div className="space-y-3" aria-label="Memuat kelompok SKU"><Skeleton className="h-44 w-full" /><Skeleton className="h-20 w-full" /></div>
+        : <StoreMappingPanel mappings={mappings} stores={stores} variants={variants} onSaved={loadAll} />)}
+
+      {(tab === "mapping" || tab === "varian") && (
         <div id="mapping-workspace" className="grid scroll-mt-4 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
           {/* Daftar (master) */}
           <section className={`${detailActive ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm`}>
@@ -1435,10 +1440,10 @@ export default function ProductMappingPage() {
                             active={selection?.kind === "mapping" && selection.id === m.id}
                             onClick={() => setSelection({ kind: "mapping", id: m.id })}
                             avatar={<Avatar>{(m.account?.label ?? "?").charAt(0).toUpperCase()}</Avatar>}
-                            title={m.variant?.masterProduct.name ?? m.channelSku}
+                            title={m.sellerSku || m.platformTitle || m.variant?.masterProduct.name || m.channelSku}
                             subtitle={
                               m.variant
-                                ? `${m.account?.label ?? "-"} · ${m.channelSku} → ${m.variant.sku}`
+                                ? `${m.account?.label ?? "-"} · ${m.platformTitle || m.variant.masterProduct.name} → ${m.variant.sku}`
                                 : `belum ter-mapping · ${m.account?.label ?? "-"}`
                             }
                             originBadge={<OriginBadge mapping={m} />}

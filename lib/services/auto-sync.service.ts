@@ -18,14 +18,13 @@
  */
 import { prisma } from "@/lib/db/prisma";
 import { enqueueOrderRuns } from "@/lib/services/order-run.service";
-import { syncOrdersTikTok } from "@/lib/services/order-sync.service";
-import { syncOrdersShopee } from "@/lib/services/shopee-order-sync.service";
 import { syncShopeeListings } from "@/lib/services/marketplace-shopee.service";
 import { syncTikTokListings, importTikTokListings } from "@/lib/services/marketplace-tiktok.service";
 import { ingestPromotionActivitiesForAccount } from "@/lib/services/promotion-activity.service";
 import { ingestShopeePromotionsForAccount } from "@/lib/services/shopee-promotion.service";
 
 export type OrdersAutoSummary = {
+  queued: number;
   accounts: number;
   created: number;
   skipped: number;
@@ -53,7 +52,7 @@ let promosInFlight = false;
 
 export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
   if (ordersInFlight) {
-    return { accounts: 0, created: 0, skipped: 0, errors: 0 };
+    return { accounts: 0, queued: 0, created: 0, skipped: 0, errors: 0 };
   }
   ordersInFlight = true;
   try {
@@ -61,52 +60,13 @@ export async function autoSyncOrdersOnce(): Promise<OrdersAutoSummary> {
       where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, accessToken: { not: null }, isFrozen: false },
       select: { id: true, platform: true, lastPulledAt: true, businessId: true },
     });
-    const out: OrdersAutoSummary = { accounts: accounts.length, created: 0, skipped: 0, errors: 0 };
+    const out: OrdersAutoSummary = { accounts: accounts.length, queued: 0, created: 0, skipped: 0, errors: 0 };
     for (const acc of accounts) {
-      // Guard: jangan tarik dobel saat background SyncRun (tombol manual) jalan.
-      const activeRun = await prisma.syncRun.findFirst({
-        where: { accountId: acc.id, kind: "orders", status: { in: ["QUEUED", "RUNNING"] } },
-        select: { id: true },
-      });
-      if (activeRun) continue;
-
       try {
-        if (!acc.lastPulledAt) {
-          const runs = await enqueueOrderRuns(acc.businessId, { accountId: acc.id });
-          out.errors += runs.filter((run) => run.error).length;
-          continue;
-        }
-        const since = acc.lastPulledAt;
-        const r =
-          acc.platform === "TIKTOK_SHOP"
-            ? await syncOrdersTikTok(acc.id, undefined, { since })
-            : await syncOrdersShopee(acc.id, undefined, { since });
-        out.created += r.created;
-        out.skipped += r.skipped;
-        out.errors += r.errors.length;
-        // Watermark maju hanya bila tarikan bersih — error sebagian tidak
-        // boleh melewatkan order (tick berikutnya mengulang rentang yang sama).
-        if (r.errors.length === 0) {
-          await prisma.platformAccount
-            .update({ where: { id: acc.id }, data: { lastPulledAt: new Date() } })
-            .catch(() => {});
-        }
-        // TikTok sudah menulis SyncLog order_sync per akun di dalam service.
-        // Shopee hanya menulis log pada error eksepsi → ringkasan sukses ditulis di sini.
-        if (acc.platform === "SHOPEE" && r.created > 0) {
-          await prisma.syncLog
-            .create({
-              data: {
-                direction: "in",
-                kind: "order_sync",
-                status: "success",
-                message: `auto: ${r.fetched} ditarik, ${r.created} baru, ${r.skipped} sudah ada`,
-                payload: JSON.stringify({ fetched: r.fetched, created: r.created, skipped: r.skipped }),
-                accountId: acc.id,
-              },
-            })
-            .catch(() => {});
-        }
+        const runs = await enqueueOrderRuns(acc.businessId, { accountId: acc.id });
+        out.queued += runs.filter((run) => run.runId && !run.skipped).length;
+        out.errors += runs.filter((run) => run.error).length;
+        out.skipped += runs.filter((run) => run.skipped).length;
       } catch (e) {
         out.errors += 1;
         const errMsg = e instanceof Error ? e.message : String(e);

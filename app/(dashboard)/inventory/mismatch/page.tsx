@@ -41,6 +41,7 @@ type MismatchRow = {
   };
   account: { id: string; platform: string; label: string };
   diffVsCentral: number;
+  holdReason?: string | null;
 };
 
 type FilterId = "mismatch" | "FAILED" | "PENDING" | "SUCCESS" | "all";
@@ -188,7 +189,7 @@ export default function SyncMismatchPage() {
     });
   }
 
-  const retryableRows = rows.filter((r) => r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0));
+  const retryableRows = rows.filter((r) => !r.holdReason && (r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0)));
   const allRetryableSelected = retryableRows.length > 0 && retryableRows.every((r) => selectedForRetry.has(r.id));
 
   async function loadMore() {
@@ -500,7 +501,7 @@ export default function SyncMismatchPage() {
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
-                        {r.status === "PENDING" && r.nextRetryAt && (
+                        {r.status === "PENDING" && !r.holdReason && r.nextRetryAt && (
                           <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
                             <Clock className="h-3 w-3" />
                             <span>retry otomatis {fmtDate(r.nextRetryAt)}</span>
@@ -510,7 +511,8 @@ export default function SyncMismatchPage() {
 
                       {/* Status & Waktu */}
                       <td className="whitespace-nowrap px-4 py-3.5 text-xs text-muted-foreground">
-                        <StatusBadge status={r.status} className="mb-1" />
+                        {r.holdReason ? <span className="mb-1 inline-flex rounded-full bg-muted px-2 py-1 font-medium text-foreground">Ditahan</span> : <StatusBadge status={r.status} className="mb-1" />}
+                        {r.holdReason && <p className="max-w-56 whitespace-normal text-xs leading-relaxed">{r.holdReason}</p>}
                         <div>{fmtDate(r.updatedAt)}</div>
                       </td>
 
@@ -529,13 +531,13 @@ export default function SyncMismatchPage() {
                           }}
                           className="w-4 h-4 rounded border-border accent-primary"
                           aria-label={`Pilih ${r.variant.productName} untuk retry massal`}
-                          disabled={!(r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0))}
+                          disabled={!!r.holdReason || !(r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0))}
                         />
                       </td>
 
                       {/* Aksi Retry */}
                       <td className="whitespace-nowrap px-4 py-3.5 text-right">
-                        {r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0) ? (
+                        {!r.holdReason && (r.status === "FAILED" || (r.status === "PENDING" && r.retryCount > 0)) ? (
                           <button
                             type="button"
                             onClick={() => retryJob(r.id)}

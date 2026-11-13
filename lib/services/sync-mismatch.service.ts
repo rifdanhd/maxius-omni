@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db/prisma";
 import { effectiveStock } from "@/lib/services/stock-level.policy";
 import { SYNC_JOB_MAX_RETRIES } from "@/lib/services/sync-job.service";
 import { businessWhere } from "@/lib/services/business-scope.service";
+import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
+import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
 
 /**
  * PHASE B.1 — Stock Mismatch View (read-only).
@@ -48,6 +50,7 @@ export type MismatchRow = {
   account: { id: string; platform: string; label: string };
   /** newSellable yang gagal di-push minus stok central saat ini. */
   diffVsCentral: number;
+  holdReason: string | null;
 };
 
 /**
@@ -163,7 +166,7 @@ export async function listMismatchSyncJobs(params: {
           masterProduct: { select: { name: true } },
         },
       },
-      account: { select: { id: true, platform: true, label: true } },
+      account: { select: { id: true, platform: true, label: true, isFrozen: true, stockPushEnabled: true } },
     },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     take: limit + 1,
@@ -172,6 +175,7 @@ export async function listMismatchSyncJobs(params: {
   const hasMore = jobs.length > limit;
   const page = hasMore ? jobs.slice(0, limit) : jobs;
 
+  const settings = await getCachedInventorySettings(params.businessId);
   const rows: MismatchRow[] = page.map((j) => {
     const central = effectiveStock(j.variant.stock, j.variant.safetyStock);
     return {
@@ -196,6 +200,7 @@ export async function listMismatchSyncJobs(params: {
       },
       account: j.account,
       diffVsCentral: j.newSellable - central,
+      holdReason: j.status === "SUCCESS" ? null : stockPushDisabledReason(j.account, settings),
     };
   });
 

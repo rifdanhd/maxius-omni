@@ -99,6 +99,7 @@ type UnmappedAccount = {
 };
 
 type CentralStockPreview = {
+  previewToken?: string;
   accountId: string;
   label: string;
   updated: Array<{
@@ -325,7 +326,8 @@ export default function TikTokMarketplacePage() {
     try {
       const res = await authFetch("/api/marketplace/tiktok/products/sync", {
         method: "POST",
-        headers: { },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(accountFilter.length ? { accountIds: accountFilter } : {}),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Sync gagal.");
@@ -385,7 +387,7 @@ export default function TikTokMarketplacePage() {
       const res = await authFetch("/api/inventory/sync/tiktok-to-central", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId: centralPreview.accountId, confirm: true }),
+        body: JSON.stringify({ accountId: centralPreview.accountId, confirm: true, previewToken: centralPreview.previewToken }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Penggantian stok pusat gagal.");

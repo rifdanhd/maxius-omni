@@ -1,8 +1,9 @@
-import crypto from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { searchTikTokInventory } from "@/lib/integrations/tiktokShop";
 import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
 import { adjustStockAbsoluteInTx, pushVariantStockToOthers, STOCK_REASONS } from "@/lib/services/central-stock.service";
+import { StockPreviewConflict, signStockPreview, stockPlanDigest, verifyStockPreview } from "@/lib/services/stock-preview.policy";
 
 type SyncMapping = {
   id: string;
@@ -11,12 +12,14 @@ type SyncMapping = {
   platformSkuId: string | null;
   platformProductId: string | null;
   variantId: string;
-  variant: { id: string; sku: string; stock: number; masterProduct: { name: string; imageUrl: string | null } | null };
+  updatedAt: Date;
+  variant: { id: string; sku: string; stock: number; version: number; masterProduct: { name: string; imageUrl: string | null } | null };
 };
 
 export type TikTokCentralStockSyncResult = {
   accountId: string;
   label: string;
+  previewToken?: string;
   updated: Array<{ mappingId: string; sku: string; channelSku: string; productName: string; imageUrl: string | null; before: number; after: number }>;
   skipped: Array<{ mappingId: string; sku: string; reason: string }>;
 };
@@ -31,8 +34,10 @@ export async function syncTikTokStockToCentral(
   businessId: string,
   userId: string,
   accountId: string,
-  options: { apply?: boolean } = {},
+  options: { apply?: boolean; previewToken?: string } = {},
 ): Promise<TikTokCentralStockSyncResult> {
+  const scope = { businessId, userId, accountId };
+  const approved = options.apply ? verifyStockPreview(options.previewToken, scope) : null;
   const account = await prisma.platformAccount.findFirst({
     where: { id: accountId, businessId, platform: "TIKTOK_SHOP" },
     select: { id: true, label: true, accessToken: true, refreshToken: true, tokenExpiresAt: true, shopCipher: true, isFrozen: true },
@@ -47,7 +52,7 @@ export async function syncTikTokStockToCentral(
       variant: { isArchived: false, masterProduct: { businessId, isActive: true } } },
     select: {
       id: true, channelSku: true, sellerSku: true, platformSkuId: true, platformProductId: true,
-      variantId: true, variant: { select: { id: true, sku: true, stock: true, masterProduct: { select: { name: true, imageUrl: true } } } },
+      variantId: true, updatedAt: true, variant: { select: { id: true, sku: true, stock: true, version: true, masterProduct: { select: { name: true, imageUrl: true } } } },
     },
     orderBy: { id: "asc" },
   }) as SyncMapping[];
@@ -60,7 +65,7 @@ export async function syncTikTokStockToCentral(
     }
     return true;
   });
-  if (!eligible.length) return { accountId: account.id, label: account.label, updated, skipped };
+  if (!eligible.length && !options.apply) return { accountId: account.id, label: account.label, updated, skipped };
 
   const snapshots = await withRefreshedTiktokToken(account, (token, creds) =>
     searchTikTokInventory(token, account.shopCipher ?? undefined, eligible.map((mapping) => mapping.platformSkuId!), creds),
@@ -100,35 +105,34 @@ export async function syncTikTokStockToCentral(
       before: mapping.variant.stock,
       after: snapshot.availableQuantity,
     };
-    if (!options.apply) {
-      updated.push(preview);
-      continue;
-    }
-    const referenceId = `tiktok-stock-sync:${account.id}:${mapping.id}:${crypto.createHash("sha256").update(`${snapshot.productId}:${snapshot.skuId}:${snapshot.availableQuantity}`).digest("hex").slice(0, 24)}`;
-    const result = await prisma.$transaction(async (tx) => {
-      const variant = await tx.productVariant.findFirst({
-        where: { id: mapping.variantId, isArchived: false, masterProduct: { businessId, isActive: true } },
-        select: { id: true, sku: true, stock: true },
-      });
-      if (!variant) return { ok: false as const, reason: "Varian tidak ditemukan pada brand aktif." };
-      const changed = await adjustStockAbsoluteInTx(tx, {
-        variantId: variant.id,
-        newStock: snapshot.availableQuantity,
-        reason: STOCK_REASONS.SYNC_CORRECTION,
-        referenceId,
-        note: `Koreksi dari stok available TikTok Shop · ${account.label} · SKU ${snapshot.skuId}`,
-        userId,
-      });
-      await tx.productMapping.update({ where: { id: mapping.id }, data: { platformStock: snapshot.availableQuantity, lastSyncedAt: new Date() } });
-      return { ...changed, before: variant.stock };
-    }, { timeout: 60_000 });
-    if (!result.ok) {
-      skipped.push({ mappingId: mapping.id, sku: mapping.variant.sku, reason: result.reason ?? "Koreksi stok gagal." });
-      continue;
-    }
-    updated.push({ ...preview, before: result.before, after: result.stockAfter! });
-    if (result.changeQty !== 0) touchedVariants.push(mapping.variantId);
+    updated.push(preview);
   }
+
+  const digest = stockPlanDigest({ mappings: mappings.map((row) => [row.id, row.channelSku, row.platformSkuId, row.platformProductId, row.variantId, row.updatedAt.toISOString(), row.variant.version, row.variant.stock]),
+    changes: updated.map((row) => [row.mappingId, row.before, row.after]), skipped });
+  if (!options.apply) return { accountId, label: account.label, updated, skipped, previewToken: signStockPreview(scope, digest) };
+  if (approved?.digest !== digest) throw new StockPreviewConflict("Stok atau mapping berubah sejak preview. Periksa preview baru; belum ada stok yang disimpan.");
+  await prisma.$transaction(async (tx) => {
+    const stillAllowed = await tx.platformAccount.findFirst({ where: { id: accountId, businessId, isFrozen: false } });
+    if (!stillAllowed) throw new StockPreviewConflict("Kondisi toko berubah. Ambil preview baru.");
+    for (const change of [...updated].sort((a, b) => a.mappingId.localeCompare(b.mappingId))) {
+      const mapping = mappings.find((row) => row.id === change.mappingId)!;
+      for (const member of mappings.filter((row) => row.variantId === mapping.variantId)) {
+        const current = await tx.productMapping.findFirst({ where: { id: member.id, variantId: member.variantId, updatedAt: member.updatedAt,
+          channelSku: member.channelSku, platformSkuId: member.platformSkuId, platformProductId: member.platformProductId,
+          sellerSku: member.sellerSku, platformStatus: { in: ["ACTIVATE", "ACTIVE"] }, accountId } });
+        if (!current) throw new StockPreviewConflict("Mapping berubah saat penyimpanan. Semua perubahan dibatalkan.");
+      }
+      const [variant] = await tx.$queryRaw<{ stock: number; version: number }[]>`SELECT stock, version FROM "ProductVariant" WHERE id=${mapping.variantId} FOR UPDATE`;
+      if (!variant || variant.stock !== change.before || variant.version !== mapping.variant.version) throw new StockPreviewConflict("Stok berubah saat penyimpanan. Semua perubahan dibatalkan; ambil preview baru.");
+      const result = await adjustStockAbsoluteInTx(tx, { variantId: mapping.variantId, newStock: change.after,
+        reason: STOCK_REASONS.SYNC_CORRECTION, referenceId: `tiktok-preview:${approved!.jti}:${mapping.id}`, userId,
+        note: `Stok sesuai preview yang dikonfirmasi · ${account.label}` });
+      if (!result.ok) throw new StockPreviewConflict(result.reason ?? "Koreksi dibatalkan.");
+      await tx.productMapping.update({ where: { id: mapping.id }, data: { platformStock: change.after, lastSyncedAt: new Date() } });
+      if (result.changeQty) touchedVariants.push(mapping.variantId);
+    }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60_000 });
 
   for (const variantId of [...new Set(touchedVariants)]) {
     await pushVariantStockToOthers(variantId, account.id);

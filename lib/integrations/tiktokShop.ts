@@ -463,7 +463,8 @@ export async function getOrders(
     updateTimeGe?: number;
     createTimeGe?: number;
     createTimeLt?: number;
-  } = {}
+  } = {},
+  creds?: TiktokCreds,
 ) {
   const { pageSize = 20, orderStatus, pageToken, updateTimeGe, createTimeGe, createTimeLt } = opts;
   // Catatan penting (106001/sign invalid): bila body kosong `{}`, generateSign melewati
@@ -486,7 +487,8 @@ export async function getOrders(
     accessToken,
     { page_size: pageSize, ...(pageToken ? { page_token: pageToken } : {}) },
     body,
-    shopCipher
+    shopCipher,
+    creds,
   );
   const data = result.data as
     | { orders?: Array<Record<string, unknown>>; next_page_token?: string }

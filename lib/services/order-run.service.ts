@@ -20,6 +20,8 @@ import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_INITIAL_ORDER_SYNC_DAYS, initialOrderSyncDays } from "@/lib/services/order-sync-range.policy";
 import { getOrderList, ShopeeRateLimitError } from "@/lib/integrations/shopee";
 import { getOrders } from "@/lib/integrations/tiktokShop";
+import { loadShopeeAccount, withRefreshedToken } from "@/lib/services/marketplace-shopee.service";
+import { withRefreshedTiktokToken } from "@/lib/services/tiktok-token.service";
 import {
   ingestShopeeOrderSummaries,
   type ShopeeSyncResult,
@@ -85,6 +87,7 @@ export async function enqueueOrderRuns(
   businessId: string,
   opts?: { full?: boolean; history?: { from: Date; to: Date }; accountId?: string }
 ): Promise<EnqueueAccountResult[]> {
+  await sweepStaleOrderRuns(businessId);
   const accounts = await prisma.platformAccount.findMany({
     where: { platform: { in: ["TIKTOK_SHOP", "SHOPEE"] }, businessId, isFrozen: false, ...(opts?.accountId ? { id: opts.accountId } : {}) },
     select: {
@@ -110,13 +113,14 @@ export async function enqueueOrderRuns(
       continue;
     }
 
-    const active = await prisma.syncRun.findFirst({
+    const queued = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${"orders:" + acc.id}, 0))`;
+    const active = await tx.syncRun.findFirst({
       where: { accountId: acc.id, kind: KIND, status: { in: ["QUEUED", "RUNNING"] } },
       select: { id: true },
     });
     if (active) {
-      out.push({ accountId: acc.id, label: acc.label, runId: active.id, skipped: "masih berjalan" });
-      continue;
+      return { runId: active.id, skipped: "masih berjalan" };
     }
 
     // Resume: run FAILED yang masih punya posisi (cursor/jendela) → lanjut,
@@ -124,14 +128,14 @@ export async function enqueueOrderRuns(
     // Rentang eksplisit selalu memulai run baru sesuai tanggal yang dipilih.
     const resumable = opts?.full || opts?.history
       ? null
-      : await prisma.syncRun.findFirst({
+      : await tx.syncRun.findFirst({
           where: { accountId: acc.id, kind: KIND, status: "FAILED", cursor: { not: null } },
           orderBy: { startedAt: "desc" },
           select: { id: true },
         });
     let runId: string;
     if (resumable) {
-      await prisma.syncRun.update({
+      await tx.syncRun.update({
         where: { id: resumable.id },
         data: { status: "QUEUED", phase: "resume", error: null, finishedAt: null, message: "lanjut dari posisi terakhir" },
       });
@@ -145,7 +149,7 @@ export async function enqueueOrderRuns(
       const windowFrom = opts?.history?.from ?? (useDelta
         ? new Date(since.getTime() - 600_000) // overlap 10 mnt (clock skew / run kecil sebelumnya)
         : new Date(now.getTime() - initialDays * 86_400_000));
-      const run = await prisma.syncRun.create({
+      const run = await tx.syncRun.create({
         data: {
           businessId,
           accountId: acc.id,
@@ -161,8 +165,10 @@ export async function enqueueOrderRuns(
       });
       runId = run.id;
     }
-    out.push({ accountId: acc.id, label: acc.label, runId });
-    startRun(runId);
+    return { runId, skipped: undefined };
+    });
+    out.push({ accountId: acc.id, label: acc.label, ...queued });
+    if (!queued.skipped) startRun(queued.runId);
   }
   return out;
 }
@@ -188,18 +194,24 @@ async function processOrderRun(runId: string): Promise<void> {
   if (!account) return failRun(runId, "Akun tidak ditemukan.");
   if (!account.accessToken) return failRun(runId, "Akun tidak punya access token.");
 
+  const heartbeat = setInterval(() => {
+    void prisma.syncRun.updateMany({ where: { id: runId, status: "RUNNING" }, data: { updatedAt: new Date() } }).catch(() => {});
+  }, 30_000);
+  heartbeat.unref();
   try {
     if (account.platform === "SHOPEE") {
       if (!account.externalShopId) return failRun(runId, "Akun tidak punya external shop id.");
-      await runShopee(run, account.accessToken, account.externalShopId);
+      await runShopee(run);
     } else if (account.platform === "TIKTOK_SHOP") {
       if (!account.shopCipher) return failRun(runId, "Akun tidak punya shop_cipher.");
-      await runTikTok(run, account.accessToken, account.shopCipher);
+      await runTikTok(run, account.shopCipher);
     } else {
       return failRun(runId, `Platform ${account.platform} tidak didukung.`);
     }
   } catch (e) {
     await failRun(runId, errMsg(e));
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -238,10 +250,10 @@ async function failRun(runId: string, message: string): Promise<void> {
   });
 }
 
-async function finishRun(runId: string, message: string): Promise<void> {
+async function finishRun(runId: string, message: string, warnings: string[] = []): Promise<void> {
   await prisma.syncRun.updateMany({
     where: { id: runId, status: "RUNNING" },
-    data: { status: "DONE", phase: "done", message, error: null, finishedAt: new Date() },
+    data: { status: "DONE", phase: warnings.length ? "partial" : "done", message, error: warnings.length ? `${warnings.length} bagian belum berhasil diperbarui. Periksa log sinkronisasi toko.` : null, finishedAt: new Date() },
   });
 }
 
@@ -262,10 +274,10 @@ async function advanceWatermark(run: SyncRunRow): Promise<void> {
  * sweepStaleOrderRuns — run RUNNING yang tidak berdenyut >2 menit (proses
  * mati / restart server) → FAILED resumable. Dipanggil tick instrumentation.
  */
-export async function sweepStaleOrderRuns(): Promise<number> {
+export async function sweepStaleOrderRuns(businessId?: string): Promise<number> {
   const cutoff = new Date(Date.now() - 2 * 60_000);
   const r = await prisma.syncRun.updateMany({
-    where: { status: "RUNNING", updatedAt: { lt: cutoff } },
+    where: { ...(businessId ? { businessId } : {}), kind: KIND, status: { in: ["QUEUED", "RUNNING"] }, updatedAt: { lt: cutoff } },
     data: {
       status: "FAILED",
       phase: "error",
@@ -279,35 +291,31 @@ export async function sweepStaleOrderRuns(): Promise<number> {
 
 /** Daftar run terbaru utk brand (UI polling status). */
 export async function listOrderRuns(businessId: string, take = 10) {
-  return prisma.syncRun.findMany({
-    where: { businessId, kind: KIND },
+  const select = {
+      id: true, accountId: true, status: true, phase: true, message: true,
+      fetched: true, created: true, skipped: true, error: true,
+      startedAt: true, updatedAt: true, finishedAt: true,
+      account: { select: { label: true, platform: true } },
+  } as const;
+  const [active, recent] = await Promise.all([prisma.syncRun.findMany({
+    where: { businessId, kind: KIND, status: { in: ["QUEUED", "RUNNING"] } },
+    orderBy: { startedAt: "desc" }, take: 100, select,
+  }), prisma.syncRun.findMany({
+    where: { businessId, kind: KIND, status: { notIn: ["QUEUED", "RUNNING"] } },
     orderBy: { startedAt: "desc" },
     take,
-    select: {
-      id: true,
-      accountId: true,
-      status: true,
-      phase: true,
-      message: true,
-      fetched: true,
-      created: true,
-      skipped: true,
-      error: true,
-      startedAt: true,
-      updatedAt: true,
-      finishedAt: true,
-      account: { select: { label: true, platform: true } },
-    },
-  });
+    select,
+  })]);
+  return [...active, ...recent];
 }
 
 /* ───────────────────────────── Shopee ───────────────────────────── */
 
 async function runShopee(
-  run: SyncRunRow,
-  accessToken: string,
-  shopId: string
+  run: SyncRunRow
 ): Promise<void> {
+  const account = await loadShopeeAccount(run.accountId);
+  if (!account) throw new Error("Akun Shopee tidak ditemukan.");
   const pageSize = 50;
   // Untuk histori, windowTo menyimpan batas akhir tetap, termasuk saat resume.
   const historyEnd = run.rangeField === "create_time_history" ? run.windowTo : null;
@@ -340,13 +348,13 @@ async function runShopee(
       let attempts = 0;
       while (page === null) {
         try {
-          page = await getOrderList(accessToken, shopId, {
+          page = await withRefreshedToken(account, (token, shopId, creds) => getOrderList(token, shopId, {
             createTimeFrom: windowFrom,
             createTimeTo: winTo,
             cursor,
             pageSize,
             timeRangeField,
-          });
+          }, creds));
         } catch (e) {
           if (e instanceof ShopeeRateLimitError) {
             // Jeda rate limit = normal (PRD poin 1) — phase rate_wait, lalu coba lagi.
@@ -381,7 +389,7 @@ async function runShopee(
         return true;
       });
       if (fresh.length > 0) {
-        await ingestShopeeOrderSummaries(prisma, run.accountId, accessToken, shopId, fresh, result, { importOnly: run.rangeField !== "update_time" });
+        await withRefreshedToken(account, (token, shopId, creds) => ingestShopeeOrderSummaries(prisma, run.accountId, token, shopId, fresh, result, { importOnly: run.rangeField !== "update_time", creds }));
       }
 
       const pageLen = page.orders?.length ?? 0;
@@ -431,16 +439,16 @@ async function runShopee(
     /* log gagal tidak menggagalkan run */
   }
   if (result.errors.length === 0) await advanceWatermark(run);
-  await finishRun(run.id, `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada`);
+  await finishRun(run.id, `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada`, result.errors);
 }
 
 /* ───────────────────────────── TikTok ───────────────────────────── */
 
 async function runTikTok(
   run: SyncRunRow,
-  accessToken: string,
   shopCipher: string
 ): Promise<void> {
+  const account = await prisma.platformAccount.findUniqueOrThrow({ where: { id: run.accountId } });
   const result: TikTokOrderSyncResult = {
     fetched: run.fetched,
     created: run.created,
@@ -465,7 +473,7 @@ async function runTikTok(
     let attempts = 0;
     while (res === null) {
       try {
-        res = await getOrders(accessToken, shopCipher, { pageToken, ...timeFilter });
+        res = await withRefreshedTiktokToken(account, (token, creds) => getOrders(token, shopCipher, { pageToken, ...timeFilter }, creds));
       } catch (e) {
         attempts += 1;
         if (attempts >= MAX_PAGE_ATTEMPTS) {
@@ -524,6 +532,6 @@ async function runTikTok(
   if (result.errors.length === 0) await advanceWatermark(run);
   await finishRun(
     run.id,
-    `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada${reconcileNote}`
+    `${result.fetched} ditarik, ${result.created} baru, ${result.skipped} sudah ada${reconcileNote}`, result.errors
   );
 }
