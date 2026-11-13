@@ -29,6 +29,7 @@ type VariantRow = {
   variantId: string | null;
   sku: string;
   sellerSku: string | null;
+  attributes: string | null;
   channelSku: string;
   status: string | null;
   tab: TabKey | null;
@@ -1329,6 +1330,7 @@ export default function TikTokMarketplacePage() {
                           <thead>
                             <tr className="text-left text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border">
                               <th className="py-2 pr-4">SKU Lokal</th>
+                              <th className="py-2 pr-4">Atribut</th>
                               <th className="py-2 pr-4">SKU Penjual</th>
                               <th className="py-2 pr-4">SKU Channel</th>
                               <th className="py-2 pr-4">Harga</th>
@@ -1352,6 +1354,7 @@ export default function TikTokMarketplacePage() {
                                   <span>{v.sku}</span>
                                 </div>
                               </td>
+                              <td className="py-2 pr-4 text-foreground">{v.attributes ?? "–"}</td>
                               <td className="py-2 pr-4 font-mono text-foreground">{v.sellerSku ?? "–"}</td>
                               <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
                               <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
@@ -2040,6 +2043,7 @@ function FragmentRow({
               <thead>
                 <tr className="text-left text-[10px] text-muted-foreground uppercase tracking-wide border-b border-border">
                   <th className="py-2 pr-4">SKU Lokal</th>
+                  <th className="py-2 pr-4">Atribut</th>
                   <th className="py-2 pr-4">SKU Penjual</th>
                   <th className="py-2 pr-4">SKU Channel</th>
                   <th className="py-2 pr-4">Harga</th>
@@ -2064,6 +2068,7 @@ function FragmentRow({
                         <span>{v.sku}</span>
                       </div>
                     </td>
+                    <td className="py-2 pr-4 text-foreground">{v.attributes ?? "–"}</td>
                     <td className="py-2 pr-4 font-mono text-foreground">{v.sellerSku ?? "–"}</td>
                     <td className="py-2 pr-4 text-muted-foreground">{v.channelSku}</td>
                     <td className="py-2 pr-4 text-foreground font-semibold">{fmtPrice(v.price)}</td>
