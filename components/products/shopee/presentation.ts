@@ -9,12 +9,18 @@ export type ShopeeListingRow = {
   platformTitle: string | null;
   status: string | null;
   channelSku: string | null;
+  sellerSkus?: string[];
   variantCount: number;
   stockTotal: number;
   imageUrl: string | null;
   lastSyncedAt: string | null;
   mappingStatus?: MappingStatus;
 };
+
+export function sellerSkuLabel(row: ShopeeListingRow): string | null {
+  const skus = row.sellerSkus ?? [];
+  return skus.length > 0 ? skus.join(", ") : null;
+}
 
 export function productTitle(row: ShopeeListingRow) {
   return (row.platformTitle ?? row.channelSku ?? "Tanpa nama produk").replace(/(?:\s*\(\s*\))+\s*$/, "").trim() || "Tanpa nama produk";

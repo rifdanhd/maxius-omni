@@ -198,6 +198,8 @@ export type ShopeeListingRow = {
   platformTitle: string | null;
   status: string | null;
   channelSku: string | null;
+  /** SKU penjual (model_sku) seluruh varian listing; kosong bila Shopee tidak mengirimnya. */
+  sellerSkus: string[];
   variantCount: number;
   stockTotal: number;
   imageUrl: string | null;
@@ -261,6 +263,7 @@ export async function listShopeeProducts(opts: {
     platformTitle: string | null;
     status: string | null;
     channelSkus: string[];
+    sellerSkus: string[];
     stockTotal: number;
     imageUrl: string | null;
     lastSyncedAt: Date | null;
@@ -282,6 +285,7 @@ export async function listShopeeProducts(opts: {
         platformTitle: m.platformTitle,
         status: m.platformStatus,
         channelSkus: [m.channelSku],
+        sellerSkus: m.sellerSku ? [m.sellerSku] : [],
         stockTotal: stock,
         imageUrl: m.variant?.masterProduct?.imageUrl ?? null,
         lastSyncedAt: m.lastSyncedAt,
@@ -295,6 +299,7 @@ export async function listShopeeProducts(opts: {
     if (m.variantId == null) g.allMapped = false;
     else if (!g.variantId) g.variantId = m.variantId;
     if (!g.channelSkus.includes(m.channelSku)) g.channelSkus.push(m.channelSku);
+    if (m.sellerSku && !g.sellerSkus.includes(m.sellerSku)) g.sellerSkus.push(m.sellerSku);
     g.stockTotal += stock;
     if (failed.has(JSON.stringify([m.accountId, m.channelSku, m.variantId]))) g.failed = true;
     if (m.lastSyncedAt && (!g.lastSyncedAt || m.lastSyncedAt > g.lastSyncedAt)) {
@@ -310,7 +315,8 @@ export async function listShopeeProducts(opts: {
   if (search) {
     const query = search.toLocaleLowerCase("id-ID");
     all = all.filter((group) => group.platformTitle?.toLocaleLowerCase("id-ID").includes(query)
-      || group.channelSkus.some((sku) => sku.toLocaleLowerCase("id-ID").includes(query)));
+      || group.channelSkus.some((sku) => sku.toLocaleLowerCase("id-ID").includes(query))
+      || group.sellerSkus.some((sku) => sku.toLocaleLowerCase("id-ID").includes(query)));
   }
   if (mapping && mapping !== "all") all = all.filter((group) => mappingState(group) === mapping);
 
@@ -332,7 +338,7 @@ export async function listShopeeProducts(opts: {
   // Sort — sebelumnya UI mengirim `sort` tapi backend selalu updatedAt desc.
   const cmpStr = (a: string, b: string) => a.localeCompare(b, "id", { sensitivity: "base" });
   const byTitle = (g: (typeof all)[number]) => g.platformTitle ?? g.channelSkus[0] ?? "";
-  const bySku = (g: (typeof all)[number]) => g.channelSkus[0] ?? "";
+  const bySku = (g: (typeof all)[number]) => g.sellerSkus[0] ?? g.channelSkus[0] ?? "";
   const byUpdated = (g: (typeof all)[number]) => g.lastSyncedAt?.getTime() ?? 0;
   switch (sort) {
     case "name_asc":
@@ -385,6 +391,7 @@ export async function listShopeeProducts(opts: {
       platformTitle: g.platformTitle,
       status: g.status,
       channelSku: g.channelSkus.length === 1 ? g.channelSkus[0] : null,
+      sellerSkus: g.sellerSkus,
       variantCount: g.channelSkus.length,
       stockTotal: g.stockTotal,
       imageUrl: g.imageUrl,

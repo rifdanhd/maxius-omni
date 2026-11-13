@@ -191,10 +191,16 @@ function applyProduct(
     ? productSkuStock(matchingSku)
     : skus.reduce((sum, s) => sum + productSkuStock(s), 0);
 
+  // sellerSku hanya ditulis bila benar-benar terbaca dari payload: hasil
+  // search TikTok kadang tanpa `skus`, dan menulis null akan menghapus SKU
+  // penjual yang sudah tersimpan.
+  const sellerSku =
+    typeof matchingSku?.seller_sku === "string" ? matchingSku.seller_sku.trim() || null : null;
+
   return {
     platformProductId: productId || null,
     platformSkuId: matchingSku?.id ? String(matchingSku.id) : null,
-    sellerSku: typeof matchingSku?.seller_sku === "string" ? matchingSku.seller_sku.trim() || null : null,
+    ...(sellerSku ? { sellerSku } : {}),
     platformStatus: (product.status as string | undefined) ?? null,
     platformStatusRaw: JSON.stringify(product),
     platformStock: stock,
@@ -1318,7 +1324,8 @@ export async function listTikTokProducts(
         ? {
             OR: [
               { channelSku: { contains: search } },
-              { platformTitle: { contains: search } },
+              { sellerSku: { contains: search, mode: "insensitive" } },
+              { platformTitle: { contains: search, mode: "insensitive" } },
               { variant: { sku: { contains: search } } },
               { variant: { masterProduct: { name: { contains: search } } } },
             ],

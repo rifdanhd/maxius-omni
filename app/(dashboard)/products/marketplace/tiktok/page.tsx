@@ -933,7 +933,7 @@ export default function TikTokMarketplacePage() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Cari nama produk, SKU, atau SKU channel"
+              placeholder="Cari nama produk, SKU lokal, SKU penjual, atau SKU channel"
               className="border border-border rounded-md pl-3 pr-10 py-2 text-sm outline-none w-full h-[38px] font-medium"
             />
             <Search size={16} className="text-muted-foreground absolute right-3 top-2.5" />

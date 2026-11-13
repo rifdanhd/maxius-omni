@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { fmtDate, fmtNumber, mappingHref, mappingLabels, mappingStatus, productTitle, statusLabel, storeName, type ShopeeListingRow } from "./presentation";
+import { fmtDate, fmtNumber, mappingHref, mappingLabels, mappingStatus, productTitle, sellerSkuLabel, statusLabel, storeName, type ShopeeListingRow } from "./presentation";
 
 function ProductInfo({ row, compact, full = false }: { row: ShopeeListingRow; compact: boolean; full?: boolean }) {
   const title = productTitle(row);
@@ -88,7 +88,7 @@ export function ShopeeProductList({ rows, selected, onToggleRow, onToggleAll, so
   const cell = cn("px-4 align-top", compact ? "py-2" : "py-4");
   const columns = [
     { label: "Informasi Produk", field: "name", width: "min-w-[280px] w-[28%]" },
-    { label: "SKU", field: "sku", width: "min-w-32" },
+    { label: "SKU Penjual", field: "sku", width: "min-w-32" },
     { label: "Stok", field: "stock", width: "min-w-28 text-right" },
     { label: "Status Mapping", field: "mapping", width: "min-w-40" },
     { label: "Toko", field: "account", width: "min-w-40" },
@@ -118,7 +118,10 @@ export function ShopeeProductList({ rows, selected, onToggleRow, onToggleAll, so
           {rows.map((row) => <tr key={row.key} data-testid="shopee-product-row" className="group border-b border-border last:border-0 hover:bg-muted/50">
             <td className={cn(cell, "sticky left-0 z-10 w-14 min-w-14 bg-card group-hover:bg-muted")}><Checkbox aria-label={`Pilih ${productTitle(row)}`} checked={selected.has(row.key)} onCheckedChange={() => onToggleRow(row.key)} /></td>
             <td className={cn(cell, "sticky left-14 z-10 max-w-xs bg-card group-hover:bg-muted")}><ProductInfo row={row} compact={compact} /></td>
-            <td className={cn(cell, "break-all font-mono text-xs")}>{row.variantCount > 1 ? `${fmtNumber(row.variantCount)} SKU` : row.channelSku ?? "-"}</td>
+            <td className={cn(cell, "break-all font-mono text-xs")} title={sellerSkuLabel(row) ?? undefined}>
+              {sellerSkuLabel(row) ? <span className="line-clamp-2">{sellerSkuLabel(row)}</span> : <span className="text-muted-foreground">Belum tersedia</span>}
+              {row.variantCount > 1 && <p className="mt-1 text-[10px] font-sans text-muted-foreground">{fmtNumber(row.variantCount)} varian</p>}
+            </td>
             <td className={cn(cell, "text-right")}><Stock row={row} threshold={threshold} /></td>
             <td className={cell}><Mapping row={row} /></td>
             <td className={cell}><StoreName row={row} /></td>
@@ -137,7 +140,7 @@ export function ShopeeProductList({ rows, selected, onToggleRow, onToggleAll, so
           <RowActions row={row} busy={busy} onDetail={onDetail} onSync={onSync} />
         </div>
         <div className="flex flex-wrap items-start justify-between gap-3"><Mapping row={row} /><div className="text-right"><p className="text-xs text-muted-foreground">Stok</p><Stock row={row} threshold={threshold} /></div></div>
-        <div className="mt-3 border-t border-border pt-3 text-xs"><StoreName row={row} /><p className="mt-2 break-all text-muted-foreground">SKU: {row.variantCount > 1 ? `${fmtNumber(row.variantCount)} SKU` : row.channelSku ?? "-"}</p><p className="mt-1 text-muted-foreground">Sinkron terakhir: {fmtDate(row.lastSyncedAt)}</p></div>
+        <div className="mt-3 border-t border-border pt-3 text-xs"><StoreName row={row} /><p className="mt-2 break-all text-muted-foreground">SKU penjual: {sellerSkuLabel(row) ?? "Belum tersedia"}{row.variantCount > 1 ? ` (${fmtNumber(row.variantCount)} varian)` : ""}</p><p className="mt-1 text-muted-foreground">Sinkron terakhir: {fmtDate(row.lastSyncedAt)}</p></div>
       </article>)}
     </div>
   </>;
@@ -152,7 +155,8 @@ export function ShopeeProductDetail({ row, onClose, threshold, returnFocus }: { 
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
         <dt className="text-muted-foreground">Toko</dt><dd><StoreName row={row} /></dd>
         <dt className="text-muted-foreground">ID produk</dt><dd className="break-all font-mono">{row.platformProductId ?? "Belum tersedia"}</dd>
-        <dt className="text-muted-foreground">SKU</dt><dd className="break-all">{row.channelSku ?? `${fmtNumber(row.variantCount)} SKU per varian`}</dd>
+        <dt className="text-muted-foreground">SKU penjual</dt><dd className="break-all font-mono">{sellerSkuLabel(row) ?? "Belum tersedia"}</dd>
+        <dt className="text-muted-foreground">SKU channel</dt><dd className="break-all font-mono text-xs">{row.channelSku ?? `${fmtNumber(row.variantCount)} SKU per varian`}</dd>
         <dt className="text-muted-foreground">Jumlah varian</dt><dd>{fmtNumber(row.variantCount)}</dd>
         <dt className="text-muted-foreground">Sinkron terakhir</dt><dd>{fmtDate(row.lastSyncedAt)}</dd>
         <dt className="text-muted-foreground">Sumber stok</dt><dd className="text-xs text-foreground">Stok ditampilkan adalah stok yang tampil di toko Shopee (marketplace), bukan stok gudang pusat. Ubah stok pusat di Stok Gudang (Pusat).</dd>
