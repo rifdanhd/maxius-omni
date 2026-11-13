@@ -9,6 +9,7 @@ import {
 import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { safeStockPushMessage } from "@/lib/services/stock-push-error";
+import { shopeeRawWithModels } from "@/lib/services/shopee-raw";
 import {
   ShopeeApiError,
   getItemBaseInfo,
@@ -517,6 +518,9 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
             getModelList(token, shopId, itemId, creds), selection?.signal
           );
           modelCount += models.length;
+          // Simpan daftar model supaya atribut varian (warna/ukuran) bisa
+          // dibaca dari payload yang tersimpan.
+          const rawWithModels = shopeeRawWithModels(info, models);
           const image = itemBaseImage(info);
           if (image) {
             const imageCandidates =
@@ -546,7 +550,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
                   platformProductId: String(itemId),
                   platformTitle: extraTitle,
                   platformStatus: extraStatus,
-                  platformStatusRaw: JSON.stringify(info).slice(0, 8000),
+                  platformStatusRaw: rawWithModels,
                   ...(image ? { imageUrl: image } : {}),
                   // Refresh snapshot stok Shopee (tampilan "Stok" di halaman
                   // Produk) — parser stock_info_v2; null = tak diketahui →

@@ -34,6 +34,7 @@ import {
   loadShopeeAccount,
   withRefreshedToken,
 } from "@/lib/services/marketplace-shopee.service";
+import { shopeeRawWithModels } from "@/lib/services/shopee-raw";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 200;
@@ -266,7 +267,7 @@ async function importOneItem(params: {
   }
 
   const pending = descriptors.filter((d) => !byChannelSku.has(d.channelSku));
-  const statusRaw = JSON.stringify(info).slice(0, 8000);
+  const statusRaw = shopeeRawWithModels(info, models);
   const now = new Date();
 
   if (pending.length === 0) {

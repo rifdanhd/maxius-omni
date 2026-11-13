@@ -756,6 +756,10 @@ export type ShopeeModel = {
   model_id: number;
   model_sku?: string;
   model_status?: string;
+  /** Nama varian di Seller Center (mis. "Merah, XL"). */
+  model_name?: string;
+  /** Posisi opsi per tier — dipakai bila model_name kosong. */
+  tier_index?: number[];
 };
 
 /**

@@ -13,6 +13,7 @@
     "audit:orphans": "tsx scripts/detect-orphans.mts",
     "backfill:mapping-images": "tsx scripts/backfill-mapping-images.mts",
     "backfill:seller-sku": "tsx scripts/backfill-seller-sku.mts",
+    "backfill:shopee-models": "tsx scripts/backfill-shopee-models.mts",
     "postinstall": "prisma generate",
     "clean:seed": "tsx scripts/clean-seed.mts",
     "push": "bash scripts/git-push.sh"
