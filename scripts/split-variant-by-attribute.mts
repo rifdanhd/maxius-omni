@@ -173,15 +173,38 @@ await prisma.$transaction(async (tx) => {
   keepSkuFinal = keepSku;
   await tx.productVariant.update({
     where: { id: variant.id },
-    data: { sku: keepSku, name: keep, stock: planned.get(keep)!, version: { increment: 1 } },
+    data: { sku: keepSku, name: keep },
   });
-  const warehouseRows = await tx.variantWarehouseStock.findMany({ where: { variantId: variant.id } });
-  for (const row of warehouseRows) {
+  // Stok fisik bersumber dari VariantWarehouseStock; trigger
+  // inventory_balance_total yang menurunkan ProductVariant.stock dari situ.
+  const defaultWarehouse = await tx.inventoryWarehouse.findFirst({
+    where: { businessId: master.businessId, isDefault: true },
+    select: { id: true },
+  });
+  const warehouseRows = await tx.variantWarehouseStock.findMany({
+    where: { variantId: variant.id },
+    orderBy: { warehouseId: "asc" },
+  });
+  const settleWarehouseStock = async (variantId: string, target: number, existing: typeof warehouseRows, fallbackWarehouseId?: string) => {
+    if (existing.length === 0) {
+      if (!fallbackWarehouseId) throw new Error("Tidak ada gudang untuk menampung stok varian baru.");
+      await tx.variantWarehouseStock.create({ data: { variantId, warehouseId: fallbackWarehouseId, stock: target, safetyStock: 0 } });
+      return;
+    }
     await tx.variantWarehouseStock.update({
-      where: { variantId_warehouseId: { variantId: variant.id, warehouseId: row.warehouseId } },
-      data: { stock: planned.get(keep)! },
+      where: { variantId_warehouseId: { variantId: variantId, warehouseId: existing[0].warehouseId } },
+      data: { stock: target },
     });
-  }
+    for (const extra of existing.slice(1)) {
+      if (extra.stock !== 0) {
+        await tx.variantWarehouseStock.update({
+          where: { variantId_warehouseId: { variantId: variantId, warehouseId: extra.warehouseId } },
+          data: { stock: 0 },
+        });
+      }
+    }
+  };
+  await settleWarehouseStock(variant.id, planned.get(keep)!, warehouseRows, defaultWarehouse?.id);
   await tx.stockLedger.create({
     data: {
       id: crypto.randomUUID(),
@@ -216,10 +239,20 @@ await prisma.$transaction(async (tx) => {
       },
       select: { id: true },
     });
-    for (const row of warehouseRows) {
-      await tx.variantWarehouseStock.create({
-        data: { variantId: createdVariant.id, warehouseId: row.warehouseId, stock, safetyStock: row.safetyStock },
-      });
+    // Trigger inventory_variant_warehouse_mirror sudah membuat baris gudang
+    // untuk stok awal; hanya rapikan bila totalnya belum sesuai target.
+    const mirrored = await tx.variantWarehouseStock.findMany({
+      where: { variantId: createdVariant.id },
+      orderBy: { warehouseId: "asc" },
+    });
+    const mirroredTotal = mirrored.reduce((sum, row) => sum + row.stock, 0);
+    if (mirroredTotal !== stock) {
+      await settleWarehouseStock(
+        createdVariant.id,
+        stock,
+        mirrored,
+        mirrored[0]?.warehouseId ?? defaultWarehouse?.id ?? warehouseRows[0]?.warehouseId,
+      );
     }
     await tx.stockLedger.create({
       data: {
