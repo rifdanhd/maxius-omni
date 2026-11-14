@@ -759,7 +759,7 @@ export default function ProductMappingPage() {
 
   /* ── Data turunan ── */
   const mq = mapQuery.trim().toLowerCase();
-  const filteredMappings = mappings.filter((m) => (storeFilter === "all" || m.account?.id === storeFilter) && (!mq || [m.sellerSku, m.channelSku, m.platformTitle, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq))));
+  const filteredMappings = mappings.filter((m) => (storeFilter === "all" || m.account?.id === storeFilter) && (!mq || [m.sellerSku, m.channelSku, m.platformTitle, m.attributes, m.account?.label, m.variant?.sku, m.variant?.masterProduct.name].some((x) => x?.toLowerCase().includes(mq))));
   const filteredOrphans = orphans.filter((o) => (storeFilter === "all" || o.accountId === storeFilter) && (!mq || [o.channelSku, o.accountLabel, o.sampleProductName].some((x) => x?.toLowerCase().includes(mq))));
   const vq = variantQuery.trim().toLowerCase();
   const filteredVariants = vq ? variants.filter((v) => [v.sku, v.masterProduct.name].some((x) => x.toLowerCase().includes(vq))) : variants;
@@ -898,6 +898,7 @@ export default function ProductMappingPage() {
               <OriginBadge mapping={m} />
               <span>{m.account?.label ?? "-"}</span>
               {m.account?.platform && <PlatformChip platform={m.account.platform} />}
+              {m.attributes && <span className="font-medium text-foreground">{m.attributes}</span>}
             </>
           }
           onBack={back}
@@ -1174,7 +1175,7 @@ export default function ProductMappingPage() {
                           <p className="truncate font-mono text-sm font-medium text-foreground">{m.channelSku}</p>
                           <OriginBadge mapping={m} />
                         </div>
-                        <p className="truncate text-xs text-muted-foreground">{m.account?.label ?? "-"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{m.account?.label ?? "-"}{m.attributes ? ` · ${m.attributes}` : ""}</p>
                       </div>
                       {m.account?.platform && <PlatformChip platform={m.account.platform} />}
                       <ChevronRight size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -1428,8 +1429,8 @@ export default function ProductMappingPage() {
                             title={m.sellerSku || m.platformTitle || m.variant?.masterProduct.name || m.channelSku}
                             subtitle={
                               m.variant
-                                ? `${m.account?.label ?? "-"} · ${m.platformTitle || m.variant.masterProduct.name} → ${m.variant.sku}`
-                                : `belum ter-mapping · ${m.account?.label ?? "-"}`
+                                ? `${m.account?.label ?? "-"} · ${m.platformTitle || m.variant.masterProduct.name} → ${m.variant.sku}${m.attributes ? ` · ${m.attributes}` : ""}`
+                                : `belum ter-mapping · ${m.account?.label ?? "-"}${m.attributes ? ` · ${m.attributes}` : ""}`
                             }
                             originBadge={<OriginBadge mapping={m} />}
                             trailing={m.variant ? <StockPill value={effectiveStock(m.variant)} /> : undefined}

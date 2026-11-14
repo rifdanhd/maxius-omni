@@ -9,6 +9,7 @@ import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { backfillOrderItems, reconcileMappedOrders } from "@/lib/services/orphan-sku.service";
 import { stockQuantity } from "@/lib/security/input";
+import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 
 const mappingSchema = z.object({
   accountId: z.string().trim().min(1).max(200),
@@ -48,6 +49,8 @@ export const GET = withAuth(async (req) => {
   // Badge asal: tinjauan yang sudah diselesaikan (review) > auto > manual.
   const mappings = rows.map(({ mappingReviews, ...mapping }) => ({
     ...mapping,
+    // Atribut marketplace (mis. "Biru") — pembeda saat seller SKU/foto sama.
+    attributes: variantAttributesFromRaw(mapping.account?.platform, mapping.platformStatusRaw, mapping.channelSku),
     reviewed: (mappingReviews ?? []).some((review) => review.status === "RESOLVED"),
   }));
   return NextResponse.json({ mappings });

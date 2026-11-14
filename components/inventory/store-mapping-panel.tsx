@@ -14,6 +14,8 @@ export type StoreMappingVariant = {
 export type StoreMappingRow = {
   id: string; channelSku: string; sellerSku?: string | null; platformTitle?: string | null;
   imageUrl?: string | null; platformStatus?: string | null; updatedAt?: string;
+  /** Atribut varian marketplace (mis. "Biru, XL") — pembeda saat SKU penjual sama. */
+  attributes?: string | null;
   account: { id: string; label: string; platform: string } | null;
   variant: StoreMappingVariant | null;
 };
@@ -103,6 +105,7 @@ function MappingReview({ group, stores, variants, onSaved }: {
                     : <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><ImageIcon className="size-5 shrink-0" />Foto toko belum tersedia</div>}
                   <p className="break-words text-sm font-medium">{row.platformTitle || row.variant?.masterProduct.name || "Nama produk belum tersedia"}</p>
                   <p className="mt-1 break-words text-xs text-muted-foreground">SKU penjual: <strong className="text-foreground">{row.sellerSku || "Belum tersimpan"}</strong></p>
+                  {row.attributes && <p className="mt-1 break-words text-xs text-muted-foreground">Atribut: <strong className="text-foreground">{row.attributes}</strong></p>}
                   <p className="mt-1 break-words text-xs text-muted-foreground">Varian pusat: {row.variant?.name || row.variant?.sku || "Belum terhubung"}</p>
                   <p className="mt-1 break-all text-xs text-muted-foreground">SKU pusat: {row.variant?.sku || "—"}</p>
                   <details className="mt-2 text-xs text-muted-foreground"><summary>Detail marketplace</summary><p className="mt-1 break-all">ID SKU: {row.channelSku}</p><p>Status: {row.platformStatus || "Belum diketahui"}</p></details>
@@ -126,7 +129,7 @@ function MappingReview({ group, stores, variants, onSaved }: {
       <div className="min-w-0 space-y-3">
         <h4 className="text-sm font-semibold">3. Tinjau sebelum disimpan</h4>
         <p className="text-sm text-muted-foreground">{chosen.length} listing dipilih · {target ? moving.length : 0} hubungan akan berubah.</p>
-        {target && chosen.length > 0 && <ul aria-label="Preview perubahan hubungan" className="max-h-48 space-y-2 overflow-y-auto text-xs">{chosen.map((row) => <li key={row.id} className="break-words rounded-lg bg-muted p-2"><strong>{row.account?.label}</strong> · {row.sellerSku || row.channelSku}<br />{row.variant?.sku || "Belum terhubung"} → {target.sku}{row.variant?.id === target.id ? " (tetap)" : ""}</li>)}</ul>}
+        {target && chosen.length > 0 && <ul aria-label="Preview perubahan hubungan" className="max-h-48 space-y-2 overflow-y-auto text-xs">{chosen.map((row) => <li key={row.id} className="break-words rounded-lg bg-muted p-2"><strong>{row.account?.label}</strong> · {row.sellerSku || row.channelSku}{row.attributes ? ` · ${row.attributes}` : ""}<br />{row.variant?.sku || "Belum terhubung"} → {target.sku}{row.variant?.id === target.id ? " (tetap)" : ""}</li>)}</ul>}
         <label className="flex items-start gap-2 text-sm leading-relaxed"><input type="checkbox" checked={acknowledge} disabled={saving || !chosen.length || !target} onChange={(event) => setAcknowledge(event.target.checked)} className="mt-1 size-4 shrink-0 accent-primary" />Saya sudah memeriksa barang, warna, ukuran, dan isi paket pada listing yang dipilih.</label>
         <p className="text-xs leading-relaxed text-muted-foreground">Jumlah stok dan pesanan lama tidak diubah. Pengiriman stok ke marketplace tetap mengikuti pengaturan sinkronisasi saat ada perubahan stok berikutnya.</p>
         {chosen.length > 250 && <p role="alert" className="text-sm text-destructive">Pilih maksimal 250 listing per penyimpanan.</p>}
