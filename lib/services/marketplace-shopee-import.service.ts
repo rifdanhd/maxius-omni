@@ -35,6 +35,7 @@ import {
   withRefreshedToken,
 } from "@/lib/services/marketplace-shopee.service";
 import { shopeeRawWithModels } from "@/lib/services/shopee-raw";
+import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 200;
@@ -275,9 +276,13 @@ async function importOneItem(params: {
       // Ambil platformStatus dari descriptor yang sesuai (status terakhir dari import)
       const matchingDesc = descriptors.find((d) => d.channelSku === ref.channelSku);
       const platformStatus = matchingDesc?.platformStatus ?? (isShopeeInactive ? "UNLISTED" : null);
-      await prisma.productMapping.updateMany({
+      await prisma.productMapping.update({
         where: { id: ref.id },
-        data: { platformProductId: String(itemId), platformStatus, platformStatusRaw: statusRaw, lastSyncedAt: now },
+        data: {
+          platformProductId: String(itemId), platformStatus, platformStatusRaw: statusRaw,
+          variantAttributes: variantAttributesFromRaw("SHOPEE", statusRaw, ref.channelSku),
+          lastSyncedAt: now,
+        },
       });
     }
     return;
@@ -332,6 +337,7 @@ async function importOneItem(params: {
             platformTitle: d.platformTitle,
             platformStatus: d.platformStatus,
             platformStatusRaw: statusRaw,
+            variantAttributes: variantAttributesFromRaw("SHOPEE", statusRaw, d.channelSku),
             // Hanya diisi kalau Shopee benar-benar melaporkan stok — kalau
             // tidak, dibiarkan null supaya tidak terlihat sebagai "0 di Shopee".
             ...(d.stockKnown ? { platformStock: d.stock } : {}),

@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
-import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 
 /**
  * product-list.service — daftar Produk Master (Katalog Pusat) versi
@@ -322,14 +321,14 @@ export async function listProducts(
   const variantIds = products.flatMap((product) => product.productVariant.map((variant) => variant.id));
   const attributeRows = variantIds.length > 0
     ? await prisma.productMapping.findMany({
-      where: { variantId: { in: variantIds }, platformStatusRaw: { not: null } },
-      select: { variantId: true, channelSku: true, platformStatusRaw: true, account: { select: { platform: true } } },
+      where: { variantId: { in: variantIds }, variantAttributes: { not: null } },
+      select: { variantId: true, variantAttributes: true },
     })
     : [];
   const attributesByVariant = new Map<string, string[]>();
   for (const row of attributeRows) {
     if (!row.variantId) continue;
-    const label = variantAttributesFromRaw(row.account.platform, row.platformStatusRaw, row.channelSku);
+    const label = row.variantAttributes;
     if (!label) continue;
     const labels = attributesByVariant.get(row.variantId) ?? [];
     if (!labels.includes(label)) labels.push(label);

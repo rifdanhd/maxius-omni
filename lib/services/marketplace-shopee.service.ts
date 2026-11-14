@@ -10,6 +10,7 @@ import { stockPushDisabledReason } from "@/lib/services/stock-push.policy";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { safeStockPushMessage } from "@/lib/services/stock-push-error";
 import { shopeeRawWithModels } from "@/lib/services/shopee-raw";
+import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 import {
   ShopeeApiError,
   getItemBaseInfo,
@@ -551,6 +552,7 @@ export async function syncShopeeListings(businessId: string, accountId?: string,
                   platformTitle: extraTitle,
                   platformStatus: extraStatus,
                   platformStatusRaw: rawWithModels,
+                  variantAttributes: variantAttributesFromRaw("SHOPEE", rawWithModels, c),
                   ...(image ? { imageUrl: image } : {}),
                   // Refresh snapshot stok Shopee (tampilan "Stok" di halaman
                   // Produk) — parser stock_info_v2; null = tak diketahui →

@@ -200,12 +200,14 @@ function applyProduct(
   const sellerSku =
     typeof matchingSku?.seller_sku === "string" ? matchingSku.seller_sku.trim() || null : null;
 
+  const raw = JSON.stringify(product);
   return {
     platformProductId: productId || null,
     platformSkuId: matchingSku?.id ? String(matchingSku.id) : null,
     ...(sellerSku ? { sellerSku } : {}),
     platformStatus: (product.status as string | undefined) ?? null,
-    platformStatusRaw: JSON.stringify(product),
+    platformStatusRaw: raw,
+    variantAttributes: variantAttributesFromRaw("TIKTOK_SHOP", raw, mapping.channelSku),
     platformStock: stock,
     platformTitle: (product.title as string | undefined) ?? null,
     imageUrl: matchingSku ? (extractSkuImage(matchingSku) ?? productMainImage(product)) : productMainImage(product),

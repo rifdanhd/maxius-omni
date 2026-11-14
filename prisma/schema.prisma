@@ -248,6 +248,10 @@ model ProductMapping {
   platformProductId     String?
   platformStatus        String?
   platformStatusRaw     String?
+  // Label atribut varian marketplace (mis. "Biru, 10 Buah") yang diekstrak
+  // dari platformStatusRaw saat sync/backfill — dipakai daftar agar tidak
+  // perlu membaca payload mentah yang besar.
+  variantAttributes     String?
   platformStock         Int?
   platformTitle         String?
   imageUrl              String?

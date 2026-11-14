@@ -9,7 +9,6 @@ import { STOCK_REASONS } from "@/lib/services/central-stock.service";
 import { getCachedInventorySettings } from "@/lib/services/inventory-settings.service";
 import { backfillOrderItems, reconcileMappedOrders } from "@/lib/services/orphan-sku.service";
 import { stockQuantity } from "@/lib/security/input";
-import { variantAttributesFromRaw } from "@/lib/services/variant-attributes";
 
 const mappingSchema = z.object({
   accountId: z.string().trim().min(1).max(200),
@@ -40,17 +39,37 @@ const mappingInclude = {
   mappingReviews: { select: { status: true } },
 } as const;
 
+// Kolom yang dibutuhkan daftar Mapping. platformStatusRaw TIDAK diikutkan:
+// seluruh katalog bisa >100 MB dan membuat respons melewati batas proxy (504).
+const mappingListSelect = {
+  id: true, channelSku: true, sellerSku: true, platformSkuId: true, origin: true,
+  stockAllocationMode: true, stockAllocationValue: true, stockBuffer: true,
+  lastStockPushStatus: true, lastStockPushError: true, lastStockPushAt: true,
+  variantId: true, accountId: true, price: true, priceUpdatedAt: true,
+  platformProductId: true, platformStatus: true, platformStock: true, platformTitle: true,
+  imageUrl: true, lastSyncedAt: true, createdAt: true, updatedAt: true,
+  variantAttributes: true,
+  account: { select: { id: true, platform: true, label: true } },
+  variant: {
+    select: {
+      id: true, sku: true, name: true, stock: true, safetyStock: true,
+      masterProduct: { select: { id: true, name: true, imageUrl: true, threshold: true } },
+    },
+  },
+  mappingReviews: { select: { status: true } },
+} as const;
+
 export const GET = withAuth(async (req) => {
   const rows = await prisma.productMapping.findMany({
     where: { account: { businessId: req.businessId } },
-    include: mappingInclude,
+    select: mappingListSelect,
     orderBy: [{ variant: { masterProduct: { name: "asc" } } }, { variant: { sku: "asc" } }],
   });
   // Badge asal: tinjauan yang sudah diselesaikan (review) > auto > manual.
-  const mappings = rows.map(({ mappingReviews, ...mapping }) => ({
+  const mappings = rows.map(({ mappingReviews, variantAttributes, ...mapping }) => ({
     ...mapping,
     // Atribut marketplace (mis. "Biru") — pembeda saat seller SKU/foto sama.
-    attributes: variantAttributesFromRaw(mapping.account?.platform, mapping.platformStatusRaw, mapping.channelSku),
+    attributes: variantAttributes,
     reviewed: (mappingReviews ?? []).some((review) => review.status === "RESOLVED"),
   }));
   return NextResponse.json({ mappings });
