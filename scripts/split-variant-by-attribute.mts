@@ -18,7 +18,10 @@ import { variantAttributesFromRaw } from "../lib/services/variant-attributes";
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
-const value = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 2);
+const value = (name: string) => {
+  const arg = args.find((item) => item.startsWith(`--${name}=`));
+  return arg ? arg.slice(arg.indexOf("=") + 1) : undefined;
+};
 
 const productId = value("product");
 const sku = value("sku")?.trim();
